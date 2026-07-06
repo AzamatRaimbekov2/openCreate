@@ -3,10 +3,12 @@
 // test/helpers/build-test-app.ts) and production boot (index.ts) injects real ones.
 import Fastify from 'fastify'
 import type { AppConfig } from './config'
+import type { Db } from './db/client'
 
 export type AppDeps = {
   config: AppConfig
-  // added in later tasks: db, runware, storage
+  db: Db
+  // added in later tasks: runware, storage
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -14,7 +16,7 @@ export type AppDeps = {
 type HttpError = Error & { statusCode?: number; apiCode?: string }
 
 export async function buildApp(deps: AppDeps) {
-  void deps // config consumed from Task 4 onward (db/auth wiring)
+  void deps.db // consumed by auth/module wiring from Task 5 onward
   // bodyLimit 15 MiB: inputImage data URIs are allowed up to 14 MB by contract.
   const app = Fastify({ logger: false, bodyLimit: 15 * 1024 * 1024 })
 

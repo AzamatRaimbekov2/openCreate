@@ -3,8 +3,12 @@
 // app.ts so tests never import this file (it has listen() side effects).
 import { buildApp } from './app'
 import { loadConfig } from './config'
+import { createDb } from './db/client'
 
 const config = loadConfig()
-const app = await buildApp({ config })
+// createDb also runs the idempotent DDL bootstrap, so a fresh checkout can boot
+// even before `pnpm db:migrate` was ever run.
+const { db } = createDb(config.databasePath)
+const app = await buildApp({ config, db })
 await app.listen({ port: config.port, host: '0.0.0.0' })
 console.log(`api on :${config.port}`)

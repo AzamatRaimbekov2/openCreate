@@ -26,4 +26,4 @@ flowchart LR
 - `BETTER_AUTH_SECRET` must be ≥32 chars; `API_PORT`/`SIGNUP_BONUS_CREDITS` use `z.coerce.number()` since env values are strings.
 
 ## Commits
-- (pending) feat(api): fastify skeleton with typed config and health route
+- eb91028 feat(api): fastify skeleton with typed config and health route

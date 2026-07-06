@@ -25,4 +25,4 @@ flowchart LR
 - Intentionally empty: API tests run in the default node environment; no globals, no setup files needed for MVP.
 
 ## Commits
-- (pending) feat(api): fastify skeleton with typed config and health route
+- eb91028 feat(api): fastify skeleton with typed config and health route

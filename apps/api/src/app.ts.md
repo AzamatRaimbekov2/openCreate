@@ -8,11 +8,11 @@ DI composition root (plan Task 3): `buildApp(deps)` returns a configured Fastify
 ## What it does (for an AI reader)
 - Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and (from Task 4 on) wire db/auth/module routes.
 - Public API / exports: `AppDeps` (type), `buildApp(deps): Promise<FastifyInstance>`.
-- Inputs → Outputs: `AppDeps` (`config`; later `db`, `runware`, `storage`) → ready Fastify app (not listening).
+- Inputs → Outputs: `AppDeps` (`config`, `db`; later `runware`, `storage`) → ready Fastify app (not listening).
 - Side effects: none until `listen()`; route registration only.
 
 ## Dependencies
-- Imports / depends on: `fastify`, `./config` (type).
+- Imports / depends on: `fastify`, `./config` (type), `./db/client` (`Db` type).
 - Used by: `src/index.ts` (boot), `test/helpers/build-test-app.ts` (all HTTP tests).
 
 ## Diagram
@@ -27,4 +27,5 @@ flowchart LR
 - `AppDeps` intentionally grows per plan tasks; keep the exact shape so `build-test-app.ts` stays the one place tests configure it.
 
 ## Commits
-- (pending) feat(api): fastify skeleton with typed config and health route
+- eb91028 feat(api): fastify skeleton with typed config and health route
+- (pending) feat(api): drizzle schema + sqlite bootstrap DDL — `db` added to `AppDeps`
