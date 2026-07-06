@@ -86,6 +86,31 @@
       "description": "The model catalog did not load. Try again later."
     }
   },
+  "gallery": {
+    "title": "Library",
+    "filter": {
+      "label": "Filter",
+      "all": "All",
+      "images": "Images",
+      "videos": "Videos"
+    },
+    "empty": {
+      "title": "No generations yet",
+      "description": "Your images and videos will appear here.",
+      "cta": "Create"
+    },
+    "loadMore": "Load more",
+    "processing": "Generating",
+    "failed": "Generation failed",
+    "refunded": "Credits refunded",
+    "download": "Download",
+    "delete": "Delete",
+    "detail": {
+      "title": "Generation details"
+    },
+    "cost_one": "{{count}} credit",
+    "cost_other": "{{count}} credits"
+  },
   "common": {
     "retry": "Try again",
     "close": "Close",

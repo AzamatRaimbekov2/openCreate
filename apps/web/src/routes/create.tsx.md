@@ -12,14 +12,15 @@ panel (and, from Task 17, the live Gallery column).
 - Responsibilities: route registration, `beforeLoad` auth guard, page layout.
   Composition only — no business logic (modular-architecture rule for routes/).
 - Public API / exports: `Route` (TanStack file-route).
-- Inputs → Outputs: navigation to `/create` → guard check → `CreatePage` render;
+- Inputs → Outputs: navigation to `/create` → guard check → two-column render
+  (GeneratorPanel left, live `GalleryGrid hasCreateCta=false` right; mobile stacks);
   signed-out → thrown redirect to `/login`.
 - Side effects: `requireSession()` performs a session fetch in `beforeLoad`.
 
 ## Dependencies
 
 - Imports: `@tanstack/react-router`, `react-i18next`, `modules/Auth` (`requireSession`),
-  `modules/Generator` (`GeneratorPanel`); Task 17 adds `modules/Gallery` (`GalleryGrid`).
+  `modules/Generator` (`GeneratorPanel`), `modules/Gallery` (`GalleryGrid`).
 - Used by: `routeTree.gen.ts` (generated), `main.tsx` router.
 
 ## Diagram
@@ -27,7 +28,10 @@ panel (and, from Task 17, the live Gallery column).
 ```mermaid
 flowchart LR
   NAV[/create/] --> BL[beforeLoad requireSession]
-  BL -->|signed in| PG[CreatePage: h1 + GeneratorPanel + gallery column T17]
+  BL -->|signed in| PG[CreatePage grid lg:26rem+1fr]
+  PG --> GEN[GeneratorPanel]
+  PG --> GAL[GalleryGrid hasCreateCta=false]
+  GEN -.submit prepends card via 'generations' cache.-> GAL
   BL -->|signed out| RD[redirect /login]
 ```
 
@@ -40,5 +44,5 @@ flowchart LR
 
 ## Commits
 
-- (pending) feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
+- 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
 - (pending) feat(web): gallery with 4-state cards and 4s polling of processing items (adds the gallery column)
