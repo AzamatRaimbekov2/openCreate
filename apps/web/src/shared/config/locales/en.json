@@ -28,6 +28,20 @@
       "emailTaken": "An account with this email already exists"
     }
   },
+  "credits": {
+    "balance": "Credits balance",
+    "reload": "Reload balance",
+    "history": "Credit history",
+    "empty": {
+      "title": "No transactions yet",
+      "description": "Your credit history will appear here after your first generation."
+    },
+    "kinds": {
+      "signup_bonus": "Signup bonus",
+      "charge": "Generation",
+      "refund": "Refund"
+    }
+  },
   "common": {
     "retry": "Try again",
     "close": "Close",

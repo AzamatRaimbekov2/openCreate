@@ -50,10 +50,12 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
   if (!isOpen) return null
 
   return createPortal(
+    // The overlay is presentational (click target only) — it must NOT be
+    // aria-hidden: that would hide the dialog inside it from the a11y tree
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4"
       onClick={onClose}
-      aria-hidden="true"
+      role="presentation"
     >
       <div
         ref={dialogRef}
