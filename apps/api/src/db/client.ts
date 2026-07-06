@@ -20,6 +20,18 @@ export function createDb(path: string) {
   sqlite.pragma('foreign_keys = ON')
   // Idempotent bootstrap — CREATE IF NOT EXISTS, safe to run on every boot.
   sqlite.exec(DDL)
+  // Micro-migrations: CREATE TABLE IF NOT EXISTS never alters tables that
+  // already exist, so columns added after a db file was first created must be
+  // back-filled here (SQLite has no ADD COLUMN IF NOT EXISTS). Guarded by
+  // pragma table_info so re-runs are no-ops.
+  const generationColumns = (
+    sqlite.pragma('table_info(generation)') as Array<{ name: string }>
+  ).map((column) => column.name)
+  if (!generationColumns.includes('error_code')) {
+    // error_code: machine-readable failure reason (e.g. 'content_blocked') —
+    // added for the NSFW safety-filter handling; see modules/generations.
+    sqlite.exec('ALTER TABLE generation ADD COLUMN error_code TEXT')
+  }
   // Pass the schema so db.query.* and better-auth's drizzle adapter can
   // resolve tables by name.
   const db = drizzle(sqlite, { schema })

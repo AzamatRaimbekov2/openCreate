@@ -15,7 +15,7 @@ The generation lifecycle service (plan Task 10) — the core money-touching sequ
   - `STALE_PROCESSING_MS` — exported staleness threshold (1 hour).
   - `list(userId, limit, cursor?)` → `{ items, nextCursor }` — newest-first; cursor is the createdAt epoch-ms of the last returned row; fetches `limit + 1` to detect the next page without COUNT.
   - `remove(userId, id)` — deletes the media file (idempotent) then the row; 404 if not owned.
-  - Errors: `NotFoundError` (404/not_found), `ValidationError` (400/validation_failed) — statusCode+apiCode consumed by the app.ts central error handler.
+  - Errors: `NotFoundError` (404/not_found), `ValidationError` (400/validation_failed), `ContentBlockedError` (422/content_blocked — NSFW safety filter) — statusCode+apiCode consumed by the app.ts central error handler.
 - Inputs → Outputs: `CreateGenerationInput` (contracts) → `Generation` DTO (contracts). DB rows mapped by `toDto` (JSON columns parsed, dates → ISO strings).
 - Side effects (I/O, network, state): DB writes (generation rows + ledger rows inside ledger transactions), outbound Runware calls, asset downloads into `StorageProvider`, media file deletions.
 
@@ -55,6 +55,7 @@ flowchart TD
 - Every failure path after the charge refunds; `refundCredits` is idempotent (once-per-generation guard lives in the ledger), so concurrent polls cannot double-refund.
 - Poll success downloads the asset BEFORE flipping status: a failed download leaves the row processing so the next poll retries — a succeeded row always has media. Poll success WITHOUT a URL is unrecoverable (same payload forever) → `failGeneration` + refund.
 - **Stuck-processing settlement**: `failGeneration` centralizes the guarded fail + idempotent refund; the get()-level reaper and the `settleStaleGenerations` boot sweep guarantee hold→settle/refund even when downloads fail permanently or the owner never polls again. Pinned by `test/generations-stale.test.ts`.
+- **NSFW safety gate (spec §2/§9.4)**: `NSFWContent === true` on the image result or the video poll is checked BEFORE any storage download — flagged assets are never stored or served. Both paths settle failed + refund with `errorCode: 'content_blocked'` (persisted in the `error_code` column, surfaced in the DTO) so the SPA renders localized safety copy; the image path additionally returns the 422 `content_blocked` envelope via `ContentBlockedError`.
 - Transitions out of `processing` re-read the fresh status inside a transaction because two tabs can poll the same generation concurrently.
 - All reads/deletes are `(id, userId)`-scoped: another account gets 404, never data.
 - `creditsFor`'s plain Errors (missing/unsupported duration) are re-thrown as `ValidationError` — caller mistakes must be 400, not 500.
@@ -63,3 +64,4 @@ flowchart TD
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
 - 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes
+- 5d16801 fix(api): settle stuck processing generations — no-asset polls fail with refund, stale rows reaped on poll and boot

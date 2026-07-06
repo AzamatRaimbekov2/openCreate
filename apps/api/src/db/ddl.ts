@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS generation (
   media_json TEXT NOT NULL DEFAULT '[]',
   progress INTEGER,
   error_message TEXT,
+  error_code TEXT,
   created_at INTEGER NOT NULL,
   completed_at INTEGER
 );

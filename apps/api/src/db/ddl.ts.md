@@ -23,7 +23,8 @@ flowchart LR
 
 ## Key decisions / gotchas
 - Indexes: `idx_generation_user_created(user_id, created_at DESC)` and `idx_credit_tx_user(user_id, created_at DESC)` back the library list and transactions endpoints.
-- Idempotent by construction — safe to run on every boot; adding a column later requires an explicit `ALTER TABLE` block here (expand → backfill → contract).
+- Idempotent by construction — safe to run on every boot; adding a column later requires a guarded `ALTER TABLE` micro-migration in `client.ts` (CREATE IF NOT EXISTS never alters existing tables).
+- `generation.error_code` (nullable TEXT) mirrors `schema.ts` — machine-readable failure reason (`content_blocked` for NSFW safety blocks); back-filled for older db files by `client.ts`.
 
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL

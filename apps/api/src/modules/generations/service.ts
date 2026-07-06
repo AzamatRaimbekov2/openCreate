@@ -24,6 +24,17 @@ export class ValidationError extends Error {
   statusCode = 400
   apiCode = 'validation_failed'
 }
+// Runware flagged the produced asset NSFW (safety.checkContent). The spec's
+// moderation stance (risk §9.4): flagged content is NEVER stored or served,
+// the user gets a clear safety message, and the charge is refunded. 422 —
+// the request was well-formed; the CONTENT was rejected.
+export class ContentBlockedError extends Error {
+  statusCode = 422
+  apiCode = 'content_blocked'
+  constructor() {
+    super('Blocked by the content safety filter')
+  }
+}
 
 type Deps = { db: Db; runware: RunwareClient; storage: StorageProvider }
 
@@ -39,12 +50,21 @@ export const STALE_PROCESSING_MS = 60 * 60 * 1000
 // is STILL processing is flipped (concurrent pollers/creators race each
 // other), and refundCredits is idempotent (once-per-generation guard in the
 // ledger) — so no combination of callers can double-refund or resurrect a row.
-function failGeneration(db: Db, userId: string, id: string, errorMessage: string) {
+function failGeneration(
+  db: Db,
+  userId: string,
+  id: string,
+  errorMessage: string,
+  // Machine-readable reason for failures the SPA localizes specially
+  // ('content_blocked'); null for ordinary provider/timeout failures where
+  // the errorMessage itself is shown.
+  errorCode: 'content_blocked' | null = null,
+) {
   db.transaction((tx) => {
     const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
     if (fresh?.status !== 'processing') return
     tx.update(generation)
-      .set({ status: 'failed', errorMessage, completedAt: new Date() })
+      .set({ status: 'failed', errorMessage, errorCode, completedAt: new Date() })
       .where(eq(generation.id, id))
       .run()
   })
@@ -80,6 +100,9 @@ function toDto(row: typeof generation.$inferSelect): Generation {
     mediaUrls: JSON.parse(row.mediaJson) as string[],
     progress: row.progress,
     errorMessage: row.errorMessage,
+    // The column stores only values from the contracts ApiErrorCode enum
+    // (writes go through failGeneration / the ContentBlockedError path).
+    errorCode: row.errorCode as Generation['errorCode'],
     createdAt: new Date(row.createdAt).toISOString(),
     completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null,
   }
@@ -150,6 +173,10 @@ export function createGenerationService({ db, runware, storage }: Deps) {
           width,
           height,
         })
+        // Safety gate BEFORE the download: an NSFW-flagged asset must never
+        // reach our storage or be served to the user (spec §2/§9.4). Throwing
+        // here routes through the catch below → failed + refund + 422 envelope.
+        if (res.NSFWContent) throw new ContentBlockedError()
         const mediaUrl = await storage.saveFromUrl(res.imageURL, id, 'webp')
         // Status-guarded settle: ONLY a processing row may become succeeded.
         // Without the guard a row that some other path already failed+refunded
@@ -176,17 +203,18 @@ export function createGenerationService({ db, runware, storage }: Deps) {
         // made whole; discard the downloaded asset instead of delivering it.
         if (!settled) await storage.remove(id, 'webp')
       } catch (err) {
-        // Provider or download failure → mark failed, give the money back,
-        // and rethrow so the route surfaces the provider error envelope.
-        refundCredits(db, userId, id)
-        db.update(generation)
-          .set({
-            status: 'failed',
-            errorMessage: err instanceof Error ? err.message : 'generation failed',
-            completedAt: new Date(),
-          })
-          .where(eq(generation.id, id))
-          .run()
+        // Provider, safety, or download failure → guarded fail + refund, then
+        // rethrow so the route surfaces the matching error envelope
+        // (provider_error / content_blocked). The errorCode is persisted so
+        // the gallery card can localize the safety block later — the envelope
+        // alone only reaches whoever made the POST.
+        failGeneration(
+          db,
+          userId,
+          id,
+          err instanceof Error ? err.message : 'generation failed',
+          err instanceof ContentBlockedError ? 'content_blocked' : null,
+        )
         throw err
       }
       const row = db.select().from(generation).where(eq(generation.id, id)).get()
@@ -263,6 +291,15 @@ export function createGenerationService({ db, runware, storage }: Deps) {
       return toDto({ ...row, progress: poll.progress })
     }
     if (poll.status === 'success') {
+      // Safety gate BEFORE the download (spec §2/§9.4): NSFW-flagged output
+      // is never stored or served — settle as failed with the machine-readable
+      // 'content_blocked' code (the SPA shows a localized safety message) and
+      // give the credits back.
+      if (poll.NSFWContent) {
+        failGeneration(db, userId, id, 'Blocked by the content safety filter', 'content_blocked')
+        const settled = db.select().from(generation).where(eq(generation.id, id)).get()
+        return toDto(settled!)
+      }
       const src = poll.videoURL ?? poll.imageURL
       if (!src) {
         // 'success' with no asset URL is unrecoverable: every future poll of

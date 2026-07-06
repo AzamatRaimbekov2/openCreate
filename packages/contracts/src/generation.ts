@@ -5,6 +5,7 @@
 // strings because SQLite stores ms timestamps and JSON has no Date type.
 import { z } from 'zod'
 import { aspectRatioSchema } from './catalog'
+import { apiErrorCodeSchema } from './errors'
 
 export const generationTypeSchema = z.enum(['image', 'video'])
 export const generationModeSchema = z.enum(['text', 'image'])
@@ -37,6 +38,10 @@ export const generationSchema = z.object({
   mediaUrls: z.array(z.string()),
   progress: z.number().int().min(0).max(100).nullable().optional(),
   errorMessage: z.string().nullable(),
+  // Machine-readable failure reason (subset of ApiErrorCode) so the SPA can
+  // localize specific failures — e.g. 'content_blocked' (NSFW safety filter)
+  // renders a dedicated message instead of the provider's raw errorMessage.
+  errorCode: apiErrorCodeSchema.nullable().optional(),
   createdAt: z.string(),
   completedAt: z.string().nullable(),
 })

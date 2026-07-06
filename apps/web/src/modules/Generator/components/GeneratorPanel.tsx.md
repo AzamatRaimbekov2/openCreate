@@ -15,8 +15,10 @@ cost, submit — orchestrating the store, the catalog query, and the mutation.
   gate submit on `selectCreateInput`; surface mutation failures inline.
 - Public API / exports: `GeneratorPanel` (no props — state lives in `generatorStore`).
 - Inputs → Outputs: user edits → store actions; submit → `useCreateGeneration.mutate(input)`;
-  `insufficient_credits` → inline `role="alert"` banner + `/pricing` link; other errors →
-  localized generic banner.
+  `insufficient_credits` → inline `role="alert"` banner + `/pricing` link;
+  `content_blocked` (NSFW safety filter) → dedicated localized banner
+  (`generator.errors.contentBlocked`: try a different prompt + credits refunded);
+  other errors → localized generic banner.
 - Side effects: `useEffect` pushes `catalog.data.models` into the store (cache → store sync).
 
 ## Dependencies
@@ -37,6 +39,7 @@ flowchart TD
   ST -->|selectCreateInput| SUB[Generate button]
   SUB --> M[useCreateGeneration]
   M -->|402 insufficient_credits| BAN[inline alert + /pricing link]
+  M -->|422 content_blocked| SB[inline alert: safety-filter copy + refund note]
 ```
 
 ## Key decisions / gotchas

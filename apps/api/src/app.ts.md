@@ -37,3 +37,4 @@ flowchart LR
 - bdc4175 feat(api): curated model catalog with credit pricing — catalog route wired
 - 6c4e94f feat(api): local media storage with /media serving — `storage` added to `AppDeps`, static /media/*, error handler moved before plugin boot
 - 681e20f feat(api): generation lifecycle — `runware` added to `AppDeps` (now complete), generation service + routes wired
+- 5d16801 fix(api): settle stuck processing generations — boot sweep `settleStaleGenerations(db)` wired after route registration

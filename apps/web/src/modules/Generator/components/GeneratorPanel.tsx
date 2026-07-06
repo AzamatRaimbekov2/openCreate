@@ -67,6 +67,11 @@ export function GeneratorPanel() {
   const input = selectCreateInput(state)
   const isInsufficient =
     mutation.error instanceof ApiClientError && mutation.error.code === 'insufficient_credits'
+  // Safety-filter block (API 'content_blocked'): needs its own copy — the
+  // failure is about the CONTENT, the fix is a different prompt, and the user
+  // must hear the charge came back (spec: clear message + refund on NSFW block)
+  const isBlocked =
+    mutation.error instanceof ApiClientError && mutation.error.code === 'content_blocked'
 
   const handleSubmit = () => {
     // input is null while the draft is not submittable (button disabled too)
@@ -138,7 +143,11 @@ export function GeneratorPanel() {
         // for failures that need a decision — this one has an inline next step)
         <div role="alert" className="flex flex-col gap-1 rounded-xl bg-danger/10 px-4 py-3 text-sm">
           <span className="text-ink">
-            {isInsufficient ? t('generator.errors.insufficientCredits') : t('errors.actionFailed')}
+            {isInsufficient
+              ? t('generator.errors.insufficientCredits')
+              : isBlocked
+                ? t('generator.errors.contentBlocked')
+                : t('errors.actionFailed')}
           </span>
           {isInsufficient ? (
             // Typed Link since Task 20 shipped /pricing — SPA navigation keeps

@@ -118,6 +118,67 @@ describe('generations', () => {
     expect(me.json().creditsBalance).toBe(200)
   })
 
+  it('image: NSFW-flagged result → 422 content_blocked, refund, asset never stored', async () => {
+    const rw = fakeRunware()
+    rw.imageInference.mockResolvedValue({
+      imageURL: 'https://im.runware.ai/a.webp',
+      seed: 1,
+      NSFWContent: true,
+    })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    // Fresh reference to the global fetch stub — storage downloads go through it.
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockClear()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'flux-schnell', prompt: 'red fox', aspectRatio: '1:1' },
+    })
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error.code).toBe('content_blocked')
+    // Flagged content must never be downloaded to our storage.
+    expect(fetchMock).not.toHaveBeenCalled()
+    // The charge was refunded.
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(me.json().creditsBalance).toBe(200)
+    // The row is failed and carries the machine-readable code for the SPA.
+    const list = await app.inject({ method: 'GET', url: '/api/generations', headers: { cookie } })
+    expect(list.json().items[0]).toMatchObject({ status: 'failed', errorCode: 'content_blocked' })
+  })
+
+  it('video: NSFW-flagged poll → failed + refund + content_blocked, asset never stored', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    rw.getResponse.mockResolvedValue({
+      status: 'success',
+      videoURL: 'https://vm.runware.ai/v.mp4',
+      NSFWContent: true,
+    })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockClear()
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'pixverse-v6', prompt: 'waves', aspectRatio: '9:16', duration: 5 },
+    })
+    const id = created.json().id
+    const p = await app.inject({
+      method: 'GET',
+      url: `/api/generations/${id}`,
+      headers: { cookie },
+    })
+    expect(p.json()).toMatchObject({ status: 'failed', errorCode: 'content_blocked' })
+    expect(p.json().mediaUrls).toHaveLength(0)
+    expect(fetchMock).not.toHaveBeenCalled()
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(me.json().creditsBalance).toBe(200)
+  })
+
   it('video: poll success without a media URL settles as failed + refund', async () => {
     const rw = fakeRunware()
     rw.submitVideo.mockResolvedValue(undefined)

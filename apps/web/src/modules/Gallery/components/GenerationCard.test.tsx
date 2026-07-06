@@ -51,6 +51,14 @@ const failedVideo: Generation = {
   completedAt: '2026-07-06T10:01:00.000Z',
 }
 
+// A safety-filter block: the API sets errorCode 'content_blocked' and the raw
+// provider message — the card must render OUR localized copy, not the raw text
+const blockedVideo: Generation = {
+  ...failedVideo,
+  errorMessage: 'NSFW content detected',
+  errorCode: 'content_blocked',
+}
+
 const succeededImage: Generation = {
   ...processingVideo,
   id: 'gen2',
@@ -114,6 +122,14 @@ describe('GenerationCard', () => {
     expect(screen.getByText(/credits refunded/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()
     expect(container.querySelector('video')).not.toBeInTheDocument()
+  })
+
+  it('failed with content_blocked: shows the localized safety message, not the raw provider text', () => {
+    renderCard(blockedVideo)
+    expect(screen.getByText(/blocked by the safety filter/i)).toBeInTheDocument()
+    // The raw provider message is not user copy — it must not leak through
+    expect(screen.queryByText('NSFW content detected')).not.toBeInTheDocument()
+    expect(screen.getByText(/credits refunded/i)).toBeInTheDocument()
   })
 
   it('invalidates the list and balance when polling reaches a terminal state', async () => {

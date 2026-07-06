@@ -148,7 +148,8 @@
     "submit": "Generate",
     "errors": {
       "insufficientCredits": "Not enough credits for this generation.",
-      "seePricing": "See pricing"
+      "seePricing": "See pricing",
+      "contentBlocked": "Blocked by the safety filter — try a different prompt. Your credits were refunded."
     },
     "unavailable": {
       "title": "Models are unavailable",
@@ -171,6 +172,7 @@
     "loadMore": "Load more",
     "processing": "Generating",
     "failed": "Generation failed",
+    "contentBlocked": "Blocked by the safety filter — try a different prompt.",
     "refunded": "Credits refunded",
     "download": "Download",
     "delete": "Delete",

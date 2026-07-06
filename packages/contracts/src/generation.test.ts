@@ -49,4 +49,43 @@ describe('generationSchema', () => {
     })
     expect(r.success).toBe(true)
   })
+  it('parses a failed generation carrying a content_blocked error code', () => {
+    const r = generationSchema.safeParse({
+      id: 'gen_2',
+      type: 'image',
+      mode: 'text',
+      status: 'failed',
+      prompt: 'something the safety filter rejects',
+      modelId: 'flux-schnell',
+      params: { aspectRatio: '1:1' },
+      costCredits: 1,
+      mediaUrls: [],
+      progress: null,
+      errorMessage: 'Blocked by the content safety filter',
+      errorCode: 'content_blocked',
+      createdAt: '2026-07-06T10:00:00.000Z',
+      completedAt: '2026-07-06T10:00:05.000Z',
+    })
+    expect(r.success).toBe(true)
+    if (r.success) expect(r.data.errorCode).toBe('content_blocked')
+  })
+  it('rejects an unknown errorCode', () => {
+    const r = generationSchema.safeParse({
+      id: 'gen_3',
+      type: 'image',
+      mode: 'text',
+      status: 'failed',
+      prompt: 'x y',
+      modelId: 'flux-schnell',
+      params: { aspectRatio: '1:1' },
+      costCredits: 1,
+      mediaUrls: [],
+      progress: null,
+      errorMessage: 'boom',
+      errorCode: 'not_a_real_code',
+      createdAt: '2026-07-06T10:00:00.000Z',
+      completedAt: null,
+    })
+    expect(r.success).toBe(false)
+  })
 })

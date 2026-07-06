@@ -75,6 +75,10 @@ export const generation = sqliteTable('generation', {
   mediaJson: text('media_json').notNull().default('[]'),
   progress: integer('progress'),
   errorMessage: text('error_message'),
+  // Machine-readable failure reason (contracts ApiErrorCode subset). Set for
+  // failures the SPA must localize specially — today only 'content_blocked'
+  // (NSFW safety filter), where the raw provider errorMessage is not user copy.
+  errorCode: text('error_code'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
 })

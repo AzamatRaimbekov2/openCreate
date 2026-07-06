@@ -89,7 +89,11 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
           >
             <span className="text-sm font-medium text-danger">{t('gallery.failed')}</span>
           </div>
-          {generation.errorMessage ? (
+          {/* Safety blocks carry the machine-readable errorCode — render OUR
+              localized copy; the raw provider message is not user copy */}
+          {generation.errorCode === 'content_blocked' ? (
+            <p className="text-xs text-ink-soft">{t('gallery.contentBlocked')}</p>
+          ) : generation.errorMessage ? (
             <p className="text-xs text-ink-soft">{generation.errorMessage}</p>
           ) : null}
           <div>

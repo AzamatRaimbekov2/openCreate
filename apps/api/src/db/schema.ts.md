@@ -26,7 +26,8 @@ erDiagram
 ```
 
 ## Key decisions / gotchas
-- ANY change here MUST be mirrored in `ddl.ts` (idempotent SQL bootstrap) — there are no drizzle-kit migrations in MVP.
+- ANY change here MUST be mirrored in `ddl.ts` (idempotent SQL bootstrap) — there are no drizzle-kit migrations in MVP. Columns added AFTER first ship also need a guarded `ALTER TABLE` micro-migration in `client.ts` (CREATE IF NOT EXISTS never alters existing tables).
+- `generation.errorCode` (`error_code`, nullable) is the machine-readable failure reason — today only `'content_blocked'` for NSFW safety blocks, so the SPA can localize the message instead of echoing raw provider text.
 - `creditsBalance` is mutated ONLY inside the same transaction as a `credit_transaction` row (ledger invariant).
 - `credit_transaction.amount` is signed: negative for `charge`, positive for `signup_bonus`/`refund`.
 

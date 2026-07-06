@@ -37,6 +37,7 @@ flowchart TD
   UL -->|processing| P[media well pulse + Progress %]
   UL -->|succeeded| S[video controls / img button -> GenerationDetail]
   UL -->|failed| F[danger border + reason + refunded Badge]
+  F -->|errorCode content_blocked| CB[localized safety-filter copy]
   S & F --> A[footer: cost · download · delete -> useDeleteGeneration]
 ```
 
@@ -48,6 +49,9 @@ flowchart TD
 - Failed cards show the stored `errorMessage` as a secondary caption per the
   plan's card contract — a deliberate, recorded exception to design.md §8's
   "no raw server text" (the primary line stays localized).
+- EXCEPT safety blocks: when `errorCode === 'content_blocked'` the card renders
+  the localized `gallery.contentBlocked` copy instead of the raw provider
+  message — moderation failures are user-facing product copy, never provider text.
 - Status is never color-only (a11y §7): danger border + "Generation failed"
   text + refunded badge all carry it together.
 - Delete is offered only for terminal states — a processing task can't be

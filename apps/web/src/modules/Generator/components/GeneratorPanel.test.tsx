@@ -243,6 +243,22 @@ describe('GeneratorPanel', () => {
     })
   })
 
+  it('surfaces a safety block with dedicated localized copy instead of the generic error', async () => {
+    apiMock.mockImplementation((path) => {
+      if (path === '/api/catalog') return Promise.resolve({ models })
+      return Promise.reject(
+        new ApiClientError('content_blocked', 'Blocked by the content safety filter', 422),
+      )
+    })
+    renderPanel()
+    const prompt = await screen.findByLabelText(/prompt/i)
+    await userEvent.type(prompt, 'red fox in the snow')
+    await userEvent.click(screen.getByRole('button', { name: /generate/i }))
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent(/safety filter/i)
+    expect(banner).toHaveTextContent(/refunded/i)
+  })
+
   it('surfaces insufficient credits inline with a link to pricing', async () => {
     apiMock.mockImplementation((path) => {
       if (path === '/api/catalog') return Promise.resolve({ models })

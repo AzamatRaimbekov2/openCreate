@@ -6,7 +6,7 @@
 Single factory for the SQLite connection + drizzle instance (plan Task 4), so prod (file db) and tests (`:memory:`) get identical pragmas and bootstrap DDL.
 
 ## What it does (for an AI reader)
-- Responsibilities: mkdir the db's parent dir (file dbs only), open better-sqlite3, set `journal_mode=WAL` + `foreign_keys=ON`, run the idempotent `DDL`, wrap in `drizzle(sqlite, { schema })`.
+- Responsibilities: mkdir the db's parent dir (file dbs only), open better-sqlite3, set `journal_mode=WAL` + `foreign_keys=ON`, run the idempotent `DDL`, apply guarded micro-migrations (`pragma table_info` checks → `ALTER TABLE` for columns added post-ship, currently `generation.error_code`), wrap in `drizzle(sqlite, { schema })`.
 - Public API / exports: `createDb(path): { db, sqlite }`, `Db` (type — used everywhere as the db dependency type).
 - Inputs → Outputs: db path (or `':memory:'`) → connected, schema-ready `{ db, sqlite }`.
 - Side effects: filesystem mkdir + db file creation (file path), DDL execution.
@@ -18,7 +18,7 @@ Single factory for the SQLite connection + drizzle instance (plan Task 4), so pr
 ## Diagram
 ```mermaid
 flowchart LR
-  P[path] --> C[createDb] --> SQ[better-sqlite3 + WAL + FK ON] --> DDLX[exec DDL] --> DR[drizzle db]
+  P[path] --> C[createDb] --> SQ[better-sqlite3 + WAL + FK ON] --> DDLX[exec DDL] --> MM[guarded ALTER micro-migrations] --> DR[drizzle db]
 ```
 
 ## Key decisions / gotchas
