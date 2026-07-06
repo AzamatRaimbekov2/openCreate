@@ -25,4 +25,4 @@ flowchart LR
 - Balance is read from the db on every call — it's the single source the SPA trusts after generate/refund flows.
 
 ## Commits
-- (pending) feat(api): better-auth (email+google) with signup bonus + /api/me
+- 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me

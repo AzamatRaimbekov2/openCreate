@@ -34,4 +34,4 @@ sequenceDiagram
 - GET/HEAD send `body: null` (fetch spec forbids bodies there).
 
 ## Commits
-- (pending) feat(api): better-auth (email+google) with signup bonus + /api/me
+- 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me

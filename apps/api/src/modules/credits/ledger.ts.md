@@ -30,4 +30,5 @@ flowchart LR
 - better-sqlite3 transactions are synchronous — no `await` inside `db.transaction`.
 
 ## Commits
-- (pending) feat(api): better-auth (email+google) with signup bonus + /api/me
+- 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me
+- (pending) feat(api): transactional credit ledger with charge/refund invariants — chargeCredits/refundCredits/InsufficientCreditsError added

@@ -6,6 +6,7 @@ import type { AppConfig } from './config'
 import type { Db } from './db/client'
 import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
+import { registerCreditRoutes } from './modules/credits/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -28,6 +29,7 @@ export async function buildApp(deps: AppDeps) {
   const auth = createAuth(deps.db, deps.config)
   await registerAuth(app, auth)
   registerUserRoutes(app, deps.db)
+  registerCreditRoutes(app, deps.db)
 
   // Single error → ApiError envelope mapping. `apiCode` (set by domain errors
   // like InsufficientCreditsError or requireUser) wins; otherwise fall back on
