@@ -6,19 +6,19 @@
 DI composition root (plan Task 3): `buildApp(deps)` returns a configured Fastify instance as a pure function of its dependencies, so tests inject in-memory deps and `index.ts` injects real ones.
 
 ## What it does (for an AI reader)
-- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and wire modules: `createAuth` + `registerAuth` (decorates `requireUser`) first, then `registerUserRoutes` (`/api/me`), `registerCreditRoutes` (`/api/credits/transactions`), `registerCatalogRoutes` (`GET /api/catalog`, public — pricing renders before sign-in), and `@fastify/static` serving `deps.storage.dir` at `/media/*`; generations follow in Task 10.
+- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and wire modules: `createAuth` + `registerAuth` (decorates `requireUser`) first, then `registerUserRoutes` (`/api/me`), `registerCreditRoutes` (`/api/credits/transactions`), `registerCatalogRoutes` (`GET /api/catalog`, public — pricing renders before sign-in), `registerGenerationRoutes` (the Task 10 core, built from `createGenerationService({ db, runware, storage })`), and `@fastify/static` serving `deps.storage.dir` at `/media/*`.
 - Public API / exports: `AppDeps` (type), `buildApp(deps): Promise<FastifyInstance>`.
-- Inputs → Outputs: `AppDeps` (`config`, `db`, `storage`; later `runware`) → ready Fastify app (not listening).
+- Inputs → Outputs: `AppDeps` (`config`, `db`, `storage`, `runware`) → ready Fastify app (not listening). `AppDeps` is complete as of Task 10.
 - Side effects: none until `listen()`; route registration only.
 
 ## Dependencies
-- Imports / depends on: `fastify`, `@fastify/static`, `./config` (type), `./db/client` (`Db` type), `./storage/local` (`StorageProvider` type), `./modules/auth/auth`, `./modules/auth/plugin`, `./modules/users/routes`, `./modules/credits/routes`, `./modules/catalog/routes`.
+- Imports / depends on: `fastify`, `@fastify/static`, `./config` (type), `./db/client` (`Db` type), `./storage/local` (`StorageProvider` type), `./integrations/runware/client` (`RunwareClient` type), `./modules/auth/auth`, `./modules/auth/plugin`, `./modules/users/routes`, `./modules/credits/routes`, `./modules/catalog/routes`, `./modules/generations/service` + `./modules/generations/routes`.
 - Used by: `src/index.ts` (boot), `test/helpers/build-test-app.ts` (all HTTP tests).
 
 ## Diagram
 ```mermaid
 flowchart LR
-  DEPS[AppDeps: config, db...] --> B[buildApp] --> R[routes: /health, modules]
+  DEPS[AppDeps: config, db, storage, runware] --> B[buildApp] --> R[routes: /health, auth, me, credits, catalog, generations, /media]
   B --> EH[setErrorHandler → ApiError envelope]
 ```
 

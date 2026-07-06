@@ -5,11 +5,14 @@ import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import type { AppConfig } from './config'
 import type { Db } from './db/client'
+import type { RunwareClient } from './integrations/runware/client'
 import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
+import { createGenerationService } from './modules/generations/service'
+import { registerGenerationRoutes } from './modules/generations/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -17,7 +20,9 @@ export type AppDeps = {
   db: Db
   // Media storage: assets downloaded from Runware are served from here.
   storage: StorageProvider
-  // added in later tasks: runware
+  // Runware provider client — injected so tests script it (fakeRunware) and
+  // prod boot (index.ts) passes the real REST client. AppDeps is complete now.
+  runware: RunwareClient
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -49,6 +54,12 @@ export async function buildApp(deps: AppDeps) {
   registerCreditRoutes(app, deps.db)
   // Catalog is public (no requireUser): pricing must render before sign-in.
   registerCatalogRoutes(app)
+  // The core (Task 10): generation lifecycle service gets the db + provider +
+  // storage trio; routes stay thin and session-gated via requireUser.
+  registerGenerationRoutes(
+    app,
+    createGenerationService({ db: deps.db, runware: deps.runware, storage: deps.storage }),
+  )
 
   // Serve downloaded generation assets at /media/* straight off the storage
   // dir. Public by design for the MVP: keys are unguessable UUIDs minted by

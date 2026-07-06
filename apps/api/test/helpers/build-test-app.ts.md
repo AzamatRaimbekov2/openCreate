@@ -3,28 +3,40 @@
 > AI-facing sidecar for `build-test-app.ts`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Test-only factory that builds the API app with a fully in-memory `AppConfig` (SQLite `:memory:`, fake Runware key, mkdtemp media dir) so each test gets an isolated app instance without env vars or persistent disk state. Grows alongside `AppDeps` over plan Tasks 3→10.
+Test-only factory that builds the API app with a fully in-memory `AppConfig` (SQLite `:memory:`, fake Runware key, mkdtemp media dir) so each test gets an isolated app instance without env vars or persistent disk state. Grows alongside `AppDeps` over plan Tasks 3→10; as of Task 10 it also ships the scripted Runware fake and the sign-up helper the generation lifecycle tests are built on.
 
 ## What it does (for an AI reader)
-- Responsibilities: construct `buildApp(deps)` with deterministic test config, a fresh `createDb(':memory:').db` per call, and a `createLocalStorage` rooted in a temp dir (test isolation).
-- Public API / exports: `buildTestApp(overrides?: TestAppOverrides): Promise<FastifyInstance>`; `TestAppOverrides` currently supports `storageDir` (Task 9) — Task 10 adds `runware`, `signupBonusCredits`.
-- Inputs → Outputs: optional overrides → a ready-to-`inject()` Fastify app.
+- Responsibilities: construct `buildApp(deps)` with deterministic test config, a fresh `createDb(':memory:').db` per call, a `createLocalStorage` rooted in a temp dir (test isolation), and an injectable `RunwareClient` (scripted fake by default) so no test can ever reach the real provider.
+- Public API / exports:
+  - `buildTestApp(overrides?: TestAppOverrides): Promise<FastifyInstance>`
+  - `TestAppOverrides = { storageDir?, runware?, signupBonusCredits? }` — `storageDir` (Task 9) points `/media` at a caller-owned dir; `runware` (Task 10) injects a scripted provider; `signupBonusCredits` (Task 10) lowers the bonus for insufficient-credit tests.
+  - `fakeRunware()` — `{ imageInference, submitVideo, getResponse }` as `vi.fn()`s: tests script resolutions per method AND assert call counts (e.g. "402 ⇒ provider never called").
+  - `registerAndGetCookie(app, email?)` — signs up a fresh user via `POST /api/auth/sign-up/email` and returns a `cookie` header value; the `email` parameter exists so ownership tests can create a second account.
+- Inputs → Outputs: optional overrides → a ready-to-`inject()` Fastify app; sign-up → session cookie string.
 - Side effects: creates an in-memory SQLite database and (by default) a `mkdtemp` media dir under the OS tmpdir per call.
 
 ## Dependencies
-- Imports / depends on: `src/app` (`buildApp`), `src/db/client` (`createDb`), `src/storage/local` (`createLocalStorage`), `node:fs`/`node:os`/`node:path` (mkdtemp).
-- Used by: every HTTP-level test in `apps/api/test/*.test.ts`.
+- Imports / depends on: `src/app` (`buildApp`), `src/db/client` (`createDb`), `src/storage/local` (`createLocalStorage`), `src/integrations/runware/client` (type `RunwareClient`), `vitest` (`vi.fn` for the fake), `node:fs`/`node:os`/`node:path` (mkdtemp).
+- Used by: every HTTP-level test in `apps/api/test/*.test.ts`; `fakeRunware`/`registerAndGetCookie` primarily by `generations.test.ts`.
 
 ## Diagram
 ```mermaid
 flowchart LR
-  T[test file] --> H[buildTestApp overrides?] --> A[buildApp deps: db, storage, config] --> I[app.inject]
+  T[test file] --> F[fakeRunware scripts provider]
+  T --> H[buildTestApp overrides?]
+  F --> H
+  H --> A[buildApp deps: db, storage, runware, config]
+  T --> R[registerAndGetCookie] --> C[session cookie]
+  C --> I[app.inject authenticated]
+  A --> I
 ```
 
 ## Key decisions / gotchas
-- `signupBonusCredits: 200` mirrors the plan's auth test expectation (`creditsBalance: 200`).
+- `signupBonusCredits: 200` default mirrors the plan's auth test expectation (`creditsBalance: 200`); Task 10's 402 test overrides it to 5 instead of crafting an expensive charge.
 - `port: 0` — the app is never `listen()`ed in tests; only `inject()` is used.
 - `storageDir` override exists so `/media` serving tests can write files into the dir the app serves; default stays a fresh mkdtemp so parallel tests never share media state. Temp dirs are left to the OS to reap.
+- Default `runware` is a fresh `fakeRunware()` (cast to `RunwareClient` — `vi.fn()`s are untyped): pre-Task-10 tests never touch the provider, and a default fake guarantees an accidental provider call fails loudly (unscripted mock resolves `undefined`) instead of hitting the network.
+- `registerAndGetCookie` keeps only the `name=value` pair of each Set-Cookie (drops Path/HttpOnly attrs) and joins with `; ` — that is what a browser would send back; better-auth may set more than one cookie.
 
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route
