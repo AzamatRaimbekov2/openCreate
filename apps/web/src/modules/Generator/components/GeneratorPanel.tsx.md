@@ -44,8 +44,9 @@ flowchart TD
 - Prompt is a plain store-backed textarea, NOT React Hook Form: the plan puts the
   whole draft in the Zustand store and validation is the contracts zod schema via
   `selectCreateInput` — a parallel RHF state would just duplicate it (recorded deviation).
-- `/pricing` link is a plain `<a>` until plan Task 20 creates the route (typed
-  `<Link>` union does not include it yet) — same escape-hatch convention as login.tsx used pre-Task 16.
+- `/pricing` is a typed `<Link>` since Task 20 shipped the route — SPA
+  navigation keeps the drafted prompt alive in the store if the user returns
+  (the pre-Task-20 plain `<a>` escape hatch is gone as promised).
 - Duration and ImageDrop are conditionally MOUNTED (not disabled): a control that
   cannot apply to the current model should not exist in the a11y tree.
 - Insufficient credits is not a modal: the failure has an inline next step
@@ -54,3 +55,4 @@ flowchart TD
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
+- _pending: feat(web): pricing page with per-model credit table (pricing anchor → typed Link)_

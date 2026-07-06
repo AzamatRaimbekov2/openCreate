@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShellPricingRouteImport } from './routes/_shell.pricing'
 import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
 import { Route as ShellCreateRouteImport } from './routes/_shell.create'
 
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShellPricingRoute = ShellPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellLibraryRoute = ShellLibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -45,12 +51,14 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/create': typeof ShellCreateRoute
   '/library': typeof ShellLibraryRoute
+  '/pricing': typeof ShellPricingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/create': typeof ShellCreateRoute
   '/library': typeof ShellLibraryRoute
+  '/pricing': typeof ShellPricingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -59,12 +67,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_shell/create': typeof ShellCreateRoute
   '/_shell/library': typeof ShellLibraryRoute
+  '/_shell/pricing': typeof ShellPricingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/create' | '/library'
+  fullPaths: '/' | '/login' | '/create' | '/library' | '/pricing'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/create' | '/library'
+  to: '/' | '/login' | '/create' | '/library' | '/pricing'
   id:
     | '__root__'
     | '/'
@@ -72,6 +81,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_shell/create'
     | '/_shell/library'
+    | '/_shell/pricing'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -103,6 +113,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_shell/pricing': {
+      id: '/_shell/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof ShellPricingRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/library': {
       id: '/_shell/library'
       path: '/library'
@@ -123,11 +140,13 @@ declare module '@tanstack/react-router' {
 interface ShellRouteChildren {
   ShellCreateRoute: typeof ShellCreateRoute
   ShellLibraryRoute: typeof ShellLibraryRoute
+  ShellPricingRoute: typeof ShellPricingRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellCreateRoute: ShellCreateRoute,
   ShellLibraryRoute: ShellLibraryRoute,
+  ShellPricingRoute: ShellPricingRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)

@@ -180,6 +180,25 @@
     "cost_one": "{{count}} credit",
     "cost_other": "{{count}} credits"
   },
+  "pricing": {
+    "title": "Pricing",
+    "subtitle": "A credit is $0.01. Pay per generation — nothing else.",
+    "models": {
+      "title": "Credits per model",
+      "model": "Model",
+      "type": "Type",
+      "credits": "Credits",
+      "price": "≈ USD",
+      "perImage": "per image",
+      "duration": "{{count}}s",
+      "from": "from {{price}}"
+    },
+    "cta": {
+      "title": "200 free credits at signup",
+      "description": "Enough for up to 200 images or five 5-second videos. Credits never expire.",
+      "button": "Create free account"
+    }
+  },
   "common": {
     "retry": "Try again",
     "close": "Close",

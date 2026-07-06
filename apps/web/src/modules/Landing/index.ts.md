@@ -8,8 +8,9 @@ internal files (`components/`, `model/`) are private.
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export the module surface; no logic.
-- Public API / exports: `LandingPage` (+`LandingPageProps`), `PriceTable`.
-- Inputs → Outputs: `import { LandingPage, PriceTable } from 'modules/Landing'`.
+- Public API / exports: `LandingPage` (+`LandingPageProps`), `PriceTable`,
+  `ModelCreditTable` (+`ModelCreditTableProps`).
+- Inputs → Outputs: `import { LandingPage, PriceTable, ModelCreditTable } from 'modules/Landing'`.
 - Side effects: none.
 
 ## Dependencies
@@ -30,6 +31,9 @@ flowchart LR
   same verified comparison card — one honesty surface, one source of truth.
 - `Hero`, `HowItWorks`, `FaqClaims`, `pricingData` stay private — pages
   compose `LandingPage`, never individual sections.
+- `ModelCreditTable` went public in Task 20: the /pricing route owns the
+  catalog query and passes `models` in — presentation stays in the module.
 
 ## Commits
-- _pending: feat(web): landing with honest price comparison (EN/RU)_
+- f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
+- _pending: feat(web): pricing page with per-model credit table (adds `ModelCreditTable`)_

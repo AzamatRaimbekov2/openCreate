@@ -74,11 +74,14 @@ export function AppShell({
             >
               {t('nav.library')}
             </Link>
-            {/* Plain <a> until plan Task 20 creates /pricing — the typed Link
-                union rejects routes that don't exist yet; swapped to Link there */}
-            <a href="/pricing" className={`${navLinkClass} text-ink-soft`}>
+            <Link
+              to="/pricing"
+              className={navLinkClass}
+              activeProps={{ className: 'text-accent' }}
+              inactiveProps={{ className: 'text-ink-soft' }}
+            >
               {t('nav.pricing')}
-            </a>
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             {balanceSlot}

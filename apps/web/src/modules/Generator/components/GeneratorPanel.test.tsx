@@ -5,6 +5,13 @@
 // on prompt length and posts the exact CreateGenerationInput; an
 // insufficient-credits failure surfaces inline with a link to /pricing.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  RouterContextProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CatalogModel, Generation } from '@opencreate/contracts'
@@ -85,14 +92,31 @@ function mockApiHappyPath() {
   })
 }
 
+// The panel renders a typed <Link to="/pricing"> since Task 20, so it needs
+// router CONTEXT. RouterContextProvider (not RouterProvider) renders children
+// synchronously — the sync loading-state assertions below stay valid.
+function buildTestRouter() {
+  const rootRoute = createRootRoute()
+  const routeTree = rootRoute.addChildren([
+    createRoute({ getParentRoute: () => rootRoute, path: '/', component: () => null }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/pricing', component: () => null }),
+  ])
+  return createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+}
+
 function renderPanel() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return {
     queryClient,
     ...render(
-      <QueryClientProvider client={queryClient}>
-        <GeneratorPanel />
-      </QueryClientProvider>,
+      <RouterContextProvider router={buildTestRouter()}>
+        <QueryClientProvider client={queryClient}>
+          <GeneratorPanel />
+        </QueryClientProvider>
+      </RouterContextProvider>,
     ),
   }
 }

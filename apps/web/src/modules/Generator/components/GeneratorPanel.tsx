@@ -4,6 +4,7 @@
 // follows the 4-states rule; submit failures surface inline — insufficient
 // credits gets its own banner with a pricing link instead of a generic error.
 import { useEffect, useId } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { Button, EmptyState, ErrorState, PillGroup, Skeleton } from 'shared/ui'
@@ -140,14 +141,14 @@ export function GeneratorPanel() {
             {isInsufficient ? t('generator.errors.insufficientCredits') : t('errors.actionFailed')}
           </span>
           {isInsufficient ? (
-            // Plain anchor: /pricing ships in plan Task 20, so the typed
-            // TanStack <Link> union does not include it yet — switch then
-            <a
-              href="/pricing"
+            // Typed Link since Task 20 shipped /pricing — SPA navigation keeps
+            // the drafted prompt alive in the store if the user comes back
+            <Link
+              to="/pricing"
               className="font-medium text-accent underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
             >
               {t('generator.errors.seePricing')}
-            </a>
+            </Link>
           ) : null}
         </div>
       ) : null}

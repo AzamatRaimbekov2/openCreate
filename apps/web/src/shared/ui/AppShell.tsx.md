@@ -46,11 +46,12 @@ flowchart LR
   Resolved with slots/props: the `routes/_shell.tsx` layout route (routes MAY
   import modules) does the wiring. Behavior contracts of the plan's test are
   unchanged.
-- `/pricing` ships as a plain `<a>` in Task 18 because the typed Link union
-  rejects routes that don't exist yet; plan Task 20 creates the route and swaps
-  it to a `Link` with active styling (same convention GeneratorPanel used).
+- `/pricing` shipped as a plain `<a>` in Task 18 (the typed Link union rejects
+  routes that don't exist yet); Task 20 created the route and swapped it to a
+  typed `Link` with the same active/inactive styling as the other nav items.
 - Account name can be an empty string in better-auth — trigger label falls back
   to the email via `user.name?.trim()`.
 
 ## Commits
-- _pending: feat(web): app shell with nav, balance, language switch_
+- 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
+- _pending: feat(web): pricing page with per-model credit table (pricing anchor → typed Link)_

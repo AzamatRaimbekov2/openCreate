@@ -166,6 +166,7 @@ NOT part of `shared/ui`):
 | Landing | `PriceTable` (landing + `/pricing`) | White card, semantic `<table>`; `<caption>` = the "verified July 2026" honesty marker (also the table's accessible name). Our column cells `bg-accent-soft` with `text-accent` ONLY (§7); one named competitor item per row, no blanket "cheapest" claims. |
 | Landing | `HowItWorks` | `<ol>` of three white step cards (aria-hidden ordinal badge, h3 + description). |
 | Landing | `FaqClaims` | `<ul>` of exactly three Q&A cards (expire+no-subscription / what a credit is / which models) — the FAQ must not grow topics beyond the approved claims. |
+| Landing | `ModelCreditTable` (route `/pricing`) | White card, labelled `<table>` of every catalog model: product name + honest provider label, localized type, credits (`1 · per image` / `5s — 35 · 8s — 56`), ≈ USD (`from $0.35` via cheapest duration). Purely presentational — the pricing ROUTE owns the catalog query and its 4 states (skeleton rows / `ErrorState` retry / defensive `EmptyState` / table) plus the signed-out 200-free-credits CTA card. |
 
 A11y fix recorded 2026-07-06: the `Modal` overlay no longer sets `aria-hidden`
 (it hid the dialog itself from the accessibility tree); it is `role="presentation"`.

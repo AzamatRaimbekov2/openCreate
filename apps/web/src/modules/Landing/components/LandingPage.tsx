@@ -32,13 +32,12 @@ export function LandingPage({ ctaTo }: LandingPageProps) {
           openCreate
         </Link>
         <div className="ml-auto flex items-center gap-3">
-          {/* Plain <a> until plan Task 20 creates /pricing (typed Link union) */}
-          <a
-            href="/pricing"
+          <Link
+            to="/pricing"
             className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-medium text-ink-soft transition-opacity duration-150 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
           >
             {t('nav.pricing')}
-          </a>
+          </Link>
           <LangSwitch />
           {/* Session-aware top-bar action mirrors the hero CTA destination */}
           <Link

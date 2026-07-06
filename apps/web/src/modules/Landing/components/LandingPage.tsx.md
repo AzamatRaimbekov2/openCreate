@@ -35,8 +35,9 @@ flowchart LR
   `modules/Auth` (cross-module imports are banned); the route composes them.
 - The LangSwitch in this top bar is the control the e2e RU-hero scenario
   (plan Task 21) clicks — do not remove it when restyling.
-- `/pricing` is a plain `<a>` until Task 20 creates the route (typed Link
-  union); swapped to `Link` in the Task 20 commit.
+- `/pricing` shipped as a plain `<a>` in Task 19 (typed Link union lacked the
+  route); Task 20 created the route and swapped it to a typed `Link`.
 
 ## Commits
-- _pending: feat(web): landing with honest price comparison (EN/RU)_
+- f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
+- _pending: feat(web): pricing page with per-model credit table (pricing anchor → typed Link)_
