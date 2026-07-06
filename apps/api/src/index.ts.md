@@ -28,4 +28,4 @@ flowchart LR
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — real db wired into boot
-- _pending_ feat(api): local media storage with /media serving — real storage wired into boot
+- 6c4e94f feat(api): local media storage with /media serving — real storage wired into boot

@@ -28,4 +28,4 @@ flowchart LR
 - Response is static per process — if the catalog ever becomes DB-backed, add cache headers here.
 
 ## Commits
-- _pending_ — feat(api): curated model catalog with credit pricing
+- bdc4175 feat(api): curated model catalog with credit pricing

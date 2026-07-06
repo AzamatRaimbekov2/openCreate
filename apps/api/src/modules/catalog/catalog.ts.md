@@ -34,4 +34,4 @@ flowchart LR
 - Prices are research 2026-07; re-verify quarterly. AIR ids `minimax:4@1` and `google:3@2` were flagged as needing verification — run `pnpm --filter @opencreate/api exec tsx src/scripts/verify-catalog.ts` with a real `RUNWARE_API_KEY` before launch.
 
 ## Commits
-- _pending_ — feat(api): curated model catalog with credit pricing
+- bdc4175 feat(api): curated model catalog with credit pricing

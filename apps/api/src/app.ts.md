@@ -34,4 +34,4 @@ flowchart LR
 - 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me — auth + user routes wired
 - f6f9734 feat(api): transactional credit ledger with charge/refund invariants — credits routes wired
 - bdc4175 feat(api): curated model catalog with credit pricing — catalog route wired
-- _pending_ feat(api): local media storage with /media serving — `storage` added to `AppDeps`, static /media/*
+- 6c4e94f feat(api): local media storage with /media serving — `storage` added to `AppDeps`, static /media/*, error handler moved before plugin boot

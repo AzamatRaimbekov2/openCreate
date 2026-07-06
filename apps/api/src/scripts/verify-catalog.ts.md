@@ -30,4 +30,4 @@ flowchart LR
 - Uses raw `fetch`, not `integrations/runware/client.ts`: the client is shaped for inference tasks (imageInference/videoInference/getResponse), and the script must keep zero app-runtime dependencies.
 
 ## Commits
-- _pending_ — feat(api): curated model catalog with credit pricing
+- bdc4175 feat(api): curated model catalog with credit pricing

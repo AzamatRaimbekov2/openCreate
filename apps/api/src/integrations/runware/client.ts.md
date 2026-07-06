@@ -38,4 +38,4 @@ flowchart LR
 - `imageInference` result is a cast (`as unknown as RunwareImageResult`), trusting Runware's documented shape; tests pin the parts we rely on.
 
 ## Commits
-- _pending_ — feat(api): runware REST client (imageInference, videoInference, getResponse)
+- 46cf18d feat(api): runware REST client (imageInference, videoInference, getResponse)

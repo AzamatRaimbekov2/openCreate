@@ -35,4 +35,4 @@ flowchart LR
 - Keys are our own generation UUIDs, not user input; traversal safety on reads is @fastify/static's job.
 
 ## Commits
-- _pending_ — feat(api): local media storage with /media serving
+- 6c4e94f feat(api): local media storage with /media serving

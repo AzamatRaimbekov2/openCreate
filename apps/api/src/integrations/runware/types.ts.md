@@ -31,4 +31,4 @@ flowchart LR
 - Optional props are declared `?: T | undefined` (not just `?: T`): this repo compiles with `exactOptionalPropertyTypes`, and the client builds these objects from `unknown` JSON fields that legitimately produce `undefined`.
 
 ## Commits
-- _pending_ — feat(api): runware REST client (imageInference, videoInference, getResponse)
+- 46cf18d feat(api): runware REST client (imageInference, videoInference, getResponse)
