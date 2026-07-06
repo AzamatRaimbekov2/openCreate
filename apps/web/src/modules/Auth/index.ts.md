@@ -39,4 +39,4 @@ flowchart LR
 
 ## Commits
 
-- _no commit yet_
+- 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)

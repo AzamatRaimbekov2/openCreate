@@ -138,3 +138,17 @@ panic styling; messages exist in both locales (`errors.*` keys).
   when user demand appears — status colors must be re-contrast-checked then.
 - Screens/routes: standalone (landing, login, 404, crash, offline) sit directly on
   paper; app screens (create, library) run inside the AppShell (Task 18).
+
+## 10. Module UI surfaces (kept current per task)
+
+Module-owned components (live inside `modules/*`, composed from §5 primitives —
+NOT part of `shared/ui`):
+
+| Module | Surface | Composition & states |
+|---|---|---|
+| Auth | `AuthForm` (login screen `/login`) | White card on paper; `Input` + `Button`; login↔register switch (fields remount per mode); zod errors per field (`role="alert"`); localized server-error banner (`role="alert"`, `bg-danger/10`); submitting = button spinner; Google button only when `VITE_GOOGLE_AUTH=1`. |
+| Credits | `BalanceChip` (AppShell header) | Accent-soft pill `⚡ n` (`rounded-full bg-accent-soft text-accent`); loading = chip-shaped `Skeleton`; failure = compact ↻ icon-button (aria-label); signed-out = hidden. Click opens the history modal. |
+| Credits | `TransactionsList` (modal) | `Modal` + 4 states: 3 skeleton rows / `ErrorState` retry / `EmptyState` / rows with localized kind + locale-formatted date + signed amount (`+n` `text-success`, `-n` `text-danger`). |
+
+A11y fix recorded 2026-07-06: the `Modal` overlay no longer sets `aria-hidden`
+(it hid the dialog itself from the accessibility tree); it is `role="presentation"`.

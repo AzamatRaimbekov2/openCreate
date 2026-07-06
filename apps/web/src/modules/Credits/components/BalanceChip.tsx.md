@@ -48,4 +48,4 @@ flowchart LR
 
 ## Commits
 
-- _no commit yet_
+- da1318e 2026-07-06 feat(web): credits balance chip + transactions modal
