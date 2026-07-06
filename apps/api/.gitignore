@@ -1,0 +1,7 @@
+# Guard against stray tsc output being emitted next to sources (the real build
+# goes to dist/ via tsconfig.build.json). eslint.config.js is the only genuine
+# .js source in this package.
+src/**/*.js
+test/**/*.js
+/drizzle.config.js
+/vitest.config.js

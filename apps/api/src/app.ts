@@ -6,6 +6,7 @@ import type { AppConfig } from './config'
 import type { Db } from './db/client'
 import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
+import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
@@ -30,6 +31,8 @@ export async function buildApp(deps: AppDeps) {
   await registerAuth(app, auth)
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)
+  // Catalog is public (no requireUser): pricing must render before sign-in.
+  registerCatalogRoutes(app)
 
   // Single error → ApiError envelope mapping. `apiCode` (set by domain errors
   // like InsufficientCreditsError or requireUser) wins; otherwise fall back on
