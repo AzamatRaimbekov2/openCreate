@@ -4,6 +4,7 @@
 import { buildApp } from './app'
 import { loadConfig } from './config'
 import { createDb } from './db/client'
+import { createRunwareClient } from './integrations/runware/client'
 import { createLocalStorage } from './storage/local'
 
 const config = loadConfig()
@@ -12,6 +13,9 @@ const config = loadConfig()
 const { db } = createDb(config.databasePath)
 // Local disk storage (mkdir -p'd on boot); assets are served back at /media/*.
 const storage = createLocalStorage(config.storageDir)
-const app = await buildApp({ config, db, storage })
+// The ONLY place the real Runware key leaves config — the client keeps it in a
+// closure and never exposes it (tests always inject a fake instead).
+const runware = createRunwareClient({ apiKey: config.runwareApiKey })
+const app = await buildApp({ config, db, storage, runware })
 await app.listen({ port: config.port, host: '0.0.0.0' })
 console.log(`api on :${config.port}`)
