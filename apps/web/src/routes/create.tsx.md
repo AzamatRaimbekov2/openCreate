@@ -45,4 +45,4 @@ flowchart LR
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
-- (pending) feat(web): gallery with 4-state cards and 4s polling of processing items (adds the gallery column)
+- 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items (adds the gallery column)

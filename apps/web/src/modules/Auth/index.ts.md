@@ -42,4 +42,4 @@ flowchart LR
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
-- (pending) feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `requireSession`)
+- 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `requireSession`)

@@ -37,4 +37,4 @@ flowchart LR
 
 ## Commits
 
-- (pending) feat(web): gallery with 4-state cards and 4s polling of processing items
+- 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items

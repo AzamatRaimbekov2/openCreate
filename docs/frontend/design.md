@@ -86,6 +86,7 @@ anything new; new shared components must be added to this table in the same task
 | `AppErrorBoundary` | wraps the app | catches render crashes → full-screen calm fallback + reload |
 | `OfflineOverlay` | none (self-managed) | full-screen blocking overlay while `navigator.onLine === false`, auto-clears |
 | `NotFoundPage` | none | 404 screen with link home (root `notFoundComponent`) |
+| `PillGroup<T>` | `label`, `options: {value,label}[]`, `value`, `onChange` | labelled `role="group"` of toggle pills, selection via `aria-pressed`; selected = `border-accent bg-accent-soft text-accent` (added Task 16 — needed by Generator pickers AND Gallery filter chips) |
 
 Buttons: primary = the single main action per view; ghost = secondary/quiet actions and
 retry; danger = destructive only (delete). Size `lg` only for landing/hero CTAs.
@@ -149,6 +150,17 @@ NOT part of `shared/ui`):
 | Auth | `AuthForm` (login screen `/login`) | White card on paper; `Input` + `Button`; login↔register switch (fields remount per mode); zod errors per field (`role="alert"`); localized server-error banner (`role="alert"`, `bg-danger/10`); submitting = button spinner; Google button only when `VITE_GOOGLE_AUTH=1`. |
 | Credits | `BalanceChip` (AppShell header) | Accent-soft pill `⚡ n` (`rounded-full bg-accent-soft text-accent`); loading = chip-shaped `Skeleton`; failure = compact ↻ icon-button (aria-label); signed-out = hidden. Click opens the history modal. |
 | Credits | `TransactionsList` (modal) | `Modal` + 4 states: 3 skeleton rows / `ErrorState` retry / `EmptyState` / rows with localized kind + locale-formatted date + signed amount (`+n` `text-success`, `-n` `text-danger`). |
+| Generator | `GeneratorPanel` (create page `/create`) | White card; catalog 4 states (form-silhouette skeletons / `ErrorState` retry / defensive `EmptyState` / form). Composes `PillGroup` (type), `ModelPicker`, prompt textarea, `AspectPicker` + `DurationPicker` (video only), `ImageDrop` (i2v only), `CostLabel` + primary Generate. Submit failures are INLINE `role="alert"` banners (`bg-danger/10`); insufficient credits adds a `/pricing` link. |
+| Generator | `ModelPicker` (cards) | 2-col grid of `aria-pressed` cards: product name + honest provider label + price hint (image "≈ 1 credit" / video "from 35"); selected = `border-accent bg-accent-soft`. |
+| Generator | `ImageDrop` | Dashed dropzone button (`border-dashed border-ink/15`) + sr-only labelled file input; validates image/* ≤10MB; preview thumb + ghost Remove; errors inline `role="alert"` `text-danger`. |
+| Gallery | `GalleryGrid` (create + library) | 4 states: 8 card skeletons / `ErrorState` retry / `EmptyState` + primary-styled `/create` `Link` CTA (off on the create page) / responsive 1-2-3-col grid + ghost "Load more" while `nextCursor`. |
+| Gallery | `GenerationCard` | White card, media well in the REAL aspect (`aspect-video`/`aspect-square`/`aspect-[9/16]`) on `bg-media`. Processing = pulsing well + `Progress` + "n%" caption; succeeded = `<video controls>` or image button → `GenerationDetail` modal, footer cost · download link · ghost-danger Delete; failed = `border-danger` + localized title + stored failure reason (caption) + success `Badge` "Credits refunded". |
+| Gallery | `GalleryFilterChips` (library) | `PillGroup` of All / Images / Videos; selection is page-local state. |
 
 A11y fix recorded 2026-07-06: the `Modal` overlay no longer sets `aria-hidden`
 (it hid the dialog itself from the accessibility tree); it is `role="presentation"`.
+
+Recorded copy exception (Tasks 16-17): failed generation cards show the stored
+provider failure reason as a SECONDARY caption under a localized primary line —
+the plan's card contract requires the reason to be visible; §8's "no raw server
+text" otherwise stands.
