@@ -10,23 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as LibraryRouteImport } from './routes/library'
-import { Route as CreateRouteImport } from './routes/create'
+import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
+import { Route as ShellCreateRouteImport } from './routes/_shell.create'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LibraryRoute = LibraryRouteImport.update({
-  id: '/library',
-  path: '/library',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CreateRoute = CreateRouteImport.update({
-  id: '/create',
-  path: '/create',
+const ShellRoute = ShellRouteImport.update({
+  id: '/_shell',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -34,38 +29,54 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShellLibraryRoute = ShellLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellCreateRoute = ShellCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => ShellRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/create': typeof CreateRoute
-  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
+  '/create': typeof ShellCreateRoute
+  '/library': typeof ShellLibraryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/create': typeof CreateRoute
-  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
+  '/create': typeof ShellCreateRoute
+  '/library': typeof ShellLibraryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/create': typeof CreateRoute
-  '/library': typeof LibraryRoute
+  '/_shell': typeof ShellRouteWithChildren
   '/login': typeof LoginRoute
+  '/_shell/create': typeof ShellCreateRoute
+  '/_shell/library': typeof ShellLibraryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/create' | '/library' | '/login'
+  fullPaths: '/' | '/login' | '/create' | '/library'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/create' | '/library' | '/login'
-  id: '__root__' | '/' | '/create' | '/library' | '/login'
+  to: '/' | '/login' | '/create' | '/library'
+  id:
+    | '__root__'
+    | '/'
+    | '/_shell'
+    | '/login'
+    | '/_shell/create'
+    | '/_shell/library'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CreateRoute: typeof CreateRoute
-  LibraryRoute: typeof LibraryRoute
+  ShellRoute: typeof ShellRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -78,18 +89,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/library': {
-      id: '/library'
-      path: '/library'
-      fullPath: '/library'
-      preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/create': {
-      id: '/create'
-      path: '/create'
-      fullPath: '/create'
-      preLoaderRoute: typeof CreateRouteImport
+    '/_shell': {
+      id: '/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -99,13 +103,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_shell/library': {
+      id: '/_shell/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof ShellLibraryRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/create': {
+      id: '/_shell/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof ShellCreateRouteImport
+      parentRoute: typeof ShellRoute
+    }
   }
 }
 
+interface ShellRouteChildren {
+  ShellCreateRoute: typeof ShellCreateRoute
+  ShellLibraryRoute: typeof ShellLibraryRoute
+}
+
+const ShellRouteChildren: ShellRouteChildren = {
+  ShellCreateRoute: ShellCreateRoute,
+  ShellLibraryRoute: ShellLibraryRoute,
+}
+
+const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CreateRoute: CreateRoute,
-  LibraryRoute: LibraryRoute,
+  ShellRoute: ShellRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

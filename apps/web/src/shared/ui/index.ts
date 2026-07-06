@@ -3,6 +3,8 @@
 // ONLY from 'shared/ui' — never from the individual component files.
 // Component inventory + variants: docs/frontend/design.md §5.
 export { AppErrorBoundary } from './AppErrorBoundary'
+export { AppShell } from './AppShell'
+export type { AppShellProps, AppShellUser } from './AppShell'
 export { Badge } from './Badge'
 export type { BadgeProps, BadgeVariant } from './Badge'
 export { Button } from './Button'
@@ -15,6 +17,7 @@ export { Input } from './Input'
 export type { InputProps } from './Input'
 export { Modal } from './Modal'
 export type { ModalProps } from './Modal'
+export { LangSwitch } from './LangSwitch'
 export { NotFoundPage } from './NotFoundPage'
 export { OfflineOverlay } from './OfflineOverlay'
 export { PillGroup } from './PillGroup'

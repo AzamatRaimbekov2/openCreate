@@ -87,6 +87,8 @@ anything new; new shared components must be added to this table in the same task
 | `OfflineOverlay` | none (self-managed) | full-screen blocking overlay while `navigator.onLine === false`, auto-clears |
 | `NotFoundPage` | none | 404 screen with link home (root `notFoundComponent`) |
 | `PillGroup<T>` | `label`, `options: {value,label}[]`, `value`, `onChange` | labelled `role="group"` of toggle pills, selection via `aria-pressed`; selected = `border-accent bg-accent-soft text-accent` (added Task 16 — needed by Generator pickers AND Gallery filter chips) |
+| `LangSwitch` | none (reads/sets locale via `shared/config/i18n`) | compact `role="group"` EN/RU toggle, `aria-pressed` active pill = `bg-accent-soft text-accent` (added Task 18 — needed by AppShell AND the standalone landing) |
+| `AppShell` | `user: {name,email} \| null`, `isSessionPending?`, `onSignOut`, `balanceSlot?`, `children` | header (wordmark home link, nav Create/Library/Pricing with accent active state, balance slot, LangSwitch, account area) + `bg-paper` canvas; account area: pending = `Skeleton`, signed out = primary Sign in link, signed in = disclosure user menu (`aria-haspopup`/`aria-expanded`, Escape + click-away close) |
 
 Buttons: primary = the single main action per view; ghost = secondary/quiet actions and
 retry; danger = destructive only (delete). Size `lg` only for landing/hero CTAs.
@@ -138,7 +140,10 @@ panic styling; messages exist in both locales (`errors.*` keys).
 - Dark mode: out of scope for MVP (`--color-media` is the only dark surface). Revisit
   when user demand appears — status colors must be re-contrast-checked then.
 - Screens/routes: standalone (landing, login, 404, crash, offline) sit directly on
-  paper; app screens (create, library) run inside the AppShell (Task 18).
+  paper; app screens (create, library, pricing) run inside the AppShell via the
+  pathless `_shell` layout route. AppShell itself is presentational — session
+  state and BalanceChip are injected by `routes/_shell.tsx` (shared/ui never
+  imports modules/*).
 
 ## 10. Module UI surfaces (kept current per task)
 
