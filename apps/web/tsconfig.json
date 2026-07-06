@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "baseUrl": ".",
+    "paths": {
+      "modules": ["./src/modules"],
+      "modules/*": ["./src/modules/*"],
+      "shared": ["./src/shared"],
+      "shared/*": ["./src/shared/*"],
+      "routes": ["./src/routes"],
+      "routes/*": ["./src/routes/*"]
+    }
+  },
+  "include": ["src", "e2e", "*.ts"]
+}
