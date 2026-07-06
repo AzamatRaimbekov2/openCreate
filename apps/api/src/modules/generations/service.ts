@@ -80,6 +80,11 @@ export function createGenerationService({ db, runware, storage }: Deps) {
 
     // Charge first (throws 402 before any provider call), then persist the
     // processing row — from here on every failure path must refund.
+    // runwareTaskUuid is deliberately NOT set yet: the row must not be
+    // pollable before Runware knows the task. A concurrent GET /:id during the
+    // in-flight provider call would otherwise ask Runware about an unknown
+    // task, get an error, mark the row failed AND refund — while the provider
+    // call still succeeds (free-generation double-spend).
     chargeCredits(db, userId, cost, id)
     db.insert(generation)
       .values({
@@ -92,7 +97,6 @@ export function createGenerationService({ db, runware, storage }: Deps) {
         modelId: model.id,
         paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, duration: input.duration }),
         costCredits: cost,
-        runwareTaskUuid: taskUUID,
         createdAt: now,
       })
       .run()
@@ -109,16 +113,30 @@ export function createGenerationService({ db, runware, storage }: Deps) {
           height,
         })
         const mediaUrl = await storage.saveFromUrl(res.imageURL, id, 'webp')
-        db.update(generation)
-          .set({
-            status: 'succeeded',
-            mediaJson: JSON.stringify([mediaUrl]),
-            runwareCostUsd: res.cost?.toString(),
-            completedAt: new Date(),
-            paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, seed: res.seed }),
-          })
-          .where(eq(generation.id, id))
-          .run()
+        // Status-guarded settle: ONLY a processing row may become succeeded.
+        // Without the guard a row that some other path already failed+refunded
+        // (e.g. the stale-generation reaper) would be flipped back to
+        // succeeded and deliver the asset for free — the ledger would show
+        // charge + refund = 0 while the user keeps the image.
+        let settled = false
+        db.transaction((tx) => {
+          const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
+          if (fresh?.status !== 'processing') return
+          tx.update(generation)
+            .set({
+              status: 'succeeded',
+              mediaJson: JSON.stringify([mediaUrl]),
+              runwareCostUsd: res.cost?.toString(),
+              completedAt: new Date(),
+              paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, seed: res.seed }),
+            })
+            .where(eq(generation.id, id))
+            .run()
+          settled = true
+        })
+        // Row already settled elsewhere (failed + refunded) → the user was
+        // made whole; discard the downloaded asset instead of delivering it.
+        if (!settled) await storage.remove(id, 'webp')
       } catch (err) {
         // Provider or download failure → mark failed, give the money back,
         // and rethrow so the route surfaces the provider error envelope.
@@ -150,6 +168,16 @@ export function createGenerationService({ db, runware, storage }: Deps) {
           ? { frameImages: [{ image: input.inputImage, frame: 'first' as const }] }
           : {}),
       })
+      // Publish the task uuid ONLY now that Runware has acknowledged the task.
+      // Before this point get() refuses to poll (null uuid → no provider call),
+      // which closes the submit-window race: a concurrent poll can no longer
+      // ask Runware about a not-yet-registered task, read the resulting error
+      // as a failure, and refund a job the operator still pays Runware for.
+      // Status-guarded so a row settled elsewhere is never resurrected.
+      db.update(generation)
+        .set({ runwareTaskUuid: taskUUID })
+        .where(and(eq(generation.id, id), eq(generation.status, 'processing')))
+        .run()
     } catch (err) {
       refundCredits(db, userId, id)
       db.update(generation)
@@ -176,6 +204,11 @@ export function createGenerationService({ db, runware, storage }: Deps) {
       .where(and(eq(generation.id, id), eq(generation.userId, userId)))
       .get()
     if (!row) throw new NotFoundError('generation not found')
+    // A null runwareTaskUuid on a processing row means create() has not yet
+    // finished the provider submit — the task does not exist on Runware's side
+    // yet, so polling it would misread "unknown task" as a terminal failure
+    // (and refund a job that is about to succeed). Return the row as-is; the
+    // SPA's next poll will find the uuid once the submit completes.
     if (row.status !== 'processing' || !row.runwareTaskUuid) return toDto(row)
 
     const poll = await runware.getResponse(row.runwareTaskUuid)

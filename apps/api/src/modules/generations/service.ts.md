@@ -19,7 +19,7 @@ The generation lifecycle service (plan Task 10) — the core money-touching sequ
 
 ## Dependencies
 - Imports / depends on: `@opencreate/contracts` (input/DTO types), `db/schema` (`generation`), `credits/ledger` (`chargeCredits`/`refundCredits`), `catalog/catalog` (`getModel`/`creditsFor`/`resolutionFor`), `integrations/runware/client` (type), `storage/local` (type), drizzle operators, `node:crypto`.
-- Used by: `modules/generations/routes.ts` (wired in `app.ts`, Task 11); tested by `test/generations.test.ts` with the scripted `fakeRunware`.
+- Used by: `modules/generations/routes.ts` (wired in `app.ts`, Task 11); tested by `test/generations.test.ts` and `test/generations-races.test.ts` with the scripted `fakeRunware`.
 
 ## Diagram
 ```mermaid
@@ -27,13 +27,13 @@ flowchart TD
   P[POST /api/generations] --> V{catalog valid?}
   V -- no --> E400[400 validation_failed]
   V -- yes --> C[chargeCredits 402-guarded]
-  C --> R[insert processing row]
-  R -- image --> I[runware.imageInference] --> S[storage.saveFromUrl] --> OK[succeeded → 201]
-  R -- video --> SV[runware.submitVideo] --> A[202 processing]
+  C --> R[insert processing row, NO task uuid yet]
+  R -- image --> I[runware.imageInference] --> S[storage.saveFromUrl] --> GTX[guarded flip → succeeded → 201]
+  R -- video --> SV[runware.submitVideo] --> PU[publish runwareTaskUuid, guarded] --> A[202 processing]
   I -- throw --> RF[refund + mark failed + rethrow]
   SV -- throw --> RF
-  G[GET /api/generations/:id] --> Q{processing?}
-  Q -- no --> DTO[return row]
+  G[GET /api/generations/:id] --> Q{processing AND has task uuid?}
+  Q -- no --> DTO[return row as-is]
   Q -- yes --> PL[runware.getResponse]
   PL -- processing --> UP[update progress]
   PL -- success --> DL[download asset] --> TX[guarded flip → succeeded]
@@ -42,6 +42,8 @@ flowchart TD
 
 ## Key decisions / gotchas
 - Charge happens BEFORE any provider call: a 402 means Runware was never contacted (asserted in tests).
+- **Anti-double-spend (create/poll race)**: the processing row is inserted WITHOUT `runwareTaskUuid`; the uuid is published only after the provider call is acknowledged (video) — and images never need it. `get()` refuses to poll a row with a null uuid. This closes the window where a concurrent GET /:id polled Runware for a task it didn't know yet, misread the error as terminal, refunded, and create() then flipped the row to succeeded anyway (charge + refund = 0, asset delivered). Pinned by `test/generations-races.test.ts`.
+- The image success transition is a status-guarded transaction (only processing → succeeded); if the row was settled elsewhere, the downloaded asset is discarded instead of delivered.
 - Every failure path after the charge refunds; `refundCredits` is idempotent (once-per-generation guard lives in the ledger), so concurrent polls cannot double-refund.
 - Poll success downloads the asset BEFORE flipping status: a failed download leaves the row processing so the next poll retries — a succeeded row always has media.
 - Transitions out of `processing` re-read the fresh status inside a transaction because two tabs can poll the same generation concurrently.
