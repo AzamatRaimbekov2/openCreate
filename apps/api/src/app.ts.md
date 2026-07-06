@@ -1,0 +1,30 @@
+# app.ts — AI component doc
+
+> AI-facing sidecar for `app.ts`. Created 2026-07-06. Keep this in sync with the code on every change.
+
+## Purpose
+DI composition root (plan Task 3): `buildApp(deps)` returns a configured Fastify instance as a pure function of its dependencies, so tests inject in-memory deps and `index.ts` injects real ones.
+
+## What it does (for an AI reader)
+- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and (from Task 4 on) wire db/auth/module routes.
+- Public API / exports: `AppDeps` (type), `buildApp(deps): Promise<FastifyInstance>`.
+- Inputs → Outputs: `AppDeps` (`config`; later `db`, `runware`, `storage`) → ready Fastify app (not listening).
+- Side effects: none until `listen()`; route registration only.
+
+## Dependencies
+- Imports / depends on: `fastify`, `./config` (type).
+- Used by: `src/index.ts` (boot), `test/helpers/build-test-app.ts` (all HTTP tests).
+
+## Diagram
+```mermaid
+flowchart LR
+  DEPS[AppDeps: config, db...] --> B[buildApp] --> R[routes: /health, modules]
+  B --> EH[setErrorHandler → ApiError envelope]
+```
+
+## Key decisions / gotchas
+- Error mapping: `err.apiCode` (set by domain errors like `InsufficientCreditsError` / `requireUser`) wins; otherwise 500→`internal_error`, other statuses→`validation_failed` — unexpected errors never leak a non-envelope shape.
+- `AppDeps` intentionally grows per plan tasks; keep the exact shape so `build-test-app.ts` stays the one place tests configure it.
+
+## Commits
+- (pending) feat(api): fastify skeleton with typed config and health route
