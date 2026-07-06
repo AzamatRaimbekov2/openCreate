@@ -6,7 +6,7 @@
 Single build/dev/test config for `@opencreate/web`: Vite 8 bundling, TanStack Router file-based codegen, Tailwind v4, path aliases, dev proxy to the API, and the Vitest jsdom environment.
 
 ## What it does (for an AI reader)
-- Responsibilities: register plugins in the required order (`tanstackRouter` BEFORE `react()` so `src/routeTree.gen.ts` is generated before JSX transform), map `modules/ shared/ routes/` aliases, proxy `/api` and `/media` to `http://localhost:8787`, configure Vitest (`jsdom`, `globals`, `src/test-setup.ts`).
+- Responsibilities: register plugins in the required order (`tanstackRouter` BEFORE `react()` so `src/routeTree.gen.ts` is generated before JSX transform), map `modules/ shared/ routes/` aliases, proxy `/api` and `/media` to `http://localhost:8787`, configure Vitest (`jsdom`, `globals`, `src/test-setup.ts`, and `exclude: e2e/**` so Playwright specs never run under vitest).
 - Public API / exports: default export — Vite/Vitest `UserConfig` via `defineConfig` from `vitest/config` (typed `test` block).
 - Inputs → Outputs: `src/**` sources → dev server on :5173 / production bundle / test runs. Route files in `src/routes/` → generated `src/routeTree.gen.ts`.
 - Side effects: writes `src/routeTree.gen.ts` on dev/build/test start (router plugin codegen).
@@ -32,6 +32,7 @@ flowchart LR
 - `defineConfig` is imported from `vitest/config` (not `vite`) so the `test` option typechecks — vitest 4 supports vite ^8.
 - Aliases must stay mirrored with `tsconfig.json` `paths`; relative `../../..` imports are banned by the frontend standard.
 - Proxying `/api` + `/media` keeps auth cookies first-party in dev — no CORS config needed anywhere.
+- Vitest's default include glob (`**/*.spec.*`) would match `e2e/generate.spec.ts` and crash importing `@playwright/test`; `exclude: [...configDefaults.exclude, 'e2e/**']` keeps unit (`pnpm test`) and browser (`pnpm e2e`) runners separate. Spreading `configDefaults.exclude` is required — overriding `exclude` REPLACES the defaults (node_modules, dist…).
 
 ## Commits
 - _no commit yet_

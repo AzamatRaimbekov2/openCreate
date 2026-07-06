@@ -3,7 +3,7 @@
 // dev proxy to the API on :8787 (same-origin /api + /media — no CORS in dev),
 // and the jsdom test environment for component tests.
 // `defineConfig` comes from 'vitest/config' so the `test` block is typed.
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
@@ -41,5 +41,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test-setup.ts',
     globals: true,
+    // Playwright specs live in e2e/ and match vitest's default *.spec.* glob —
+    // exclude them so `pnpm test` (unit) and `pnpm e2e` (browser) stay separate
+    // runners; vitest would crash importing '@playwright/test'.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })
