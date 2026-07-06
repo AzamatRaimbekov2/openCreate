@@ -17,6 +17,15 @@ void i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 })
 
+// <html lang> mirrors the active locale (a11y rule, design.md §7) so screen
+// readers pronounce RU copy with Russian phonetics; guarded for non-DOM loads
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = stored ?? 'en'
+  i18n.on('languageChanged', (lang) => {
+    document.documentElement.lang = lang
+  })
+}
+
 // Single entry point for switching language (used by the app-shell lang switch)
 export function setLanguage(lang: 'en' | 'ru') {
   localStorage.setItem('oc-lang', lang)

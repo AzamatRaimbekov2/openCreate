@@ -12,7 +12,7 @@ SPA entry point: builds the typed TanStack Router from the generated route tree 
 - Side effects: DOM render; module-level router construction.
 
 ## Dependencies
-- Imports / depends on: `react`, `react-dom/client`, `@tanstack/react-router`, `./routeTree.gen` (generated); Task 13 adds `shared/config/theme.css` import.
+- Imports / depends on: `react`, `react-dom/client`, `@tanstack/react-router`, `./routeTree.gen` (generated), `shared/config/theme.css` (Tailwind v4 entry + Paper & Ink tokens — the app's only stylesheet, imported once here).
 - Used by: `index.html` (`<script type="module" src="/src/main.tsx">`).
 
 ## Diagram
@@ -28,4 +28,4 @@ flowchart LR
 - `routeTree.gen.ts` is produced by the vite plugin on dev/build/test start — run any script once before `tsc` if the file is missing.
 
 ## Commits
-- _no commit yet_
+- c987d5f 2026-07-06 feat(web): vite scaffold, tanstack router, i18n, providers

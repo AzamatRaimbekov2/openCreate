@@ -1,0 +1,25 @@
+// apps/web/src/shared/ui/index.ts
+// Public API of the "Paper & Ink" design-system kit. Modules and routes import
+// ONLY from 'shared/ui' — never from the individual component files.
+// Component inventory + variants: docs/frontend/design.md §5.
+export { AppErrorBoundary } from './AppErrorBoundary'
+export { Badge } from './Badge'
+export type { BadgeProps, BadgeVariant } from './Badge'
+export { Button } from './Button'
+export type { ButtonProps, ButtonSize, ButtonVariant } from './Button'
+export { EmptyState } from './EmptyState'
+export type { EmptyStateProps } from './EmptyState'
+export { ErrorState } from './ErrorState'
+export type { ErrorStateProps } from './ErrorState'
+export { Input } from './Input'
+export type { InputProps } from './Input'
+export { Modal } from './Modal'
+export type { ModalProps } from './Modal'
+export { NotFoundPage } from './NotFoundPage'
+export { OfflineOverlay } from './OfflineOverlay'
+export { Progress } from './Progress'
+export type { ProgressProps } from './Progress'
+export { Select } from './Select'
+export type { SelectOption, SelectProps } from './Select'
+export { Skeleton } from './Skeleton'
+export type { SkeletonProps } from './Skeleton'

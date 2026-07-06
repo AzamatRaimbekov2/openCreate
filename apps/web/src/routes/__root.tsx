@@ -1,20 +1,27 @@
 // apps/web/src/routes/__root.tsx
 // Root route: wraps every screen with the global providers (TanStack Query,
-// i18n side-effect init). Error-UX surfaces (crash boundary, offline overlay,
-// 404) are wired here in Task 13.
+// i18n side-effect init) and the app-wide error-UX surfaces — the crash
+// boundary sits OUTSIDE the providers so even a provider failure still shows
+// the calm fallback; the offline overlay renders above whatever screen is on.
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from 'shared/config/queryClient'
+import { AppErrorBoundary, NotFoundPage, OfflineOverlay } from 'shared/ui'
 import 'shared/config/i18n'
 
 export const Route = createRootRoute({
   component: RootLayout,
+  // Unknown paths render the custom 404 instead of TanStack's default
+  notFoundComponent: NotFoundPage,
 })
 
 function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <OfflineOverlay />
+        <Outlet />
+      </QueryClientProvider>
+    </AppErrorBoundary>
   )
 }

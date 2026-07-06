@@ -1,0 +1,34 @@
+/* apps/web/src/shared/config/theme.css
+   The ONLY CSS file in the app (frontend law). Tailwind v4 entry + the
+   "Paper & Ink" design tokens — see docs/frontend/design.md for roles,
+   use-when/avoid-when rules and contrast notes. Components consume these
+   through utility classes (bg-paper, text-ink, ring-accent, …). */
+@import 'tailwindcss';
+
+@theme {
+  /* Warm paper canvas — the app-wide background */
+  --color-paper: #faf9f6;
+  /* Ink — primary text */
+  --color-ink: #111110;
+  /* Softened ink — secondary text, captions */
+  --color-ink-soft: #57534e;
+  /* The single electric accent — actions, focus, progress */
+  --color-accent: #4f46e5;
+  /* Accent wash — hovers, selected states, accent badges */
+  --color-accent-soft: #eef2ff;
+  /* Dark media well — ONLY behind image/video previews */
+  --color-media: #141413;
+  /* Positive status — refunds, +credits */
+  --color-success: #16a34a;
+  /* Destructive/failure status — delete, failed generations */
+  --color-danger: #dc2626;
+  /* Card radius (rounded-2xl equivalent, kept as a named token) */
+  --radius-card: 1rem;
+}
+
+/* Base canvas: every screen starts on paper with ink text */
+@layer base {
+  body {
+    @apply bg-paper text-ink antialiased;
+  }
+}
