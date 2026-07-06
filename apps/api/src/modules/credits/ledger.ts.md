@@ -31,4 +31,4 @@ flowchart LR
 
 ## Commits
 - 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me
-- (pending) feat(api): transactional credit ledger with charge/refund invariants — chargeCredits/refundCredits/InsufficientCreditsError added
+- f6f9734 feat(api): transactional credit ledger with charge/refund invariants — chargeCredits/refundCredits/InsufficientCreditsError added

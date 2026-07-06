@@ -26,4 +26,4 @@ flowchart LR
 - Amounts come out signed (charge negative, bonus/refund positive) — the UI renders the sign, the API does not reinterpret it.
 
 ## Commits
-- (pending) feat(api): transactional credit ledger with charge/refund invariants
+- f6f9734 feat(api): transactional credit ledger with charge/refund invariants

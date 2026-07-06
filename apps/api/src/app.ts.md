@@ -30,4 +30,4 @@ flowchart LR
 - eb91028 feat(api): fastify skeleton with typed config and health route
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — `db` added to `AppDeps`
 - 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me — auth + user routes wired
-- (pending) feat(api): transactional credit ledger with charge/refund invariants — credits routes wired
+- f6f9734 feat(api): transactional credit ledger with charge/refund invariants — credits routes wired
