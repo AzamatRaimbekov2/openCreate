@@ -3,27 +3,40 @@
 > AI-facing sidecar for `index.tsx`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Landing route (`/`) — temporary placeholder rendering the localized headline/subtitle until `modules/Landing` ships in Task 19.
+Landing route (`/`) — thin composition wrapper: reads the session and renders
+`modules/Landing`'s `LandingPage` with the CTA destination.
 
 ## What it does (for an AI reader)
-- Responsibilities: `createFileRoute('/')` with a small presentational component; all copy via i18n keys `landing.headline` / `landing.subtitle`.
+- Responsibilities: `createFileRoute('/')`; decide `ctaTo` from the session
+  (`/create` signed in, `/login` otherwise). No layout/business logic here.
 - Public API / exports: `Route`.
-- Inputs → Outputs: none → centered hero headline on the paper background.
-- Side effects: none.
+- Inputs → Outputs: better-auth session snapshot → `<LandingPage ctaTo=…/>`.
+- Side effects: `useAuthSession` triggers better-auth's session fetch on mount.
 
 ## Dependencies
-- Imports / depends on: `@tanstack/react-router`, `react-i18next`.
-- Used by: `routeTree.gen.ts`; smoke-tested by `src/routes/__root.test.tsx` (asserts the EN headline via memory-history router).
+- Imports / depends on: `@tanstack/react-router`, `modules/Auth`
+  (`useAuthSession`), `modules/Landing` (`LandingPage`).
+- Used by: `routeTree.gen.ts`; smoke-tested by `src/routes/__root.test.tsx`
+  (mocks `modules/Auth`, asserts the EN hero headline via memory-history router).
 
 ## Diagram
 ```mermaid
 flowchart LR
-  URL["/"] --> R[index.tsx Route] --> H[localized hero headline]
+  URL["/"] --> R[index.tsx Route]
+  Auth[modules/Auth useAuthSession] --> R
+  R -- "ctaTo /create | /login" --> LP[modules/Landing LandingPage]
 ```
 
 ## Key decisions / gotchas
-- Task 19 replaces the body with `modules/Landing`'s `LandingPage`; keep this file a thin composition wrapper.
-- Uses design tokens (`bg-paper`, `text-ink`, `text-ink-soft`) that activate when Task 13's `theme.css` lands — classes are inert strings until then.
+- The session read lives HERE because `modules/Landing` must not import
+  `modules/Auth` (cross-module imports are banned) — routes are the
+  composition layer.
+- While the session is still resolving the visitor CTA (`/login`) shows; a
+  signed-in user who clicks it is bounced `/login → /create` by the login
+  route, so no wrong destination is reachable.
+- Landing stays OUTSIDE the `_shell` AppShell layout — standalone marketing
+  screen with its own top bar (design.md §9).
 
 ## Commits
-- _no commit yet_
+- c987d5f 2026-07-06 feat(web): vite scaffold, tanstack router, i18n, providers (placeholder)
+- _pending: feat(web): landing with honest price comparison (EN/RU)_

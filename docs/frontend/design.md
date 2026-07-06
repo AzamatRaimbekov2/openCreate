@@ -161,6 +161,11 @@ NOT part of `shared/ui`):
 | Gallery | `GalleryGrid` (create + library) | 4 states: 8 card skeletons / `ErrorState` retry / `EmptyState` + primary-styled `/create` `Link` CTA (off on the create page) / responsive 1-2-3-col grid + ghost "Load more" while `nextCursor`. |
 | Gallery | `GenerationCard` | White card, media well in the REAL aspect (`aspect-video`/`aspect-square`/`aspect-[9/16]`) on `bg-media`. Processing = pulsing well + `Progress` + "n%" caption; succeeded = `<video controls>` or image button → `GenerationDetail` modal, footer cost · download link · ghost-danger Delete; failed = `border-danger` + localized title + stored failure reason (caption) + success `Badge` "Credits refunded". |
 | Gallery | `GalleryFilterChips` (library) | `PillGroup` of All / Images / Videos; selection is page-local state. |
+| Landing | `LandingPage` (route `/`) | Standalone screen with its OWN top bar (wordmark · /pricing link · `LangSwitch` · session-aware Sign in/Create action); sections in reading order: Hero → PriceTable → HowItWorks → FaqClaims. CTA destination comes in as a prop (`ctaTo`) — the route reads the session, the module never imports Auth. |
+| Landing | `Hero` | Display headline (i18n `landing.headline`), the three approved claims mid-dot joined, primary-lg CTA `Link`, decorative `aria-hidden` showcase strip (`public/showcase/*.webp` gradient placeholders on `bg-media` wells). |
+| Landing | `PriceTable` (landing + `/pricing`) | White card, semantic `<table>`; `<caption>` = the "verified July 2026" honesty marker (also the table's accessible name). Our column cells `bg-accent-soft` with `text-accent` ONLY (§7); one named competitor item per row, no blanket "cheapest" claims. |
+| Landing | `HowItWorks` | `<ol>` of three white step cards (aria-hidden ordinal badge, h3 + description). |
+| Landing | `FaqClaims` | `<ul>` of exactly three Q&A cards (expire+no-subscription / what a credit is / which models) — the FAQ must not grow topics beyond the approved claims. |
 
 A11y fix recorded 2026-07-06: the `Modal` overlay no longer sets `aria-hidden`
 (it hid the dialog itself from the accessibility tree); it is `role="presentation"`.

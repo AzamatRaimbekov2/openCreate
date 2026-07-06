@@ -8,9 +8,77 @@
     "language": "Language"
   },
   "landing": {
-    "headline": "AI images and video, honestly priced",
-    "subtitle": "Images from $0.01. 5-second videos from $0.35. Credits never expire.",
-    "cta": "Start creating"
+    "headline": "Create images & video. Pay pennies, not plans.",
+    "claims": {
+      "images": "Images from $0.01",
+      "videos": "5-second videos from $0.35",
+      "expire": "Credits never expire"
+    },
+    "cta": "Start creating",
+    "price": {
+      "title": "Honest price comparison",
+      "caption": "Public prices for comparable generations, verified {{date}}",
+      "date": "July 2026",
+      "columns": {
+        "useCase": "What you get",
+        "ours": "openCreate",
+        "competitor": "Elsewhere"
+      },
+      "rows": {
+        "image": {
+          "useCase": "One image",
+          "ourModel": "Flash (FLUX schnell)",
+          "competitorItem": "Midjourney — one image",
+          "competitorNote": "subscription effective rate"
+        },
+        "video5s": {
+          "useCase": "5-second video",
+          "ourModel": "Swift (PixVerse V6)",
+          "competitorItem": "Higgsfield — Seedance 5s",
+          "competitorNote": "Ultra plan effective rate"
+        },
+        "cinema5s": {
+          "useCase": "5-second cinema video",
+          "ourModel": "Cinema (Wan 2.7)",
+          "competitorItem": "Runway — Gen-4 5s",
+          "competitorNote": "pay-as-you-go rate"
+        }
+      }
+    },
+    "how": {
+      "title": "How it works",
+      "steps": {
+        "prompt": {
+          "title": "Describe it",
+          "description": "Type a prompt in any language."
+        },
+        "model": {
+          "title": "Pick a model",
+          "description": "Speed or quality — the price is visible before you generate."
+        },
+        "result": {
+          "title": "Get your result",
+          "description": "Download the image or video. It stays in your library."
+        }
+      }
+    },
+    "faq": {
+      "title": "Fair questions",
+      "items": {
+        "expire": {
+          "q": "Do credits expire?",
+          "a": "No. Credits stay on your account until you use them, and no subscription is required."
+        },
+        "credit": {
+          "q": "What is a credit?",
+          "a": "A credit is $0.01. One image costs from 1 credit, a 5-second video from 35 credits."
+        },
+        "models": {
+          "q": "Which models are behind this?",
+          "a": "FLUX for images; PixVerse, MiniMax Hailuo, Wan, Kling and Veo for video — every model is labelled with its real provider."
+        }
+      }
+    }
   },
   "auth": {
     "signIn": "Sign in",
