@@ -6,13 +6,13 @@
 DI composition root (plan Task 3): `buildApp(deps)` returns a configured Fastify instance as a pure function of its dependencies, so tests inject in-memory deps and `index.ts` injects real ones.
 
 ## What it does (for an AI reader)
-- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and (from Task 4 on) wire db/auth/module routes.
+- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and wire modules: `createAuth` + `registerAuth` (decorates `requireUser`) first, then `registerUserRoutes` (`/api/me`) and later modules.
 - Public API / exports: `AppDeps` (type), `buildApp(deps): Promise<FastifyInstance>`.
 - Inputs → Outputs: `AppDeps` (`config`, `db`; later `runware`, `storage`) → ready Fastify app (not listening).
 - Side effects: none until `listen()`; route registration only.
 
 ## Dependencies
-- Imports / depends on: `fastify`, `./config` (type), `./db/client` (`Db` type).
+- Imports / depends on: `fastify`, `./config` (type), `./db/client` (`Db` type), `./modules/auth/auth`, `./modules/auth/plugin`, `./modules/users/routes`.
 - Used by: `src/index.ts` (boot), `test/helpers/build-test-app.ts` (all HTTP tests).
 
 ## Diagram
@@ -28,4 +28,5 @@ flowchart LR
 
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL — `db` added to `AppDeps`
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — `db` added to `AppDeps`
+- (pending) feat(api): better-auth (email+google) with signup bonus + /api/me — auth + user routes wired

@@ -4,6 +4,9 @@
 import Fastify from 'fastify'
 import type { AppConfig } from './config'
 import type { Db } from './db/client'
+import { createAuth } from './modules/auth/auth'
+import { registerAuth } from './modules/auth/plugin'
+import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
   config: AppConfig
@@ -16,11 +19,15 @@ export type AppDeps = {
 type HttpError = Error & { statusCode?: number; apiCode?: string }
 
 export async function buildApp(deps: AppDeps) {
-  void deps.db // consumed by auth/module wiring from Task 5 onward
   // bodyLimit 15 MiB: inputImage data URIs are allowed up to 14 MB by contract.
   const app = Fastify({ logger: false, bodyLimit: 15 * 1024 * 1024 })
 
   app.get('/health', async () => ({ ok: true }))
+
+  // Auth first: it decorates `requireUser`, which every protected module needs.
+  const auth = createAuth(deps.db, deps.config)
+  await registerAuth(app, auth)
+  registerUserRoutes(app, deps.db)
 
   // Single error → ApiError envelope mapping. `apiCode` (set by domain errors
   // like InsufficientCreditsError or requireUser) wins; otherwise fall back on

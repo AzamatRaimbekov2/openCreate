@@ -26,4 +26,4 @@ flowchart LR
 - Idempotent by construction — safe to run on every boot; adding a column later requires an explicit `ALTER TABLE` block here (expand → backfill → contract).
 
 ## Commits
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL

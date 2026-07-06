@@ -27,4 +27,4 @@ flowchart LR
 
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL — in-memory db injected
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — in-memory db injected

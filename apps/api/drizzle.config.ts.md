@@ -25,4 +25,4 @@ flowchart LR
 - Runtime table creation stays in `ddl.ts` (works for `:memory:` tests); do not wire drizzle-kit migrations into boot without replacing that bootstrap.
 
 ## Commits
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL

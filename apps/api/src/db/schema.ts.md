@@ -31,4 +31,4 @@ erDiagram
 - `credit_transaction.amount` is signed: negative for `charge`, positive for `signup_bonus`/`refund`.
 
 ## Commits
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL

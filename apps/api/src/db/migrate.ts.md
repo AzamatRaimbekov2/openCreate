@@ -25,4 +25,4 @@ flowchart LR
 - Requires a valid env (`RUNWARE_API_KEY`, `BETTER_AUTH_SECRET` ≥32 chars) since it goes through `loadConfig()` — copy `.env.example` first.
 
 ## Commits
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL

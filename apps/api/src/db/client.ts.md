@@ -26,4 +26,4 @@ flowchart LR
 - better-sqlite3 is synchronous: `db.transaction((tx) => …)` with `.run()/.get()/.all()` — no `await` inside transactions.
 
 ## Commits
-- (pending) feat(api): drizzle schema + sqlite bootstrap DDL
+- 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
