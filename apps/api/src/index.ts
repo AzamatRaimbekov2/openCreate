@@ -4,11 +4,14 @@
 import { buildApp } from './app'
 import { loadConfig } from './config'
 import { createDb } from './db/client'
+import { createLocalStorage } from './storage/local'
 
 const config = loadConfig()
 // createDb also runs the idempotent DDL bootstrap, so a fresh checkout can boot
 // even before `pnpm db:migrate` was ever run.
 const { db } = createDb(config.databasePath)
-const app = await buildApp({ config, db })
+// Local disk storage (mkdir -p'd on boot); assets are served back at /media/*.
+const storage = createLocalStorage(config.storageDir)
+const app = await buildApp({ config, db, storage })
 await app.listen({ port: config.port, host: '0.0.0.0' })
 console.log(`api on :${config.port}`)

@@ -2,8 +2,10 @@
 // of its dependencies so tests can inject an in-memory config/db (see
 // test/helpers/build-test-app.ts) and production boot (index.ts) injects real ones.
 import Fastify from 'fastify'
+import fastifyStatic from '@fastify/static'
 import type { AppConfig } from './config'
 import type { Db } from './db/client'
+import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
@@ -13,7 +15,9 @@ import { registerUserRoutes } from './modules/users/routes'
 export type AppDeps = {
   config: AppConfig
   db: Db
-  // added in later tasks: runware, storage
+  // Media storage: assets downloaded from Runware are served from here.
+  storage: StorageProvider
+  // added in later tasks: runware
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -23,6 +27,18 @@ type HttpError = Error & { statusCode?: number; apiCode?: string }
 export async function buildApp(deps: AppDeps) {
   // bodyLimit 15 MiB: inputImage data URIs are allowed up to 14 MB by contract.
   const app = Fastify({ logger: false, bodyLimit: 15 * 1024 * 1024 })
+
+  // Single error → ApiError envelope mapping. `apiCode` (set by domain errors
+  // like InsufficientCreditsError or requireUser) wins; otherwise fall back on
+  // status heuristics so unexpected errors never leak a non-envelope shape.
+  // MUST be set before any `await app.register(...)`: awaiting a register boots
+  // the avvio plugin tree, and an error handler set after boot never binds
+  // (bit us in Task 9 — 401s regressed to Fastify's default error shape).
+  app.setErrorHandler((err: HttpError, _req, reply) => {
+    const status = typeof err.statusCode === 'number' ? err.statusCode : 500
+    const code = err.apiCode ?? (status === 500 ? 'internal_error' : 'validation_failed')
+    reply.status(status).send({ error: { code, message: err.message } })
+  })
 
   app.get('/health', async () => ({ ok: true }))
 
@@ -34,13 +50,14 @@ export async function buildApp(deps: AppDeps) {
   // Catalog is public (no requireUser): pricing must render before sign-in.
   registerCatalogRoutes(app)
 
-  // Single error → ApiError envelope mapping. `apiCode` (set by domain errors
-  // like InsufficientCreditsError or requireUser) wins; otherwise fall back on
-  // status heuristics so unexpected errors never leak a non-envelope shape.
-  app.setErrorHandler((err: HttpError, _req, reply) => {
-    const status = typeof err.statusCode === 'number' ? err.statusCode : 500
-    const code = err.apiCode ?? (status === 500 ? 'internal_error' : 'validation_failed')
-    reply.status(status).send({ error: { code, message: err.message } })
+  // Serve downloaded generation assets at /media/* straight off the storage
+  // dir. Public by design for the MVP: keys are unguessable UUIDs minted by
+  // us, and <img>/<video> tags need plain GETs without auth headers.
+  await app.register(fastifyStatic, {
+    root: deps.storage.dir,
+    prefix: '/media/',
+    index: false,
+    list: false,
   })
 
   return app
