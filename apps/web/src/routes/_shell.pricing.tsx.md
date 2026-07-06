@@ -50,4 +50,4 @@ flowchart LR
   five 5s videos (35×5=175) — no inflated claims.
 
 ## Commits
-- _pending: feat(web): pricing page with per-model credit table_
+- a04eac7 2026-07-06 feat(web): pricing page with per-model credit table

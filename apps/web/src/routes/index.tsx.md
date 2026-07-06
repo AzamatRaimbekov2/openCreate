@@ -39,4 +39,4 @@ flowchart LR
 
 ## Commits
 - c987d5f 2026-07-06 feat(web): vite scaffold, tanstack router, i18n, providers (placeholder)
-- _pending: feat(web): landing with honest price comparison (EN/RU)_
+- f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)

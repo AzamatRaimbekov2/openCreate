@@ -47,4 +47,4 @@ flowchart LR
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
-- _pending: feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)_
+- 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)

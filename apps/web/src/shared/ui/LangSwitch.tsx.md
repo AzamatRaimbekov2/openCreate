@@ -39,4 +39,4 @@ flowchart LR
   is why it lives in `shared/ui`, not inside AppShell.
 
 ## Commits
-- _pending: feat(web): app shell with nav, balance, language switch_
+- 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch

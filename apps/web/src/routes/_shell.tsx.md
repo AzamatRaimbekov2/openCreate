@@ -48,4 +48,4 @@ flowchart LR
   they are standalone paper screens (design.md §9).
 
 ## Commits
-- _pending: feat(web): app shell with nav, balance, language switch_
+- 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch

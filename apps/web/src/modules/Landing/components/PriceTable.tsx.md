@@ -40,4 +40,4 @@ flowchart LR
 - `min-w-[36rem]` + `overflow-x-auto` keeps three readable columns on phones.
 
 ## Commits
-- _pending: feat(web): landing with honest price comparison (EN/RU)_
+- f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)

@@ -41,4 +41,4 @@ flowchart LR
 - Type column reuses `generator.type.*` keys instead of duplicating copy.
 
 ## Commits
-- _pending: feat(web): pricing page with per-model credit table_
+- a04eac7 2026-07-06 feat(web): pricing page with per-model credit table

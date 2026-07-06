@@ -55,4 +55,4 @@ flowchart TD
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
-- _pending: feat(web): pricing page with per-model credit table (pricing anchor → typed Link)_
+- a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)

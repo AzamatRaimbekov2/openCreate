@@ -54,4 +54,4 @@ flowchart LR
 
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
-- _pending: feat(web): pricing page with per-model credit table (pricing anchor → typed Link)_
+- a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
