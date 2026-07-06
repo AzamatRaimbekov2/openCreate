@@ -44,6 +44,11 @@ Diagrams (C4 container, video sequence, ER) live in the spec: `docs/superpowers/
 - Local storage requires disk space and a later migration job to S3/R2.
 - Credit economics allow ~55–70% blended gross margin while headline claims stay honest.
 
+## Implementation notes (2026-07-07)
+
+- Decision 3's hold→settle/refund ledger shipped as **charge-at-submit + refund-on-failure** (`charge`/`refund`/`signup_bonus` transaction kinds): equivalent user-visible semantics with a simpler two-state ledger. Chosen at plan time (see plan §Ledger semantics note), confirmed by review; invariants (balance ≥ 0, refund exactly once) are enforced transactionally and covered by tests incl. create/poll race regressions.
+- Added beyond the ADR during review hardening: NSFW `content_blocked` failures with refund, stale-processing reaper (1h) + boot sweep, landing prerender build step.
+
 ## Rejected alternatives
 
 - **Next.js 16 single app** — rejected by user choice (SPA + separate backend preferred).
