@@ -43,6 +43,13 @@ node_modules/
 .ai/settings.local.json
 ruvector.db
 
+# --- Agent-runtime state (churns every session — never commit) ---------------
+.claude-flow/
+.swarm/
+.rtk/
+ruvector.db
+memory.db
+
 # --- openCreate workspace ----------------------------------------------------
 node_modules/
 dist/
