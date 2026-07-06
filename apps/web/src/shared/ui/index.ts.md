@@ -7,7 +7,7 @@ Public API of the "Paper & Ink" design-system kit (`shared/ui`). The modular-arc
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export every kit component and its prop types; nothing else (no logic, no side effects).
-- Public API / exports / props / endpoints: `AppErrorBoundary`, `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `Skeleton`(+`SkeletonProps`).
+- Public API / exports / props / endpoints: `AppErrorBoundary`, `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `Skeleton`(+`SkeletonProps`).
 - Inputs → Outputs: import from `'shared/ui'` → any kit component.
 - Side effects (I/O, network, state): none.
 
@@ -28,3 +28,4 @@ flowchart LR
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
+- (pending) feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `PillGroup` — first component needed by 2+ modules per design.md §9)

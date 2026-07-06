@@ -11,16 +11,17 @@ Public API of the Auth module — the only import surface other layers may use
 
 - Responsibilities: re-export the module's public pieces; keep `model/` and
   `components/` internals private (modular-architecture rule).
-- Public API / exports / props / endpoints: `AuthForm`, `signOut`, `useAuthSession`,
-  `useMe`.
+- Public API / exports / props / endpoints: `AuthForm`, `signOut`, `requireSession`
+  (beforeLoad guard, Task 16), `useAuthSession`, `useMe`.
 - Inputs → Outputs: barrel only — no logic.
 - Side effects (I/O, network, state): none.
 
 ## Dependencies
 
-- Imports / depends on: `./components/AuthForm`, `./model/authClient`, `./model/useSession`.
-- Used by: `routes/login.tsx`; later the AppShell (Task 18: `signOut`, `useMe`) and
-  auth-guarded routes (Tasks 16-17).
+- Imports / depends on: `./components/AuthForm`, `./model/authClient`,
+  `./model/routeGuard`, `./model/useSession`.
+- Used by: `routes/login.tsx`; `routes/create.tsx` + `routes/library.tsx`
+  (`requireSession`); later the AppShell (Task 18: `signOut`, `useMe`).
 
 ## Diagram
 
@@ -29,6 +30,7 @@ flowchart LR
   R[routes / shell] --> IDX[modules/Auth index.ts]
   IDX --> AF[AuthForm]
   IDX --> SO[signOut]
+  IDX --> RG[requireSession beforeLoad guard]
   IDX --> US[useAuthSession / useMe]
 ```
 
@@ -40,3 +42,4 @@ flowchart LR
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
+- (pending) feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `requireSession`)

@@ -3,4 +3,6 @@
 // 'modules/Auth'. Internal files (model/, components/) are private.
 export { AuthForm } from './components/AuthForm'
 export { signOut } from './model/authClient'
+// beforeLoad guard for protected routes (/create, /library) — Task 16
+export { requireSession } from './model/routeGuard'
 export { useAuthSession, useMe } from './model/useSession'

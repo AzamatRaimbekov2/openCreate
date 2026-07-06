@@ -42,6 +42,50 @@
       "refund": "Refund"
     }
   },
+  "generator": {
+    "title": "Create",
+    "type": {
+      "label": "Type",
+      "image": "Image",
+      "video": "Video"
+    },
+    "model": {
+      "label": "Model",
+      "from": "from {{count}}"
+    },
+    "prompt": {
+      "label": "Prompt",
+      "placeholder": "Describe what you want to see"
+    },
+    "aspect": {
+      "label": "Aspect ratio"
+    },
+    "duration": {
+      "label": "Duration",
+      "seconds": "{{count}}s"
+    },
+    "image": {
+      "label": "Animate an image",
+      "hint": "Drop an image here or click to upload (up to 10MB)",
+      "previewAlt": "Uploaded reference image",
+      "remove": "Remove image",
+      "errors": {
+        "type": "Only image files are supported",
+        "size": "The image must be under 10MB"
+      }
+    },
+    "cost_one": "≈ {{count}} credit",
+    "cost_other": "≈ {{count}} credits",
+    "submit": "Generate",
+    "errors": {
+      "insufficientCredits": "Not enough credits for this generation.",
+      "seePricing": "See pricing"
+    },
+    "unavailable": {
+      "title": "Models are unavailable",
+      "description": "The model catalog did not load. Try again later."
+    }
+  },
   "common": {
     "retry": "Try again",
     "close": "Close",

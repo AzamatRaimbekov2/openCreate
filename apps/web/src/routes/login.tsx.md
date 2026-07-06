@@ -13,14 +13,14 @@ redirects already-signed-in visitors to `/create`.
   session gate + layout.
 - Public API / exports / props / endpoints: `Route` (TanStack `createFileRoute('/login')`).
 - Inputs → Outputs: session state → pending/redirecting → card-shaped `Skeleton`;
-  signed in → effect runs `router.history.replace('/create')`; signed out → `<AuthForm />`.
+  signed in → effect runs `navigate({ to: '/create', replace: true })`; signed out → `<AuthForm />`.
 - Side effects (I/O, network, state): `useAuthSession` triggers better-auth's
-  get-session fetch; history replace on redirect.
+  get-session fetch; replace-navigation on redirect.
 
 ## Dependencies
 
 - Imports / depends on: `react` (useEffect), `@tanstack/react-router`
-  (createFileRoute, useRouter), `modules/Auth` (AuthForm, useAuthSession),
+  (createFileRoute, useNavigate), `modules/Auth` (AuthForm, useAuthSession),
   `shared/ui` (Skeleton).
 - Used by: route tree (`routeTree.gen.ts`, auto-generated).
 
@@ -30,16 +30,15 @@ redirects already-signed-in visitors to `/create`.
 flowchart LR
   V[visit /login] --> S{session?}
   S -->|pending| SK[Skeleton card]
-  S -->|signed in| NAV[effect: history.replace '/create']
+  S -->|signed in| NAV[effect: navigate to /create replace]
   S -->|signed out| AF[AuthForm]
 ```
 
 ## Key decisions / gotchas
 
-- Redirect uses `router.history.replace('/create')` in an effect instead of the typed
-  `<Navigate to>`: `/create` ships in plan Task 16, so the typed route union does not
-  include it yet (Navigate's `RequiredToOptions` rejects `href`-only props too). Switch
-  to `navigate({ to: '/create' })` once Task 16 lands.
+- Redirect now uses TYPED `useNavigate()({ to: '/create', replace: true })` — the
+  `/create` route exists since Task 16, so the temporary `router.history.replace`
+  escape hatch (documented while the typed union lacked the route) was removed as promised.
 - Post-login redirect also flows through here: AuthForm succeeds → session store
   updates → this component re-renders and the redirect effect fires.
 - Skeleton during `isPending` prevents a form flash for already-authenticated users.
@@ -47,3 +46,4 @@ flowchart LR
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
+- (pending) feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (typed /create redirect)
