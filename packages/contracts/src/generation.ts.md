@@ -32,3 +32,4 @@ flowchart LR
 
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
+- 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

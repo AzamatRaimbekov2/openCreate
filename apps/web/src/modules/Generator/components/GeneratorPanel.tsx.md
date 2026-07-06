@@ -59,3 +59,4 @@ flowchart TD
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
+- 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

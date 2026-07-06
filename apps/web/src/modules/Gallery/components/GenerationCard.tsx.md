@@ -60,3 +60,4 @@ flowchart TD
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
+- 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

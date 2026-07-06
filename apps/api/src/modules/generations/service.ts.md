@@ -65,3 +65,4 @@ flowchart TD
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
 - 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes
 - 5d16801 fix(api): settle stuck processing generations — no-asset polls fail with refund, stale rows reaped on poll and boot
+- 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
