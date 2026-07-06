@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Golang"
+  short_description: "Idiomatic Go backend services and APIs"
+  default_prompt: "Use $backend-golang to build or review Go backend services, APIs, workers, database code, concurrency, and tests."

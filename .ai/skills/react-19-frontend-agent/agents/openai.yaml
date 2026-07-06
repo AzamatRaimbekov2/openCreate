@@ -1,0 +1,5 @@
+interface:
+  display_name: "React 19 Frontend Agent"
+  short_description: "React 19 architecture and routing."
+  default_prompt: "Use $react-19-frontend-agent for this React 19 frontend task."
+

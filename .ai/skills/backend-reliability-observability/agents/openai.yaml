@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Reliability Observability"
+  short_description: "Logs, metrics, traces, SLOs, retries, and idempotency"
+  default_prompt: "Use $backend-reliability-observability to add observability or failure handling to a backend."

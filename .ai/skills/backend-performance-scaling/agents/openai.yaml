@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Performance Scaling"
+  short_description: "Latency, caching, queues, capacity, and backpressure"
+  default_prompt: "Use $backend-performance-scaling to review or improve backend latency and throughput."

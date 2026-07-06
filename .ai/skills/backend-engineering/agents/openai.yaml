@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Engineering"
+  short_description: "Backend architecture and tradeoff advisor"
+  default_prompt: "Use $backend-engineering to design a production backend or choose architecture tradeoffs."

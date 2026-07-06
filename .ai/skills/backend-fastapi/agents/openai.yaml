@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend FastAPI"
+  short_description: "Production FastAPI, Pydantic, SQLAlchemy, and pytest"
+  default_prompt: "Use $backend-fastapi to build or review FastAPI services, routes, schemas, dependencies, database sessions, auth, and tests."

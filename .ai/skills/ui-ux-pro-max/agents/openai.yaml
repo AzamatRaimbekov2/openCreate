@@ -1,0 +1,7 @@
+interface:
+  display_name: "UI/UX Pro Max"
+  short_description: "Searchable UI/UX design intelligence"
+  brand_color: "#DB2777"
+  default_prompt: "Use $ui-ux-pro-max to choose and verify UI/UX design direction."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Prompt Refiner"
+  short_description: "Clarifies messy prompts before execution"
+  default_prompt: "Use $prompt-refiner to clarify my rough request before acting on it."
+
+policy:
+  allow_implicit_invocation: true

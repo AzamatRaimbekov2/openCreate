@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Data Persistence"
+  short_description: "Schemas, migrations, indexes, transactions, and pools"
+  default_prompt: "Use $backend-data-persistence to design databases or optimize backend persistence."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Code Review"
+  short_description: "Backend correctness, security, performance, and test review"
+  default_prompt: "Use $backend-code-review to review backend code changes with production checklists."

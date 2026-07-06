@@ -42,3 +42,12 @@ node_modules/
 .ai/checkpoints/
 .ai/settings.local.json
 ruvector.db
+
+# --- openCreate workspace ----------------------------------------------------
+node_modules/
+dist/
+data/
+.env
+*.tsbuildinfo
+playwright-report/
+test-results/

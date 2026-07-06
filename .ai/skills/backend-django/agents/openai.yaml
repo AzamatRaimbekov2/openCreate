@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Django"
+  short_description: "Django and DRF backend architecture, ORM, security, and tests"
+  default_prompt: "Use $backend-django to build or review Django/DRF models, serializers, views, services, permissions, migrations, and tests."

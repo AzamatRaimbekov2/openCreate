@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Agent"
+  short_description: "Modular React and Next.js frontend standards"
+  default_prompt: "Use $frontend-agent to build or review a production frontend with the project architecture rules."

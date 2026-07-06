@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend API Contracts"
+  short_description: "REST, OpenAPI, pagination, errors, and versioning"
+  default_prompt: "Use $backend-api-contracts to design or review backend API contracts."

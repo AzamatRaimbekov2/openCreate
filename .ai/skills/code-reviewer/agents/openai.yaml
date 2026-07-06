@@ -1,0 +1,7 @@
+interface:
+  display_name: "Code Reviewer"
+  short_description: "Security, performance, and quality review"
+  brand_color: "#DC2626"
+  default_prompt: "Use $code-reviewer to review this code for security, performance, correctness, and maintainability."
+policy:
+  allow_implicit_invocation: true

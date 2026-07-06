@@ -1,0 +1,4 @@
+interface:
+  display_name: "React 19 Patterns"
+  short_description: "React 19 component architecture."
+  default_prompt: "Use $react-19-patterns to review this React 19 component architecture."

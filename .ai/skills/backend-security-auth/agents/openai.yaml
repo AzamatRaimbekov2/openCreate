@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Security Auth"
+  short_description: "Authentication, authorization, secrets, and input safety"
+  default_prompt: "Use $backend-security-auth to harden auth, authorization, secrets, and validation."

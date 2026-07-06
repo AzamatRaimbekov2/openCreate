@@ -1,0 +1,4 @@
+interface:
+  display_name: "TypeScript React Routing"
+  short_description: "Typed routing for React apps."
+  default_prompt: "Use $typescript-react-routing when adding this React route."

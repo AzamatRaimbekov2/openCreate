@@ -1,0 +1,15 @@
+{
+  "id": "session-1783336409372",
+  "startedAt": "2026-07-06T11:13:29.372Z",
+  "cwd": "/Users/raimbekov/Desktop/openCreate",
+  "context": {},
+  "metrics": {
+    "edits": 0,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  },
+  "restoredAt": "2026-07-06T11:16:26.127Z",
+  "endedAt": "2026-07-06T11:17:36.190Z",
+  "duration": 246818
+}

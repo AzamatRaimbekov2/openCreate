@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design System Steward"
+  short_description: "Govern web and mobile design systems."
+  default_prompt: "Use $design-system-steward to create or update the project design.md and keep UI tokens, palettes, components, platform rules, and accessibility notes consistent."

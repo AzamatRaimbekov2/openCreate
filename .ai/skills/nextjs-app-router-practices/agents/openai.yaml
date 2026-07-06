@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next.js App Router"
+  short_description: "Next.js App Router architecture."
+  default_prompt: "Use $nextjs-app-router-practices for this App Router change."

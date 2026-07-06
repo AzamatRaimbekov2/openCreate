@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Framework Patterns"
+  short_description: "FastAPI, Node, Express, and Next.js backend patterns"
+  default_prompt: "Use $backend-framework-patterns to implement backend framework routes, services, and middleware."

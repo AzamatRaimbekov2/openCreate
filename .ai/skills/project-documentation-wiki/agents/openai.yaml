@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Documentation Wiki"
+  short_description: "Keep project docs current as an LLM wiki"
+  default_prompt: "Use $project-documentation-wiki to ensure the project wiki exists, read it, and update docs for this change."

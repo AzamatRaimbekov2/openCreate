@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Error UX"
+  short_description: "404, error modal, crash, and offline UX checks"
+  default_prompt: "Use $frontend-error-ux to audit a frontend project for 404, error modal, crash fallback, and offline blocker behavior."
