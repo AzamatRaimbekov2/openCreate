@@ -1,7 +1,7 @@
 ---
 type: index
 status: current
-updated: 2026-06-03
+updated: 2026-07-06
 sources: []
 tags:
   - project-docs
@@ -23,9 +23,11 @@ tags:
 
 - [[modular-frontend-architecture]] - Imported modular/FSD-like frontend architecture guidance from Notion and FigJam.
 - [[opencreate-mvp-architecture]] - **Accepted ADR**: openCreate MVP — Runware-backed image/video generation platform (pnpm monorepo, Vite SPA + Fastify API, credit ledger, own asset storage). Spec: `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`.
+- [[opencreate-implementation]] - ADR → implementation map for the shipped openCreate MVP (decision-by-decision code locations, recorded deltas, verification results).
 
 ## Workflows
 
+- **openCreate MVP build (2026-07-06)** - Plan-driven implementation of the full MVP (`docs/superpowers/plans/2026-07-06-opencreate-mvp.md`, Tasks 1–22): contracts → Fastify API (auth, ledger, catalog, Runware, storage, generations) → React SPA (design system, auth, generator, gallery, shell, landing, pricing) → Playwright e2e → verification. See [[opencreate-implementation]] and `apps/{api,web}/FEATURE.md`.
 - [[agent-assets-consolidation]] - Canonical folder for local skills, agents, and rule/reference resources.
 - [[backend-skill-pack]] - SkillsMP-derived local backend plugin with architecture, API, data, security, reliability, performance, framework, and review skills.
 - [[frontend-agent-plugin]] - Local frontend plugin and agent packaging workflow.
@@ -66,6 +68,8 @@ tags:
 
 ## Local Feature Docs
 
+- `apps/api/FEATURE.md` - openCreate Fastify API: auth, credit ledger, catalog, Runware integration, generation lifecycle, media storage.
+- `apps/web/FEATURE.md` - openCreate React SPA: landing, auth, generator, gallery, credits, pricing, design system, e2e.
 - `agent-assets/FEATURE.md` - Consolidated local skills, agents, and rule/reference resources.
 - `agent-assets/backend/FEATURE.md` - SkillsMP-derived backend engineering skill pack.
 - `agent-assets/claude-plugin-directory/FEATURE.md` - Folder-based mirror of the public Claude Plugins directory.

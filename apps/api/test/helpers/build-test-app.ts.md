@@ -42,3 +42,4 @@ flowchart LR
 - eb91028 feat(api): fastify skeleton with typed config and health route
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — in-memory db injected
 - 6c4e94f feat(api): local media storage with /media serving — storage dep + `storageDir` override
+- 681e20f feat(api): generation lifecycle — `fakeRunware`, `registerAndGetCookie`, `runware`/`signupBonusCredits` overrides

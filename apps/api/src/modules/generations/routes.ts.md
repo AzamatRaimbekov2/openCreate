@@ -40,4 +40,4 @@ flowchart LR
 - `limit` clamp: `Number()` first, then finite/positive check; hostile `?limit=1e9` gets 50, `?limit=abc` gets 24.
 
 ## Commits
-- _no commit yet_
+- 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund

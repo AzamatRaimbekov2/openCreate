@@ -1,7 +1,7 @@
 ---
 type: log
 status: current
-updated: 2026-06-03
+updated: 2026-07-06
 sources: []
 tags:
   - project-docs
@@ -181,3 +181,10 @@ tags:
 - Ran project-kickoff gate: prompt-refiner → brainstorming (user decisions: base generation scope, auth+credits no payments, Vite SPA + separate backend, i18n EN+RU) → feature-architecture → research workflow wf_9fc64756-311 (Higgsfield product map, Runware API, pricing).
 - Recorded accepted ADR [[opencreate-mvp-architecture]] and spec `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`. User approved architecture explicitly.
 - Next: writing-plans → implementation (monorepo scaffold, contracts, API, SPA, landing).
+
+## 2026-07-06 — openCreate MVP implemented (plan Tasks 1–22)
+
+- Executed `docs/superpowers/plans/2026-07-06-opencreate-mvp.md` test-first across parallel agent chains: workspace scaffold → `packages/contracts` (shared Zod schemas) → `apps/api` (Fastify 5: better-auth + signup bonus, transactional credit ledger, curated catalog, Runware REST client, local media storage, generation lifecycle with charge/poll/refund) → `apps/web` (React 19 SPA: Paper & Ink design system, auth, generator, gallery with 4s polling, credits chip, app shell, EN/RU landing with verified price claims, pricing page) → Playwright e2e with fully mocked `/api` + `/media`.
+- Verification: root `pnpm lint`, `pnpm typecheck`, `pnpm test` (116 tests: 6 contracts / 31 api / 79 web), `pnpm build` — all green; e2e 2/2 (happy path with balance 200→165, RU landing). Manual smoke: API boots on :8787, `/health` + `/api/catalog` + 401 envelope verified.
+- Docs: `apps/api/FEATURE.md`, `apps/web/FEATURE.md`, [[opencreate-implementation]] (ADR → code map incl. recorded deltas: charge-at-submit collapses hold→settle; landing prerender deferred to stretch Task 23), sidecar `.md` docs for every source file.
+- Chore: `.gitignore` now excludes agent-runtime state (`.claude-flow/`, `.swarm/`, `.rtk/`, `ruvector.db`, `memory.db`); previously tracked runtime files untracked.

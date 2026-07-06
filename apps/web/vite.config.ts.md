@@ -35,4 +35,5 @@ flowchart LR
 - Vitest's default include glob (`**/*.spec.*`) would match `e2e/generate.spec.ts` and crash importing `@playwright/test`; `exclude: [...configDefaults.exclude, 'e2e/**']` keeps unit (`pnpm test`) and browser (`pnpm e2e`) runners separate. Spreading `configDefaults.exclude` is required — overriding `exclude` REPLACES the defaults (node_modules, dist…).
 
 ## Commits
-- _no commit yet_
+- c987d5f feat(web): vite scaffold, tanstack router, i18n, providers
+- 3a30d65 test(web): e2e happy path with mocked api — vitest `exclude: e2e/**` so Playwright specs never run under vitest

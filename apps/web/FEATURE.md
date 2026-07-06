@@ -1,0 +1,76 @@
+# @opencreate/web — Feature doc
+
+React 19 + Vite 8 SPA of the openCreate MVP: create AI images and videos, watch async
+video progress live, browse a per-account library, and read an honest EN/RU landing
+with verified price comparisons. TanStack Router (file-based) + Query v5, Zustand,
+Tailwind v4 ("Paper & Ink" design system), react-hook-form + zod, i18next.
+
+## What it does
+
+- **Landing (`/`)** — hero with the three approved claims (images from $0.01,
+  5s videos from $0.35, credits never expire), honest price comparison table
+  ("verified July 2026"), how-it-works, FAQ. Standalone top bar with LangSwitch and a
+  session-aware CTA (`/create` signed in, `/login` otherwise). EN/RU.
+- **Auth (`/login`)** — email+password sign-in/register (better-auth client), zod
+  validation, localized server-error mapping, optional Google button.
+- **Create (`/create`, guarded)** — generator form (type → model cards with provider
+  labels and prices → prompt → aspect/duration → optional i2v upload) with a live
+  cost label, next to a live gallery column: a submit prepends its card instantly;
+  processing video cards poll `GET /api/generations/:id` every 4s until terminal.
+- **Library (`/library`, guarded)** — infinite gallery (24/page, "Load more"),
+  client-side type filter chips, per-card download/delete (optimistic with rollback),
+  failed cards show the reason + "credits refunded" badge.
+- **Pricing (`/pricing`, public)** — comparison table + full per-model credit table
+  from the catalog query + "200 free credits" signup CTA.
+- **App shell** — header nav (Create/Library/Pricing), balance chip (opens the credit
+  history modal), LangSwitch, sign-out (clears personal query caches).
+- **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
+  (loading skeletons / empty / error+retry / data) on every data surface.
+
+## Module map (modular architecture — public API via index.ts, no cross-module imports)
+
+```
+src/
+├── main.tsx  routeTree.gen.ts  test-setup.ts  @types/
+├── routes/                     # composition-only file routes
+│   ├── __root.tsx              # providers, crash boundary, offline overlay, 404
+│   ├── index.tsx  login.tsx    # standalone (no shell)
+│   └── _shell.tsx + _shell.{create,library,pricing}.tsx   # pathless layout
+├── modules/
+│   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, requireSession
+│   ├── Generator/              # generatorStore (draft), catalog query, create mutation, panel
+│   ├── Gallery/                # generations list/poll/delete hooks, cards, grid, detail
+│   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
+│   └── Landing/                # hero, price table, how-it-works, FAQ, pricingData
+└── shared/
+    ├── config/                 # theme.css (tokens), i18n (EN/RU), queryClient
+    ├── libs/apiClient.ts       # fetch wrapper → ApiClientError with envelope codes
+    └── ui/                     # Button, Input, Select, Modal, Skeleton, Badge, Progress,
+                                # PillGroup, EmptyState, ErrorState, AppShell, LangSwitch,
+                                # AppErrorBoundary, OfflineOverlay, NotFoundPage
+```
+
+Modules talk through the TanStack Query cache (`['me']`, `['generations']`,
+`['catalog']`), never through imports. Design tokens & rules: `docs/frontend/design.md`.
+Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and commit refs.
+
+## Run / test
+
+```bash
+pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
+pnpm --filter @opencreate/web test       # vitest + RTL — 79 tests (jsdom)
+pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
+pnpm --filter @opencreate/web lint       # eslint src
+pnpm --filter @opencreate/web typecheck  # tsc --noEmit
+pnpm --filter @opencreate/web build      # tsc --noEmit && vite build → dist/
+```
+
+Unit tests mock `shared/libs/apiClient`; the e2e suite runs the real SPA against
+`page.route`-scripted `/api` + `/media` (no backend process — see `e2e/mocks.ts`).
+
+## Design references
+
+- Design system: `docs/frontend/design.md`
+- Spec: `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`
+- ADR: `docs/wiki/decisions/opencreate-mvp-architecture.md`
+- Implementation note: `docs/wiki/architecture/opencreate-implementation.md`

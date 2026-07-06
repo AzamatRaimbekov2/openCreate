@@ -50,4 +50,4 @@ flowchart TD
 - `duration!` non-null assertion in the video branch is safe: `creditsFor` already threw if duration was undefined for a video model.
 
 ## Commits
-- _no commit yet_
+- 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund

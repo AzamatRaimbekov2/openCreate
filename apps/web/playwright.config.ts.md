@@ -32,4 +32,4 @@ flowchart LR
 - No API process is needed: the vite proxy to :8787 is never hit because `page.route` intercepts before the network layer.
 
 ## Commits
-- _no commit yet_
+- 3a30d65 test(web): e2e happy path with mocked api

@@ -36,4 +36,4 @@ flowchart LR
 - ESM note: `import.meta.dirname` works because the package is `"type": "module"` and Playwright ≥1.44 runs ESM natively on Node 22.
 
 ## Commits
-- _no commit yet_
+- 3a30d65 test(web): e2e happy path with mocked api
