@@ -25,4 +25,4 @@ flowchart LR
 - Kept empty on purpose (plan Task 2): contracts are runtime-agnostic Zod schemas, so jsdom/globals/setup are not required here (unlike apps/web).
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

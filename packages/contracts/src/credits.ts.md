@@ -27,4 +27,4 @@ flowchart LR
 - `generationId` is null for `signup_bonus`, set for `charge`/`refund`; refund-once invariant enforced API-side.
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

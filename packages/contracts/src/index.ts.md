@@ -32,4 +32,4 @@ flowchart LR
 - Exported as TS source (`./src/index.ts`); consumers compile it via their own bundler/tsx (no build step in contracts).
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

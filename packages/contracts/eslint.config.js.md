@@ -25,4 +25,4 @@ flowchart LR
 - Plan Task 2 didn't list a config for contracts but its `lint` script requires one under ESLint flat-config; added the api-baseline config + `typescript-eslint` dev dep (recorded as a deviation).
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

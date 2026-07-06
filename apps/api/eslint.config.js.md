@@ -25,4 +25,4 @@ flowchart LR
 - The web app copies this baseline and layers react-hooks rules on top (plan Task 3 note).
 
 ## Commits
-- _no commit yet_
+- b2afdb4 chore: workspace scaffold + package skeletons and dependencies

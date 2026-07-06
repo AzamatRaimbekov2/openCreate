@@ -29,4 +29,4 @@ flowchart LR
 - `air` regex loosely validates Runware AIR ids like `runware:100@1` / `klingai:kling-video@3-pro`; real existence is checked by `verify-catalog.ts` against the live API.
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

@@ -26,4 +26,4 @@ flowchart LR
 - `creditsBalance` is the denormalized column on the user row, mutated only inside the same DB transaction as ledger writes — one cheap query for the header chip instead of aggregating the ledger.
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

@@ -30,4 +30,4 @@ flowchart LR
 - `status` enum `processing|succeeded|failed`: images may return `succeeded` immediately (201); video returns `processing` (202) and the web polls every 4s.
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

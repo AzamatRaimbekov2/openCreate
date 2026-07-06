@@ -28,4 +28,4 @@ flowchart LR
 - `insufficient_credits` maps to HTTP 402 in the API; the web Generator shows an inline banner with a /pricing link for it.
 
 ## Commits
-- _no commit yet_
+- 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

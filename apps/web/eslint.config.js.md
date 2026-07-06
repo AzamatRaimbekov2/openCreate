@@ -28,4 +28,4 @@ flowchart LR
 - Installed `eslint-plugin-react-hooks` is v7: the flat preset lives at `configs.flat.recommended` (NOT the legacy `configs.recommended`, which is eslintrc-format). Verified against node_modules before writing.
 
 ## Commits
-- _no commit yet_
+- b2afdb4 chore: workspace scaffold + package skeletons and dependencies
