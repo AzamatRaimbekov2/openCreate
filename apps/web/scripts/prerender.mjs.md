@@ -33,4 +33,4 @@ flowchart TD
 - SPA-fallback hosting serves this prerendered index.html for every route; non-`/` routes briefly show landing markup until `main.tsx` renders — accepted MVP trade-off, SEO only targets `/`.
 
 ## Commits
-- (pending) fix(web): prerender the landing route at build for SEO
+- 1e925aa fix(web): prerender the landing route at build for SEO

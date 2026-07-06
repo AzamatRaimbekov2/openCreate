@@ -31,4 +31,4 @@ flowchart LR
 - Keep the required landing copy assertions in `scripts/prerender.mjs` and `entry-server.test.tsx` in sync with `locales/en.json`.
 
 ## Commits
-- (pending) fix(web): prerender the landing route at build for SEO
+- 1e925aa fix(web): prerender the landing route at build for SEO
