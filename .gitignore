@@ -1,0 +1,44 @@
+# ============================================================================
+#  Distribution .gitignore — keep the toolkit payload, drop runtime & secrets
+# ============================================================================
+
+# --- Secrets / local-only ---------------------------------------------------
+.env
+.env.local
+.env.*.local
+CLAUDE.local.md
+.claude/settings.local.json
+
+# --- Runtime state & generated data (NOT distributed) -----------------------
+# Patterns match at ANY depth (covers nested bundles like frontend-agents/).
+*.db
+*.db-*
+*.rvf
+*.rvf.lock
+**/.swarm/
+**/.claude-flow/data/
+**/.claude-flow/logs/
+**/.claude/memory/
+*.log
+.DS_Store
+
+# --- Locally-fetched npm package (re-fetched via `npx -y ruflo@latest`) ------
+ruflo/
+
+# --- Pre-ruflo backups ------------------------------------------------------
+CLAUDE.md.pre-ruflo
+*.bak
+
+# --- Node -------------------------------------------------------------------
+node_modules/
+
+# NOTE: .codex/ IS shipped (config.toml + AGENTS.override.md are shareable).
+# Codex local session data, if any, should be added explicitly below.
+
+# .ai canonical runtime (через симлинки .claude/.codex)
+.ai/memory.db
+.ai/memory.db-*
+.ai/*.lock
+.ai/checkpoints/
+.ai/settings.local.json
+ruvector.db

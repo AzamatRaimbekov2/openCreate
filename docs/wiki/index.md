@@ -1,0 +1,76 @@
+---
+type: index
+status: current
+updated: 2026-06-03
+sources: []
+tags:
+  - project-docs
+  - wiki/index
+---
+
+# ai-tools Wiki Index
+
+## Start Here
+
+- [[overview]] - High-level project overview.
+- [[schema]] - Wiki conventions and maintenance rules.
+- [[project-documentation-wiki-required]] - Decision requiring wiki checks and updates for project tasks.
+- [[prompt-refinement-required]] - Decision requiring every task to start by refining the user's raw prompt into a clear working request.
+- [[test-first-development-required]] - Decision requiring tests and test cases before production code changes.
+- [[frontend-error-ux-startup-required]] - Decision requiring 404, error modal, crash fallback, and offline no-internet blocker startup audits.
+
+## Architecture
+
+- [[modular-frontend-architecture]] - Imported modular/FSD-like frontend architecture guidance from Notion and FigJam.
+- [[opencreate-mvp-architecture]] - **Accepted ADR**: openCreate MVP — Runware-backed image/video generation platform (pnpm monorepo, Vite SPA + Fastify API, credit ledger, own asset storage). Spec: `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`.
+
+## Workflows
+
+- [[agent-assets-consolidation]] - Canonical folder for local skills, agents, and rule/reference resources.
+- [[backend-skill-pack]] - SkillsMP-derived local backend plugin with architecture, API, data, security, reliability, performance, framework, and review skills.
+- [[frontend-agent-plugin]] - Local frontend plugin and agent packaging workflow.
+- [[frontend-project-bootstrap]] - Installing project-local skills, agents, wiki startup, and frontend governance into new frontend projects.
+- [[design-system-steward]] - Workflow for maintaining detailed `design.md` design-system docs for frontend and mobile projects.
+- [[project-documentation-wiki-skill]] - How the living documentation skill is configured and used.
+- [[repository-publication]] - Remote repository publication status for GitHub and GitLab.
+- [[superpowers-local-plugin]] - Local Codex Superpowers plugin mirror for planning, TDD, debugging, review, verification, and delivery workflows.
+- [[template-project]] - Ready-to-copy frontend project starter with local skills, agents, `AGENTS.md`, and `AgentMD.md`.
+
+## Concepts
+
+- [[next-js-patterns]] - Next.js App Router, Server/Client Component, Cache Components, auth, metadata, and verification guidance.
+- [[react-patterns]] - Component, hook, state, composition, performance, error, TypeScript, and testing patterns for React work.
+
+## Entities
+
+## Decisions
+
+- [[frontend-architecture-guardrails]] - Project guardrails for shared ownership, dependency rules, UI component sourcing, TanStack Router/Query, Zustand, ESLint, and bundle splitting.
+- [[frontend-error-ux-startup-required]] - Require frontend initialization to run `frontend-error-ux` and verify app-level failure/offline surfaces.
+- [[prompt-refinement-required]] - Require `prompt-refiner` as the first agent step for rough or routine user prompts across this workspace and installed project-local bundles.
+- [[project-documentation-wiki-required]] - Keep documentation checks tied to project work.
+- [[test-first-development-required]] - Require frontend JS/TS tests, backend Python tests, E2E coverage, and explicit test cases before production code changes.
+
+## Sources
+
+- [[claude-plugin-directory]] - Source summary for the imported public Claude Plugins directory registry.
+- [[code-review-graph-plugin]] - Source summary for the imported Code Review Graph MCP/test plugin bundle.
+- [[imported-agent-skills]] - Source summary for imported UI/UX Pro Max, Code Reviewer, and Backend Patterns skills.
+- [[skillsmp-backend-skills]] - Source summary for SkillsMP backend candidates used to synthesize the local backend skill pack.
+- [[project-documentation-wiki-skill]] - Summary of the skill configuration and files.
+- [[notion-modular-architecture]] - Source summary for the external Notion modular architecture docs and linked FigJam diagram.
+- [[next-js-skill-sources]] - Source summary for imported Next.js App Router, Next.js 16, and Better Auth skill files.
+- [[react-patterns-source]] - Source summary for imported React patterns and LobeHub layout/component conventions.
+
+## Synthesis
+
+## Local Feature Docs
+
+- `agent-assets/FEATURE.md` - Consolidated local skills, agents, and rule/reference resources.
+- `agent-assets/backend/FEATURE.md` - SkillsMP-derived backend engineering skill pack.
+- `agent-assets/claude-plugin-directory/FEATURE.md` - Folder-based mirror of the public Claude Plugins directory.
+- `agent-assets/code-review-graph/FEATURE.md` - Local Code Review Graph MCP/test plugin bundle.
+- `agent-assets/frontend/FEATURE.md` - Codex-first frontend plugin with `frontend-agent`, `design-system-steward`, and `frontend-error-ux` skills.
+- `agent-assets/superpowers/FEATURE.md` - Local Codex Superpowers plugin mirror and workflow skill bundle.
+- `agent-assets/react-19-frontend-agent/FEATURE.md` - Existing React 19 frontend agent updated to the current guardrails.
+- `Template Project/FEATURE.md` - Ready-to-copy project starter wired to local skills and agents.
