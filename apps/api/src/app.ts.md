@@ -6,10 +6,10 @@
 DI composition root (plan Task 3): `buildApp(deps)` returns a configured Fastify instance as a pure function of its dependencies, so tests inject in-memory deps and `index.ts` injects real ones.
 
 ## What it does (for an AI reader)
-- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and wire modules: `createAuth` + `registerAuth` (decorates `requireUser`) first, then `registerUserRoutes` (`/api/me`), `registerCreditRoutes` (`/api/credits/transactions`), `registerCatalogRoutes` (`GET /api/catalog`, public — pricing renders before sign-in), `registerGenerationRoutes` (the Task 10 core, built from `createGenerationService({ db, runware, storage })`), and `@fastify/static` serving `deps.storage.dir` at `/media/*`.
+- Responsibilities: create Fastify (logger off, 15 MiB body limit for data-URI uploads), expose `GET /health`, own the single error→ApiError-envelope handler, and wire modules: `createAuth` + `registerAuth` (decorates `requireUser`) first, then `registerUserRoutes` (`/api/me`), `registerCreditRoutes` (`/api/credits/transactions`), `registerCatalogRoutes` (`GET /api/catalog`, public — pricing renders before sign-in), `registerGenerationRoutes` (the Task 10 core, built from `createGenerationService({ db, runware, storage })`), and `@fastify/static` serving `deps.storage.dir` at `/media/*`. Also runs the `settleStaleGenerations(db)` boot sweep so processing rows abandoned across restarts are failed + refunded.
 - Public API / exports: `AppDeps` (type), `buildApp(deps): Promise<FastifyInstance>`.
 - Inputs → Outputs: `AppDeps` (`config`, `db`, `storage`, `runware`) → ready Fastify app (not listening). `AppDeps` is complete as of Task 10.
-- Side effects: none until `listen()`; route registration only.
+- Side effects: one DB sweep at build time (stale-generation settlement); otherwise route registration only until `listen()`.
 
 ## Dependencies
 - Imports / depends on: `fastify`, `@fastify/static`, `./config` (type), `./db/client` (`Db` type), `./storage/local` (`StorageProvider` type), `./integrations/runware/client` (`RunwareClient` type), `./modules/auth/auth`, `./modules/auth/plugin`, `./modules/users/routes`, `./modules/credits/routes`, `./modules/catalog/routes`, `./modules/generations/service` + `./modules/generations/routes`.
@@ -20,6 +20,7 @@ DI composition root (plan Task 3): `buildApp(deps)` returns a configured Fastify
 flowchart LR
   DEPS[AppDeps: config, db, storage, runware] --> B[buildApp] --> R[routes: /health, auth, me, credits, catalog, generations, /media]
   B --> EH[setErrorHandler → ApiError envelope]
+  B --> SW[settleStaleGenerations boot sweep]
 ```
 
 ## Key decisions / gotchas

@@ -118,6 +118,31 @@ describe('generations', () => {
     expect(me.json().creditsBalance).toBe(200)
   })
 
+  it('video: poll success without a media URL settles as failed + refund', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    // Provider claims success but hands back no asset — before the fix this
+    // left the row processing forever with the user's credits held.
+    rw.getResponse.mockResolvedValue({ status: 'success' })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'pixverse-v6', prompt: 'waves', aspectRatio: '9:16', duration: 5 },
+    })
+    const id = created.json().id
+    const p = await app.inject({
+      method: 'GET',
+      url: `/api/generations/${id}`,
+      headers: { cookie },
+    })
+    expect(p.json().status).toBe('failed')
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(me.json().creditsBalance).toBe(200)
+  })
+
   it('insufficient credits → 402, no runware call', async () => {
     const rw = fakeRunware()
     const app = await buildTestApp({ runware: rw, signupBonusCredits: 5 })

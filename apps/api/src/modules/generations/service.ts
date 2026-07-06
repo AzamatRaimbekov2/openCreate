@@ -27,6 +27,44 @@ export class ValidationError extends Error {
 
 type Deps = { db: Db; runware: RunwareClient; storage: StorageProvider }
 
+// How long a row may stay 'processing' before it counts as abandoned. There
+// are no background workers in the MVP — settlement is driven entirely by the
+// SPA's polls — so a row nobody can settle (expired 7-day Runware asset URL,
+// persistent download failure, crash between insert and submit) would hold
+// the user's credits forever. Runware video jobs finish in minutes; one hour
+// is far beyond any legitimate in-flight generation.
+export const STALE_PROCESSING_MS = 60 * 60 * 1000
+
+// Guarded terminal transition shared by every failure path: only a row that
+// is STILL processing is flipped (concurrent pollers/creators race each
+// other), and refundCredits is idempotent (once-per-generation guard in the
+// ledger) — so no combination of callers can double-refund or resurrect a row.
+function failGeneration(db: Db, userId: string, id: string, errorMessage: string) {
+  db.transaction((tx) => {
+    const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
+    if (fresh?.status !== 'processing') return
+    tx.update(generation)
+      .set({ status: 'failed', errorMessage, completedAt: new Date() })
+      .where(eq(generation.id, id))
+      .run()
+  })
+  refundCredits(db, userId, id)
+}
+
+// Boot-time sweep (wired in app.ts): settles processing rows older than the
+// staleness threshold even if their owner never polls again — the spec's
+// hold→settle/refund guarantee must not depend on the SPA staying open.
+export function settleStaleGenerations(db: Db, now = Date.now()): number {
+  const cutoff = new Date(now - STALE_PROCESSING_MS)
+  const rows = db
+    .select()
+    .from(generation)
+    .where(and(eq(generation.status, 'processing'), lt(generation.createdAt, cutoff)))
+    .all()
+  for (const row of rows) failGeneration(db, row.userId, row.id, 'generation timed out')
+  return rows.length
+}
+
 // DB row → wire DTO (contracts generationSchema). JSON columns are parsed here
 // and dates leave as ISO strings — the wire contract is JSON, not Date objects.
 function toDto(row: typeof generation.$inferSelect): Generation {
@@ -204,12 +242,20 @@ export function createGenerationService({ db, runware, storage }: Deps) {
       .where(and(eq(generation.id, id), eq(generation.userId, userId)))
       .get()
     if (!row) throw new NotFoundError('generation not found')
+    if (row.status !== 'processing') return toDto(row)
+    // Reaper: an hour-old processing row is abandoned (see STALE_PROCESSING_MS)
+    // — settle it as failed + refund instead of holding the charge forever.
+    if (Date.now() - row.createdAt.getTime() > STALE_PROCESSING_MS) {
+      failGeneration(db, userId, id, 'generation timed out')
+      const settled = db.select().from(generation).where(eq(generation.id, id)).get()
+      return toDto(settled!)
+    }
     // A null runwareTaskUuid on a processing row means create() has not yet
     // finished the provider submit — the task does not exist on Runware's side
     // yet, so polling it would misread "unknown task" as a terminal failure
     // (and refund a job that is about to succeed). Return the row as-is; the
     // SPA's next poll will find the uuid once the submit completes.
-    if (row.status !== 'processing' || !row.runwareTaskUuid) return toDto(row)
+    if (!row.runwareTaskUuid) return toDto(row)
 
     const poll = await runware.getResponse(row.runwareTaskUuid)
     if (poll.status === 'processing') {
@@ -218,7 +264,15 @@ export function createGenerationService({ db, runware, storage }: Deps) {
     }
     if (poll.status === 'success') {
       const src = poll.videoURL ?? poll.imageURL
-      if (!src) return toDto(row)
+      if (!src) {
+        // 'success' with no asset URL is unrecoverable: every future poll of
+        // this task would return the same payload, so "leave it processing
+        // and retry" loops forever while the user's credits stay held. Treat
+        // it as a provider failure and give the money back.
+        failGeneration(db, userId, id, 'provider returned no asset')
+        const settled = db.select().from(generation).where(eq(generation.id, id)).get()
+        return toDto(settled!)
+      }
       // Download BEFORE the status flip: if the download throws, the row stays
       // processing and the next poll retries — never a succeeded row without media.
       const mediaUrl = await storage.saveFromUrl(src, id, row.type === 'video' ? 'mp4' : 'webp')
@@ -239,17 +293,8 @@ export function createGenerationService({ db, runware, storage }: Deps) {
           .run()
       })
     } else {
-      db.transaction((tx) => {
-        const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
-        if (fresh?.status !== 'processing') return
-        tx.update(generation)
-          .set({ status: 'failed', errorMessage: poll.message, completedAt: new Date() })
-          .where(eq(generation.id, id))
-          .run()
-      })
-      // refundCredits is idempotent (once-per-generation guard lives in the
-      // ledger), so a concurrent poll racing this one cannot double-refund.
-      refundCredits(db, userId, id)
+      // Guarded fail + idempotent refund — concurrent polls cannot double-settle.
+      failGeneration(db, userId, id, poll.message)
     }
     const updated = db.select().from(generation).where(eq(generation.id, id)).get()
     return toDto(updated!)

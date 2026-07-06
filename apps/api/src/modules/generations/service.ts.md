@@ -10,7 +10,9 @@ The generation lifecycle service (plan Task 10) — the core money-touching sequ
 - Public API / exports / props / endpoints:
   - `createGenerationService({ db, runware, storage })` → `{ create, get, list, remove }` (`GenerationService` type).
   - `create(userId, input)` → `{ dto: Generation, created: boolean }` — `created: true` = image finished synchronously (route → 201); `false` = video accepted (route → 202). Throws `ValidationError` (400), `InsufficientCreditsError` (402, from ledger), `RunwareError` (502).
-  - `get(userId, id)` → `Generation`; while the row is processing it polls `runware.getResponse` and applies the transition (no background workers in MVP — the SPA's 4s polling drives progress).
+  - `get(userId, id)` → `Generation`; while the row is processing it polls `runware.getResponse` and applies the transition (no background workers in MVP — the SPA's 4s polling drives progress). Rows without a `runwareTaskUuid` are never polled (submit still in flight); rows older than `STALE_PROCESSING_MS` (1h) are settled as failed + refunded instead of polling.
+  - `settleStaleGenerations(db, now?)` → number of settled rows — boot-time sweep called by `app.ts`; fails + refunds processing rows older than `STALE_PROCESSING_MS` so poll-abandoned generations (expired 7-day asset URLs, crashes mid-create) never hold credits forever.
+  - `STALE_PROCESSING_MS` — exported staleness threshold (1 hour).
   - `list(userId, limit, cursor?)` → `{ items, nextCursor }` — newest-first; cursor is the createdAt epoch-ms of the last returned row; fetches `limit + 1` to detect the next page without COUNT.
   - `remove(userId, id)` — deletes the media file (idempotent) then the row; 404 if not owned.
   - Errors: `NotFoundError` (404/not_found), `ValidationError` (400/validation_failed) — statusCode+apiCode consumed by the app.ts central error handler.
@@ -32,12 +34,18 @@ flowchart TD
   R -- video --> SV[runware.submitVideo] --> PU[publish runwareTaskUuid, guarded] --> A[202 processing]
   I -- throw --> RF[refund + mark failed + rethrow]
   SV -- throw --> RF
-  G[GET /api/generations/:id] --> Q{processing AND has task uuid?}
+  G[GET /api/generations/:id] --> Q{processing?}
   Q -- no --> DTO[return row as-is]
-  Q -- yes --> PL[runware.getResponse]
+  Q -- yes --> ST{older than 1h?}
+  ST -- yes --> TF
+  ST -- no --> HU{has task uuid?}
+  HU -- no --> DTO
+  HU -- yes --> PL[runware.getResponse]
   PL -- processing --> UP[update progress]
+  PL -- success w/o URL --> TF
   PL -- success --> DL[download asset] --> TX[guarded flip → succeeded]
-  PL -- error --> TF[guarded flip → failed] --> RFD[refundCredits idempotent]
+  PL -- error --> TF[failGeneration: guarded flip → failed + idempotent refund]
+  B[app.ts boot] --> SW[settleStaleGenerations sweep] --> TF
 ```
 
 ## Key decisions / gotchas
@@ -45,7 +53,8 @@ flowchart TD
 - **Anti-double-spend (create/poll race)**: the processing row is inserted WITHOUT `runwareTaskUuid`; the uuid is published only after the provider call is acknowledged (video) — and images never need it. `get()` refuses to poll a row with a null uuid. This closes the window where a concurrent GET /:id polled Runware for a task it didn't know yet, misread the error as terminal, refunded, and create() then flipped the row to succeeded anyway (charge + refund = 0, asset delivered). Pinned by `test/generations-races.test.ts`.
 - The image success transition is a status-guarded transaction (only processing → succeeded); if the row was settled elsewhere, the downloaded asset is discarded instead of delivered.
 - Every failure path after the charge refunds; `refundCredits` is idempotent (once-per-generation guard lives in the ledger), so concurrent polls cannot double-refund.
-- Poll success downloads the asset BEFORE flipping status: a failed download leaves the row processing so the next poll retries — a succeeded row always has media.
+- Poll success downloads the asset BEFORE flipping status: a failed download leaves the row processing so the next poll retries — a succeeded row always has media. Poll success WITHOUT a URL is unrecoverable (same payload forever) → `failGeneration` + refund.
+- **Stuck-processing settlement**: `failGeneration` centralizes the guarded fail + idempotent refund; the get()-level reaper and the `settleStaleGenerations` boot sweep guarantee hold→settle/refund even when downloads fail permanently or the owner never polls again. Pinned by `test/generations-stale.test.ts`.
 - Transitions out of `processing` re-read the fresh status inside a transaction because two tabs can poll the same generation concurrently.
 - All reads/deletes are `(id, userId)`-scoped: another account gets 404, never data.
 - `creditsFor`'s plain Errors (missing/unsupported duration) are re-thrown as `ValidationError` — caller mistakes must be 400, not 500.
@@ -53,3 +62,4 @@ flowchart TD
 
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
+- 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes

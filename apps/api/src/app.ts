@@ -11,7 +11,7 @@ import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
-import { createGenerationService } from './modules/generations/service'
+import { createGenerationService, settleStaleGenerations } from './modules/generations/service'
 import { registerGenerationRoutes } from './modules/generations/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
@@ -60,6 +60,10 @@ export async function buildApp(deps: AppDeps) {
     app,
     createGenerationService({ db: deps.db, runware: deps.runware, storage: deps.storage }),
   )
+  // Boot-time sweep: settlement is poll-driven (no background workers), so a
+  // processing row whose owner never returns would hold its credit charge
+  // forever. Fail + refund anything older than the staleness threshold now.
+  settleStaleGenerations(deps.db)
 
   // Serve downloaded generation assets at /media/* straight off the storage
   // dir. Public by design for the MVP: keys are unguessable UUIDs minted by
