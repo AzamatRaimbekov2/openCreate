@@ -29,4 +29,4 @@ flowchart TD
 - Sits OUTSIDE `QueryClientProvider` in the root route, so the fallback must not depend on query/router context (it doesn't — only i18next's global instance).
 
 ## Commits
-- _no commit yet_
+- 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

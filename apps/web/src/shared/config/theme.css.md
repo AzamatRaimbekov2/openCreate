@@ -27,4 +27,4 @@ flowchart LR
 - New tokens require a repeated product need + a design.md §2 entry in the same change.
 
 ## Commits
-- _no commit yet_
+- 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

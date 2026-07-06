@@ -27,4 +27,4 @@ flowchart LR
 - New shared components must be added here AND to design.md §5 in the same task.
 
 ## Commits
-- _no commit yet_
+- 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

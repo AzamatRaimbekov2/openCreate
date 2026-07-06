@@ -28,4 +28,4 @@ flowchart LR
 - Copy is calm and blame-free per design.md §8; standalone screens sit directly on paper (§9).
 
 ## Commits
-- _no commit yet_
+- 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

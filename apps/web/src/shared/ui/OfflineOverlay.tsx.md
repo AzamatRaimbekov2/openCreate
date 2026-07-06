@@ -30,4 +30,4 @@ flowchart LR
 - `getServerSnapshot` returns `true` (assume online) — required by the hook contract even though the SPA never SSRs.
 
 ## Commits
-- _no commit yet_
+- 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
