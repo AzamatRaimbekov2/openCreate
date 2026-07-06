@@ -11,6 +11,23 @@
     "subtitle": "Images from $0.01. 5-second videos from $0.35. Credits never expire.",
     "cta": "Start creating"
   },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "google": "Continue with Google",
+    "switchToRegister": "New here? Create an account",
+    "switchToLogin": "Already have an account? Sign in",
+    "errors": {
+      "email": "Enter a valid email",
+      "password": "At least 8 characters",
+      "name": "Enter your name",
+      "invalidCredentials": "Wrong email or password",
+      "emailTaken": "An account with this email already exists"
+    }
+  },
   "common": {
     "retry": "Try again",
     "close": "Close",
