@@ -59,3 +59,4 @@ flowchart LR
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- 59cf4f9 2026-07-07 restyle(web): qa round 1 refinements
