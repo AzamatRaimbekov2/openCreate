@@ -1,177 +1,238 @@
-# openCreate — Design System ("Paper & Ink")
+# openCreate — Design System v2 ("Light Editorial")
 
 > Canonical design source of truth for `apps/web`. Every screen, component, and token
-> decision starts here. Created 2026-07-06 (plan Task 13). Keep in sync with
+> decision starts here. v2 created 2026-07-07 (editorial redesign, stage 1) after the
+> product owner rejected v1 "Paper & Ink" as template-like. Keep in sync with
 > `apps/web/src/shared/config/theme.css` and `apps/web/src/shared/ui/`.
 
-## 1. Intent
+## 1. Intent & identity
 
-openCreate is an honest, cheaper AI image/video generation product. The UI must feel
-calm, editorial, and trustworthy — deliberately NOT the dark-cinema look of
-Higgsfield-style competitors. Direction: **"Paper & Ink"** — warm paper surfaces, ink
-text, one electric indigo accent, generous whitespace. Media (generated images/video)
-is the only dark element on the page, so the user's output is always the hero.
+openCreate is an honest, cheaper AI image/video generation product. The UI must read
+like a **premium print magazine about generative art**: light, typographic,
+art-forward, unmistakably designed — never a dashboard template, never dark-cinema.
 
-- Audience: creators comparing generation prices; EN + RU locales, desktop-first, fully responsive.
-- Platforms: web SPA (React 19 + Vite 8 + Tailwind v4). No native mobile in MVP.
-- Principles: honest copy (short verbs, no exclamation marks), one accent color,
-  motion only as feedback, never decoration.
+- Direction: **"Light Editorial"** — warm cream canvas, ink typography with a display
+  serif, ONE vermillion accent used like an editor's red pen, hairline rules,
+  poster-grade showcase art, generous asymmetric whitespace.
+- Audience: creators comparing generation prices; EN + RU locales, desktop-first,
+  fully responsive (390px must wrap cleanly).
+- Voice: honest copy — short verbs, sentence case, no exclamation marks, no blame.
+  All strings via i18next keys present in BOTH `en.json` and `ru.json`. The four
+  approved claims ($0.01 images / $0.35 5s video / credits never expire / no
+  subscription) keep their exact meaning everywhere.
+- Depth: **no heavy shadows.** Hierarchy comes from hairlines (`border-ink/15`),
+  tinted sand blocks, and type scale. Media (generated output) is the only dark
+  element — the user's work is always the hero.
 
 ## 2. Color tokens
 
 Defined once in `apps/web/src/shared/config/theme.css` via Tailwind v4 `@theme`.
-Use utility classes (`bg-paper`, `text-ink`, `ring-accent`, …) — never raw hex in components.
+Use utility classes (`bg-cream`, `text-ink`, `ring-vermillion`, …) — never raw hex in
+components (single exception: `ShowcasePoster` art data, §5).
 
 | Token | Value | Role | Use when | Avoid when |
 |---|---|---|---|---|
-| `--color-paper` | `#faf9f6` | App canvas | Page/body background, standalone screens (login, 404, crash, offline) | Cards that must lift off the canvas (use white) |
-| `--color-ink` | `#111110` | Primary text | Headings, body copy, ghost-button labels | Large fills; disabled text (use ink-soft) |
-| `--color-ink-soft` | `#57534e` | Secondary text | Descriptions, captions, placeholder labels, meta info | Primary copy the user must read to act |
-| `--color-accent` | `#4f46e5` | The one action color | Primary buttons, active nav, focus rings, progress fill, links | Status meaning (success/danger), large decorative surfaces |
-| `--color-accent-soft` | `#eef2ff` | Accent wash | Ghost-button hover, selected-card background, accent badge bg | Text (contrast too low) |
+| `--color-cream` | `#faf7f2` | The canvas | Page/body background, standalone screens, modal sheets, menu panels | Nothing "sits on white" anymore — cards are hairline frames on cream |
+| `--color-ink` | `#161412` | Ink | Headings, body copy, solid CTA pills, selected pills, hairlines via opacity | Large decorative fills |
+| `--color-ink-soft` | `#6e675e` | Soft ink | Secondary text, captions, micro-labels, inactive nav | Primary copy the user must read to act |
+| `--color-vermillion` | `#e8442e` | THE accent (editor's red pen) | One italic hero word, active nav/states, "us" price column, stamps/badges, CTA hover, focus rings, progress fill | Body text at any size; backgrounds; status meaning (success/danger own that) |
+| `--color-sand` | `#efe9df` | Tinted block | Quiet hovers, skeleton shimmer, manifesto/tinted sections, selected-card wash | Text on sand other than ink/ink-soft |
 | `--color-media` | `#141413` | Media well | ONLY behind image/video previews and media cards | Any non-media surface — the app stays light |
-| `--color-success` | `#16a34a` | Positive status | Refund confirmations, "+credits" amounts, success badges | Buttons/CTAs (accent owns actions) |
-| `--color-danger` | `#dc2626` | Destructive / failure status | Delete buttons, failed-generation borders, "-credits" amounts, validation text | Primary styling of error screens (calm neutrals + ghost retry instead — see §8) |
+| `--color-success` | `#1e6b41` | Positive status | Refund stamps, "+credits" amounts | Buttons/CTAs (ink owns actions) |
+| `--color-danger` | `#b3261e` | Destructive / failure | Delete fill, failed-card borders, "-credits", validation text | Error screens (calm neutrals + ghost retry instead — §9); never as "accent #2" |
 
-Neutrals in between (borders, skeletons, disabled) are derived with opacity modifiers:
-`border-ink/10`, `border-ink/15`, `bg-ink/5`, `bg-ink/10` — do not add new gray tokens.
-White (`bg-white`) is the raised-surface color for cards, inputs, and modals.
+Hairlines and in-between grays are opacity modifiers — `border-ink/15` (the standard
+hairline), `border-ink/20`–`/30` (controls), `bg-ink/5`, `bg-ink/10` — do not add gray
+tokens. `bg-white` is retired from the kit; module surfaces migrate to cream/hairline
+in redesign stage 2.
+
+### Contrast rules (checked against cream #faf7f2)
+
+- ink 16.6:1, ink-soft 5.5:1 — body/secondary text AA+.
+- **vermillion 3.7:1 — NOT for body text.** Allowed only: ≥18px/bold display text,
+  non-text (rules, fills, rings, progress), active nav micro-labels, and stamp badges
+  (brief-sanctioned exception, recorded here). Failure text never uses vermillion.
+- danger 6.1:1 and success 5.6:1 — safe at small sizes for status text.
+- Text on sand: ink or ink-soft only.
 
 ## 3. Typography
 
-System font stack (Tailwind default `font-sans`) — no webfont cost, instant paint.
+Two self-hosted variable families (imported in `main.tsx` via @fontsource, declared as
+`@theme` font tokens — `font-display` / `font-sans` utilities):
+
+| Token | Family | Role |
+|---|---|---|
+| `--font-display` | **Fraunces Variable** (opsz + italic axes), fallback Georgia | Hero + section headings, oversized numerals, modal titles, the ONE italic accent word in headlines |
+| `--font-sans` | **Space Grotesk Variable**, fallback system-ui | Default everywhere: body, buttons, labels, tables, nav |
+
+Neither family ships Cyrillic — RU renders in the serif/system fallbacks by design
+(accepted; identity is carried by layout, hairlines, and the accent as well as type).
+
+### Type scale
 
 | Level | Classes | Use |
 |---|---|---|
-| Display | `text-4xl md:text-5xl font-semibold tracking-tight text-ink` | Landing hero only |
-| H1 | `text-2xl font-semibold tracking-tight text-ink` | Screen titles, crash/404 titles |
-| H2 | `text-xl font-semibold text-ink` | Section titles, modal titles |
+| Hero display | `font-display text-[clamp(3.5rem,8vw,7rem)] leading-[0.98] font-semibold tracking-tight` | Landing hero only; one word `italic text-vermillion` |
+| Section title | `font-display text-4xl md:text-5xl font-semibold tracking-tight` | Landing sections, error screens (404/crash/offline) |
+| H2 / modal title | `font-display text-2xl font-semibold tracking-tight` | Modal titles, EmptyState titles, card headings |
 | Body | `text-base text-ink` | Default copy |
-| Secondary | `text-sm text-ink-soft` | Descriptions, helper text |
-| Caption | `text-xs text-ink-soft` | Badges, table captions, "verified" notes |
+| Secondary | `text-sm text-ink-soft` | Descriptions, helper text, figure captions |
+| Micro-label | `text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft` | Field labels, kickers, section numbers' captions; hero kicker may use `tracking-[0.2em]`+ |
+| Serif numeral | `font-display font-semibold` (size per context) | Price columns, section ordinals 01/02/03, cost lines |
 
-Voice: short verbs, sentence case, no exclamation marks, no blame. All strings via
-i18next keys present in BOTH `en.json` and `ru.json`.
+Uppercase is always CSS `text-transform` — DOM/i18n text stays sentence case.
 
-## 4. Spacing, radius, elevation, motion
+## 4. Structure, spacing, radius, motion
 
-- **Spacing**: 4px scale (Tailwind default). Common rhythm: `gap-1` (4) inside controls,
-  `gap-4` (16) between form fields, `p-6` (24) card padding, `py-10`+ (40+) section padding.
-  Generous whitespace is part of the identity — when in doubt, add space, not lines.
-- **Radius**: cards/modals `rounded-2xl` (`--radius-card: 1rem`), controls (buttons,
-  inputs, selects, skeletons) `rounded-xl`, badges/progress `rounded-full`.
-- **Elevation**: `shadow-sm` on raised cards; `shadow-xl` only for modals. No other shadows.
-- **Borders**: `border-ink/10` default, `border-ink/15` for inputs, `border-danger` only
-  on failed media cards.
-- **Motion**: opacity/translate only, 150ms (`duration-150`). No scale, no bounces, no
-  spinners longer than the wait. `animate-pulse` is reserved for skeletons and
-  processing-media placeholders. Respect `prefers-reduced-motion` for any added animation.
+- **Magazine structure**: hairline rules between sections, asymmetric 12-col grids,
+  oversized serif section numbers (01/02/03), figure captions under media
+  (`fig. 01 — "…" · Studio (provider)` in secondary text). Landing sections keep
+  ≥96px vertical rhythm on desktop (`py-24`+).
+- **Spacing**: 4px scale. `gap-1` inside controls, `gap-4` between fields, `p-6`–`p-8`
+  framed blocks. When in doubt add space, not boxes.
+- **Radius language**: pills for interactive controls (`rounded-full` — buttons,
+  toggles, chips); near-flat for surfaces (`rounded-sm` sheets/menus, `rounded-[3px]`
+  stamps); square ends for rules/progress. `rounded-xl/2xl` cards are v1 — retire on
+  touch.
+- **Elevation**: hairline borders first. `shadow-lg` only on floating layers (modal
+  sheet, menus). Nothing else casts a shadow.
+- **Motion**: opacity/translate/color only, 150–250ms (`duration-200` default).
+  Hovers must be FELT (ink→vermillion flip, hairline solidifying, ≤1deg rotation or
+  slight lift on art cards). `animate-pulse` reserved for skeletons/processing media.
+  Respect `prefers-reduced-motion` for any added animation.
 
-## 5. Component inventory (`apps/web/src/shared/ui/`)
+## 5. Showcase art direction (`ShowcasePoster`)
+
+Poster-grade **SVG compositions** replace all placeholder gradients. Component:
+`ShowcasePoster` (`shared/ui`), data: `showcasePosterArt.ts`. Rules:
+
+- Each palette is a deliberate composition (backdrop gradient + shapes + feTurbulence
+  grain overlay), 400×500 canvas, `preserveAspectRatio: slice` so cards may crop.
+- **No text inside the art**; `aria-hidden` — the honest i18n'd figure caption lives
+  outside (`landing.showcase.*`, labeled "sample style" / «пример стиля»).
+- Art colors are content, not chrome — the ONLY sanctioned raw-hex site.
+
+| Palette | Mood | Composition |
+|---|---|---|
+| `dusk` | orange/rose evening | pale sun disc + halo over a dark rose horizon band |
+| `sea` | deep blue/teal night water | pale moon + orbit ring over two teal wave layers |
+| `botanical` | green on warm cream | one great leaf blob, stem, seeds, cream vein ring |
+| `mono` | ink print-shop geometry | concentric ink rules, offset ink disc, one diagonal |
+| `ultraviolet` | after-dark aura | magenta core in a violet glow, lilac orbit + comet line |
+| `koi` | brand plate (vermillion/cream) | vermillion koi form, ink eye, faint pond ring |
+
+Spread layout (stage 2): cards vary in size (some span 2 cols, one tall 9:16), slight
+hover scale/rotate ≤1deg, one poster carries a `video · 5s` marker with a play glyph.
+
+## 6. Component inventory (`apps/web/src/shared/ui/`)
 
 Import from `'shared/ui'` only (public API via `index.ts`). Reuse these before creating
 anything new; new shared components must be added to this table in the same task.
 
-| Component | Variants / props | States |
+| Component | Variants / props | Editorial treatment & states |
 |---|---|---|
-| `Button` | `variant: primary \| ghost \| danger`, `size: md \| lg`, `isLoading` | hover, focus-visible ring, disabled (50% opacity), loading (spinner + disabled + `aria-busy`) |
-| `Input` | `label`, `error`; all native input props incl. `ref` (RHF-ready) | focus ring, `aria-invalid` + `role="alert"` message when `error` |
-| `Select` | `label`, `options: {value,label}[]`, `error` | same as Input |
-| `Skeleton` | `className` for shape | pulsing block — mirrors the content's silhouette |
-| `Modal` | `isOpen`, `onClose`, `title`, `role: dialog \| alertdialog` | portal, Escape + overlay close, body-scroll lock, focus restore |
-| `EmptyState` | `icon?`, `title`, `description?`, `action?` | static placeholder — never an empty screen |
-| `ErrorState` | `message`, `onRetry?` | calm card, ghost "Try again" button, `role="alert"` |
-| `Badge` | `variant: neutral \| accent \| success \| danger` | static pill |
-| `Progress` | `value: 0–100`, `label?` | accent fill, `role="progressbar"` with value now/min/max |
-| `AppErrorBoundary` | wraps the app | catches render crashes → full-screen calm fallback + reload |
-| `OfflineOverlay` | none (self-managed) | full-screen blocking overlay while `navigator.onLine === false`, auto-clears |
-| `NotFoundPage` | none | 404 screen with link home (root `notFoundComponent`) |
-| `PillGroup<T>` | `label`, `options: {value,label}[]`, `value`, `onChange` | labelled `role="group"` of toggle pills, selection via `aria-pressed`; selected = `border-accent bg-accent-soft text-accent` (added Task 16 — needed by Generator pickers AND Gallery filter chips) |
-| `LangSwitch` | none (reads/sets locale via `shared/config/i18n`) | compact `role="group"` EN/RU toggle, `aria-pressed` active pill = `bg-accent-soft text-accent` (added Task 18 — needed by AppShell AND the standalone landing) |
-| `AppShell` | `user: {name,email} \| null`, `isSessionPending?`, `onSignOut`, `balanceSlot?`, `children` | header (wordmark home link, nav Create/Library/Pricing with accent active state, balance slot, LangSwitch, account area) + `bg-paper` canvas; account area: pending = `Skeleton`, signed out = primary Sign in link, signed in = disclosure user menu (`aria-haspopup`/`aria-expanded`, Escape + click-away close) |
+| `Button` | `variant: primary \| ghost \| danger`, `size: md \| lg`, `isLoading` | primary = solid-ink pill, hover→vermillion; ghost = hairline outline pill, hover solidifies + sand wash; danger = solid danger pill. Focus = vermillion ring (+cream offset); disabled 50%; loading spinner + `aria-busy` |
+| `Input` | `label`, `error`; native props incl. `ref` (RHF-ready) | hairline underline field: uppercase micro-label, transparent body, `border-b border-ink/30`; focus = vermillion rule (+1px shadow, no layout shift); error = danger rule + `role="alert"` |
+| `Select` | `label`, `options`, `error` | same underline treatment as Input; native picker kept |
+| `Skeleton` | `className` for shape | cream shimmer: `animate-pulse bg-sand rounded-sm` — "unprinted paper", never gray |
+| `Modal` | `isOpen`, `onClose`, `title`, `role: dialog \| alertdialog` | cream sheet, hairline border, `rounded-sm`, serif title over a hairline rule, circle hairline close; portal, Escape + overlay close, scroll lock, focus restore |
+| `EmptyState` | `icon?`, `title`, `description?`, `action?` | hairline frame on cream (no card), serif title |
+| `ErrorState` | `message`, `onRetry?` | calm hairline frame, ghost retry, `role="alert"` — never red-primary |
+| `Badge` | `variant: neutral \| accent \| success \| danger` | STAMP: uppercase tracked 11px, hairline outline in variant color, `rounded-[3px]` — never a solid chip |
+| `Progress` | `value: 0–100`, `label?` | thin square-ended rule: vermillion fill on `bg-ink/10` track; full ARIA |
+| `PillGroup<T>` | `label`, `options`, `value`, `onChange` | micro-label caption; selected = solid ink pill (`bg-ink text-cream`), unselected = hairline outline; `aria-pressed` |
+| `LangSwitch` | none | hairline pill group; active locale = solid ink mini-pill |
+| `AppShell` | `user`, `isSessionPending?`, `onSignOut`, `balanceSlot?`, `children` | hairline masthead: serif wordmark "openCreate·" (vermillion dot, aria-hidden), uppercase grotesk nav (active = vermillion), ink-pill Sign in, cream hairline user menu |
+| `ShowcasePoster` | `palette: 6 palettes (§5)`, `className?` | decorative grained SVG poster; consumer owns sizing + caption |
+| `AppErrorBoundary` | wraps the app | crash → serif headline, one line, one ink-pill reload (§9) |
+| `OfflineOverlay` | none (self-managed) | full-screen `role="alertdialog"` on cream; serif headline; auto-clears on reconnect |
+| `NotFoundPage` | none | vermillion "404" micro-stamp, oversized serif headline, one ink-pill home link |
 
-Buttons: primary = the single main action per view; ghost = secondary/quiet actions and
-retry; danger = destructive only (delete). Size `lg` only for landing/hero CTAs.
+Buttons: primary = the single main action per view; ghost = secondary/quiet + retry;
+danger = destructive only. Size `lg` only for landing/hero CTAs. Links styled as the
+primary action mirror Button primary classes (ink pill, vermillion hover).
 
-## 6. The 4-states rule (mandatory)
+## 7. The 4-states rule (mandatory)
 
 Every component/screen that renders server data implements all four states:
 
 1. **Loading** — `Skeleton` blocks shaped like the eventual content (never bare spinners).
-2. **Empty** — `EmptyState` with a next action (e.g. CTA to create).
+2. **Empty** — `EmptyState` with a next action.
 3. **Error** — `ErrorState` with a localized, user-safe message + retry.
 4. **Data** — the real render.
 
 No blank screens, no raw error text, ever.
 
-## 7. Accessibility rules
+## 8. Accessibility rules
 
-- Focus: `focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none` on
-  every interactive element. Never remove outlines without a ring replacement.
-- Hit area: minimum 40px (`min-h-10`) for all controls; 44px+ on touch layouts.
-- Icon-only buttons always get `aria-label`.
-- Inputs always have visible `<label>`s; errors are linked via `aria-describedby` and
-  announced with `role="alert"`.
-- Contrast: ink on paper 17.9:1; accent on white 6.3:1; ink-soft on paper 6.2:1 — all AA+.
-  Never place text on `accent-soft` other than `text-accent` (5.9:1).
-- Status is never color-only: failed cards pair the danger border with text + badge.
-- Language: `<html lang>` mirrors the active locale; RU copy is complete, not partial.
+- Focus: `focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none`
+  on every interactive element (underline fields instead thicken + recolor their rule —
+  an equally visible replacement). Never remove outlines without a replacement.
+- Hit area ≥40px (`min-h-10`); 44px+ on touch layouts. Icon-only buttons get `aria-label`.
+- Inputs always have visible labels; errors via `aria-describedby` + `role="alert"`.
+- Vermillion text policy: see §2 contrast rules. Recorded brief-sanctioned exceptions:
+  stamp badges (11px outline stamps), active nav micro-labels, the balance stamp chip.
+- Status is never color-only: failed cards pair the danger border with text + stamp.
+- Decorative art (`ShowcasePoster`, ordinals, the wordmark dot) is `aria-hidden`;
+  uppercase is CSS-only so accessible names match i18n strings.
+- `<html lang>` mirrors the active locale; RU copy is complete, not partial.
 
-## 8. Error-UX surfaces (frontend-error-ux contract)
+## 9. Error-UX surfaces (frontend-error-ux contract)
 
 | Surface | Component | Behavior |
 |---|---|---|
-| Unknown route | `NotFoundPage` | Calm 404, title + description + home link. Wired as root `notFoundComponent`. |
-| Render crash | `AppErrorBoundary` | Full-screen "technical update" fallback + reload button. Technical detail goes to console/monitoring only. |
-| Lost connectivity | `OfflineOverlay` | `useSyncExternalStore` on `online`/`offline` events; full-screen `role="alertdialog"` blocker; auto-dismisses on reconnect. |
-| Blocking failure | `Modal role="alertdialog"` + `ErrorState` | For failures requiring acknowledgement/decision. Non-blocking failures stay inline (banners/`ErrorState`). |
+| Unknown route | `NotFoundPage` | Editorial 404 (vermillion micro-stamp + serif headline + one action). Root `notFoundComponent`. |
+| Render crash | `AppErrorBoundary` | Serif "technical update" fallback + reload. Technical detail → console/monitoring only. |
+| Lost connectivity | `OfflineOverlay` | `useSyncExternalStore` on `online`/`offline`; full-screen `role="alertdialog"` blocker on cream; auto-dismisses. |
+| Blocking failure | `Modal role="alertdialog"` + `ErrorState` | For failures requiring acknowledgement. Non-blocking failures stay inline. |
 
-Copy rules: never show raw server text, stack traces, or status codes; no red-primary
-panic styling; messages exist in both locales (`errors.*` keys).
+Copy rules: never raw server text, stack traces, or status codes; no red-primary panic
+styling; every error screen = serif headline, one line, one action; both locales
+(`errors.*` keys).
 
-## 9. Governance
+## 10. Governance
 
-- Tokens live only in `theme.css` `@theme`; new tokens require a repeated product need,
-  an entry in §2, and a note here — one-screen needs use existing tokens + opacity.
-- New shared components: only when 2+ modules need them; add to §5 with variants/states.
-  Module-specific UI lives inside the module.
-- Documented exception: `Progress` uses an inline `style` width — a runtime-computed
-  percentage cannot be a static Tailwind utility. No other inline styles are allowed.
-- Dark mode: out of scope for MVP (`--color-media` is the only dark surface). Revisit
-  when user demand appears — status colors must be re-contrast-checked then.
-- Screens/routes: standalone (landing, login, 404, crash, offline) sit directly on
-  paper; app screens (create, library, pricing) run inside the AppShell via the
-  pathless `_shell` layout route. AppShell itself is presentational — session
-  state and BalanceChip are injected by `routes/_shell.tsx` (shared/ui never
-  imports modules/*).
+- Tokens live only in `theme.css` `@theme`; new tokens require a repeated product
+  need, an entry in §2, and a note here. One-screen needs use existing tokens + opacity.
+- New shared components: only when 2+ modules need them; add to §6 in the same task.
+- Documented inline-style exception: `Progress` width % (runtime-computed). Documented
+  raw-hex exception: `showcasePosterArt.ts` (§5). No others.
+- Dark mode: out of scope for MVP (`--color-media` is the only dark surface).
+- Screens/routes: standalone screens (landing, login, 404, crash, offline) sit directly
+  on cream; app screens run inside `AppShell` via the pathless `_shell` layout route.
+  AppShell stays presentational (session + BalanceChip injected by `routes/_shell.tsx`).
+- Prerender guard: `pnpm --filter @opencreate/web build` greps the hero/claims copy —
+  redesigns must keep those strings rendering at `/`.
 
-## 10. Module UI surfaces (kept current per task)
+## 11. Page treatments (redesign map — stage 2 applies these)
 
-Module-owned components (live inside `modules/*`, composed from §5 primitives —
-NOT part of `shared/ui`):
+| Page | Treatment |
+|---|---|
+| Landing `/` | Hero: micro-label kicker, giant Fraunces headline with ONE vermillion italic word, claims line, ink CTA + text link. "Selected works" ShowcasePoster spread with fig. captions. "The index" price table (serif numerals, vermillion "us" column, verified-July-2026 footnote). How-it-works as 01/02/03 hairline rows. FAQ as clean rows. Colophon footer. |
+| `/pricing` | Same "index" table treatment + "200 free credits" stamp `Badge`. |
+| `/login` | Editorial split: serif manifesto block on sand left; underline-field form right (RHF/Zod + roles intact). |
+| `/create`, `/library` | Cream canvas, hairline masthead (done, AppShell); generator = numbered "commission sheet" groups with hairline separators, serif cost numeral; library media wells stay `bg-media` with cream figure captions. |
+| 404 / crash / offline | Done (stage 1): serif headline, one line, one action. |
+
+## 12. Module UI surfaces (kept current per task)
+
+Module-owned components (inside `modules/*`, composed from §6 primitives). Stage 1
+mechanically migrated all module surfaces to the v2 tokens (cream/sand/vermillion,
+ink-pill CTA mirrors); their full editorial restyle lands in stage 2 per §11.
 
 | Module | Surface | Composition & states |
 |---|---|---|
-| Auth | `AuthForm` (login screen `/login`) | White card on paper; `Input` + `Button`; login↔register switch (fields remount per mode); zod errors per field (`role="alert"`); localized server-error banner (`role="alert"`, `bg-danger/10`); submitting = button spinner; Google button only when `VITE_GOOGLE_AUTH=1`. |
-| Credits | `BalanceChip` (AppShell header) | Accent-soft pill `⚡ n` (`rounded-full bg-accent-soft text-accent`); loading = chip-shaped `Skeleton`; failure = compact ↻ icon-button (aria-label); signed-out = hidden. Click opens the history modal. |
-| Credits | `TransactionsList` (modal) | `Modal` + 4 states: 3 skeleton rows / `ErrorState` retry / `EmptyState` / rows with localized kind + locale-formatted date + signed amount (`+n` `text-success`, `-n` `text-danger`). |
-| Generator | `GeneratorPanel` (create page `/create`) | White card; catalog 4 states (form-silhouette skeletons / `ErrorState` retry / defensive `EmptyState` / form). Composes `PillGroup` (type), `ModelPicker`, prompt textarea, `AspectPicker` + `DurationPicker` (video only), `ImageDrop` (i2v only), `CostLabel` + primary Generate. Submit failures are INLINE `role="alert"` banners (`bg-danger/10`); insufficient credits adds a `/pricing` link. |
-| Generator | `ModelPicker` (cards) | 2-col grid of `aria-pressed` cards: product name + honest provider label + price hint (image "≈ 1 credit" / video "from 35"); selected = `border-accent bg-accent-soft`. |
-| Generator | `ImageDrop` | Dashed dropzone button (`border-dashed border-ink/15`) + sr-only labelled file input; validates image/* ≤10MB; preview thumb + ghost Remove; errors inline `role="alert"` `text-danger`. |
-| Gallery | `GalleryGrid` (create + library) | 4 states: 8 card skeletons / `ErrorState` retry / `EmptyState` + primary-styled `/create` `Link` CTA (off on the create page) / responsive 1-2-3-col grid + ghost "Load more" while `nextCursor`. |
-| Gallery | `GenerationCard` | White card, media well in the REAL aspect (`aspect-video`/`aspect-square`/`aspect-[9/16]`) on `bg-media`. Processing = pulsing well + `Progress` + "n%" caption; succeeded = `<video controls>` or image button → `GenerationDetail` modal, footer cost · download link · ghost-danger Delete; failed = `border-danger` + localized title + stored failure reason (caption) + success `Badge` "Credits refunded". |
-| Gallery | `GalleryFilterChips` (library) | `PillGroup` of All / Images / Videos; selection is page-local state. |
-| Landing | `LandingPage` (route `/`) | Standalone screen with its OWN top bar (wordmark · /pricing link · `LangSwitch` · session-aware Sign in/Create action); sections in reading order: Hero → PriceTable → HowItWorks → FaqClaims. CTA destination comes in as a prop (`ctaTo`) — the route reads the session, the module never imports Auth. |
-| Landing | `Hero` | Display headline (i18n `landing.headline`), the three approved claims mid-dot joined, primary-lg CTA `Link`, decorative `aria-hidden` showcase strip (`public/showcase/*.webp` gradient placeholders on `bg-media` wells). |
-| Landing | `PriceTable` (landing + `/pricing`) | White card, semantic `<table>`; `<caption>` = the "verified July 2026" honesty marker (also the table's accessible name). Our column cells `bg-accent-soft` with `text-accent` ONLY (§7); one named competitor item per row, no blanket "cheapest" claims. |
-| Landing | `HowItWorks` | `<ol>` of three white step cards (aria-hidden ordinal badge, h3 + description). |
-| Landing | `FaqClaims` | `<ul>` of exactly three Q&A cards (expire+no-subscription / what a credit is / which models) — the FAQ must not grow topics beyond the approved claims. |
-| Landing | `ModelCreditTable` (route `/pricing`) | White card, labelled `<table>` of every catalog model: product name + honest provider label, localized type, credits (`1 · per image` / `5s — 35 · 8s — 56`), ≈ USD (`from $0.35` via cheapest duration). Purely presentational — the pricing ROUTE owns the catalog query and its 4 states (skeleton rows / `ErrorState` retry / defensive `EmptyState` / table) plus the signed-out 200-free-credits CTA card. |
+| Auth | `AuthForm` (`/login`) | Card on cream; `Input` + `Button`; login↔register switch; zod errors per field (`role="alert"`); localized server-error banner; Google button behind `VITE_GOOGLE_AUTH=1`. |
+| Credits | `BalanceChip` (header) | Stamp-style chip `⚡ n` (vermillion outline — brief-sanctioned); loading = chip `Skeleton`; failure = ↻ icon-button; signed-out hidden. Opens history modal. |
+| Credits | `TransactionsList` (modal) | `Modal` + 4 states; signed amounts (`+n` success / `-n` danger). |
+| Generator | `GeneratorPanel` (`/create`) | Catalog 4 states; composes `PillGroup`, `ModelPicker`, prompt, aspect/duration pickers, `ImageDrop` (i2v), cost + Generate. Submit failures inline `role="alert"`; insufficient credits links `/pricing`. |
+| Generator | `ModelPicker` | `aria-pressed` cards: honest provider label + price hint; selected = vermillion hairline + sand wash. |
+| Generator | `ImageDrop` | Dashed hairline dropzone + sr-only file input; image/* ≤10MB; inline errors. |
+| Gallery | `GalleryGrid` | 4 states: 8 skeletons / `ErrorState` / `EmptyState` + ink-pill `/create` CTA / 1-2-3-col grid + ghost Load more. |
+| Gallery | `GenerationCard` | Media well in real aspect on `bg-media`; processing = pulse + `Progress` + %; succeeded = media + download/delete; failed = danger border + reason + "Credits refunded" stamp. |
+| Gallery | `GalleryFilterChips` | `PillGroup` All/Images/Videos. |
+| Landing | `LandingPage`, `Hero`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable` | See §11 for the stage-2 target treatments; claims and honesty markers ("verified July 2026" caption, one named competitor per row) are unchangeable. |
 
-A11y fix recorded 2026-07-06: the `Modal` overlay no longer sets `aria-hidden`
-(it hid the dialog itself from the accessibility tree); it is `role="presentation"`.
-
-Recorded copy exception (Tasks 16-17): failed generation cards show the stored
-provider failure reason as a SECONDARY caption under a localized primary line —
-the plan's card contract requires the reason to be visible; §8's "no raw server
-text" otherwise stands.
+Recorded exceptions: `Modal` overlay is `role="presentation"` (2026-07-06 a11y fix);
+failed cards show the stored provider failure reason as a secondary caption
+(Tasks 16-17) — §9's "no raw server text" otherwise stands.

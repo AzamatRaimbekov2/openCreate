@@ -3,7 +3,8 @@
 React 19 + Vite 8 SPA of the openCreate MVP: create AI images and videos, watch async
 video progress live, browse a per-account library, and read an honest EN/RU landing
 with verified price comparisons. TanStack Router (file-based) + Query v5, Zustand,
-Tailwind v4 ("Paper & Ink" design system), react-hook-form + zod, i18next.
+Tailwind v4 ("Light Editorial" design system v2 — cream/ink/vermillion tokens,
+Fraunces + Space Grotesk variable fonts via @fontsource), react-hook-form + zod, i18next.
 
 ## What it does
 
@@ -43,11 +44,12 @@ src/
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, price table, how-it-works, FAQ, pricingData
 └── shared/
-    ├── config/                 # theme.css (tokens), i18n (EN/RU), queryClient
+    ├── config/                 # theme.css (v2 editorial tokens + font tokens), i18n (EN/RU), queryClient
     ├── libs/apiClient.ts       # fetch wrapper → ApiClientError with envelope codes
     └── ui/                     # Button, Input, Select, Modal, Skeleton, Badge, Progress,
                                 # PillGroup, EmptyState, ErrorState, AppShell, LangSwitch,
-                                # AppErrorBoundary, OfflineOverlay, NotFoundPage
+                                # AppErrorBoundary, OfflineOverlay, NotFoundPage,
+                                # ShowcasePoster (+ showcasePosterArt — 6 poster palettes)
 ```
 
 Modules talk through the TanStack Query cache (`['me']`, `['generations']`,
