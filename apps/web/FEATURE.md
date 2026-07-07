@@ -88,6 +88,32 @@ Modules talk through the TanStack Query cache (`['me']`, `['generations']`,
 `['catalog']`), never through imports. Design tokens & rules: `docs/frontend/design.md`.
 Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and commit refs.
 
+## Hardening (QA rounds + final gate)
+
+- **Blocking `Modal`** has a real focus trap (Tab/Shift+Tab cycle inside, focus restored
+  to the trigger on close) plus a latent-bug fix found while adding it: `onClose` in the
+  mount effect's deps re-ran the effect on parent re-renders and let focus escape to the
+  trigger while the dialog stayed open.
+- **No one-click delete**: the library's glow-red delete icon opens a blocking
+  `role="alertdialog"` confirmation; only the danger pill starts the optimistic mutation
+  (with rollback on failure).
+- **`SubmitErrorBanner`** maps every contracts `apiErrorCode` to localized EN/RU copy via
+  a closed Record (unknown/future codes → generic fallback); raw server text appears only
+  as a secondary line and is fully suppressed for `content_blocked` (moderation strings
+  are never user copy — recorded review decision).
+- **Bounded polling**: processing cards poll every 4s within the 20-minute
+  `GENERATION_STALL_MS` budget from `createdAt`; past it the amber "taking longer than
+  usual" note with a manual Refresh pill replaces automatic polling, and a first-poll
+  failure shows an error state with retry — never a frozen "Generating N%".
+- **Wide tables** get overflow-measured scroll affordances (`TableScrollRegion`: mono
+  "scroll →" hint + solid right-edge strip that retires at the far right — no gradients).
+- **Final gate (2026-07-07)**: `lint` + `tsc --noEmit` + 135/135 vitest + production
+  `build` (landing prerender guard injected `/` into `dist/index.html`) + Playwright e2e
+  2/2 — all green. One e2e-only fix was needed: `e2e/mocks.ts` used a fixed pre-hardening
+  `createdAt`, which put the mocked generation past the polling budget so the SPA
+  (correctly) rendered the stalled card instead of the succeeded `<video>`; the mock now
+  stamps `createdAt` fresh at POST time.
+
 ## Run / test
 
 ```bash
