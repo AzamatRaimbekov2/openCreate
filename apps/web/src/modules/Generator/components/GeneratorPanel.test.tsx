@@ -150,7 +150,11 @@ describe('GeneratorPanel', () => {
     expect(await screen.findByLabelText(/prompt/i)).toBeInTheDocument()
     // Image type is default — only image models are offered as cards
     const modelGroup = screen.getByRole('group', { name: /model/i })
-    expect(within(modelGroup).getByRole('button', { name: /flash/i })).toBeInTheDocument()
+    const flashCard = within(modelGroup).getByRole('button', { name: /flash/i })
+    // v3 stage-3: model cards are STEEL tiles; the (auto-)selected one wears
+    // the amber selection ring — the reference files picker highlights under amber
+    expect(flashCard).toHaveAttribute('aria-pressed', 'true')
+    expect(flashCard).toHaveClass('bg-steel', 'border-glow-amber/60')
     expect(within(modelGroup).queryByRole('button', { name: /swift/i })).not.toBeInTheDocument()
     // Switching to video swaps the card list
     await userEvent.click(screen.getByRole('button', { name: /^video$/i }))
@@ -179,6 +183,9 @@ describe('GeneratorPanel', () => {
     // by test id — the model cards show the same price text as a hint.
     expect(screen.queryByRole('group', { name: /duration/i })).not.toBeInTheDocument()
     expect(screen.getByTestId('cost-label')).toHaveTextContent('≈ 1 credit')
+    // v3 stage-3: the cost numeral glows specimen-green — the price belongs
+    // to the green create action it sits beside
+    expect(screen.getByTestId('cost-label')).toHaveClass('text-glow-green')
     // Video model: duration pills drive the cost
     await userEvent.click(screen.getByRole('button', { name: /^video$/i }))
     const durationGroup = await screen.findByRole('group', { name: /duration/i })

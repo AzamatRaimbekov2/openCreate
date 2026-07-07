@@ -20,26 +20,30 @@ react-hook-form + zod, i18next.
   how-it-works prose rows, FAQ prose, minimal footer. Floating transparent
   masthead with LangSwitch and a session-aware CTA (`/create` signed in,
   `/login` otherwise). EN/RU.
-- **Auth (`/login`)** — terminal split: mono manifesto panel on the abyss step
-  (brand quote + the approved claims) beside the email+password sign-in/register
-  form (better-auth client) on the void — steel fields, zod validation, localized
-  server-error mapping, optional Google button.
+- **Auth (`/login`)** — one centered steel card on the void under the mono
+  wordmark home link: email+password sign-in/register form (better-auth client),
+  steel fields, zod validation, localized server-error mapping, optional Google
+  button; the submit pill is red for log-in and green for sign-up (reference
+  taxonomy).
 - **Create (`/create`, guarded)** — the generator as a "commission sheet"
-  (numbered hairline field groups: type → model cards with provider labels and
-  prices → prompt → aspect/duration → optional i2v upload; white mono cost numeral),
+  (numbered hairline field groups: type → steel model tiles with provider labels,
+  prices and an amber selection ring → prompt → aspect/duration → optional i2v
+  upload; glow-green mono cost numeral beside the green Generate pill),
   next to a live gallery column: a submit prepends its card instantly;
   processing video cards poll `GET /api/generations/:id` every 4s until terminal.
 - **Library (`/library`, guarded)** — infinite gallery of figure cards
-  (abyss media plates + mono prompt captions; 24/page, "Load more"),
-  client-side type filter chips, per-card download/delete (optimistic with rollback),
-  failed cards show the reason + "credits refunded" chip; status triad
+  (SQUARE abyss media tiles + mono prompt captions; 24/page, "Load more"),
+  client-side type filter chips, per-card portal download + glow-red icon delete
+  (optimistic with rollback), succeeded cards show a green "ready" chip, failed
+  cards show the reason + "credits refunded" chip; status triad
   processing=amber / succeeded=green / failed=red.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
   full per-model credit table from the catalog query, a "200 free credits" amber
   chip by the title, and the visitor signup CTA as a steel card with a green pill.
 - **App shell** — sticky steel bar: mono wordmark with the portal dot, lowercase
-  mono nav (Create/Library/Pricing), amber balance chip (opens the credit history
-  ledger modal), LangSwitch, red-pill Sign in / sign-out (clears personal caches).
+  mono nav (Create/Library/Pricing), amber specimen-pill balance chip (opens the
+  credit history ledger modal on the steel sheet with triad-signed amounts),
+  LangSwitch, red-pill Sign in / sign-out (clears personal caches).
 - **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
   (loading skeletons / empty / error+retry / data) on every data surface.
 
@@ -53,7 +57,7 @@ src/
 │   ├── index.tsx  login.tsx    # standalone (no shell)
 │   └── _shell.tsx + _shell.{create,library,pricing}.tsx   # pathless layout
 ├── modules/
-│   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, AuthManifesto, requireSession
+│   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, requireSession
 │   ├── Generator/              # generatorStore (draft), catalog query, create mutation,
 │   │                           # commission-sheet panel (SheetField/PromptField/SubmitErrorBanner)
 │   ├── Gallery/                # generations list/poll/delete hooks, cards, grid, detail
@@ -78,7 +82,7 @@ Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and com
 
 ```bash
 pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
-pnpm --filter @opencreate/web test       # vitest + RTL — 99 tests (jsdom)
+pnpm --filter @opencreate/web test       # vitest + RTL — 97 tests (jsdom)
 pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
 pnpm --filter @opencreate/web lint       # eslint src
 pnpm --filter @opencreate/web typecheck  # tsc --noEmit

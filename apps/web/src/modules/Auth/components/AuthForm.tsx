@@ -1,6 +1,8 @@
 // apps/web/src/modules/Auth/components/AuthForm.tsx
-// Email/password login-or-register form (v3 terminal: printed directly on the
-// void, steel input fields, mono weight-400 heading).
+// Email/password login-or-register form (v3 terminal, stage 3: rendered inside
+// the login route's centered STEEL card — fields stay border-defined steel,
+// mono weight-400 heading, submit pill tinted by mode per the reference
+// taxonomy: log-in = red, sign-up = green).
 // One component serves both modes: switching remounts the fields (key={mode})
 // so RHF state, zod errors and the server alert reset predictably. Server
 // failures surface as LOCALIZED copy in a role="alert" banner — never raw text.
@@ -45,10 +47,10 @@ export function AuthForm() {
   const [mode, setMode] = useState<AuthMode>('login')
   const isLogin = mode === 'login'
   return (
-    // No card — the form is printed directly on the void (the split's
-    // manifesto panel provides the structure), opened by a mono weight-400
-    // 30px heading over the standard white/10 hairline (v3 heading law)
-    <section className="flex w-full max-w-md flex-col gap-8">
+    // The route's steel card owns the surface — the form only structures it,
+    // opened by a mono weight-400 30px heading over the standard white/10
+    // hairline (v3 heading law)
+    <section className="flex w-full flex-col gap-8">
       <h1 className="border-b border-white/10 pb-5 text-3xl font-normal text-white">
         {t(isLogin ? 'auth.signIn' : 'auth.signUp')}
       </h1>
@@ -134,16 +136,25 @@ function AuthFields({ mode }: { mode: AuthMode }) {
       />
       {serverErrorKey ? (
         // Inline non-blocking failure banner (design.md §8); alert = announced.
-        // v3 treatment: a calm steel surface block with a glow-red left rule —
-        // red stays on the rule + text (the failure STATUS), never a red panel
+        // v3 treatment: a calm RECESSED block with a glow-red left rule — red
+        // stays on the rule + text (the failure STATUS), never a red panel.
+        // bg-abyss (not steel): the form now sits on the login card's steel
+        // surface, so the banner steps DOWN the ladder to stay visible.
         <p
           role="alert"
-          className="rounded-lg border-l-2 border-glow-red bg-steel px-4 py-3 text-sm text-glow-red"
+          className="rounded-lg border-l-2 border-glow-red bg-abyss px-4 py-3 text-sm text-glow-red"
         >
           {t(serverErrorKey)}
         </p>
       ) : null}
-      <Button type="submit" isLoading={isSubmitting}>
+      {/* Submit tint follows the reference taxonomy (design.md v3 §2): log-in
+          is an auth-entry action → RED specimen pill; sign-up creates an
+          account → GREEN specimen pill. Same closed triad, no new colors. */}
+      <Button
+        type="submit"
+        variant={mode === 'login' ? 'danger' : 'primary'}
+        isLoading={isSubmitting}
+      >
         {t(mode === 'login' ? 'auth.signIn' : 'auth.signUp')}
       </Button>
       {/* Optional Google OAuth — rendered only when the deploy enables it */}

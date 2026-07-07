@@ -103,6 +103,17 @@ describe('AuthForm', () => {
     expect(signUpEmail).not.toHaveBeenCalled()
   })
 
+  it('tints the submit pill red for log-in and green for sign-up (reference taxonomy)', async () => {
+    renderForm()
+    // Log in = the red specimen pill (auth-entry files under red in v3)
+    expect(screen.getByRole('button', { name: 'Sign in' })).toHaveClass('bg-specimen-red/20')
+    await userEvent.click(screen.getByRole('button', { name: /create an account/i }))
+    // Sign up = the green specimen pill (creating an account = a create action)
+    expect(screen.getByRole('button', { name: 'Create account' })).toHaveClass(
+      'bg-specimen-green/20',
+    )
+  })
+
   it('hides the Google button unless VITE_GOOGLE_AUTH is "1"', () => {
     renderForm()
     expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument()

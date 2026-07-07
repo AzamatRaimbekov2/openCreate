@@ -38,13 +38,15 @@ flowchart LR
   comparable before a duration is picked.
 - Custom cards instead of shared `PillGroup`: cards carry three lines of
   content, not a single label — different component class (module-owned UI).
-- v3 terminal restyle: catalog cards — `rounded-lg` white/10 hairline frames on
-  the void, `font-medium text-white` model name (500 = the weight ceiling),
-  quiet lowercase mono caption; SELECTED = amber specimen tint
-  (`border-glow-amber/60 bg-specimen-amber/20`, price hint `text-glow-amber`)
-  because the reference explicitly files "model picker highlights" under amber;
-  hover steps toward `bg-ridge/40`. Never a solid fill.
-  Roles (`aria-pressed`, group name) and i18n untouched.
+- v3 stage-3 restyle: catalog cards are STEEL TILES (`rounded-lg bg-steel`,
+  white/10 hairline — "cards on #1d293d", design.md §2) with `font-medium
+  text-white` model name (500 = the weight ceiling) and quiet lowercase mono
+  captions; SELECTED = the AMBER RING (`border-glow-amber/60`, price hint
+  `text-glow-amber`) because the reference files "model picker highlights"
+  under amber — the earlier amber bg wash was dropped so the tile surface
+  stays steel and only the ring + hint carry selection (aria-pressed carries
+  it for AT); unselected hover steps the surface to `bg-ridge`. Never a solid
+  fill. Roles (`aria-pressed`, group name) and i18n untouched.
 
 ## Commits
 

@@ -32,10 +32,11 @@ flowchart LR
   `cost_one/few/many/other` ru) — never string-concatenated.
 - Renders nothing for `null` (no model/duration resolved) — a wrong or empty
   number would undermine the product's honest-pricing promise.
-- v3 terminal restyle: the line is a mono weight-400 numeral in white
-  (`text-2xl font-normal text-white`) in the sheet footer — same numeral voice
-  as the landing's price index; weight 400 obeys the ceiling law. Text content
-  and `data-testid="cost-label"` untouched.
+- v3 stage-3 restyle: the line is a mono weight-400 numeral in SPECIMEN GREEN
+  (`text-2xl font-normal text-glow-green`) in the sheet footer — the price
+  belongs to the green Generate pill beside it, and the landing's price index
+  already speaks in the same glow-green numeral voice; weight 400 obeys the
+  ceiling law. Text content and `data-testid="cost-label"` untouched.
 
 ## Commits
 

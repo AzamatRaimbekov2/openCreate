@@ -37,19 +37,21 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
         {models.map((model) => {
           const isSelected = model.id === selectedId
           return (
-            // Terminal catalog card: selection glows in the AMBER specimen
-            // tint — the reference explicitly files "model picker highlights"
-            // under amber; unselected cards are quiet white/10 hairlines that
-            // step toward ridge on hover. Never a solid fill.
+            // Terminal catalog tile (stage 3): every card is a STEEL surface
+            // step (#1d293d — "cards on steel", design.md §2), and selection
+            // is an AMBER RING — the reference explicitly files "model picker
+            // highlights" under amber. The tile itself never changes tint
+            // (no solid fills, no amber wash): the ring + amber price hint
+            // carry the selection, aria-pressed carries it for AT.
             <button
               key={model.id}
               type="button"
               aria-pressed={isSelected}
               onClick={() => onSelect(model.id)}
-              className={`flex flex-col items-start gap-0.5 rounded-lg border p-3 text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
+              className={`flex flex-col items-start gap-0.5 rounded-lg border bg-steel p-3 text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
                 isSelected
-                  ? 'border-glow-amber/60 bg-specimen-amber/20'
-                  : 'border-white/10 bg-transparent hover:border-white/25 hover:bg-ridge/40'
+                  ? 'border-glow-amber/60'
+                  : 'border-white/10 hover:border-white/25 hover:bg-ridge'
               }`}
             >
               {/* The product name — font-medium (500) is the weight ceiling */}

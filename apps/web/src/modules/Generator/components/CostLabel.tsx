@@ -14,9 +14,12 @@ export function CostLabel({ credits }: CostLabelProps) {
   // No model/duration resolved yet — show nothing rather than a wrong number
   if (credits === null) return null
   return (
-    // Mono weight-400 numeral in white — the price is the sheet's most honest
-    // line, so it gets the heading color; weight stays at 400 (ceiling law)
-    <p className="text-2xl leading-none font-normal text-white" data-testid="cost-label">
+    // Mono weight-400 numeral in SPECIMEN GREEN (stage 3): the cost line sits
+    // beside the green Generate pill and IS that action's price — tinting the
+    // numeral in the same triad green ties price and action together (the
+    // landing's price index uses the identical glow-green numeral voice).
+    // Weight stays at 400 (ceiling law).
+    <p className="text-2xl leading-none font-normal text-glow-green" data-testid="cost-label">
       {t('generator.cost', { count: credits })}
     </p>
   )

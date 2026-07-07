@@ -1,31 +1,27 @@
 // apps/web/src/modules/Gallery/components/GenerationCard.tsx
-// One generation as a FIGURE (v3 terminal): the abyss media well is the plate
-// (the recessed surface step reserved for user media), the prompt is a quiet
-// mono caption below it, and the meta/actions row closes it over a white/10
-// hairline — no card wrapper (the user's work is the hero, not a box).
+// One generation as a FIGURE (v3 terminal, stage 3): a SQUARE abyss tile is
+// the plate (8px radius, the recessed surface step reserved for user media —
+// the same square-tile language as the landing's specimen grid, so library
+// and landing read as one product), the prompt is a quiet mono caption below
+// it, and the meta/actions row closes it over a white/10 hairline — no card
+// wrapper (the user's work is the hero, not a box).
 // Three live states (the list's Empty state is the grid's): processing →
-// stepped-pulse well + Progress + mono percent; succeeded → playable video or
-// image (image opens the detail modal) with download/delete; failed →
-// glow-red hairline well, failure reason, "credits refunded" chip, delete.
-// Status triad (design.md v3 §2): processing=amber, succeeded=green, failed=red.
+// stepped-pulse tile + Progress + mono percent; succeeded → playable video or
+// image (image opens the detail modal) + a green "ready" chip; failed →
+// glow-red hairline tile, failure reason, "credits refunded" chip.
+// Status triad (design.md v3 §2): processing=amber, succeeded=green,
+// failed=red. Delete is a glow-red ICON button (#ff2056 = the sparing
+// icon-accent rule) — destructive intent without a loud pill on every figure.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AspectRatio, Generation } from '@opencreate/contracts'
-import { Badge, Button, Progress } from 'shared/ui'
+import type { Generation } from '@opencreate/contracts'
+import { Badge, Progress } from 'shared/ui'
 import { useDeleteGeneration, useLiveGeneration } from '../model/generationsApi'
 import { GenerationDetail } from './GenerationDetail'
 
 export type GenerationCardProps = {
   // List item from the ['generations'] cache — the card keeps it live itself
   generation: Generation
-}
-
-// Media wells keep the generation's real aspect so cards don't jump when the
-// asset arrives (CLS). Static map — Tailwind needs literal class names.
-const aspectClasses: Record<AspectRatio, string> = {
-  '16:9': 'aspect-video',
-  '1:1': 'aspect-square',
-  '9:16': 'aspect-[9/16]',
 }
 
 export function GenerationCard({ generation: seed }: GenerationCardProps) {
@@ -35,7 +31,6 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
   const generation = useLiveGeneration(seed)
   const deleteMutation = useDeleteGeneration()
 
-  const aspectClass = aspectClasses[generation.params.aspectRatio]
   const mediaUrl = generation.mediaUrls[0]
   const progress = generation.progress ?? 0
   const isFailed = generation.status === 'failed'
@@ -44,13 +39,10 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
     <article className="flex flex-col gap-3">
       {generation.status === 'processing' ? (
         <>
-          {/* Stepped-pulse media well — the same surface-ladder loading pulse
-              as Skeleton (animate-skeleton, never a gradient shimmer); the
-              asset is on its way */}
-          <div
-            aria-hidden="true"
-            className={`${aspectClass} w-full animate-skeleton rounded-lg bg-abyss`}
-          />
+          {/* Stepped-pulse media tile — the same surface-ladder loading pulse
+              as Skeleton (animate-skeleton, never a gradient shimmer); square
+              like every gallery plate, so the grid never jumps between states */}
+          <div aria-hidden="true" className="aspect-square w-full animate-skeleton rounded-lg bg-abyss" />
           <div className="flex items-center gap-3">
             <Progress value={progress} label={t('gallery.processing')} />
             {/* Mono weight-400 percent in the processing AMBER — the number IS
@@ -62,12 +54,14 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
 
       {generation.status === 'succeeded' && mediaUrl ? (
         generation.type === 'video' ? (
+          // The square tile letterboxes non-square footage on the abyss plate
+          // (the recessed step) — the full frame lives in the detail modal
           <video
             controls
             src={mediaUrl}
             preload="metadata"
             aria-label={generation.prompt}
-            className={`${aspectClass} w-full rounded-lg bg-abyss`}
+            className="aspect-square w-full rounded-lg bg-abyss"
           />
         ) : (
           // Images enlarge in the detail modal — the media itself is the
@@ -78,23 +72,31 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
             onClick={() => setIsDetailOpen(true)}
             className="rounded-lg transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
           >
+            {/* object-cover crops to the square tile — honest full frame is
+                one click away in the detail modal */}
             <img
               src={mediaUrl}
               alt={generation.prompt}
               loading="lazy"
-              className={`${aspectClass} w-full rounded-lg bg-abyss object-cover`}
+              className="aspect-square w-full rounded-lg bg-abyss object-cover"
             />
           </button>
         )
       ) : null}
 
+      {generation.status === 'succeeded' ? (
+        <div>
+          {/* The green READY chip — the triad's succeeded color, said in text
+              so the status is never color-only (a11y rule) */}
+          <Badge variant="success">{t('gallery.ready')}</Badge>
+        </div>
+      ) : null}
+
       {isFailed ? (
         <>
-          {/* Quiet abyss well framed by the glow-red hairline — the border +
-              text carry the FAILED status together (never color alone) */}
-          <div
-            className={`${aspectClass} flex w-full items-center justify-center rounded-lg border border-glow-red bg-abyss`}
-          >
+          {/* Quiet square abyss tile framed by the glow-red hairline — the
+              border + text carry the FAILED status together (never color alone) */}
+          <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-glow-red bg-abyss">
             <span className="text-sm font-medium text-glow-red">{t('gallery.failed')}</span>
           </div>
           {/* Safety blocks carry the machine-readable errorCode — render OUR
@@ -106,7 +108,7 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
           ) : null}
           <div>
             {/* The charge was refunded server-side — say so explicitly (the
-                stamp Badge is the editorial refund mark) */}
+                refund note the failed state promises) */}
             <Badge variant="success">{t('gallery.refunded')}</Badge>
           </div>
         </>
@@ -122,7 +124,7 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
           <span className="text-xs text-mist-dim">
             {t('gallery.cost', { count: generation.costCredits })}
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             {generation.status === 'succeeded' && mediaUrl ? (
               // Quiet text action: portal blue — the sanctioned prose-link
               // color (v3 §2); downloads are navigation, not status
@@ -134,15 +136,10 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
                 {t('gallery.download')}
               </a>
             ) : null}
-            {/* Delete is destructive → the RED specimen pill (v3 triad);
-                v2 faked this with a ghost + red text override */}
-            <Button
-              variant="danger"
-              onClick={() => deleteMutation.mutate(generation.id)}
-              isLoading={deleteMutation.isPending}
-            >
-              {t('gallery.delete')}
-            </Button>
+            <DeleteButton
+              isPending={deleteMutation.isPending}
+              onDelete={() => deleteMutation.mutate(generation.id)}
+            />
           </div>
         </footer>
       ) : null}
@@ -155,5 +152,68 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
         />
       ) : null}
     </article>
+  )
+}
+
+type DeleteButtonProps = {
+  // Disables the button and swaps the icon for a spinner while deleting
+  isPending: boolean
+  // Fires the delete mutation for this card's generation
+  onDelete: () => void
+}
+
+// Destructive action as a quiet ICON button in the glow-red icon accent
+// (stage 3 — design.md §2 files #ff2056 under "icons/status only"): a red
+// PILL on every figure shouted destructiveness across the whole grid, while
+// the icon keeps delete findable but proportionate. The aria-label preserves
+// the exact accessible name the old pill had; 40px hit area per the a11y law.
+function DeleteButton({ isPending, onDelete }: DeleteButtonProps) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      onClick={onDelete}
+      disabled={isPending}
+      aria-busy={isPending || undefined}
+      aria-label={t('gallery.delete')}
+      className="flex size-10 items-center justify-center rounded-full text-glow-red transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {isPending ? (
+        // Same spinner anatomy as Button's — the button announces aria-busy
+        <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+      ) : (
+        // Inline currentColor trash glyph — never an OS emoji (closed triad)
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-4"
+        >
+          <path d="M4 7h16" />
+          <path d="M9 7V4h6v3" />
+          <path d="M6 7l1 13h10l1-13" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+        </svg>
+      )}
+    </button>
   )
 }

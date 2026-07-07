@@ -4,10 +4,11 @@
 
 ## Purpose
 
-The login/registration form rendered on `/login` (right column of the split —
-no card, printed directly on the void with a mono weight-400 30px heading, v3):
+The login/registration form rendered on `/login` inside the route's centered
+STEEL card (stage-3 v3 treatment — mono weight-400 30px heading over a hairline):
 one component for both modes with RHF + zod validation and an optional env-gated
-Google button.
+Google button. The submit pill is tinted by mode per the reference taxonomy
+(log-in = red specimen pill, sign-up = green specimen pill).
 
 ## What it does (for an AI reader)
 
@@ -55,11 +56,16 @@ flowchart LR
   `AuthFormValues` type.
 - v3 terminal restyle: h1 = `text-3xl font-normal text-white` over a white/10
   hairline (the 30px/400 heading law — no `md:` upscaling); the mode-switch
-  link is portal blue (prose-link law); server banner = calm `bg-steel` block
-  with a `border-glow-red` left rule + glow-red text — red marks the failure
-  STATUS, the surface never turns into a red panel. Submit stays the default
-  GREEN specimen pill (sign-in/sign-up = create actions per the triad); the
-  Google button is the amber ghost. Behavior, roles and i18n keys untouched.
+  link is portal blue (prose-link law); server banner = calm block with a
+  `border-glow-red` left rule + glow-red text — red marks the failure STATUS,
+  the surface never turns into a red panel. The Google button is the amber
+  ghost. Behavior, roles and i18n keys untouched.
+- Stage-3 (centered card): the section dropped its own `max-w-md` (the route's
+  card owns the width) and the banner surface stepped DOWN to `bg-abyss` —
+  a steel block would vanish on the card's steel surface. Submit tint is
+  mode-driven per the reference taxonomy: `variant="danger"` (red) for log-in
+  (auth-entry files under red), `variant="primary"` (green) for sign-up
+  (account creation is a create action). Accessible names are unchanged.
 
 ## Commits
 

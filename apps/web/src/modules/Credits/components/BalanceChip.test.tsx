@@ -52,6 +52,8 @@ describe('BalanceChip', () => {
     renderChip()
     const chip = await screen.findByRole('button', { name: /credits balance/i })
     expect(chip).toHaveTextContent('165')
+    // v3 stage-3: the chip is the AMBER specimen pill (credits = amber family)
+    expect(chip).toHaveClass('bg-specimen-amber/20')
     await userEvent.click(chip)
     expect(await screen.findByRole('dialog', { name: /credit history/i })).toBeInTheDocument()
   })

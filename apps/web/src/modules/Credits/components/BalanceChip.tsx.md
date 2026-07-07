@@ -49,12 +49,15 @@ flowchart LR
 - Balance updates arrive through the shared `['me']` cache (login invalidation now,
   charge/refund invalidations in Tasks 16-17) — the chip itself never mutates anything.
 
-- v3 terminal restyle: the chip is the Badge mono-caption-chip voice scaled to a
-  40px control — `rounded-full` white/10 hairline + white/5 wash, glow-AMBER
-  lettering and numeral (amber = the triad's pricing/credits family, v3 §2;
-  contrast-safe at caption size on steel), hover steps to `bg-ridge`; the
-  loading skeleton mirrors the pill silhouette (`rounded-full`); numeral weight
-  is `font-medium` — the 500 ceiling. States, roles and aria-labels untouched.
+- v3 stage-3 restyle: the chip is the full AMBER SPECIMEN PILL —
+  `bg-specimen-amber/20` + white/10 hairline + `text-lumen-amber` +
+  `shadow-pill`, hover `/35` (the exact Button-ghost anatomy), because the
+  balance is a real control in the shell and the earlier white/5 caption-chip
+  undersold that; the bolt icon wears `text-glow-amber` (the reference's
+  amber-pill ICON accent, §2 pill anatomy). Amber = the triad's
+  pricing/credits family. The loading skeleton mirrors the pill silhouette
+  (`rounded-full`); numeral weight is `font-medium` — the 500 ceiling.
+  States, roles and aria-labels untouched.
 
 ## Commits
 

@@ -200,6 +200,7 @@
     },
     "loadMore": "Load more",
     "processing": "Generating",
+    "ready": "Ready",
     "failed": "Generation failed",
     "contentBlocked": "Blocked by the safety filter — try a different prompt.",
     "refunded": "Credits refunded",

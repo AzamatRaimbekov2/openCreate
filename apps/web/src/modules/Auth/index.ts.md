@@ -11,9 +11,8 @@ Public API of the Auth module — the only import surface other layers may use
 
 - Responsibilities: re-export the module's public pieces; keep `model/` and
   `components/` internals private (modular-architecture rule).
-- Public API / exports / props / endpoints: `AuthForm`, `AuthManifesto` (login split
-  panel, stage 3 redesign), `signOut`, `requireSession` (beforeLoad guard, Task 16),
-  `useAuthSession`, `useMe`.
+- Public API / exports / props / endpoints: `AuthForm`, `signOut`,
+  `requireSession` (beforeLoad guard, Task 16), `useAuthSession`, `useMe`.
 - Inputs → Outputs: barrel only — no logic.
 - Side effects (I/O, network, state): none.
 
@@ -30,7 +29,6 @@ Public API of the Auth module — the only import surface other layers may use
 flowchart LR
   R[routes / shell] --> IDX[modules/Auth index.ts]
   IDX --> AF[AuthForm]
-  IDX --> AM[AuthManifesto]
   IDX --> SO[signOut]
   IDX --> RG[requireSession beforeLoad guard]
   IDX --> US[useAuthSession / useMe]
@@ -40,6 +38,9 @@ flowchart LR
 
 - `signIn`/`signUp` are NOT exported: only `AuthForm` performs credential auth, so the
   flow (validation, localized errors, `['me']` invalidation) cannot be bypassed.
+- `AuthManifesto` (the v3 login-split left panel) was DELETED in the stage-3
+  centered-card login restyle — nothing consumed it besides `routes/login.tsx`,
+  and the approved claims keep their one source of truth on the landing.
 
 ## Commits
 

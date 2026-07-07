@@ -1,9 +1,10 @@
 // apps/web/src/modules/Gallery/components/GenerationCard.test.tsx
-// Behavior (plan Task 17): processing → Progress % + pulsing media placeholder,
-// no <video>; succeeded video → <video controls src> + download + delete;
-// failed → danger border + errorMessage + "credits refunded" badge + delete;
-// a processing card that polls into a terminal state invalidates the list and
-// the balance; a succeeded image opens the detail modal.
+// Behavior (plan Task 17, v3 stage-3 tiles): processing → Progress % + pulsing
+// SQUARE media tile, no <video>; succeeded video → <video controls src> +
+// green "ready" chip + download + delete; failed → danger border +
+// errorMessage + "credits refunded" badge + delete; a processing card that
+// polls into a terminal state invalidates the list and the balance; a
+// succeeded image opens the detail modal.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -90,7 +91,7 @@ beforeEach(() => {
 })
 
 describe('GenerationCard', () => {
-  it('processing: shows progress percent and a pulsing placeholder, no video', async () => {
+  it('processing: shows progress percent and a pulsing square tile, no video', async () => {
     // The poll returns the same processing state — the card stays in-flight
     apiMock.mockResolvedValue(processingVideo)
     const { container } = renderCard(processingVideo)
@@ -98,14 +99,19 @@ describe('GenerationCard', () => {
     expect(progressbar).toHaveAttribute('aria-valuenow', '40')
     expect(screen.getByText('40%')).toBeInTheDocument()
     expect(container.querySelector('.animate-skeleton')).toBeInTheDocument()
+    // v3 stage-3: gallery media wells are SQUARE tiles regardless of the
+    // generation's own aspect (this one is 9:16)
+    expect(container.querySelector('.aspect-square')).toBeInTheDocument()
     expect(container.querySelector('video')).not.toBeInTheDocument()
   })
 
-  it('succeeded video: renders a playable video with download and delete', () => {
+  it('succeeded video: renders a playable video with a ready chip, download and delete', () => {
     const { container } = renderCard(succeededVideo)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('controls')
     expect(video).toHaveAttribute('src', '/media/gen1.mp4')
+    // The green status chip says it plainly — never color alone
+    expect(screen.getByText(/^ready$/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /download/i })).toHaveAttribute(
       'href',
       '/media/gen1.mp4',
