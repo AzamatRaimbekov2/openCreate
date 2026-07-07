@@ -12,10 +12,12 @@
 // Status triad (design.md v3 §2): processing=amber, succeeded=green,
 // failed=red. Delete is a glow-red ICON button (#ff2056 = the sparing
 // icon-accent rule) — destructive intent without a loud pill on every figure.
+// A paid generation never dies in one click: the icon only opens a blocking
+// confirmation alertdialog; the optimistic mutation fires on explicit confirm.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
-import { Badge, Progress } from 'shared/ui'
+import { Badge, Button, Modal, Progress } from 'shared/ui'
 import { useDeleteGeneration, useLiveGeneration } from '../model/generationsApi'
 import { GenerationDetail } from './GenerationDetail'
 
@@ -27,6 +29,9 @@ export type GenerationCardProps = {
 export function GenerationCard({ generation: seed }: GenerationCardProps) {
   const { t } = useTranslation()
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  // Delete is destructive AND paid — the icon opens this confirmation first;
+  // the mutation (and its optimistic cache removal) fires only on confirm
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   // Poll while processing; render list data once terminal (no extra requests)
   const generation = useLiveGeneration(seed)
   const deleteMutation = useDeleteGeneration()
@@ -138,11 +143,48 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
             ) : null}
             <DeleteButton
               isPending={deleteMutation.isPending}
-              onDelete={() => deleteMutation.mutate(generation.id)}
+              // The icon never deletes directly — it only asks the question
+              onDelete={() => setIsDeleteConfirmOpen(true)}
             />
           </div>
         </footer>
       ) : null}
+
+      {/* Blocking confirmation for the destructive action (frontend-error-ux):
+          Modal role="alertdialog" on the steel sheet; the danger specimen pill
+          confirms, the ghost pill cancels. Closing first keeps the exchange
+          snappy — the optimistic removal makes the card vanish right after. */}
+      <Modal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        title={t('gallery.deleteConfirm.title')}
+        role="alertdialog"
+      >
+        <div className="flex flex-col gap-6">
+          {/* Terminal voice: one quiet mist sentence states the consequence —
+              permanence is the fact the user is confirming, not a scare line */}
+          <p className="text-sm leading-relaxed text-mist">
+            {t('gallery.deleteConfirm.description')}
+          </p>
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+            >
+              {t('gallery.deleteConfirm.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setIsDeleteConfirmOpen(false)
+                deleteMutation.mutate(generation.id)
+              }}
+            >
+              {t('gallery.deleteConfirm.confirm')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {generation.status === 'succeeded' ? (
         <GenerationDetail
@@ -158,7 +200,7 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
 type DeleteButtonProps = {
   // Disables the button and swaps the icon for a spinner while deleting
   isPending: boolean
-  // Fires the delete mutation for this card's generation
+  // Opens the confirmation alertdialog — the mutation itself only fires there
   onDelete: () => void
 }
 

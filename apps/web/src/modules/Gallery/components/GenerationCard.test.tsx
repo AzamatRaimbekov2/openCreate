@@ -4,11 +4,14 @@
 // green "ready" chip + download + delete; failed → danger border +
 // errorMessage + "credits refunded" badge + delete; a processing card that
 // polls into a terminal state invalidates the list and the balance; a
-// succeeded image opens the detail modal.
+// succeeded image opens the detail modal; delete asks for confirmation in an
+// alertdialog — cancel deletes nothing, confirm fires the DELETE mutation and
+// only then removes the item optimistically.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import type { InfiniteData } from '@tanstack/react-query'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Generation } from '@opencreate/contracts'
+import type { Generation, GenerationList } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
 import { GenerationCard } from './GenerationCard'
 // i18n init — the card renders localized labels itself
@@ -155,5 +158,62 @@ describe('GenerationCard', () => {
     await userEvent.click(screen.getByRole('button', { name: /red fox/i }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('a red fox in the snow')
+  })
+})
+
+// A paid generation must never die in one click: delete opens a blocking
+// confirmation alertdialog; only an explicit confirm fires the mutation and
+// the optimistic cache removal (review finding, 2026-07-07).
+describe('GenerationCard delete confirmation', () => {
+  // The ['generations'] cache page holding the card — the optimistic removal
+  // filters THIS data, so it is the honest sensor for "card removed"
+  const seededList: InfiniteData<GenerationList> = {
+    pages: [{ items: [succeededVideo], nextCursor: null }],
+    pageParams: [null],
+  }
+
+  function renderSeededCard() {
+    const { queryClient } = renderCard(succeededVideo)
+    queryClient.setQueryData(['generations'], seededList)
+    return { queryClient }
+  }
+
+  function cachedItems(queryClient: QueryClient): Generation[] {
+    const data = queryClient.getQueryData<InfiniteData<GenerationList>>(['generations'])
+    return data?.pages.flatMap((page) => page.items) ?? []
+  }
+
+  it('opens a confirmation alertdialog without deleting anything', async () => {
+    const { queryClient } = renderSeededCard()
+    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveAccessibleName(/delete this generation/i)
+    expect(dialog).toHaveTextContent(/cannot be undone/i)
+    // Nothing fired, nothing removed — the dialog is only a question
+    expect(apiMock).not.toHaveBeenCalled()
+    expect(cachedItems(queryClient)).toHaveLength(1)
+  })
+
+  it('cancel closes the dialog and deletes nothing', async () => {
+    const { queryClient } = renderSeededCard()
+    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    const dialog = await screen.findByRole('alertdialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /cancel/i }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(apiMock).not.toHaveBeenCalled()
+    expect(cachedItems(queryClient)).toHaveLength(1)
+  })
+
+  it('confirm fires the DELETE mutation and removes the card optimistically', async () => {
+    apiMock.mockResolvedValue(undefined)
+    const { queryClient } = renderSeededCard()
+    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    const dialog = await screen.findByRole('alertdialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith('/api/generations/gen1', { method: 'DELETE' })
+    })
+    expect(cachedItems(queryClient)).toHaveLength(0)
   })
 })

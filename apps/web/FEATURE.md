@@ -34,7 +34,8 @@ react-hook-form + zod, i18next.
 - **Library (`/library`, guarded)** — infinite gallery of figure cards
   (SQUARE abyss media tiles + mono prompt captions; 24/page, "Load more"),
   client-side type filter chips, per-card portal download + glow-red icon delete
-  (optimistic with rollback), succeeded cards show a green "ready" chip, failed
+  behind a blocking confirmation alertdialog (danger pill confirms, ghost pill
+  cancels; only then optimistic with rollback), succeeded cards show a green "ready" chip, failed
   cards show the reason + "credits refunded" chip; status triad
   processing=amber / succeeded=green / failed=red.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +

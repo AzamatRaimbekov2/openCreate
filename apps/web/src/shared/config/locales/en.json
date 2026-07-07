@@ -206,6 +206,12 @@
     "refunded": "Credits refunded",
     "download": "Download",
     "delete": "Delete",
+    "deleteConfirm": {
+      "title": "Delete this generation?",
+      "description": "It will be removed from your library permanently. This cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
     "detail": {
       "title": "Generation details"
     },
