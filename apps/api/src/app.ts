@@ -2,6 +2,7 @@
 // of its dependencies so tests can inject an in-memory config/db (see
 // test/helpers/build-test-app.ts) and production boot (index.ts) injects real ones.
 import Fastify from 'fastify'
+import fastifyRateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import type { AppConfig } from './config'
 import type { Db } from './db/client'
@@ -60,10 +61,47 @@ export async function buildApp(deps: AppDeps) {
   // MUST be set before any `await app.register(...)`: awaiting a register boots
   // the avvio plugin tree, and an error handler set after boot never binds
   // (bit us in Task 9 — 401s regressed to Fastify's default error shape).
-  app.setErrorHandler((err: HttpError, _req, reply) => {
+  app.setErrorHandler((err: HttpError, req, reply) => {
     const status = typeof err.statusCode === 'number' ? err.statusCode : 500
-    const code = err.apiCode ?? (status === 500 ? 'internal_error' : 'validation_failed')
+    // Sanitization (ops hardening): an unexpected 5xx — anything WITHOUT a
+    // stable apiCode — may carry internals in its message (connection strings,
+    // hostnames, stack fragments). Those are operator material: log the full
+    // error (pino's err serializer includes the stack) and answer with the
+    // fixed generic envelope. Domain errors keep their messages because their
+    // messages were WRITTEN for clients ('Not enough credits', …).
+    if (!err.apiCode && status >= 500) {
+      req.log.error({ err, event: 'unhandled_error' }, 'unhandled error')
+      return reply
+        .status(status)
+        .send({ error: { code: 'internal_error', message: 'Something went wrong' } })
+    }
+    const code = err.apiCode ?? 'validation_failed'
     reply.status(status).send({ error: { code, message: err.message } })
+  })
+
+  // Rate limiting (ops hardening): registered BEFORE any route so the plugin's
+  // onRoute hook sees every registration and per-route `config.rateLimit`
+  // overrides (strict buckets on /api/auth/* and POST /api/generations) apply.
+  // Global default: 300 req/min per IP — generous for the SPA (4s polling ≈ 15
+  // req/min per running video), a hard wall for scripted abuse. 429s use the
+  // shared ApiError envelope with the stable 'rate_limited' code.
+  await app.register(fastifyRateLimit, {
+    global: true,
+    max: 300,
+    timeWindow: '1 minute',
+    // The plugin THROWS this builder's return value (see @fastify/rate-limit
+    // index.js), so it lands in the central error handler above — return an
+    // Error shaped like our domain errors (statusCode + apiCode) and the
+    // handler emits the standard envelope: 429 { error: { rate_limited } }.
+    errorResponseBuilder: () => {
+      const err = new Error('Too many requests — please slow down') as Error & {
+        statusCode: number
+        apiCode: string
+      }
+      err.statusCode = 429
+      err.apiCode = 'rate_limited'
+      return err
+    },
   })
 
   app.get('/health', async () => ({ ok: true }))

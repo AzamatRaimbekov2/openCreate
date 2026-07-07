@@ -11,6 +11,9 @@ export const apiErrorCodeSchema = z.enum([
   'insufficient_credits',
   'content_blocked',
   'provider_error',
+  // 429 from @fastify/rate-limit (ops hardening): a stable code so the SPA
+  // can show a dedicated "slow down" message instead of a generic error.
+  'rate_limited',
   'internal_error',
 ])
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>

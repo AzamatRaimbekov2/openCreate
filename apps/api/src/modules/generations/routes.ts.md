@@ -8,7 +8,7 @@ Thin HTTP layer over the generation service (plan Task 10): parse/clamp inputs, 
 ## What it does (for an AI reader)
 - Responsibilities: session-gate every route via `app.requireUser`, validate POST bodies with the SHARED contracts zod schema, clamp list pagination, translate `created` → 201/202, DELETE → 204, and hand `req.log` (per-request child logger) into `service.create`/`service.get` so money-path log lines carry the reqId.
 - Public API / exports / props / endpoints: `registerGenerationRoutes(app, service)` registering:
-  - `POST /api/generations` — body `CreateGenerationInput`; 400 envelope on zod failure (first issue's message); 201 (image, finished) / 202 (video, processing) with the `Generation` DTO.
+  - `POST /api/generations` — body `CreateGenerationInput`; 400 envelope on zod failure (first issue's message); 201 (image, finished) / 202 (video, processing) with the `Generation` DTO. Strict rate bucket `config.rateLimit: 20/min per IP` (submits spend provider money); reads keep the global 300/min so the SPA's 4s polling is never throttled.
   - `GET /api/generations?limit&cursor` — limit defaults 24, caps 50 (NaN/0/negative → default); returns `{ items, nextCursor }`.
   - `GET /api/generations/:id` — returns the DTO; while processing this doubles as the Runware poll (service.get).
   - `DELETE /api/generations/:id` — 204 on success.

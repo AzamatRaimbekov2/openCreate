@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
+    "@fastify/rate-limit": "^11.1.0",
     "@fastify/static": "^9.1.3",
     "@opencreate/contracts": "workspace:*",
     "better-auth": "^1.6.23",

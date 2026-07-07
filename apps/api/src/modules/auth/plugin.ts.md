@@ -6,7 +6,7 @@
 Fastify ⇄ better-auth bridge (plan Task 5): mounts `auth.handler` on `GET|POST /api/auth/*` by translating Fastify requests to web `Request`s, and decorates `requireUser` for protected routes.
 
 ## What it does (for an AI reader)
-- Responsibilities: rebuild a web `Request` from the (already-parsed) Fastify request; relay the web `Response` back preserving multiple `set-cookie` headers; expose `requireUser(req)` that resolves the session from the cookie or throws a 401 with `apiCode: 'unauthorized'`.
+- Responsibilities: rebuild a web `Request` from the (already-parsed) Fastify request; relay the web `Response` back preserving multiple `set-cookie` headers; expose `requireUser(req)` that resolves the session from the cookie or throws a 401 with `apiCode: 'unauthorized'`; declare the strict auth rate bucket (`config.rateLimit: 10/min per IP`) on the `/api/auth/*` route — credential stuffing / signup-spam surface (enforced by `@fastify/rate-limit` registered in `app.ts`, pinned by `test/rate-limit.test.ts`).
 - Public API / exports: `registerAuth(app, auth)`, `SessionUser` type; module augmentation typing `app.requireUser`.
 - Inputs → Outputs: HTTP requests under `/api/auth/*` → better-auth responses (sign-up/sign-in/sign-out/session, OAuth callbacks); `requireUser` → `{ id, email, name }`.
 - Side effects: route + decorator registration.

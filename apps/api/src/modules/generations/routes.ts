@@ -12,7 +12,13 @@ const DEFAULT_LIMIT = 24
 const MAX_LIMIT = 50
 
 export function registerGenerationRoutes(app: FastifyInstance, service: GenerationService) {
-  app.post('/api/generations', async (req, reply) => {
+  // Strict rate bucket (ops hardening): every submit spends provider money —
+  // 20/min per IP caps a runaway client/script while a human clicking the
+  // generator stays far below it. Reads (list/get) keep the global limit only:
+  // the SPA polls processing videos every 4s.
+  app.post('/api/generations', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
     const sessionUser = await app.requireUser(req)
     // Body is validated with the SHARED contracts schema — the SPA validates
     // with the same zod object, so client and server can never disagree.

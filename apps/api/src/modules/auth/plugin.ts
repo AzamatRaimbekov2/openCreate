@@ -42,6 +42,11 @@ export async function registerAuth(app: FastifyInstance, auth: Auth) {
   app.route({
     method: ['GET', 'POST'],
     url: '/api/auth/*',
+    // Strict rate bucket (ops hardening): auth endpoints are the credential
+    // stuffing / signup-spam surface — 10/min per IP is plenty for a human
+    // (sign-in + session + a retry or two) and a wall for scripts. Read by the
+    // @fastify/rate-limit plugin registered in app.ts BEFORE this route.
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     handler: async (req, reply) => {
       const response = await auth.handler(toWebRequest(req))
       reply.status(response.status)
