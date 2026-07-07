@@ -44,3 +44,5 @@ flowchart LR
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — in-memory db injected
 - 6c4e94f feat(api): local media storage with /media serving — storage dep + `storageDir` override
 - 681e20f feat(api): generation lifecycle — `fakeRunware`, `registerAndGetCookie`, `runware`/`signupBonusCredits` overrides
+- 5e8de3d feat(api): native env loading + structured logging — logLevel/logStream overrides, silent default
+- b21a116 feat(api): production single-origin serving — nodeEnv/webDistPath/trustedOrigins overrides

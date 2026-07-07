@@ -35,3 +35,5 @@ flowchart LR
 
 ## Commits
 - 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me
+- 5e8de3d feat(api): native env loading + structured logging — signup bonus log via base logger
+- b21a116 feat(api): production single-origin serving — trustedOrigins from config, explicit disableOriginCheck: false

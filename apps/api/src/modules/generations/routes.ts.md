@@ -42,3 +42,5 @@ flowchart LR
 
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
+- 5e8de3d feat(api): native env loading + structured logging — req.log passed to create/get
+- cdd94a3 feat(api): sanitized errors + rate limits — 20/min bucket on POST /api/generations

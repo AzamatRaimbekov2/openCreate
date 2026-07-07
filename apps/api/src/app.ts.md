@@ -43,3 +43,6 @@ flowchart LR
 - 6c4e94f feat(api): local media storage with /media serving — `storage` added to `AppDeps`, static /media/*, error handler moved before plugin boot
 - 681e20f feat(api): generation lifecycle — `runware` added to `AppDeps` (now complete), generation service + routes wired
 - 5d16801 fix(api): settle stuck processing generations — boot sweep `settleStaleGenerations(db)` wired after route registration
+- 5e8de3d feat(api): native env loading + structured logging — pino logger, redaction, logStream dep, log wiring
+- cdd94a3 feat(api): sanitized errors + rate limits — sanitized 5xx envelope, @fastify/rate-limit global 300/min
+- b21a116 feat(api): production single-origin serving — prod SPA static + index.html fallback

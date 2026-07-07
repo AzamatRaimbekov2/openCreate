@@ -35,3 +35,4 @@ sequenceDiagram
 
 ## Commits
 - 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me
+- cdd94a3 feat(api): sanitized errors + rate limits — 10/min bucket on /api/auth/*

@@ -32,4 +32,4 @@ flowchart LR
 - `tsconfig.build.json` is now `noEmit: true` — it is the src-only type gate; esbuild owns the emit.
 
 ## Commits
-- (pending) feat(api): production single-origin serving
+- b21a116 feat(api): production single-origin serving — esbuild bundle build introduced

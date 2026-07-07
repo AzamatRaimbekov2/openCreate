@@ -30,3 +30,4 @@ flowchart LR
 
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
+- cdd94a3 feat(api): sanitized errors + rate limits — rate_limited added to the code enum
