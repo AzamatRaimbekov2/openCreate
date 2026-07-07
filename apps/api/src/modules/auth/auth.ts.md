@@ -7,12 +7,12 @@ better-auth instance factory (plan Task 5): email+password always enabled, Googl
 
 ## What it does (for an AI reader)
 - Responsibilities: configure better-auth (secret, baseURL, `basePath: '/api/auth'`, trustedOrigins=web origin), map storage through `drizzleAdapter(db, { provider: 'sqlite', schema: { user, session, account, verification } })`, declare `creditsBalance` as a non-input additional user field, grant the signup bonus in `databaseHooks.user.create.after`.
-- Public API / exports: `createAuth(db, config)`, `Auth` (type).
-- Inputs → Outputs: `Db` + `AppConfig` → configured better-auth instance (`auth.handler`, `auth.api.getSession`).
+- Public API / exports: `createAuth(db, config, log?)`, `Auth` (type). `log` (base app logger) flows into `grantSignupBonus` so the signup bonus — a money-path event — leaves a structured `credits.signup_bonus` log line; the database hook has no request context, hence no reqId here.
+- Inputs → Outputs: `Db` + `AppConfig` (+ optional `MoneyLog`) → configured better-auth instance (`auth.handler`, `auth.api.getSession`).
 - Side effects: none at construction; db writes happen through the adapter at request time.
 
 ## Dependencies
-- Imports / depends on: `better-auth`, `better-auth/adapters/drizzle`, `db/client` (type), `db/schema`, `config` (type), `credits/ledger` (`grantSignupBonus`).
+- Imports / depends on: `better-auth`, `better-auth/adapters/drizzle`, `db/client` (type), `db/schema`, `config` (type), `credits/ledger` (`grantSignupBonus`, `MoneyLog` type).
 - Used by: `app.ts` (built once per app), `modules/auth/plugin.ts` (via the instance).
 
 ## Diagram

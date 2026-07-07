@@ -23,6 +23,9 @@ export type AppDeps = {
   // Runware provider client — injected so tests script it (fakeRunware) and
   // prod boot (index.ts) passes the real REST client. AppDeps is complete now.
   runware: RunwareClient
+  // Optional pino destination override. Tests inject a capture stream to
+  // assert on structured log lines; production leaves it unset (stdout).
+  logStream?: { write: (msg: string) => void }
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -31,7 +34,25 @@ type HttpError = Error & { statusCode?: number; apiCode?: string }
 
 export async function buildApp(deps: AppDeps) {
   // bodyLimit 15 MiB: inputImage data URIs are allowed up to 14 MB by contract.
-  const app = Fastify({ logger: false, bodyLimit: 15 * 1024 * 1024 })
+  // Logger: pino via Fastify. Level comes from config (LOG_LEVEL, default
+  // info; tests pass silent). Session cookies and auth headers are secrets —
+  // redact them in EVERY line so no serializer or hand-rolled log can leak
+  // them. Fastify's default request logging gives each request a reqId that
+  // pino stamps on every req.log line (correlation requirement).
+  const app = Fastify({
+    logger: {
+      level: deps.config.logLevel,
+      redact: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'res.headers["set-cookie"]',
+        'headers.authorization',
+        'headers.cookie',
+      ],
+      ...(deps.logStream ? { stream: deps.logStream } : {}),
+    },
+    bodyLimit: 15 * 1024 * 1024,
+  })
 
   // Single error → ApiError envelope mapping. `apiCode` (set by domain errors
   // like InsufficientCreditsError or requireUser) wins; otherwise fall back on
@@ -48,22 +69,31 @@ export async function buildApp(deps: AppDeps) {
   app.get('/health', async () => ({ ok: true }))
 
   // Auth first: it decorates `requireUser`, which every protected module needs.
-  const auth = createAuth(deps.db, deps.config)
+  // app.log is handed down so the signup-bonus hook (a money-path event with
+  // no request context) still emits a structured ledger entry.
+  const auth = createAuth(deps.db, deps.config, app.log)
   await registerAuth(app, auth)
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)
   // Catalog is public (no requireUser): pricing must render before sign-in.
   registerCatalogRoutes(app)
   // The core (Task 10): generation lifecycle service gets the db + provider +
-  // storage trio; routes stay thin and session-gated via requireUser.
+  // storage trio; routes stay thin and session-gated via requireUser. The
+  // base logger is the fallback for money-path events — routes pass req.log
+  // per call so those lines carry the request's reqId.
   registerGenerationRoutes(
     app,
-    createGenerationService({ db: deps.db, runware: deps.runware, storage: deps.storage }),
+    createGenerationService({
+      db: deps.db,
+      runware: deps.runware,
+      storage: deps.storage,
+      log: app.log,
+    }),
   )
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.
-  settleStaleGenerations(deps.db)
+  settleStaleGenerations(deps.db, Date.now(), app.log)
 
   // Serve downloaded generation assets at /media/* straight off the storage
   // dir. Public by design for the MVP: keys are unguessable UUIDs minted by

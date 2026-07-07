@@ -8,9 +8,12 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import type { Db } from '../../db/client'
 import type { AppConfig } from '../../config'
 import { account, session, user, verification } from '../../db/schema'
-import { grantSignupBonus } from '../credits/ledger'
+import { grantSignupBonus, type MoneyLog } from '../credits/ledger'
 
-export function createAuth(db: Db, config: AppConfig) {
+// `log` (the base app logger): the signup bonus is a money-path event and must
+// leave a structured ledger log line; the database hook has no request
+// context, so the app-level logger is the best correlation we can offer here.
+export function createAuth(db: Db, config: AppConfig, log?: MoneyLog) {
   return betterAuth({
     secret: config.betterAuthSecret,
     baseURL: config.betterAuthUrl,
@@ -36,7 +39,7 @@ export function createAuth(db: Db, config: AppConfig) {
       user: {
         create: {
           after: async (u) => {
-            grantSignupBonus(db, u.id, config.signupBonusCredits)
+            grantSignupBonus(db, u.id, config.signupBonusCredits, log)
           },
         },
       },

@@ -25,6 +25,10 @@ export type TestAppOverrides = {
   // Task 10: scripted provider + a lowered signup bonus for 402 tests.
   runware?: RunwareClient
   signupBonusCredits?: number
+  // Ops hardening: logger is SILENT by default so suites stay quiet; logging
+  // tests raise the level and capture pino's NDJSON via a write stub.
+  logLevel?: import('../../src/config').LogLevel
+  logStream?: { write: (msg: string) => void }
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -34,6 +38,7 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
     db: createDb(':memory:').db,
     storage: createLocalStorage(storageDir),
     runware: overrides.runware ?? (fakeRunware() as unknown as RunwareClient),
+    ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
     config: {
       databasePath: ':memory:',
       storageDir,
@@ -45,6 +50,7 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       port: 0,
       googleClientId: null,
       googleClientSecret: null,
+      logLevel: overrides.logLevel ?? 'silent',
     },
   })
 }

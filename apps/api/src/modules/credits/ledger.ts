@@ -5,8 +5,17 @@
 // generation on failure) — the ADR's hold→settle collapsed into charge-at-submit.
 import { randomUUID } from 'node:crypto'
 import { and, eq, sql } from 'drizzle-orm'
+import type { FastifyBaseLogger } from 'fastify'
 import type { Db } from '../../db/client'
 import { creditTransaction, user } from '../../db/schema'
+
+// Money-path observability: every balance mutation can emit ONE structured
+// log entry (event + userId + generationId + amount) AFTER its transaction
+// committed — a support question ("where did my credits go?") must be
+// answerable from logs alone. The logger is an optional trailing param so
+// request handlers pass req.log (reqId correlation) while non-request callers
+// (signup hook, boot sweep) pass the base app logger.
+export type MoneyLog = Pick<FastifyBaseLogger, 'info' | 'warn' | 'error'>
 
 // Thrown when a charge would take the balance below zero. Carries statusCode +
 // apiCode so the central error handler (app.ts) maps it straight to the
@@ -19,7 +28,7 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
-export function grantSignupBonus(db: Db, userId: string, amount: number) {
+export function grantSignupBonus(db: Db, userId: string, amount: number, log?: MoneyLog) {
   db.transaction((tx) => {
     tx.update(user)
       .set({ creditsBalance: sql`${user.creditsBalance} + ${amount}` })
@@ -29,13 +38,22 @@ export function grantSignupBonus(db: Db, userId: string, amount: number) {
       .values({ id: randomUUID(), userId, amount, kind: 'signup_bonus', createdAt: new Date() })
       .run()
   })
+  // Logged only after the transaction committed — a rolled-back grant must
+  // never appear in the audit trail.
+  log?.info({ event: 'credits.signup_bonus', userId, amount }, 'signup bonus granted')
 }
 
 // Charge at generation submit. The balance check happens INSIDE the transaction:
 // throwing rolls the whole transaction back (better-sqlite3 is synchronous), so
 // a rejected charge leaves both balance and ledger untouched — the "never below
 // zero" invariant lives here, not in callers.
-export function chargeCredits(db: Db, userId: string, amount: number, generationId: string) {
+export function chargeCredits(
+  db: Db,
+  userId: string,
+  amount: number,
+  generationId: string,
+  log?: MoneyLog,
+) {
   db.transaction((tx) => {
     const row = tx.select({ b: user.creditsBalance }).from(user).where(eq(user.id, userId)).get()
     if (!row || row.b < amount) throw new InsufficientCreditsError()
@@ -54,13 +72,20 @@ export function chargeCredits(db: Db, userId: string, amount: number, generation
       })
       .run()
   })
+  // After-commit log: a thrown InsufficientCreditsError rolls back and skips
+  // this line, so 'credits.charge' in the logs ⇔ a real ledger row exists.
+  log?.info({ event: 'credits.charge', userId, generationId, amount }, 'credits charged')
 }
 
 // Refund on generation failure — idempotent by design: no charge row means
 // nothing to refund (no-op), and an existing refund row for the generation
 // means it already happened (no-op). Both guards run inside the transaction so
 // concurrent refund attempts can't double-credit.
-export function refundCredits(db: Db, userId: string, generationId: string) {
+export function refundCredits(db: Db, userId: string, generationId: string, log?: MoneyLog) {
+  // Whether THIS call actually applied the refund (vs the idempotent no-op
+  // paths) — only a real balance mutation may produce a log entry, otherwise
+  // concurrent pollers would fill the logs with phantom refunds.
+  let refunded = 0
   db.transaction((tx) => {
     const charge = tx
       .select()
@@ -92,5 +117,11 @@ export function refundCredits(db: Db, userId: string, generationId: string) {
         createdAt: new Date(),
       })
       .run()
+    refunded = -charge.amount
   })
+  if (refunded > 0)
+    log?.info(
+      { event: 'credits.refund', userId, generationId, amount: refunded },
+      'credits refunded',
+    )
 }

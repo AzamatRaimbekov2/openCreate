@@ -6,7 +6,7 @@
 Thin HTTP layer over the generation service (plan Task 10): parse/clamp inputs, delegate to `service.ts`, map results to status codes. No domain logic lives here.
 
 ## What it does (for an AI reader)
-- Responsibilities: session-gate every route via `app.requireUser`, validate POST bodies with the SHARED contracts zod schema, clamp list pagination, translate `created` → 201/202, DELETE → 204.
+- Responsibilities: session-gate every route via `app.requireUser`, validate POST bodies with the SHARED contracts zod schema, clamp list pagination, translate `created` → 201/202, DELETE → 204, and hand `req.log` (per-request child logger) into `service.create`/`service.get` so money-path log lines carry the reqId.
 - Public API / exports / props / endpoints: `registerGenerationRoutes(app, service)` registering:
   - `POST /api/generations` — body `CreateGenerationInput`; 400 envelope on zod failure (first issue's message); 201 (image, finished) / 202 (video, processing) with the `Generation` DTO.
   - `GET /api/generations?limit&cursor` — limit defaults 24, caps 50 (NaN/0/negative → default); returns `{ items, nextCursor }`.
@@ -38,6 +38,7 @@ flowchart LR
 - zod failures answer directly with the 400 envelope (first issue message) instead of throwing — cheaper and keeps the central handler for *unexpected* errors.
 - Fastify route generics (`Querystring`/`Params`) type the inputs without casts — required under `strict` + `no-explicit-any`.
 - `limit` clamp: `Number()` first, then finite/positive check; hostile `?limit=1e9` gets 50, `?limit=abc` gets 24.
+- `req.log` is passed to `create` AND `get` (not `list`/`remove`): those two are the money-touching calls (charge/refund/settle happen inside), and the observability requirement is "reqId on every money log line".
 
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund

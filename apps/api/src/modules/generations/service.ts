@@ -11,7 +11,7 @@ import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import type { StorageProvider } from '../../storage/local'
 import { generation } from '../../db/schema'
-import { chargeCredits, refundCredits } from '../credits/ledger'
+import { chargeCredits, refundCredits, type MoneyLog } from '../credits/ledger'
 import { creditsFor, getModel, resolutionFor } from '../catalog/catalog'
 
 // Domain errors carry statusCode + apiCode so the central error handler in
@@ -36,7 +36,10 @@ export class ContentBlockedError extends Error {
   }
 }
 
-type Deps = { db: Db; runware: RunwareClient; storage: StorageProvider }
+// `log` is the BASE app logger — the fallback for money-path events. Routes
+// additionally pass their per-request child logger (req.log) into create/get
+// so charge/refund/settle/provider-error lines carry the request's reqId.
+type Deps = { db: Db; runware: RunwareClient; storage: StorageProvider; log?: MoneyLog }
 
 // How long a row may stay 'processing' before it counts as abandoned. There
 // are no background workers in the MVP — settlement is driven entirely by the
@@ -59,7 +62,9 @@ function failGeneration(
   // ('content_blocked'); null for ordinary provider/timeout failures where
   // the errorMessage itself is shown.
   errorCode: 'content_blocked' | null = null,
+  log?: MoneyLog,
 ) {
+  let failed = false
   db.transaction((tx) => {
     const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
     if (fresh?.status !== 'processing') return
@@ -67,21 +72,30 @@ function failGeneration(
       .set({ status: 'failed', errorMessage, errorCode, completedAt: new Date() })
       .where(eq(generation.id, id))
       .run()
+    failed = true
   })
-  refundCredits(db, userId, id)
+  // Money-path log: the fail transition releases the user's charge (refund
+  // below), so it must be visible in logs. Only the call that actually flipped
+  // the row logs — losers of the concurrent-settle race stay silent.
+  if (failed)
+    log?.warn(
+      { event: 'generation.fail', userId, generationId: id, errorMessage, errorCode },
+      'generation failed',
+    )
+  refundCredits(db, userId, id, log)
 }
 
 // Boot-time sweep (wired in app.ts): settles processing rows older than the
 // staleness threshold even if their owner never polls again — the spec's
 // hold→settle/refund guarantee must not depend on the SPA staying open.
-export function settleStaleGenerations(db: Db, now = Date.now()): number {
+export function settleStaleGenerations(db: Db, now = Date.now(), log?: MoneyLog): number {
   const cutoff = new Date(now - STALE_PROCESSING_MS)
   const rows = db
     .select()
     .from(generation)
     .where(and(eq(generation.status, 'processing'), lt(generation.createdAt, cutoff)))
     .all()
-  for (const row of rows) failGeneration(db, row.userId, row.id, 'generation timed out')
+  for (const row of rows) failGeneration(db, row.userId, row.id, 'generation timed out', null, log)
   return rows.length
 }
 
@@ -110,13 +124,17 @@ function toDto(row: typeof generation.$inferSelect): Generation {
 
 export type GenerationService = ReturnType<typeof createGenerationService>
 
-export function createGenerationService({ db, runware, storage }: Deps) {
+export function createGenerationService({ db, runware, storage, log: baseLog }: Deps) {
   // `created: true` → the asset is final (image, sync) → route answers 201.
   // `created: false` → accepted for async processing (video) → route answers 202.
+  // `reqLog` is the caller's request-scoped logger (req.log) so every money
+  // event of this call carries the reqId; baseLog covers non-request callers.
   async function create(
     userId: string,
     input: CreateGenerationInput,
+    reqLog?: MoneyLog,
   ): Promise<{ dto: Generation; created: boolean }> {
+    const log = reqLog ?? baseLog
     // Catalog-level validation BEFORE charging: zod already validated the
     // shape, but only the catalog knows which combinations are real.
     const model = getModel(input.modelId)
@@ -146,7 +164,7 @@ export function createGenerationService({ db, runware, storage }: Deps) {
     // in-flight provider call would otherwise ask Runware about an unknown
     // task, get an error, mark the row failed AND refund — while the provider
     // call still succeeds (free-generation double-spend).
-    chargeCredits(db, userId, cost, id)
+    chargeCredits(db, userId, cost, id, log)
     db.insert(generation)
       .values({
         id,
@@ -199,6 +217,18 @@ export function createGenerationService({ db, runware, storage }: Deps) {
             .run()
           settled = true
         })
+        // Money-path log: settle = the charge is final (no refund will come).
+        if (settled)
+          log?.info(
+            {
+              event: 'generation.settle',
+              userId,
+              generationId: id,
+              costCredits: cost,
+              runwareCostUsd: res.cost ?? null,
+            },
+            'generation settled',
+          )
         // Row already settled elsewhere (failed + refunded) → the user was
         // made whole; discard the downloaded asset instead of delivering it.
         if (!settled) await storage.remove(id, 'webp')
@@ -208,12 +238,20 @@ export function createGenerationService({ db, runware, storage }: Deps) {
         // (provider_error / content_blocked). The errorCode is persisted so
         // the gallery card can localize the safety block later — the envelope
         // alone only reaches whoever made the POST.
+        // Money-path log: the operator may still be paying Runware for this
+        // call — provider failures need their own structured event, with the
+        // REAL error detail (the client only ever sees the sanitized envelope).
+        log?.error(
+          { event: 'provider.error', userId, generationId: id, err },
+          'provider call failed',
+        )
         failGeneration(
           db,
           userId,
           id,
           err instanceof Error ? err.message : 'generation failed',
           err instanceof ContentBlockedError ? 'content_blocked' : null,
+          log,
         )
         throw err
       }
@@ -245,7 +283,12 @@ export function createGenerationService({ db, runware, storage }: Deps) {
         .where(and(eq(generation.id, id), eq(generation.status, 'processing')))
         .run()
     } catch (err) {
-      refundCredits(db, userId, id)
+      // Money-path log mirrors the image path: provider detail to logs only.
+      log?.error(
+        { event: 'provider.error', userId, generationId: id, err },
+        'video submit failed',
+      )
+      refundCredits(db, userId, id, log)
       db.update(generation)
         .set({
           status: 'failed',
@@ -263,7 +306,8 @@ export function createGenerationService({ db, runware, storage }: Deps) {
   // get() doubles as the poll: while a row is processing, each read asks
   // Runware getResponse and applies the transition — no background workers in
   // the MVP, the SPA's 4s polling drives progress.
-  async function get(userId: string, id: string): Promise<Generation> {
+  async function get(userId: string, id: string, reqLog?: MoneyLog): Promise<Generation> {
+    const log = reqLog ?? baseLog
     const row = db
       .select()
       .from(generation)
@@ -274,7 +318,7 @@ export function createGenerationService({ db, runware, storage }: Deps) {
     // Reaper: an hour-old processing row is abandoned (see STALE_PROCESSING_MS)
     // — settle it as failed + refund instead of holding the charge forever.
     if (Date.now() - row.createdAt.getTime() > STALE_PROCESSING_MS) {
-      failGeneration(db, userId, id, 'generation timed out')
+      failGeneration(db, userId, id, 'generation timed out', null, log)
       const settled = db.select().from(generation).where(eq(generation.id, id)).get()
       return toDto(settled!)
     }
@@ -296,7 +340,14 @@ export function createGenerationService({ db, runware, storage }: Deps) {
       // 'content_blocked' code (the SPA shows a localized safety message) and
       // give the credits back.
       if (poll.NSFWContent) {
-        failGeneration(db, userId, id, 'Blocked by the content safety filter', 'content_blocked')
+        failGeneration(
+          db,
+          userId,
+          id,
+          'Blocked by the content safety filter',
+          'content_blocked',
+          log,
+        )
         const settled = db.select().from(generation).where(eq(generation.id, id)).get()
         return toDto(settled!)
       }
@@ -306,7 +357,11 @@ export function createGenerationService({ db, runware, storage }: Deps) {
         // this task would return the same payload, so "leave it processing
         // and retry" loops forever while the user's credits stay held. Treat
         // it as a provider failure and give the money back.
-        failGeneration(db, userId, id, 'provider returned no asset')
+        log?.error(
+          { event: 'provider.error', userId, generationId: id, detail: 'no asset url' },
+          'provider returned no asset',
+        )
+        failGeneration(db, userId, id, 'provider returned no asset', null, log)
         const settled = db.select().from(generation).where(eq(generation.id, id)).get()
         return toDto(settled!)
       }
@@ -315,6 +370,7 @@ export function createGenerationService({ db, runware, storage }: Deps) {
       const mediaUrl = await storage.saveFromUrl(src, id, row.type === 'video' ? 'mp4' : 'webp')
       // Guard: only transition if still processing (two browser tabs can poll
       // the same generation concurrently).
+      let settled = false
       db.transaction((tx) => {
         const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
         if (fresh?.status !== 'processing') return
@@ -328,10 +384,29 @@ export function createGenerationService({ db, runware, storage }: Deps) {
           })
           .where(eq(generation.id, id))
           .run()
+        settled = true
       })
+      // Money-path log gated on the guard: only the poll that actually flipped
+      // the row reports the settle (racing tabs stay silent).
+      if (settled)
+        log?.info(
+          {
+            event: 'generation.settle',
+            userId,
+            generationId: id,
+            costCredits: row.costCredits,
+            runwareCostUsd: poll.cost ?? null,
+          },
+          'generation settled',
+        )
     } else {
       // Guarded fail + idempotent refund — concurrent polls cannot double-settle.
-      failGeneration(db, userId, id, poll.message)
+      // The terminal provider error is money-path telemetry too.
+      log?.error(
+        { event: 'provider.error', userId, generationId: id, detail: poll.message },
+        'provider reported failure',
+      )
+      failGeneration(db, userId, id, poll.message, null, log)
     }
     const updated = db.select().from(generation).where(eq(generation.id, id)).get()
     return toDto(updated!)

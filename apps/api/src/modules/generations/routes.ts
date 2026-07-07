@@ -25,7 +25,9 @@ export function registerGenerationRoutes(app: FastifyInstance, service: Generati
         },
       })
     }
-    const { dto, created } = await service.create(sessionUser.id, parsed.data)
+    // req.log is the per-request child logger — passing it down stamps every
+    // money-path log line (charge/refund/settle/provider error) with reqId.
+    const { dto, created } = await service.create(sessionUser.id, parsed.data, req.log)
     // 201 = image finished synchronously; 202 = video accepted, still processing.
     return reply.status(created ? 201 : 202).send(dto)
   })
@@ -40,8 +42,9 @@ export function registerGenerationRoutes(app: FastifyInstance, service: Generati
 
   app.get<{ Params: { id: string } }>('/api/generations/:id', async (req) => {
     const sessionUser = await app.requireUser(req)
-    // While processing this doubles as the Runware poll (see service.get).
-    return service.get(sessionUser.id, req.params.id)
+    // While processing this doubles as the Runware poll (see service.get) —
+    // polls can settle money (refund/settle), so they get req.log too.
+    return service.get(sessionUser.id, req.params.id, req.log)
   })
 
   app.delete<{ Params: { id: string } }>('/api/generations/:id', async (req, reply) => {
