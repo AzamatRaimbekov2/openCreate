@@ -33,7 +33,9 @@ export function TransactionsList({ isOpen, onClose }: TransactionsListProps) {
       ) : data.items.length === 0 ? (
         <EmptyState title={t('credits.empty.title')} description={t('credits.empty.description')} />
       ) : (
-        <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto">
+        // Editorial ledger: hairline-divided rows, no hover chips — the modal
+        // sheet is the surface, the rules are the structure (design.md §4)
+        <ul className="flex max-h-96 flex-col divide-y divide-ink/10 overflow-y-auto">
           {data.items.map((transaction) => (
             <TransactionRow key={transaction.id} transaction={transaction} />
           ))}
@@ -53,15 +55,21 @@ function TransactionRow({ transaction }: { transaction: CreditTransaction }) {
     timeStyle: 'short',
   }).format(new Date(transaction.createdAt))
   return (
-    <li className="flex items-center justify-between gap-4 rounded-xl px-3 py-2 hover:bg-ink/5">
-      <div className="flex flex-col">
+    // One ledger line on the hairline grid — the v1 hover chip is retired; a
+    // read-only row should not pretend to be interactive
+    <li className="flex items-center justify-between gap-4 px-1 py-3">
+      <div className="flex flex-col gap-0.5">
         <span className="text-sm font-medium text-ink">
           {t(`credits.kinds.${transaction.kind}`)}
         </span>
         <span className="text-xs text-ink-soft">{date}</span>
       </div>
-      {/* Sign is explicit (+/-) — color reinforces it but never carries it alone */}
-      <span className={`text-sm font-semibold ${isPositive ? 'text-success' : 'text-danger'}`}>
+      {/* Sign is explicit (+/-) — color reinforces it but never carries it
+          alone. Serif display numeral: the ledger speaks in the same numeral
+          voice as the price index and the cost line. */}
+      <span
+        className={`font-display text-lg leading-none font-semibold tracking-tight ${isPositive ? 'text-success' : 'text-danger'}`}
+      >
         {isPositive ? `+${transaction.amount}` : String(transaction.amount)}
       </span>
     </li>

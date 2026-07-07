@@ -112,6 +112,10 @@
     "google": "Продолжить с Google",
     "switchToRegister": "Впервые здесь? Создайте аккаунт",
     "switchToLogin": "Уже есть аккаунт? Войдите",
+    "manifesto": {
+      "quote": "Платите за то, что создаёте, — и ни за что больше.",
+      "caption": "Манифест openCreate"
+    },
     "errors": {
       "email": "Введите корректный email",
       "password": "Минимум 8 символов",
@@ -170,6 +174,7 @@
     "cost_few": "≈ {{count}} кредита",
     "cost_many": "≈ {{count}} кредитов",
     "cost_other": "≈ {{count}} кредита",
+    "sheet": "Бланк заказа",
     "submit": "Сгенерировать",
     "errors": {
       "insufficientCredits": "Недостаточно кредитов для этой генерации.",

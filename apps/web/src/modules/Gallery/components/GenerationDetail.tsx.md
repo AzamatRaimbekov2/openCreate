@@ -38,6 +38,10 @@ flowchart LR
   the browser's (same convention as Credits' TransactionsList).
 - Uses the shared `Modal` (`role="dialog"`): Escape/overlay close, scroll lock,
   focus restore come for free.
+- Stage 3 restyle (2026-07-07): media plate `rounded-sm bg-media`; the prompt is
+  the serif-italic figure caption (same voice as GenerationCard); download is the
+  ink/hairline-underline→vermillion-hover text action (small vermillion text
+  breaks the design.md §2 contrast policy). Behavior and i18n untouched.
 
 ## Commits
 

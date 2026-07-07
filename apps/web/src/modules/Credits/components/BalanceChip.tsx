@@ -15,9 +15,9 @@ export function BalanceChip() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const { data, error, isPending, isError, refetch } = useBalance()
 
-  // Loading: chip-shaped skeleton, no layout shift when the number arrives
+  // Loading: stamp-shaped skeleton, no layout shift when the number arrives
   if (isPending) {
-    return <Skeleton className="h-10 w-20 rounded-full" />
+    return <Skeleton className="h-10 w-20 rounded-[3px]" />
   }
 
   if (isError) {
@@ -41,15 +41,24 @@ export function BalanceChip() {
 
   return (
     <>
+      {/* Stamp-style chip (brief: "balance chip as stamp-style badge,
+          vermillion outline") — the Badge treatment scaled to a 40px control:
+          hairline vermillion outline, stamp corners, serif numeral. The
+          vermillion lettering is a recorded §2/§8 exception (stamp badges). */}
       <button
         type="button"
         onClick={() => setIsHistoryOpen(true)}
         aria-label={t('credits.balance')}
-        className="inline-flex min-h-10 items-center gap-1 rounded-full bg-sand px-4 py-2 text-sm font-medium text-vermillion transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+        className="inline-flex min-h-10 items-center gap-1.5 rounded-[3px] border border-vermillion/70 px-3 py-2 text-vermillion transition-colors duration-200 hover:border-vermillion hover:bg-vermillion/5 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
       >
         {/* Decorative bolt — the aria-label already names the control */}
-        <span aria-hidden="true">⚡</span>
-        {data.creditsBalance}
+        <span aria-hidden="true" className="text-xs">
+          ⚡
+        </span>
+        {/* Serif display numeral — the same numeral voice as the price index */}
+        <span className="font-display text-base leading-none font-semibold tracking-tight">
+          {data.creditsBalance}
+        </span>
       </button>
       <TransactionsList isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </>

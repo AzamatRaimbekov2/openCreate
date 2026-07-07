@@ -47,6 +47,12 @@ flowchart LR
   `min-h-screen bg-paper` wrapper was removed from this screen — keeping it
   would double the viewport height under the header.
 
+- Stage 3 restyle (2026-07-07): page opener promoted to the serif display voice
+  (`font-display text-4xl md:text-5xl` h1; gallery h2 = serif over a hairline) and
+  the grid gaps widened to `gap-10` — brief QA #6 ("/create must visibly belong to
+  the same brand as the landing"). Composition/behavior untouched; the commission
+  sheet itself lives in `modules/Generator`.
+
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost

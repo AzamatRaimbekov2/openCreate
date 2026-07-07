@@ -44,6 +44,10 @@ flowchart LR
   the page canvas (`bg-paper` + min-height + header), so the old
   `min-h-screen bg-paper` wrapper was removed from this screen.
 
+- Stage 3 restyle (2026-07-07): serif display h1 over the standard hairline —
+  the same editorial opener as /create and /pricing (brief QA #6). Filter chips and
+  grid behavior untouched.
+
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items

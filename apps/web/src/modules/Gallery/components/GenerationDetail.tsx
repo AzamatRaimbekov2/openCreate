@@ -27,22 +27,26 @@ export function GenerationDetail({ generation, isOpen, onClose }: GenerationDeta
     <Modal isOpen={isOpen} onClose={onClose} title={t('gallery.detail.title')}>
       <div className="flex flex-col gap-4">
         {mediaUrl ? (
-          // Media sits on the dark media well — the only dark surface (design.md §2)
+          // Media sits on the dark media well — the only dark surface
+          // (design.md §2); rounded-sm = the editorial near-flat plate
           generation.type === 'video' ? (
-            <video controls src={mediaUrl} className="w-full rounded-xl bg-media" />
+            <video controls src={mediaUrl} className="w-full rounded-sm bg-media" />
           ) : (
-            <img src={mediaUrl} alt={generation.prompt} className="w-full rounded-xl bg-media" />
+            <img src={mediaUrl} alt={generation.prompt} className="w-full rounded-sm bg-media" />
           )
         ) : null}
-        <p className="text-sm text-ink">{generation.prompt}</p>
+        {/* Figure caption voice — the same serif-italic prompt as the card */}
+        <p className="font-display text-base leading-snug text-ink italic">{generation.prompt}</p>
         <p className="text-xs text-ink-soft">
           {t('gallery.cost', { count: generation.costCredits })} · {createdAt}
         </p>
         {mediaUrl ? (
+          // Ink text + hairline underline→vermillion hover: small vermillion
+          // text would break the design.md §2 contrast policy
           <a
             href={mediaUrl}
             download
-            className="self-start text-sm font-medium text-vermillion underline focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+            className="self-start text-sm font-medium text-ink underline decoration-ink/30 underline-offset-4 transition-colors duration-200 hover:decoration-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {t('gallery.download')}
           </a>

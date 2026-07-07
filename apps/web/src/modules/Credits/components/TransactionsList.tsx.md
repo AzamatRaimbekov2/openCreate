@@ -46,6 +46,12 @@ flowchart LR
 - Kind labels come from `credits.kinds.<kind>` keys — adding a ledger kind requires new
   locale entries in BOTH en.json and ru.json.
 
+- Stage 3 restyle (2026-07-07): rows became an editorial LEDGER — hairline
+  `divide-y divide-ink/10` between rows (the v1 rounded hover-chip is retired: a
+  read-only row must not pretend to be interactive); amounts are serif display
+  numerals. The `text-success`/`text-danger` classes stay on the amount span —
+  tests assert them, and sign (+/-) still carries the meaning, never color alone.
+
 ## Commits
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal

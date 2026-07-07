@@ -32,6 +32,10 @@ flowchart LR
   `cost_one/few/many/other` ru) — never string-concatenated.
 - Renders nothing for `null` (no model/duration resolved) — a wrong or empty
   number would undermine the product's honest-pricing promise.
+- Stage 3 restyle (2026-07-07): the line is now a serif display numeral
+  (`font-display text-2xl`, brief: "cost line as serif numeral") in the sheet
+  footer — the same headline voice as the landing's price index. Text content and
+  `data-testid="cost-label"` untouched.
 
 ## Commits
 

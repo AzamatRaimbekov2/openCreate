@@ -15,20 +15,24 @@ Fraunces + Space Grotesk variable fonts via @fontsource), react-hook-form + zod,
   ("verified July 2026"), numbered how-it-works rows, FAQ rows, colophon footer.
   Standalone hairline masthead with LangSwitch and a session-aware CTA (`/create`
   signed in, `/login` otherwise). EN/RU.
-- **Auth (`/login`)** — email+password sign-in/register (better-auth client), zod
-  validation, localized server-error mapping, optional Google button.
-- **Create (`/create`, guarded)** — generator form (type → model cards with provider
-  labels and prices → prompt → aspect/duration → optional i2v upload) with a live
-  cost label, next to a live gallery column: a submit prepends its card instantly;
+- **Auth (`/login`)** — editorial split: serif manifesto panel on sand (brand quote +
+  the approved claims) beside the email+password sign-in/register form (better-auth
+  client), zod validation, localized server-error mapping, optional Google button.
+- **Create (`/create`, guarded)** — the generator as an editorial "commission sheet"
+  (numbered hairline field groups: type → model cards with provider labels and
+  prices → prompt → aspect/duration → optional i2v upload; serif cost numeral),
+  next to a live gallery column: a submit prepends its card instantly;
   processing video cards poll `GET /api/generations/:id` every 4s until terminal.
-- **Library (`/library`, guarded)** — infinite gallery (24/page, "Load more"),
+- **Library (`/library`, guarded)** — infinite gallery of magazine-figure cards
+  (dark media plates + serif-italic prompt captions; 24/page, "Load more"),
   client-side type filter chips, per-card download/delete (optimistic with rollback),
-  failed cards show the reason + "credits refunded" badge.
+  failed cards show the reason + "credits refunded" stamp.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
   full per-model credit table from the catalog query, a "200 free credits" accent
   stamp by the title, and the visitor signup CTA as a sand block.
-- **App shell** — header nav (Create/Library/Pricing), balance chip (opens the credit
-  history modal), LangSwitch, sign-out (clears personal query caches).
+- **App shell** — hairline masthead: serif wordmark, uppercase grotesk nav
+  (Create/Library/Pricing), stamp-style balance chip (opens the credit history
+  ledger modal), LangSwitch, sign-out (clears personal query caches).
 - **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
   (loading skeletons / empty / error+retry / data) on every data surface.
 
@@ -42,8 +46,9 @@ src/
 │   ├── index.tsx  login.tsx    # standalone (no shell)
 │   └── _shell.tsx + _shell.{create,library,pricing}.tsx   # pathless layout
 ├── modules/
-│   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, requireSession
-│   ├── Generator/              # generatorStore (draft), catalog query, create mutation, panel
+│   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, AuthManifesto, requireSession
+│   ├── Generator/              # generatorStore (draft), catalog query, create mutation,
+│   │                           # commission-sheet panel (SheetField/PromptField/SubmitErrorBanner)
 │   ├── Gallery/                # generations list/poll/delete hooks, cards, grid, detail
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, showcase spread, section heading, price tables,
@@ -65,7 +70,7 @@ Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and com
 
 ```bash
 pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
-pnpm --filter @opencreate/web test       # vitest + RTL — 92 tests (jsdom)
+pnpm --filter @opencreate/web test       # vitest + RTL — 95 tests (jsdom)
 pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
 pnpm --filter @opencreate/web lint       # eslint src
 pnpm --filter @opencreate/web typecheck  # tsc --noEmit

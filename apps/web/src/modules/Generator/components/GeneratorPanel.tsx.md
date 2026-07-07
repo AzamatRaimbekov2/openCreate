@@ -4,15 +4,19 @@
 
 ## Purpose
 
-The Generator module's main surface (create page): the full generation form —
-type toggle, model cards, prompt, aspect/duration, optional i2v upload, live
-cost, submit — orchestrating the store, the catalog query, and the mutation.
+The Generator module's main surface (create page): the full generation form as the
+stage-3 editorial "commission sheet" — a hairline-framed sheet of NUMBERED field
+groups (type toggle, model cards, prompt, aspect/duration, optional i2v upload)
+separated by hairlines, closed by a serif cost numeral + Generate footer —
+orchestrating the store, the catalog query, and the mutation.
 
 ## What it does (for an AI reader)
 
 - Responsibilities: catalog 4-states (skeletons / ErrorState retry / defensive
-  EmptyState / form); sync catalog → store; render sub-pickers from store state;
-  gate submit on `selectCreateInput`; surface mutation failures inline.
+  EmptyState / form); sync catalog → store; build the ORDERED `fields` array (stable
+  group-id keys; render position feeds each `SheetField`'s decorative ordinal) so
+  conditional groups renumber cleanly; gate submit on `selectCreateInput`; surface
+  mutation failures inline via `SubmitErrorBanner`.
 - Public API / exports: `GeneratorPanel` (no props — state lives in `generatorStore`).
 - Inputs → Outputs: user edits → store actions; submit → `useCreateGeneration.mutate(input)`;
   `insufficient_credits` → inline `role="alert"` banner + `/pricing` link;
@@ -24,9 +28,10 @@ cost, submit — orchestrating the store, the catalog query, and the mutation.
 ## Dependencies
 
 - Imports: `shared/ui` (`Button`, `EmptyState`, `ErrorState`, `PillGroup`, `Skeleton`),
-  `shared/libs/apiClient` (`ApiClientError`), module model (`catalogApi`, `createGeneration`,
-  `generatorStore`), sibling components (`AspectPicker`, `CostLabel`, `DurationPicker`,
-  `ImageDrop`, `ModelPicker`), `react-i18next`.
+  module model (`catalogApi`, `createGeneration`, `generatorStore`), sibling components
+  (`AspectPicker`, `CostLabel`, `DurationPicker`, `ImageDrop`, `ModelPicker`,
+  `PromptField`, `SheetField`, `SubmitErrorBanner`), `react-i18next`. (`ApiClientError`
+  moved into `SubmitErrorBanner` with the error-classification logic.)
 - Used by: `routes/create.tsx` via `modules/Generator` public API.
 
 ## Diagram
@@ -34,12 +39,12 @@ cost, submit — orchestrating the store, the catalog query, and the mutation.
 ```mermaid
 flowchart TD
   UC[useCatalog] -->|models| ST[(generatorStore)]
-  ST --> TT[PillGroup type] & MP[ModelPicker] & PR[prompt textarea] & AP[AspectPicker] & DP[DurationPicker video-only] & ID[ImageDrop i2v-only]
-  ST --> CL[CostLabel selectCostCredits]
+  ST --> FLD[ordered fields array → SheetField rows 01…]
+  FLD --> TT[PillGroup type] & MP[ModelPicker] & PR[PromptField] & AP[AspectPicker] & DP[DurationPicker video-only] & ID[ImageDrop i2v-only]
+  ST --> CL[CostLabel serif numeral]
   ST -->|selectCreateInput| SUB[Generate button]
   SUB --> M[useCreateGeneration]
-  M -->|402 insufficient_credits| BAN[inline alert + /pricing link]
-  M -->|422 content_blocked| SB[inline alert: safety-filter copy + refund note]
+  M -->|error| SEB[SubmitErrorBanner: insufficient/blocked/generic]
 ```
 
 ## Key decisions / gotchas
@@ -54,6 +59,11 @@ flowchart TD
   cannot apply to the current model should not exist in the a11y tree.
 - Insufficient credits is not a modal: the failure has an inline next step
   (pricing), so frontend-error-ux keeps it non-blocking.
+- Stage 3 restyle (2026-07-07): white card → hairline sheet frame; field groups →
+  `SheetField` rows with derived decorative ordinals; prompt + error banner extracted
+  to `PromptField` / `SubmitErrorBanner` (200-line cap); footer = closing hairline
+  with the serif cost numeral. Behavior, roles, i18n keys and tests untouched; new
+  key `generator.sheet` names the sheet head in both locales.
 
 ## Commits
 

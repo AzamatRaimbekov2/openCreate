@@ -23,8 +23,12 @@ function LibraryPage() {
   const [filter, setFilter] = useState<GalleryFilter>('all')
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">{t('gallery.title')}</h1>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 md:py-14">
+      {/* Serif display page title over the closing hairline — the same
+          editorial opener as /create and /pricing (one brand, brief QA #6) */}
+      <h1 className="border-b border-ink/15 pb-6 font-display text-4xl font-semibold tracking-tight text-ink md:text-5xl">
+        {t('gallery.title')}
+      </h1>
       <GalleryFilterChips value={filter} onChange={setFilter} />
       <GalleryGrid filter={filter} />
     </main>

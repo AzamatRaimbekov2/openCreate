@@ -38,6 +38,11 @@ flowchart LR
   comparable before a duration is picked.
 - Custom cards instead of shared `PillGroup`: cards carry three lines of
   content, not a single label — different component class (module-owned UI).
+- Stage 3 restyle (2026-07-07): editorial catalog cards — `rounded-sm` hairline
+  frames on cream (white fill retired), serif display model name, caption in the
+  uppercase micro-label voice; selected stays vermillion hairline + sand wash
+  (active state = sanctioned accent), hover solidifies the hairline + sand wash.
+  Roles (`aria-pressed`, group name) and i18n untouched.
 
 ## Commits
 

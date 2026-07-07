@@ -40,6 +40,10 @@ flowchart LR
   switch re-localizes a visible error.
 - Hidden-but-labelled real `<input type=file>` (sr-only): native picker,
   `userEvent.upload`-testable, visible button/dropzone stays a plain button.
+- Stage 3 restyle (2026-07-07): dropzone = dashed hairline directly on cream
+  (`rounded-sm`, white fill retired) that solidifies + sand-washes on hover; the
+  preview thumbnail sits on the dark media well (`bg-media`) — user media is the
+  app's only dark element. Behavior and labels untouched.
 
 ## Commits
 

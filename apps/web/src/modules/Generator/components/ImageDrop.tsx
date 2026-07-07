@@ -59,10 +59,12 @@ export function ImageDrop({ value, onChange }: ImageDropProps) {
     <div className="flex flex-col gap-2">
       {value ? (
         <div className="flex items-center gap-3">
+          {/* The reference image sits on the dark media well — user media is
+              the only dark element in the app (design.md §2) */}
           <img
             src={value}
             alt={t('generator.image.previewAlt')}
-            className="size-16 rounded-xl border border-ink/10 object-cover"
+            className="size-16 rounded-sm border border-ink/15 bg-media object-cover"
           />
           <Button variant="ghost" onClick={() => onChange(null)}>
             {t('generator.image.remove')}
@@ -85,7 +87,10 @@ export function ImageDrop({ value, onChange }: ImageDropProps) {
             // Allow dropping: default dragover behavior blocks the drop event
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="rounded-xl border border-dashed border-ink/15 bg-white px-4 py-6 text-sm text-ink-soft transition-opacity duration-150 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+            // Editorial dropzone: a dashed hairline directly on the cream
+            // paper (no white card); hover solidifies the line + sand wash —
+            // the "hover must be felt" gesture without any shadow
+            className="rounded-sm border border-dashed border-ink/30 bg-transparent px-4 py-6 text-sm text-ink-soft transition-colors duration-200 hover:border-ink/60 hover:bg-sand/60 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {t('generator.image.hint')}
           </button>

@@ -156,7 +156,10 @@ anything new; new shared components must be added to this table in the same task
 
 Buttons: primary = the single main action per view; ghost = secondary/quiet + retry;
 danger = destructive only. Size `lg` only for landing/hero CTAs. Links styled as the
-primary action mirror Button primary classes (ink pill, vermillion hover).
+primary action mirror Button primary classes (ink pill, vermillion hover). Quiet
+text actions/links use the editorial underline idiom: `text-ink underline
+decoration-ink/30 underline-offset-4 hover:decoration-vermillion` — never small
+vermillion text (§2 contrast policy).
 
 ## 7. The 4-states rule (mandatory)
 
@@ -218,26 +221,31 @@ styling; every error screen = serif headline, one line, one action; both locales
 |---|---|
 | Landing `/` | Done (stage 2). Hero: micro-label kicker, giant Fraunces headline with ONE vermillion italic word (EN "video", RU «копейки» — locale-driven via `landing.headlineAccent`, split inline so the h1 accessible name and the prerender grep stay intact), claims line, ink CTA + underlined text link to /pricing. "Selected works" ShowcasePoster spread (§5). "The index" price table: `SectionHeading` (ghost serif ordinal + kicker + serif h2 over a hairline), hairline rows, serif display numerals (ours vermillion / competitor ink), caption-bottom verified footnote. How-it-works as vermillion-serif 01/02/03 hairline rows. FAQ as serif-question hairline rows. Colophon footer (wordmark, tagline, rights micro-label). Sections sit ≥96px apart on desktop (`md:gap-28`). |
 | `/pricing` | Done (stage 2). Kicker + serif display h1 + "200 free credits" accent stamp `Badge`; PriceTable as section 01, `SectionHeading 02` + `ModelCreditTable` in the same hairline index treatment (serif credit numerals); visitor signup CTA as a sand tinted block with an ink-pill link. |
-| `/login` | Editorial split: serif manifesto block on sand left; underline-field form right (RHF/Zod + roles intact). |
-| `/create`, `/library` | Cream canvas, hairline masthead (done, AppShell); generator = numbered "commission sheet" groups with hairline separators, serif cost numeral; library media wells stay `bg-media` with cream figure captions. |
+| `/login` | Done (stage 3). Editorial split `grid lg:grid-cols-[5fr_7fr]`: `AuthManifesto` on sand left (wordmark home link, kicker, serif quote `auth.manifesto.quote`, the three `landing.claims.*` as hairline rows); form right printed directly on cream — serif h1 over a hairline, underline `Input` fields, ink-underline mode-switch link, sand+danger-rule server banner (RHF/Zod + roles intact). Pending state keeps the same split silhouette. |
+| `/create`, `/library` | Done (stage 3). Cream canvas, hairline masthead (AppShell), serif display page h1s. Generator = the "commission sheet" (hairline `rounded-sm` frame, `generator.sheet` micro-label head, `SheetField` rows with decorative serif ordinals + `divide-ink/10` separators, underline prompt field, serif `CostLabel` numeral against the closing hairline). Library/gallery cards = magazine figures: `rounded-sm bg-media` plates, serif-italic prompt captions on cream, hairline meta rows; processing % is a serif numeral. |
 | 404 / crash / offline | Done (stage 1): serif headline, one line, one action. |
 
 ## 12. Module UI surfaces (kept current per task)
 
-Module-owned components (inside `modules/*`, composed from §6 primitives). Stage 1
-mechanically migrated all module surfaces to the v2 tokens (cream/sand/vermillion,
-ink-pill CTA mirrors); their full editorial restyle lands in stage 2 per §11.
+Module-owned components (inside `modules/*`, composed from §6 primitives). Stage 3
+finished the editorial restyle of every module surface — `bg-white`, `shadow-sm`
+and `rounded-xl/2xl` are fully retired from `src/`.
 
 | Module | Surface | Composition & states |
 |---|---|---|
-| Auth | `AuthForm` (`/login`) | Card on cream; `Input` + `Button`; login↔register switch; zod errors per field (`role="alert"`); localized server-error banner; Google button behind `VITE_GOOGLE_AUTH=1`. |
-| Credits | `BalanceChip` (header) | Stamp-style chip `⚡ n` (vermillion outline — brief-sanctioned); loading = chip `Skeleton`; failure = ↻ icon-button; signed-out hidden. Opens history modal. |
-| Credits | `TransactionsList` (modal) | `Modal` + 4 states; signed amounts (`+n` success / `-n` danger). |
-| Generator | `GeneratorPanel` (`/create`) | Catalog 4 states; composes `PillGroup`, `ModelPicker`, prompt, aspect/duration pickers, `ImageDrop` (i2v), cost + Generate. Submit failures inline `role="alert"`; insufficient credits links `/pricing`. |
-| Generator | `ModelPicker` | `aria-pressed` cards: honest provider label + price hint; selected = vermillion hairline + sand wash. |
-| Generator | `ImageDrop` | Dashed hairline dropzone + sr-only file input; image/* ≤10MB; inline errors. |
-| Gallery | `GalleryGrid` | 4 states: 8 skeletons / `ErrorState` / `EmptyState` + ink-pill `/create` CTA / 1-2-3-col grid + ghost Load more. |
-| Gallery | `GenerationCard` | Media well in real aspect on `bg-media`; processing = pulse + `Progress` + %; succeeded = media + download/delete; failed = danger border + reason + "Credits refunded" stamp. |
+| Auth | `AuthForm` (`/login`) | No card — printed on cream: serif h1 over a hairline, underline `Input` fields + `Button`; login↔register switch as an ink-underline text link; zod errors per field (`role="alert"`); server banner = sand block + danger left rule; Google button behind `VITE_GOOGLE_AUTH=1`. |
+| Auth | `AuthManifesto` (`/login` left) | Sand panel: wordmark→`/`, `landing.kicker` micro-label, serif display quote (`auth.manifesto.*`), the three `landing.claims.*` as hairline rows (claims copy has ONE source of truth). |
+| Credits | `BalanceChip` (header) | STAMP chip `⚡ n`: `rounded-[3px]` vermillion hairline outline + serif numeral (vermillion lettering = recorded §2/§8 stamp exception); loading = stamp `Skeleton`; failure = ↻ icon-button; signed-out hidden. Opens history modal. |
+| Credits | `TransactionsList` (modal) | `Modal` + 4 states; editorial ledger — `divide-ink/10` rows (no hover chips), serif display amounts (`+n` success / `-n` danger; the sign carries meaning, color reinforces). |
+| Generator | `GeneratorPanel` (`/create`) | The "commission sheet": hairline `rounded-sm` frame, `generator.sheet` micro-label head, ordered `SheetField` rows (hairline-divided), serif `CostLabel` + Generate against the closing hairline. Catalog 4 states (loading mirrors the sheet frame). Submit failures inline via `SubmitErrorBanner`. |
+| Generator | `SheetField` | One sheet row: decorative serif ordinal (derived from render order, aria-hidden) + field group; separators owned by the parent `divide-y`. |
+| Generator | `PromptField` | Micro-label + hairline underline textarea (the `Input` treatment's textarea twin — promote a shared `Textarea` if a 2nd module ever needs one). |
+| Generator | `SubmitErrorBanner` | `role="alert"` sand block + danger left rule; maps `insufficient_credits` (+ ink-underline `/pricing` link) and `content_blocked` to dedicated copy. |
+| Generator | `ModelPicker` | `aria-pressed` specimen cards: `rounded-sm` hairline on cream, serif display name, honest provider label + price hint; selected = vermillion hairline + sand wash; hover solidifies + washes. |
+| Generator | `ImageDrop` | Dashed hairline dropzone on cream (hover solidifies + sand wash) + sr-only file input; preview thumb on `bg-media`; image/* ≤10MB; inline errors. |
+| Gallery | `GalleryGrid` | 4 states: 8 plate-shaped skeletons (`rounded-sm`) / `ErrorState` / `EmptyState` + ink-pill `/create` CTA / 1-2-3-col grid + ghost Load more. |
+| Gallery | `GenerationCard` | A magazine FIGURE (no card): `rounded-sm bg-media` plate in real aspect; serif-italic prompt caption on cream; hairline meta row (cost · ink-underline download · ghost delete). Processing = pulse + `Progress` + serif %; failed = danger-hairline well + reason + "Credits refunded" stamp. Image plates print-lift on hover (`motion-safe`). |
+| Gallery | `GenerationDetail` (modal) | `rounded-sm bg-media` plate, serif-italic caption, ink-underline download. |
 | Gallery | `GalleryFilterChips` | `PillGroup` All/Images/Videos. |
 | Landing | `LandingPage`, `Hero`, `ShowcaseSpread`, `SectionHeading`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable` | Stage-2 editorial rebuild landed (§11). `SectionHeading` (ordinal outside the h2 — heading names are behavior) and `PriceTable` (`ordinal` prop) are also consumed by the /pricing route via the module index. Claims and honesty markers ("verified July 2026" caption as the table's accessible name, one named competitor per row, per-card "sample style" labels) are unchangeable. |
 

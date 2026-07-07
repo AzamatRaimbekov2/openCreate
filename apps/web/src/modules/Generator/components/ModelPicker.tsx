@@ -28,26 +28,36 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-2">
-      {/* Visible caption; the group carries the accessible name */}
-      <span aria-hidden="true" className="text-sm font-medium text-ink">
+      {/* Visible caption in the editorial micro-label voice (uppercase is
+          CSS-only); the group carries the accessible name */}
+      <span
+        aria-hidden="true"
+        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
+      >
         {t('generator.model.label')}
       </span>
       <div role="group" aria-label={t('generator.model.label')} className="grid grid-cols-2 gap-2">
         {models.map((model) => {
           const isSelected = model.id === selectedId
           return (
+            // Editorial catalog card: a hairline frame on the cream paper —
+            // the serif name reads like a specimen entry; selection is the
+            // vermillion hairline + sand wash (active state = sanctioned accent)
             <button
               key={model.id}
               type="button"
               aria-pressed={isSelected}
               onClick={() => onSelect(model.id)}
-              className={`flex flex-col items-start gap-0.5 rounded-xl border p-3 text-left transition-opacity duration-150 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none ${
+              className={`flex flex-col items-start gap-0.5 rounded-sm border p-3 text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none ${
                 isSelected
                   ? 'border-vermillion bg-sand'
-                  : 'border-ink/15 bg-white hover:bg-sand'
+                  : 'border-ink/15 bg-transparent hover:border-ink/40 hover:bg-sand/60'
               }`}
             >
-              <span className="text-sm font-semibold text-ink">{model.name}</span>
+              {/* Display serif for the product name — the card's "headline" */}
+              <span className="font-display text-base leading-tight font-semibold tracking-tight text-ink">
+                {model.name}
+              </span>
               {/* Honest provider attribution — users see what actually runs */}
               <span className="text-xs text-ink-soft">{model.providerLabel}</span>
               <span

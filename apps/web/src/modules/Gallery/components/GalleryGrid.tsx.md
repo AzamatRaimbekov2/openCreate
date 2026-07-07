@@ -49,6 +49,10 @@ flowchart TD
   beside the Generator form where an auto-loader would fight the page scroll.
 - The CTA `Link` is styled with the primary Button classes (NotFoundPage
   convention) — semantically navigation, visually the main action.
+- Stage 3 restyle (2026-07-07): loading skeletons dropped the v1 `rounded-2xl`
+  soft-card silhouette — they now mirror the figure's near-flat media plate
+  (Skeleton's default `rounded-sm`). Still exactly 8 `animate-pulse` nodes
+  (the test counts them).
 
 ## Commits
 

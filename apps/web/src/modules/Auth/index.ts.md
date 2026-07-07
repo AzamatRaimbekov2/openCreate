@@ -11,8 +11,9 @@ Public API of the Auth module — the only import surface other layers may use
 
 - Responsibilities: re-export the module's public pieces; keep `model/` and
   `components/` internals private (modular-architecture rule).
-- Public API / exports / props / endpoints: `AuthForm`, `signOut`, `requireSession`
-  (beforeLoad guard, Task 16), `useAuthSession`, `useMe`.
+- Public API / exports / props / endpoints: `AuthForm`, `AuthManifesto` (login split
+  panel, stage 3 redesign), `signOut`, `requireSession` (beforeLoad guard, Task 16),
+  `useAuthSession`, `useMe`.
 - Inputs → Outputs: barrel only — no logic.
 - Side effects (I/O, network, state): none.
 
@@ -29,6 +30,7 @@ Public API of the Auth module — the only import surface other layers may use
 flowchart LR
   R[routes / shell] --> IDX[modules/Auth index.ts]
   IDX --> AF[AuthForm]
+  IDX --> AM[AuthManifesto]
   IDX --> SO[signOut]
   IDX --> RG[requireSession beforeLoad guard]
   IDX --> US[useAuthSession / useMe]
@@ -43,3 +45,4 @@ flowchart LR
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `requireSession`)
+- (pending) restyle(web): editorial app shell, auth, generator, gallery (adds `AuthManifesto`)

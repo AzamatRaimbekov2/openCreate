@@ -29,12 +29,13 @@ export function GalleryGrid({ filter = 'all', hasCreateCta = true }: GalleryGrid
   const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useGenerations()
 
-  // Loading: 8 card-shaped skeletons mirror the eventual grid silhouette
+  // Loading: 8 figure-shaped skeletons mirror the eventual media plates
+  // (rounded-sm — the editorial near-flat surface, never the v1 soft card)
   if (isPending) {
     return (
       <div className={gridClasses}>
         {SKELETON_KEYS.map((key) => (
-          <Skeleton key={key} className="aspect-square w-full rounded-2xl" />
+          <Skeleton key={key} className="aspect-square w-full" />
         ))}
       </div>
     )

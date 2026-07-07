@@ -1,15 +1,31 @@
 // apps/web/src/routes/login.tsx
-// Login/registration screen ('/login') — a standalone screen directly on the cream canvas
-// (design.md §9), composition only: the Auth module owns all the logic.
-// Signed-in visitors are forwarded to /create instead of seeing the form.
+// Login/registration screen ('/login') — a standalone screen (no AppShell) in
+// the stage-3 editorial split: serif manifesto block on sand left, the form on
+// cream right (design.md §11). Composition only: the Auth module owns both
+// columns' content. Signed-in visitors are forwarded to /create.
 import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { AuthForm, useAuthSession } from 'modules/Auth'
+import { AuthForm, AuthManifesto, useAuthSession } from 'modules/Auth'
 import { Skeleton } from 'shared/ui'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
 })
+
+// Shared split frame so the pending and form states keep one silhouette:
+// manifesto column (sand) + centered right column. On mobile the manifesto
+// stacks above as a compact block; from lg it becomes the fixed left page.
+function LoginSplit({ children }: { children: ReactNode }) {
+  return (
+    <main className="grid min-h-screen bg-cream lg:grid-cols-[5fr_7fr]">
+      <AuthManifesto />
+      <div className="flex items-start justify-center px-6 py-12 lg:items-center lg:py-16">
+        {children}
+      </div>
+    </main>
+  )
+}
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -23,19 +39,19 @@ function LoginPage() {
     if (isSignedIn) void navigate({ to: '/create', replace: true })
   }, [isSignedIn, navigate])
 
-  // Session resolution is async — mirror the card's silhouette instead of
-  // flashing the form; the same holds for the brief moment before redirecting
+  // Session resolution is async — mirror the form column's silhouette instead
+  // of flashing the form; the same holds briefly before the redirect above
   if (session.isPending || isSignedIn) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-cream px-6">
-        <Skeleton className="h-96 w-full max-w-md rounded-2xl" />
-      </main>
+      <LoginSplit>
+        <Skeleton className="h-96 w-full max-w-md" />
+      </LoginSplit>
     )
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-cream px-6">
+    <LoginSplit>
       <AuthForm />
-    </main>
+    </LoginSplit>
   )
 }

@@ -4,32 +4,35 @@
 
 ## Purpose
 
-The `/login` file-based route: renders the Auth module's form centered on paper and
-redirects already-signed-in visitors to `/create`.
+The `/login` file-based route: the stage-3 editorial split — `AuthManifesto` on sand
+left, `AuthForm` on cream right — and the redirect of already-signed-in visitors to
+`/create`.
 
 ## What it does (for an AI reader)
 
 - Responsibilities: composition only (modular rule: no business logic in `routes/`) —
   session gate + layout.
 - Public API / exports / props / endpoints: `Route` (TanStack `createFileRoute('/login')`).
-- Inputs → Outputs: session state → pending/redirecting → card-shaped `Skeleton`;
-  signed in → effect runs `navigate({ to: '/create', replace: true })`; signed out → `<AuthForm />`.
+- Inputs → Outputs: session state → pending/redirecting → form-column `Skeleton`
+  inside the same `LoginSplit` frame (one silhouette across states); signed in →
+  effect runs `navigate({ to: '/create', replace: true })`; signed out → `<AuthForm />`.
 - Side effects (I/O, network, state): `useAuthSession` triggers better-auth's
   get-session fetch; replace-navigation on redirect.
 
 ## Dependencies
 
-- Imports / depends on: `react` (useEffect), `@tanstack/react-router`
-  (createFileRoute, useNavigate), `modules/Auth` (AuthForm, useAuthSession),
-  `shared/ui` (Skeleton).
+- Imports / depends on: `react` (useEffect, ReactNode), `@tanstack/react-router`
+  (createFileRoute, useNavigate), `modules/Auth` (AuthForm, AuthManifesto,
+  useAuthSession), `shared/ui` (Skeleton).
 - Used by: route tree (`routeTree.gen.ts`, auto-generated).
 
 ## Diagram
 
 ```mermaid
 flowchart LR
-  V[visit /login] --> S{session?}
-  S -->|pending| SK[Skeleton card]
+  V[visit /login] --> SPLIT[LoginSplit: AuthManifesto left + right column]
+  SPLIT --> S{session?}
+  S -->|pending| SK[Skeleton form column]
   S -->|signed in| NAV[effect: navigate to /create replace]
   S -->|signed out| AF[AuthForm]
 ```
@@ -42,6 +45,10 @@ flowchart LR
 - Post-login redirect also flows through here: AuthForm succeeds → session store
   updates → this component re-renders and the redirect effect fires.
 - Skeleton during `isPending` prevents a form flash for already-authenticated users.
+- Stage 3 restyle (2026-07-07): centered-card layout replaced by the brief's editorial
+  split (`grid lg:grid-cols-[5fr_7fr]`); `LoginSplit` keeps pending/form states on ONE
+  silhouette so the manifesto never flashes in/out while the session resolves. The
+  route stays composition-only — both columns' content lives in `modules/Auth`.
 
 ## Commits
 

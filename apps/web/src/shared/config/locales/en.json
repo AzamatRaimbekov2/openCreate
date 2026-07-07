@@ -112,6 +112,10 @@
     "google": "Continue with Google",
     "switchToRegister": "New here? Create an account",
     "switchToLogin": "Already have an account? Sign in",
+    "manifesto": {
+      "quote": "Pay for what you create — nothing more.",
+      "caption": "The openCreate manifesto"
+    },
     "errors": {
       "email": "Enter a valid email",
       "password": "At least 8 characters",
@@ -168,6 +172,7 @@
     },
     "cost_one": "≈ {{count}} credit",
     "cost_other": "≈ {{count}} credits",
+    "sheet": "Commission sheet",
     "submit": "Generate",
     "errors": {
       "insufficientCredits": "Not enough credits for this generation.",

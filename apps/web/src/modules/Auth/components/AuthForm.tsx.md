@@ -4,8 +4,10 @@
 
 ## Purpose
 
-The login/registration card rendered on `/login`: one component for both modes with
-RHF + zod validation and an optional env-gated Google button.
+The login/registration form rendered on `/login` (right column of the stage-3
+editorial split — no card, printed directly on cream with a serif display heading):
+one component for both modes with RHF + zod validation and an optional env-gated
+Google button.
 
 ## What it does (for an AI reader)
 
@@ -51,6 +53,11 @@ flowchart LR
   USER_ALREADY_EXISTS); raw server text is never rendered (design.md §8).
 - login schema carries a no-op `name: z.string()` so both schemas infer one
   `AuthFormValues` type.
+- Stage 3 restyle (2026-07-07): white card + shadow removed (the split layout owns
+  structure); h1 = serif display over a hairline; the mode-switch link uses the
+  ink-text/hairline-underline→vermillion-hover idiom (small vermillion text violates
+  the §2 contrast policy); server banner = sand block with a danger left rule instead
+  of the red-tinted panel. Behavior, roles and i18n keys untouched.
 
 ## Commits
 

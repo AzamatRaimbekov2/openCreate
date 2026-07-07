@@ -46,6 +46,12 @@ flowchart LR
 - Balance updates arrive through the shared `['me']` cache (login invalidation now,
   charge/refund invalidations in Tasks 16-17) — the chip itself never mutates anything.
 
+- Stage 3 restyle (2026-07-07): the chip is now the brief's STAMP — `rounded-[3px]`
+  hairline vermillion outline (Badge treatment scaled to a 40px hit area) with a
+  serif display numeral, replacing the v1 sand-filled pill; the loading skeleton
+  mirrors the stamp silhouette. Vermillion lettering on the stamp is the recorded
+  design.md §2/§8 exception. States, roles and aria-labels untouched.
+
 ## Commits
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal

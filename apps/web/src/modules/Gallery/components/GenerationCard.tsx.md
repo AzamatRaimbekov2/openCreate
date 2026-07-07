@@ -4,9 +4,11 @@
 
 ## Purpose
 
-One generation in the gallery grid, covering the three per-item states:
-processing (progress), succeeded (playable/enlargeable media + actions),
-failed (reason + refunded badge).
+One generation in the gallery grid as a magazine FIGURE (stage-3 redesign: dark
+media plate + serif-italic prompt caption on cream + hairline meta row — the white
+card is retired), covering the three per-item states: processing (progress + serif
+percent), succeeded (playable/enlargeable media + actions), failed (danger-hairline
+well + reason + refunded stamp).
 
 ## What it does (for an AI reader)
 
@@ -15,11 +17,14 @@ failed (reason + refunded badge).
 - Public API / exports: `GenerationCard` with `GenerationCardProps = { generation: Generation }`
   (the list-cache item as seed).
 - Inputs → Outputs:
-  - processing → pulsing `bg-media` well (real aspect) + `Progress` + "n%" caption, NO `<video>`.
+  - processing → pulsing `bg-media` well (real aspect) + `Progress` + serif "n%"
+    numeral, NO `<video>`.
   - succeeded video → `<video controls src>` on the media well; image → media
-    button opening `GenerationDetail`; footer: cost + download link + delete.
-  - failed → `border-danger` card, localized "Generation failed" well, stored
-    failure reason, success-variant "Credits refunded" badge, delete.
+    button (print-lift hover, motion-safe) opening `GenerationDetail`; hairline
+    footer: cost + underline download link + ghost delete.
+  - failed → danger-HAIRLINE media well (`border-danger` on the well, quiet
+    `bg-ink/5` fill), stored failure reason, success-variant "Credits refunded"
+    stamp badge, delete.
 - Side effects: polling + invalidations via `useLiveGeneration`; DELETE via `useDeleteGeneration`.
 
 ## Dependencies
@@ -56,6 +61,13 @@ flowchart TD
   text + refunded badge all carry it together.
 - Delete is offered only for terminal states — a processing task can't be
   cancelled in the MVP API.
+- Stage 3 restyle (2026-07-07): white card wrapper retired — the figure sits
+  directly on cream (media plate `rounded-sm bg-media`, prompt = serif-italic
+  figure caption, meta/actions over a `border-ink/10` hairline). The failed
+  state's `border-danger` moved from the card wrapper to the media well itself
+  (tests query the class, not its host). Download became the ink/hairline-underline
+  text action (small vermillion text breaks §2 contrast policy). Percent numeral is
+  serif display per the brief. Behavior, roles and i18n untouched.
 
 ## Commits
 

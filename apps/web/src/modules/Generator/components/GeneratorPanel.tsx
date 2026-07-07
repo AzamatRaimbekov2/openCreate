@@ -1,12 +1,13 @@
 // apps/web/src/modules/Generator/components/GeneratorPanel.tsx
-// The create-page form: type toggle → model cards → prompt → aspect/duration →
-// optional i2v upload → cost + submit. Catalog state (loading/error/empty/data)
-// follows the 4-states rule; submit failures surface inline — insufficient
-// credits gets its own banner with a pricing link instead of a generic error.
-import { useEffect, useId } from 'react'
-import { Link } from '@tanstack/react-router'
+// The create-page form as an editorial "commission sheet" (stage-3 redesign):
+// a hairline-framed sheet whose field groups — type → model cards → prompt →
+// aspect/duration → optional i2v upload — are numbered serif rows separated by
+// hairlines, closed by a footer with the serif cost numeral + Generate.
+// Catalog state (loading/error/empty/data) follows the 4-states rule; submit
+// failures surface inline via SubmitErrorBanner (never a blocking modal).
+import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiClientError } from 'shared/libs/apiClient'
 import { Button, EmptyState, ErrorState, PillGroup, Skeleton } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
 import { useCreateGeneration } from '../model/createGeneration'
@@ -21,10 +22,12 @@ import { CostLabel } from './CostLabel'
 import { DurationPicker } from './DurationPicker'
 import { ImageDrop } from './ImageDrop'
 import { ModelPicker } from './ModelPicker'
+import { PromptField } from './PromptField'
+import { SheetField } from './SheetField'
+import { SubmitErrorBanner } from './SubmitErrorBanner'
 
 export function GeneratorPanel() {
   const { t } = useTranslation()
-  const promptId = useId()
   const catalog = useCatalog()
   const state = useGeneratorStore()
   const mutation = useCreateGeneration()
@@ -36,10 +39,14 @@ export function GeneratorPanel() {
     if (catalog.data) setCatalog(catalog.data.models)
   }, [catalog.data, setCatalog])
 
-  // Loading: mirror the form silhouette (toggle, cards, textarea, footer)
+  // Loading: mirror the sheet silhouette (toggle, cards, textarea, footer)
+  // inside the same hairline frame so data lands without a layout jump
   if (catalog.isPending) {
     return (
-      <section aria-label={t('generator.title')} className="flex flex-col gap-4">
+      <section
+        aria-label={t('generator.title')}
+        className="flex flex-col gap-4 rounded-sm border border-ink/15 p-6 md:p-7"
+      >
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-28 w-full" />
@@ -65,104 +72,116 @@ export function GeneratorPanel() {
   const model = selectModel(state)
   const cost = selectCostCredits(state)
   const input = selectCreateInput(state)
-  const isInsufficient =
-    mutation.error instanceof ApiClientError && mutation.error.code === 'insufficient_credits'
-  // Safety-filter block (API 'content_blocked'): needs its own copy — the
-  // failure is about the CONTENT, the fix is a different prompt, and the user
-  // must hear the charge came back (spec: clear message + refund on NSFW block)
-  const isBlocked =
-    mutation.error instanceof ApiClientError && mutation.error.code === 'content_blocked'
 
   const handleSubmit = () => {
     // input is null while the draft is not submittable (button disabled too)
     if (input) mutation.mutate(input)
   }
 
-  return (
-    <section
-      aria-label={t('generator.title')}
-      className="flex flex-col gap-6 rounded-2xl border border-ink/10 bg-white p-6 shadow-sm"
-    >
-      <PillGroup
-        label={t('generator.type.label')}
-        options={[
-          { value: 'image', label: t('generator.type.image') },
-          { value: 'video', label: t('generator.type.video') },
-        ]}
-        value={state.type}
-        onChange={state.setType}
-      />
-
-      <ModelPicker
-        models={state.models.filter((candidate) => candidate.type === state.type)}
-        selectedId={state.modelId}
-        onSelect={state.setModel}
-      />
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor={promptId} className="text-sm font-medium text-ink">
-          {t('generator.prompt.label')}
-        </label>
-        <textarea
-          id={promptId}
-          rows={3}
-          value={state.prompt}
-          onChange={(event) => state.setPrompt(event.target.value)}
-          placeholder={t('generator.prompt.placeholder')}
-          className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-ink placeholder:text-ink-soft focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+  // The sheet's visible field groups IN ORDER — conditional groups (aspect,
+  // duration, i2v) simply join the list, and the decorative ordinals below are
+  // derived from render position so the numbering never skips. Keys are stable
+  // group ids (never the index — the index only feeds the aria-hidden numeral).
+  const fields: { key: string; content: ReactNode }[] = [
+    {
+      key: 'type',
+      content: (
+        <PillGroup
+          label={t('generator.type.label')}
+          options={[
+            { value: 'image', label: t('generator.type.image') },
+            { value: 'video', label: t('generator.type.video') },
+          ]}
+          value={state.type}
+          onChange={state.setType}
         />
-      </div>
+      ),
+    },
+    {
+      key: 'model',
+      content: (
+        <ModelPicker
+          models={state.models.filter((candidate) => candidate.type === state.type)}
+          selectedId={state.modelId}
+          onSelect={state.setModel}
+        />
+      ),
+    },
+    {
+      key: 'prompt',
+      content: <PromptField value={state.prompt} onChange={state.setPrompt} />,
+    },
+  ]
 
-      {model ? (
+  if (model) {
+    fields.push({
+      key: 'aspect',
+      content: (
         <AspectPicker
           options={model.aspectRatios}
           value={state.aspectRatio}
           onChange={state.setAspectRatio}
         />
-      ) : null}
+      ),
+    })
+  }
 
-      {/* Duration is a video-only dimension */}
-      {model?.type === 'video' ? (
+  // Duration is a video-only dimension
+  if (model?.type === 'video') {
+    fields.push({
+      key: 'duration',
+      content: (
         <DurationPicker
           options={model.durationOptions}
           value={state.duration}
           onChange={state.setDuration}
         />
-      ) : null}
+      ),
+    })
+  }
 
-      {/* i2v upload only where the model can actually take an image */}
-      {model?.supportsImageInput ? (
+  // i2v upload only where the model can actually take an image
+  if (model?.supportsImageInput) {
+    fields.push({
+      key: 'image',
+      content: (
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-ink">{t('generator.image.label')}</span>
+          <span className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase">
+            {t('generator.image.label')}
+          </span>
           <ImageDrop value={state.inputImage} onChange={state.setInputImage} />
         </div>
-      ) : null}
+      ),
+    })
+  }
 
-      {mutation.isError ? (
-        // Inline, non-blocking failure banner (frontend-error-ux: modal only
-        // for failures that need a decision — this one has an inline next step)
-        <div role="alert" className="flex flex-col gap-1 rounded-xl bg-danger/10 px-4 py-3 text-sm">
-          <span className="text-ink">
-            {isInsufficient
-              ? t('generator.errors.insufficientCredits')
-              : isBlocked
-                ? t('generator.errors.contentBlocked')
-                : t('errors.actionFailed')}
-          </span>
-          {isInsufficient ? (
-            // Typed Link since Task 20 shipped /pricing — SPA navigation keeps
-            // the drafted prompt alive in the store if the user comes back
-            <Link
-              to="/pricing"
-              className="font-medium text-vermillion underline focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
-            >
-              {t('generator.errors.seePricing')}
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
+  return (
+    <section
+      aria-label={t('generator.title')}
+      // The commission sheet: a hairline frame on cream — no white card, no
+      // shadow; the paper itself is the surface (design.md §2)
+      className="flex flex-col rounded-sm border border-ink/15 p-6 md:p-7"
+    >
+      {/* Sheet head: uppercase micro-label over the sheet's opening hairline */}
+      <header className="mb-6 border-b border-ink/15 pb-4">
+        <span className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase">
+          {t('generator.sheet')}
+        </span>
+      </header>
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col divide-y divide-ink/10">
+        {fields.map((field, index) => (
+          <SheetField key={field.key} ordinal={String(index + 1).padStart(2, '0')}>
+            {field.content}
+          </SheetField>
+        ))}
+      </div>
+
+      {mutation.isError ? <SubmitErrorBanner error={mutation.error} /> : null}
+
+      {/* Sheet footer: the cost line as a serif numeral against the closing
+          hairline — price and action are decided together */}
+      <footer className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-ink/15 pt-5">
         <CostLabel credits={cost} />
         <Button
           onClick={handleSubmit}
@@ -172,7 +191,7 @@ export function GeneratorPanel() {
         >
           {t('generator.submit')}
         </Button>
-      </div>
+      </footer>
     </section>
   )
 }
