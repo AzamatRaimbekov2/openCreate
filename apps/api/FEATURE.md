@@ -101,6 +101,29 @@ The nearest `.env` (repo root) is loaded natively at boot via Node 22
 inject an in-memory config and a scripted Runware fake
 (`test/helpers/build-test-app.ts`).
 
+## Ops (production packaging)
+
+Deployed as ONE container built by the repo-root `Dockerfile` (multi-stage:
+full-workspace build → prod-only pnpm install → `node:22-slim` runtime, non-root
+`node` user) and run with the repo-root `docker-compose.yml` (port 8787,
+`env_file: .env`, `./data:/app/data` volume, `restart: unless-stopped`,
+`/health` healthcheck via node `fetch` — the slim image has no curl).
+
+- **Boot = migrate**: `createDb()` runs the idempotent DDL + guarded
+  micro-migrations on every start; a fresh volume needs no manual migrate step.
+- **State**: SQLite db + WAL + downloaded media all under `/app/data` — backup
+  is a copy of the host `./data` (quiesced) or `sqlite3 .backup` online.
+- **Single instance only**: SQLite/WAL is single-process — never scale the
+  service; the Postgres path is recorded in the architecture ADR.
+- **Runtime contents**: `apps/api/dist/index.js` (esbuild bundle, contracts
+  inlined, deps external), prod `node_modules` (better-sqlite3 linux prebuild),
+  `apps/web/dist` (landing prerendered at build by a pure-Node SSR pass — no
+  chromium/playwright in any image stage).
+- **Health**: `GET /health` is dependency-free; container healthcheck and any
+  external monitor should use it.
+
+Runbook (env table, first run, TLS/reverse proxy, backup/restore): `PROD.md`.
+
 ## Design references
 
 - Spec: `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`

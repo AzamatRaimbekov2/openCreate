@@ -1,7 +1,7 @@
 ---
 type: log
 status: current
-updated: 2026-07-06
+updated: 2026-07-07
 sources: []
 tags:
   - project-docs
@@ -208,3 +208,12 @@ tags:
 - **Sessions**: better-auth `trustedOrigins` from TRUSTED_ORIGINS (comma list, default WEB_ORIGIN); `advanced.disableOriginCheck: false` set explicitly because better-auth silently skips the CSRF origin wall under NODE_ENV=test; `.env.example` documents BETTER_AUTH_URL = public https origin in prod.
 - **Runnable dist**: `pnpm --filter @opencreate/api build` = tsc type gate + esbuild bundle → single `dist/index.js` (contracts inlined — its `.ts` exports are unloadable by plain node; deps external); root + api `start` scripts run `NODE_ENV=production node --enable-source-maps`.
 - Verification: api lint/typecheck green, 68 api tests green (39 pre-existing + 29 new across env-loading/logging/errors-sanitized/rate-limit/static-web/trusted-origins); manual smoke of the bundled dist: `/health` + SPA at `/` on :8891 with env from repo-root `.env`.
+
+## 2026-07-07 — openCreate production packaging (Docker + runbook)
+
+- Root `Dockerfile` (multi-stage, `e5c6fb2`): `node:22-slim` base + corepack pnpm (pinned via `packageManager`); **build** stage = full workspace install + `pnpm build` (contracts inlined into the api esbuild bundle; web dist with landing prerender); **prod-deps** stage = `pnpm install --prod --frozen-lockfile --filter @opencreate/api...` (lockfile-exact prod node_modules, better-sqlite3 linux prebuild via the `allowBuilds` allowlist); **runtime** stage = api dist + web dist + pruned node_modules under the non-root `node` user, `HEALTHCHECK` via node `fetch` (no curl in slim).
+- **Decision — prerender needs no browser**: `apps/web/scripts/prerender.mjs` is a pure-Node SSR pass (`renderToString` over the vite SSR bundle), so NO playwright/chromium image stage and NO `SKIP_PRERENDER` flag were introduced; playwright stays a dev-only e2e dependency.
+- `docker-compose.yml`: one service on 8787, `env_file: .env` (compose forces `NODE_ENV=production` over it), `./data:/app/data` volume (SQLite + media), `restart: unless-stopped`, `/health` healthcheck. Gotcha fixed during verification: compose interpolates `${…}` inside the healthcheck string — the node probe uses string concatenation instead of a template literal.
+- `.dockerignore` keeps `.env*`, `.git`, agent-runtime state, `node_modules`, `dist`, and `data` out of the build context (secrets never reach the image).
+- Docs: new `PROD.md` runbook (env table incl. `BETTER_AUTH_URL` = public https origin + `TRUSTED_ORIGINS`, first-run steps — migrations run automatically on boot via `createDb()`, Caddy/nginx TLS blocks, backup = copy `./data`, SQLite single-instance rule with the Postgres pointer to [[opencreate-mvp-architecture]]); README production section; `apps/api/FEATURE.md` ops section.
+- Verification: `docker build` green; `docker run --rm` with dummy `RUNWARE_API_KEY` → `/health` `{"ok":true}`, prerendered landing served at `/`, `/api/catalog` 200, 401 envelope on `/api/me`, container `health=healthy`, db+WAL+media created in `/app/data` as uid 1000; `docker compose config` clean; api lint/typecheck/85 tests green (no api source changes needed — boot-time DDL bootstrap already existed).
