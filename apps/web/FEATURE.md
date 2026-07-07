@@ -30,7 +30,11 @@ react-hook-form + zod, i18next.
   prices and an amber selection ring → prompt → aspect/duration → optional i2v
   upload; glow-green mono cost numeral beside the green Generate pill),
   next to a live gallery column: a submit prepends its card instantly;
-  processing video cards poll `GET /api/generations/:id` every 4s until terminal.
+  processing video cards poll `GET /api/generations/:id` every 4s until terminal,
+  bounded by a 20-minute budget since `createdAt` — past it the card shows an
+  amber "taking longer than usual" note with a one-shot Refresh pill, and a
+  status poll that fails before delivering data shows an error state with retry
+  (never a frozen "Generating N%").
 - **Library (`/library`, guarded)** — infinite gallery of figure cards
   (SQUARE abyss media tiles + mono prompt captions; 24/page, "Load more"),
   client-side type filter chips, per-card portal download + glow-red icon delete

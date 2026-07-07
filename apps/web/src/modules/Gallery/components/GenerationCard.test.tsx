@@ -161,6 +161,57 @@ describe('GenerationCard', () => {
   })
 })
 
+// Polling never runs unbounded (QA findings 1-2): past the 20-minute budget
+// the card says "taking longer than usual" in the processing AMBER with a
+// manual refresh; a failed per-item poll shows ErrorState + retry instead of
+// sitting at "Generating N%" forever.
+describe('GenerationCard stalled and poll-error states', () => {
+  // The shared processing fixture's createdAt (2026-07-06) is already far
+  // beyond the 20-minute budget against the real clock — stalled by default
+  it('stalled: shows the amber "taking longer" note with a refresh button', async () => {
+    apiMock.mockResolvedValue(processingVideo)
+    renderCard(processingVideo)
+    const note = await screen.findByText(/taking longer than usual/i)
+    // Amber = the triad's processing tone (never red — nothing failed yet)
+    expect(note).toHaveClass('text-glow-amber')
+    // Progress stays visible — stalled is a nuance of processing, not an end
+    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    const refresh = screen.getByRole('button', { name: /refresh/i })
+    const callsBefore = apiMock.mock.calls.length
+    await userEvent.click(refresh)
+    // The manual refresh restarts polling exactly once
+    await waitFor(() => {
+      expect(apiMock.mock.calls.length).toBe(callsBefore + 1)
+    })
+  })
+
+  it('fresh processing card: no stalled note within the budget', async () => {
+    const freshProcessing: Generation = {
+      ...processingVideo,
+      createdAt: new Date().toISOString(),
+    }
+    apiMock.mockResolvedValue(freshProcessing)
+    renderCard(freshProcessing)
+    await screen.findByRole('progressbar')
+    expect(screen.queryByText(/taking longer than usual/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument()
+  })
+
+  it('failed first poll: shows the error state with retry instead of a stuck progress', async () => {
+    apiMock.mockRejectedValueOnce(new Error('network down'))
+    renderCard(processingVideo)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not check/i)
+    // The stuck "Generating N%" UI is gone — the failure is said out loud
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    // Retry restarts the query; a processing answer brings the progress back
+    apiMock.mockResolvedValue(processingVideo)
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    expect(await screen.findByRole('progressbar')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
 // A paid generation must never die in one click: delete opens a blocking
 // confirmation alertdialog; only an explicit confirm fires the mutation and
 // the optimistic cache removal (review finding, 2026-07-07).

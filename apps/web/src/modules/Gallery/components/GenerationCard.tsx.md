@@ -8,7 +8,9 @@ One generation in the gallery grid as a FIGURE (v3 terminal, stage 3: SQUARE
 abyss media tile at 8px radius + quiet mono prompt caption + white/10 hairline
 meta row — no card wrapper), covering the three per-item states in the status
 triad (processing=amber, succeeded=green, failed=red): processing (progress +
-amber percent), succeeded (playable/enlargeable media + green "ready" chip +
+amber percent, with the stalled amber note + manual refresh past the 20-minute
+polling budget, and an ErrorState + retry when the status poll itself fails),
+succeeded (playable/enlargeable media + green "ready" chip +
 actions), failed (glow-red hairline tile + reason + refunded chip). Delete is
 a glow-red icon button that opens a blocking confirmation alertdialog — the
 paid generation is only removed after an explicit confirm.
@@ -23,6 +25,12 @@ paid generation is only removed after an explicit confirm.
 - Inputs → Outputs:
   - processing → `animate-skeleton` SQUARE abyss tile (the stepped surface
     pulse) + `Progress` + glow-amber "n%" numeral, NO `<video>`.
+    - stalled (`isStalled`, 20 min past `createdAt`) → adds a `role="status"`
+      row: glow-amber `gallery.stalled` note + amber ghost `gallery.refresh`
+      pill running ONE manual poll (`refresh`, spinner via `isRefreshing`).
+    - poll failure (`isPollError`) → replaces the tile with
+      `ErrorState message=gallery.pollFailed onRetry=refresh` — the card never
+      freezes at "Generating N%".
   - succeeded video → `<video controls src>` letterboxed on the square abyss
     tile; image → media button (lift hover, motion-safe, `object-cover` crop)
     opening `GenerationDetail`; green "ready" `Badge`; hairline footer: cost +
@@ -36,16 +44,19 @@ paid generation is only removed after an explicit confirm.
 ## Dependencies
 
 - Imports: `react` (`useState`), `react-i18next`, `@opencreate/contracts`,
-  `shared/ui` (`Badge`, `Button`, `Modal`, `Progress`), module model
-  (`generationsApi`), sibling `GenerationDetail`.
+  `shared/ui` (`Badge`, `Button`, `ErrorState`, `Modal`, `Progress`), module
+  model (`generationsApi`), sibling `GenerationDetail`.
 - Used by: `components/GalleryGrid.tsx`.
 
 ## Diagram
 
 ```mermaid
 flowchart TD
-  SEED[list item seed] --> UL[useLiveGeneration 4s poll while processing]
+  SEED[list item seed] --> UL[useLiveGeneration bounded 4s poll while processing]
   UL -->|processing| P[square tile pulse + Progress %]
+  UL -->|isStalled| ST[amber taking-longer note + refresh pill]
+  UL -->|isPollError| PE[ErrorState gallery.pollFailed + retry]
+  ST & PE -->|refresh| UL
   UL -->|succeeded| S[video controls / img button -> GenerationDetail + ready Badge]
   UL -->|failed| F[glow-red border + reason + refunded Badge]
   F -->|errorCode content_blocked| CB[localized safety-filter copy]
@@ -71,6 +82,11 @@ flowchart TD
   message — moderation failures are user-facing product copy, never provider text.
 - Status is never color-only (a11y §7): glow-red border + "Generation failed"
   text + refunded chip all carry it together.
+- ADDED 2026-07-07 (QA findings 1-2): the stalled sub-state stays AMBER (still
+  processing — red would claim a failure that has not happened) and keeps the
+  Progress row visible; the poll-error sub-state REPLACES the tile with the
+  shared `ErrorState` (calm hairline frame + amber ghost retry) because with a
+  dead status feed the "Generating N%" number would be a lie.
 - Delete is offered only for terminal states — a processing task can't be
   cancelled in the MVP API.
 - v3 terminal restyle intent: media plates moved to `bg-abyss rounded-lg` (the

@@ -5,10 +5,12 @@
 // and landing read as one product), the prompt is a quiet mono caption below
 // it, and the meta/actions row closes it over a white/10 hairline — no card
 // wrapper (the user's work is the hero, not a box).
-// Three live states (the list's Empty state is the grid's): processing →
-// stepped-pulse tile + Progress + mono percent; succeeded → playable video or
-// image (image opens the detail modal) + a green "ready" chip; failed →
-// glow-red hairline tile, failure reason, "credits refunded" chip.
+// Live states (the list's Empty state is the grid's): processing →
+// stepped-pulse tile + Progress + mono percent, with two honest sub-states —
+// stalled (20-min polling budget spent: amber note + manual refresh) and
+// poll-error (the status GET failed: ErrorState + retry); succeeded →
+// playable video or image (image opens the detail modal) + a green "ready"
+// chip; failed → glow-red hairline tile, failure reason, "credits refunded" chip.
 // Status triad (design.md v3 §2): processing=amber, succeeded=green,
 // failed=red. Delete is a glow-red ICON button (#ff2056 = the sparing
 // icon-accent rule) — destructive intent without a loud pill on every figure.
@@ -17,7 +19,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
-import { Badge, Button, Modal, Progress } from 'shared/ui'
+import { Badge, Button, ErrorState, Modal, Progress } from 'shared/ui'
 import { useDeleteGeneration, useLiveGeneration } from '../model/generationsApi'
 import { GenerationDetail } from './GenerationDetail'
 
@@ -32,8 +34,11 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
   // Delete is destructive AND paid — the icon opens this confirmation first;
   // the mutation (and its optimistic cache removal) fires only on confirm
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
-  // Poll while processing; render list data once terminal (no extra requests)
-  const generation = useLiveGeneration(seed)
+  // Poll while processing; render list data once terminal (no extra requests).
+  // The hook also reports the two ways polling can stop early (QA findings
+  // 1-2): isStalled (20-min budget spent) and isPollError (the GET itself
+  // failed with nothing fetched yet) — refresh() is the manual poll for both.
+  const { generation, isStalled, isPollError, refresh, isRefreshing } = useLiveGeneration(seed)
   const deleteMutation = useDeleteGeneration()
 
   const mediaUrl = generation.mediaUrls[0]
@@ -43,18 +48,47 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
   return (
     <article className="flex flex-col gap-3">
       {generation.status === 'processing' ? (
-        <>
-          {/* Stepped-pulse media tile — the same surface-ladder loading pulse
-              as Skeleton (animate-skeleton, never a gradient shimmer); square
-              like every gallery plate, so the grid never jumps between states */}
-          <div aria-hidden="true" className="aspect-square w-full animate-skeleton rounded-lg bg-abyss" />
-          <div className="flex items-center gap-3">
-            <Progress value={progress} label={t('gallery.processing')} />
-            {/* Mono weight-400 percent in the processing AMBER — the number IS
-                the status, so it wears the triad's processing color */}
-            <span className="text-lg leading-none font-normal text-glow-amber">{progress}%</span>
-          </div>
-        </>
+        isPollError ? (
+          // The status check itself failed (network/500) — never leave the
+          // card frozen at "Generating N%": say it and offer a retry that
+          // restarts the poll query (frontend-error-ux: error + recovery)
+          <ErrorState message={t('gallery.pollFailed')} onRetry={refresh} />
+        ) : (
+          <>
+            {/* Stepped-pulse media tile — the same surface-ladder loading pulse
+                as Skeleton (animate-skeleton, never a gradient shimmer); square
+                like every gallery plate, so the grid never jumps between states */}
+            <div
+              aria-hidden="true"
+              className="aspect-square w-full animate-skeleton rounded-lg bg-abyss"
+            />
+            <div className="flex items-center gap-3">
+              <Progress value={progress} label={t('gallery.processing')} />
+              {/* Mono weight-400 percent in the processing AMBER — the number IS
+                  the status, so it wears the triad's processing color */}
+              <span className="text-lg leading-none font-normal text-glow-amber">{progress}%</span>
+            </div>
+            {isStalled ? (
+              // 20 minutes past createdAt the automatic poll stops (bounded
+              // polling); the card says so honestly in the processing AMBER —
+              // nothing failed yet, so red would lie. The ghost pill runs ONE
+              // manual poll; role="status" announces the change politely.
+              <div
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-2"
+              >
+                <span className="text-xs text-glow-amber">{t('gallery.stalled')}</span>
+                <Button
+                  variant="ghost"
+                  onClick={refresh}
+                  isLoading={isRefreshing}
+                >
+                  {t('gallery.refresh')}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )
       ) : null}
 
       {generation.status === 'succeeded' && mediaUrl ? (
