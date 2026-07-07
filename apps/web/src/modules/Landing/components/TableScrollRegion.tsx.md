@@ -52,4 +52,4 @@ flowchart LR
   listener fallback branch.
 
 ## Commits
-- _no commit yet_
+- 70fb5cc 2026-07-07 restyle(web): v4 qa round 2 (component introduced — no-gradient scroll affordance + keyboard-focusable region)

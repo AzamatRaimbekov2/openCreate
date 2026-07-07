@@ -57,3 +57,4 @@ flowchart LR
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
 - 3ce8dbf 2026-07-07 restyle(web): terminal landing with ascii-sphere hero + pricing (glow-green credit numerals)
+- 70fb5cc 2026-07-07 restyle(web): v4 qa round 2 (overflow div → TableScrollRegion)
