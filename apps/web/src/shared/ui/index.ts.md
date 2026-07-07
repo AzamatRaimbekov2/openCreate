@@ -3,7 +3,7 @@
 > AI-facing sidecar for `shared/ui/index.ts`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Public API of the "Light Editorial" design-system kit (`shared/ui`). The modular-architecture law says consumers import from `'shared/ui'` only — this barrel is the single legal entry point.
+Public API of the v3 "Bioluminescent Terminal" design-system kit (`shared/ui`). The modular-architecture law says consumers import from `'shared/ui'` only — this barrel is the single legal entry point.
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export every kit component and its prop types; nothing else (no logic, no side effects).
@@ -32,3 +32,4 @@ flowchart LR
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `PillGroup` — first component needed by 2+ modules per design.md §9)
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (adds `AppShell` + `LangSwitch`)
 - 9d0106d 2026-07-07 feat(web): showcase poster art component (adds `ShowcasePoster` + palettes)
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (comment-only: kit renamed to v3 terminal)

@@ -5,13 +5,14 @@
 ## Purpose
 Full per-model credit table for the `/pricing` page: every catalog model with
 its honest provider label, localized type, credits (flat / per duration) and
-the ≈ USD conversion at $0.01/credit. Stage 2 restyled it to the "index"
-treatment — hairline rules on cream, serif credit numerals, micro-label headers.
+the ≈ USD conversion at $0.01/credit. v3 restyled it to the terminal "index"
+treatment — white/10 hairline rules on the void, mono weight-400 credit
+numerals in white, quiet lowercase mono headers (the weight/uppercase laws).
 
 ## What it does (for an AI reader)
 - Responsibilities: render `models` as a labelled `<table>` (aria-label =
-  `pricing.models.title`) with `border-ink/15` hairline rows (no card), uppercase
-  micro-label column headers, and `font-display` serif credit numerals; format
+  `pricing.models.title`) with `border-white/10` hairline rows (no card), quiet
+  mono caption column headers, and mono weight-400 credit numerals; format
   credits (`1 · per image`, `5s — 35 · 8s — 56`) and USD (`$0.01`, `from $0.35`
   via cheapest duration).
 - Public API / exports: `ModelCreditTable`, `ModelCreditTableProps`
@@ -48,3 +49,4 @@ flowchart LR
 ## Commits
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

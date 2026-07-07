@@ -1,41 +1,82 @@
 /* apps/web/src/shared/config/theme.css
    The ONLY CSS file in the app (frontend law). Tailwind v4 entry + the
-   "Light Editorial" design tokens — see docs/frontend/design.md (v2) for
-   roles, use-when/avoid-when rules and contrast notes. Components consume
-   these through utility classes (bg-cream, text-ink, ring-vermillion, …). */
+   v3 "Bioluminescent Terminal" design tokens — see docs/frontend/design.md
+   for roles, the specimen-triad semantics and the no-gradient law.
+   Components consume these through utility classes only
+   (bg-void, text-mist, bg-specimen-green/20, ring-portal, …). */
 @import 'tailwindcss';
 
 @theme {
-  /* Warm cream canvas — the app-wide background (the "paper" of the magazine) */
-  --color-cream: #faf7f2;
-  /* Ink — primary text, solid CTA fills, hairline rules (via opacity) */
-  --color-ink: #161412;
-  /* Softened ink — secondary text, captions, micro-labels */
-  --color-ink-soft: #6e675e;
-  /* Vermillion — THE editorial accent: key words, active states, stamps,
-     CTA hover. Sparingly; never body text (see design.md contrast rules) */
-  --color-vermillion: #e8442e;
-  /* Soft sand — tinted blocks, skeleton shimmer, quiet hovers */
-  --color-sand: #efe9df;
-  /* Dark media well — ONLY behind image/video previews */
-  --color-media: #141413;
-  /* Positive status — refunds, +credits (deep editorial green, AA on cream) */
-  --color-success: #1e6b41;
-  /* Destructive/failure status — delete, failed generations (distinct from
-     the vermillion accent: deeper, browner, AA on cream) */
-  --color-danger: #b3261e;
+  /* Cosmic void — the flat page background everywhere (never pure #000,
+     never a gradient: hard owner rule) */
+  --color-void: #06051d;
+  /* Surface ladder — elevation is a COLOR STEP, not a shadow */
+  /* Abyss: recessed wells (media plates, sunken panels) */
+  --color-abyss: #0f1c36;
+  /* Steel navy: the working surface — nav bar, cards, inputs, modal sheets */
+  --color-steel: #1d293d;
+  /* Ridge: hovered/elevated step above steel */
+  --color-ridge: #314062;
 
-  /* Display serif — hero and section headings, oversized numerals, the
-     italic accent word. Fraunces ships no Cyrillic: RU falls back to Georgia */
-  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
-  /* UI grotesk — body, buttons, labels, tables (default sans app-wide) */
-  --font-sans:
-    'Space Grotesk Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Mist — body text on the void */
+  --color-mist: #cad5e2;
+  /* Dimmed mist — secondary text, captions, inactive nav */
+  --color-mist-dim: #90a1b9;
+  /* Portal blue — links and the wordmark dot: the ONLY chromatic accent in prose */
+  --color-portal: #63b3ed;
+
+  /* Specimen pill triad (closed system): translucent tint bases, rendered at
+     /20 opacity with a white/10 border. green = create/submit · amber =
+     explore/browse/processing · red = auth-exit/destructive/failed */
+  --color-specimen-green: #004f3b;
+  --color-specimen-amber: #733e0a;
+  --color-specimen-red: #8b0836;
+  /* Bright triad accents — pill text (green), icons and status text.
+     Status mapping: processing = amber · succeeded = green · failed = red */
+  --color-glow-green: #00bc7d;
+  --color-glow-amber: #f0b100;
+  --color-glow-red: #ff2056;
+  /* Pill foregrounds for the amber/red tints (near-white warm/rose lumens) */
+  --color-lumen-amber: #fefce8;
+  --color-lumen-red: #fff1f2;
+
+  /* JetBrains Mono is THE typeface — headings, nav, buttons, body, links */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* DM Sans — sparing secondary body prose only (no Cyrillic subset shipped:
+     RU prose falls back to the system sans by design) */
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* The one allowed shadow: the soft double shadow on specimen pills */
+  --shadow-pill: 0 2px 5px -1px rgb(0 0 0 / 0.3), 0 1px 3px -1px rgb(0 0 0 / 0.35);
+
+  /* Skeleton loading: a STEPPED solid pulse through the surface ladder
+     (abyss → steel → ridge → steel) — never a gradient shimmer */
+  --animate-skeleton: skeleton-step 1.6s steps(1, end) infinite;
+  @keyframes skeleton-step {
+    0% {
+      background-color: var(--color-abyss);
+    }
+    25% {
+      background-color: var(--color-steel);
+    }
+    50% {
+      background-color: var(--color-ridge);
+    }
+    75% {
+      background-color: var(--color-steel);
+    }
+    100% {
+      background-color: var(--color-abyss);
+    }
+  }
 }
 
-/* Base canvas: every screen starts on cream with ink text in the grotesk */
+/* Base canvas: every screen starts on the flat void with mist mono text */
 @layer base {
+  html {
+    background-color: var(--color-void);
+  }
   body {
-    @apply bg-cream font-sans text-ink antialiased;
+    @apply bg-void font-mono text-mist antialiased;
   }
 }

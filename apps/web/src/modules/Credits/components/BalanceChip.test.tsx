@@ -41,8 +41,8 @@ describe('BalanceChip', () => {
     apiMock.mockReturnValue(new Promise(() => {}))
     const { container } = renderChip()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
-    // Skeleton contract: pulsing decorative placeholder (shared/ui Skeleton)
-    expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
+    // Skeleton contract: stepped-pulse decorative placeholder (shared/ui Skeleton)
+    expect(container.querySelector('.animate-skeleton')).toBeInTheDocument()
   })
 
   it('shows the balance and opens the transactions modal on click', async () => {

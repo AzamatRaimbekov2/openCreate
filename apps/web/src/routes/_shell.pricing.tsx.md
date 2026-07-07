@@ -4,17 +4,17 @@
 
 ## Purpose
 The `/pricing` route (inside the AppShell layout, public — no auth guard):
-the editorial "index" page — kicker + display serif title with the
-"200 free credits" accent stamp, verified price comparison, live per-model
-credit table, and the signup CTA for visitors as a tinted sand block.
+the v3 terminal "index" page — quiet mono kicker + mono weight-400 30px title
+with the "200 free credits" accent chip, verified price comparison, live
+per-model credit table, and the signup CTA for visitors as a steel surface card.
 
 ## What it does (for an AI reader)
-- Responsibilities: editorial header (uppercase `pricing.kicker`, serif h1,
-  `Badge variant="accent"` stamp `pricing.stamp`), compose `PriceTable`
+- Responsibilities: terminal header (lowercase `pricing.kicker`, mono h1,
+  `Badge variant="accent"` chip `pricing.stamp`), compose `PriceTable`
   (modules/Landing, opening 01 section), the catalog query (`useCatalog` from
   modules/Generator) with all 4 UI states around `ModelCreditTable` under a
-  `SectionHeading ordinal="02"`, and a session-aware signup CTA (sand block,
-  ink-pill link). Composition only.
+  `SectionHeading ordinal="02"`, and a session-aware signup CTA (steel card,
+  green specimen-pill link). Composition only.
 - Public API / exports: `Route` only (`PricingPage` stays private — the router
   plugin cannot code-split route files with extra exports).
 - Inputs → Outputs: catalog query → skeleton rows / `ErrorState` retry /
@@ -53,12 +53,15 @@ flowchart LR
   (Create/Library/Pricing) stays visible — URL is `/pricing` either way.
 - The signup CTA quotes exact honest math: 200 credits = up to 200 images or
   five 5s videos (35×5=175) — no inflated claims.
-- The "200 free credits" stamp shows for everyone (a fact about signup); only
-  the CTA block itself is visitor-only. Stamp = `Badge accent` — the
-  brief-sanctioned small vermillion use (design.md §2).
-- Stage 2 dropped the white cards: skeletons sit in a hairline frame, the CTA
-  is a sand tinted block — no `bg-white`/`shadow` remains on this page.
+- The "200 free credits" chip shows for everyone (a fact about signup); only
+  the CTA block itself is visitor-only. Chip = `Badge accent` → glow-amber
+  (amber = the triad's pricing/explore family, design.md v3 §2).
+- v3 restyle intent: the CTA card is `bg-steel rounded-lg` (app-screen cards
+  live on #1d293d per the adaptation table), its link is the GREEN specimen
+  pill (sign-up = create action); the h1 obeys the 30px/400 heading law — no
+  more `md:text-6xl` escalation, hierarchy comes from white-vs-mist color.
 
 ## Commits
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

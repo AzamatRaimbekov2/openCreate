@@ -4,8 +4,8 @@
 
 ## Purpose
 
-The login/registration form rendered on `/login` (right column of the stage-3
-editorial split — no card, printed directly on cream with a serif display heading):
+The login/registration form rendered on `/login` (right column of the split —
+no card, printed directly on the void with a mono weight-400 30px heading, v3):
 one component for both modes with RHF + zod validation and an optional env-gated
 Google button.
 
@@ -53,13 +53,16 @@ flowchart LR
   USER_ALREADY_EXISTS); raw server text is never rendered (design.md §8).
 - login schema carries a no-op `name: z.string()` so both schemas infer one
   `AuthFormValues` type.
-- Stage 3 restyle (2026-07-07): white card + shadow removed (the split layout owns
-  structure); h1 = serif display over a hairline; the mode-switch link uses the
-  ink-text/hairline-underline→vermillion-hover idiom (small vermillion text violates
-  the §2 contrast policy); server banner = sand block with a danger left rule instead
-  of the red-tinted panel. Behavior, roles and i18n keys untouched.
+- v3 terminal restyle: h1 = `text-3xl font-normal text-white` over a white/10
+  hairline (the 30px/400 heading law — no `md:` upscaling); the mode-switch
+  link is portal blue (prose-link law); server banner = calm `bg-steel` block
+  with a `border-glow-red` left rule + glow-red text — red marks the failure
+  STATUS, the surface never turns into a red panel. Submit stays the default
+  GREEN specimen pill (sign-in/sign-up = create actions per the triad); the
+  Google button is the amber ghost. Behavior, roles and i18n keys untouched.
 
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

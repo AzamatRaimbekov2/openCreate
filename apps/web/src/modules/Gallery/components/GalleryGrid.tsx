@@ -30,7 +30,7 @@ export function GalleryGrid({ filter = 'all', hasCreateCta = true }: GalleryGrid
     useGenerations()
 
   // Loading: 8 figure-shaped skeletons mirror the eventual media plates
-  // (rounded-sm — the editorial near-flat surface, never the v1 soft card)
+  // (the shared Skeleton's stepped surface pulse — never a gradient shimmer)
   if (isPending) {
     return (
       <div className={gridClasses}>
@@ -56,10 +56,11 @@ export function GalleryGrid({ filter = 'all', hasCreateCta = true }: GalleryGrid
         description={t('gallery.empty.description')}
         action={
           hasCreateCta ? (
-            // Link styled as the primary Button (same convention as NotFoundPage)
+            // Link styled as the primary Button (same convention as
+            // NotFoundPage): GREEN specimen pill — creating is THE green action
             <Link
               to="/create"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-white/10 bg-specimen-green/20 px-5 py-2 text-sm font-medium text-glow-green shadow-pill transition-colors duration-200 hover:bg-specimen-green/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
             >
               {t('gallery.empty.cta')}
             </Link>

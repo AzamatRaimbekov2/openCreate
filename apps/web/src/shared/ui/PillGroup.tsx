@@ -30,30 +30,28 @@ export function PillGroup<T extends string | number>({
 }: PillGroupProps<T>) {
   return (
     <div className="flex flex-col gap-2">
-      {/* Visible caption in the editorial micro-label voice (uppercase is
-          CSS-only; the group's accessible name uses the raw label text) */}
-      <span
-        aria-hidden="true"
-        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
-      >
+      {/* Visible caption in the quiet mono voice (v3 dropped the uppercase
+          tracking; the group's accessible name uses the raw label text) */}
+      <span aria-hidden="true" className="text-xs text-mist-dim">
         {label}
       </span>
       <div role="group" aria-label={label} className="flex flex-wrap gap-2">
         {options.map((option) => {
           const isSelected = option.value === value
           return (
-            // Editorial toggle pills: the selection is "printed" solid ink —
-            // unselected pills are hairline outlines that solidify on hover.
-            // No tinted-wash selection: state must be unmistakable at a glance.
+            // Terminal toggle pills: the selection glows in the AMBER specimen
+            // tint (reference taxonomy: explore/pick = amber — same family as
+            // the model picker highlight); unselected pills are quiet white/10
+            // hairlines that step up to ridge on hover. Never a solid fill.
             <button
               key={String(option.value)}
               type="button"
               aria-pressed={isSelected}
               onClick={() => onChange(option.value)}
-              className={`min-h-10 rounded-full border px-4 py-2 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none ${
+              className={`min-h-10 rounded-full border px-4 py-2 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
                 isSelected
-                  ? 'border-ink bg-ink text-cream'
-                  : 'border-ink/20 bg-transparent text-ink hover:border-ink'
+                  ? 'border-white/10 bg-specimen-amber/20 text-lumen-amber'
+                  : 'border-white/10 bg-transparent text-mist-dim hover:bg-ridge hover:text-mist'
               }`}
             >
               {option.label}

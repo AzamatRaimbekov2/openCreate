@@ -16,8 +16,8 @@ the generic action-failed line.
   matching localized message; offer the pricing link only for insufficient credits.
 - Public API / exports / props / endpoints: `SubmitErrorBanner({ error })`,
   `SubmitErrorBannerProps` (`error: Error` — the caller renders it only on failure).
-- Inputs → Outputs: mutation error → sand block with danger left rule; announced via
-  `role="alert"`.
+- Inputs → Outputs: mutation error → steel block with glow-red left rule; announced
+  via `role="alert"`.
 - Side effects (I/O, network, state): none; SPA navigation via typed `<Link>` only.
 
 ## Dependencies
@@ -41,9 +41,10 @@ flowchart LR
 
 ## Key decisions / gotchas
 
-- Editorial failure voice: sand tinted block + `border-l-2 border-danger`, body text
-  ink — never a red panic panel (design.md §9); the pricing link is ink with a
-  hairline underline that turns vermillion on hover (small vermillion text breaks §2).
+- v3 failure voice: calm `bg-steel` surface block + `border-l-2 border-glow-red`
+  (red stays on the RULE — the marker of failure — never on the whole panel,
+  design.md §9); body text mist; the pricing link is portal blue, the sanctioned
+  prose-link color, so recovery reads as navigation, not more alarm.
 - Raw server messages never render — only our i18n copy keyed off the machine code.
 - Keeping this OUT of Modal is deliberate: both failures have inline next steps, so a
   blocking dialog would be worse UX (frontend-error-ux contract).
@@ -51,3 +52,4 @@ flowchart LR
 ## Commits
 
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

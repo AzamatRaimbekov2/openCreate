@@ -1,7 +1,9 @@
 // apps/web/src/shared/ui/Button.tsx
-// Design-system button ("Light Editorial"): a solid-ink pill whose hover flips
-// to the vermillion accent — the editorial CTA gesture. Variants: primary
-// (solid ink), ghost (hairline outline, quiet), danger (destructive only).
+// Design-system button (v3 "Bioluminescent Terminal"): a translucent SPECIMEN
+// PILL from the closed triad — never a solid opaque fill. Variant → tint:
+// primary = green (create/submit), ghost = amber (explore/secondary),
+// danger = red (destructive/auth-exit). Each pill is a /20 tint + white/10
+// border + bright matching text + the one allowed soft double shadow.
 // Sizes md/lg, loading state with inline spinner. docs/frontend/design.md §5.
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
@@ -19,15 +21,14 @@ export type ButtonProps = {
   isLoading?: boolean
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'>
 
-// Editorial variants: the primary CTA is solid ink (the "printed" button) and
-// hovers to vermillion — the accent appears as a reaction, not a default.
-// Ghost is a hairline-outline pill (quiet, secondary); danger stays a solid
-// fill so destructive actions are unmistakable, in the deeper danger red that
-// never competes with the vermillion accent.
+// The specimen triad (closed system — max three button tints, no solid fills):
+// hover deepens the same tint one step (/30) so the pill glows brighter without
+// ever leaving its color. Text: green pills use the glow-green itself; amber and
+// red pills use their near-white lumen foregrounds (reference pill anatomy).
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-ink text-cream hover:bg-vermillion',
-  ghost: 'border border-ink/25 bg-transparent text-ink hover:border-ink hover:bg-sand',
-  danger: 'bg-danger text-cream hover:bg-danger/85',
+  primary: 'bg-specimen-green/20 text-glow-green hover:bg-specimen-green/35',
+  ghost: 'bg-specimen-amber/20 text-lumen-amber hover:bg-specimen-amber/35',
+  danger: 'bg-specimen-red/20 text-lumen-red hover:bg-specimen-red/35',
 }
 
 // min-h keeps the 40px minimum hit area from the a11y rules
@@ -52,10 +53,10 @@ export function Button({
       // Loading is a disabled state too — double submits are never possible
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
-      // Pill shape (rounded-full) is the editorial control silhouette;
-      // transition-colors at 200ms makes the ink→vermillion hover FELT (brief:
-      // "hover states must be felt", motion window 150–250ms)
-      className={`inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      // Pill silhouette (rounded-full) + white/10 border + shadow-pill: the
+      // ONLY shadow the design law allows. font-medium (500) is the weight
+      // ceiling — nothing in the app renders bolder.
+      className={`inline-flex items-center justify-center gap-2 rounded-full border border-white/10 font-medium shadow-pill transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       {...rest}
     >
       {isLoading ? <Spinner /> : null}

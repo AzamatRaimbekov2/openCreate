@@ -6,8 +6,9 @@
 ## Purpose
 
 One numbered row of the GeneratorPanel "commission sheet" (brief: "numbered field
-groups, hairline separators"): a decorative serif ordinal in the margin plus the
-field group content. Extracted so the panel stays under the 200-line component cap.
+groups, hairline separators"): a decorative ghost mono ordinal (v3: `text-white/20`
+weight 400) in the margin plus the field group content. Extracted so the panel
+stays under the 200-line component cap.
 
 ## What it does (for an AI reader)
 
@@ -29,7 +30,7 @@ field group content. Extracted so the panel stays under the 200-line component c
 ```mermaid
 flowchart LR
   GP[GeneratorPanel fields array] -->|ordinal by render order| SF[SheetField]
-  SF --> ORD[aria-hidden serif ordinal 01…]
+  SF --> ORD[aria-hidden ghost mono ordinal 01…]
   SF --> CNT[field group: PillGroup / ModelPicker / textarea / ImageDrop]
 ```
 
@@ -38,11 +39,12 @@ flowchart LR
 - Ordinals are DERIVED from render order (video adds duration/i2v rows), so they
   renumber when conditional groups appear — that is why they are decorative
   `aria-hidden` print furniture, never accessible names or i18n copy.
-- Separators intentionally live on the parent (`divide-y divide-ink/10`): a row that
-  drew its own borders would double the hairline at conditional boundaries.
+- Separators intentionally live on the parent (`divide-y divide-white/10`): a row
+  that drew its own borders would double the hairline at conditional boundaries.
 - `min-w-0 flex-1` on the content column: without it the model-card grid and the
   textarea can overflow the sheet's hairline frame.
 
 ## Commits
 
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

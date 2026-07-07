@@ -25,7 +25,7 @@ cost + locale-formatted date, and a download action.
 ```mermaid
 flowchart LR
   GC[GenerationCard media click] -->|isOpen| GD[GenerationDetail Modal]
-  GD --> MEDIA[video controls / img on bg-media]
+  GD --> MEDIA[video controls / img on bg-abyss]
   GD --> META[full prompt + cost + localized date]
   GD --> DL[download link]
 ```
@@ -38,12 +38,14 @@ flowchart LR
   the browser's (same convention as Credits' TransactionsList).
 - Uses the shared `Modal` (`role="dialog"`): Escape/overlay close, scroll lock,
   focus restore come for free.
-- Stage 3 restyle (2026-07-07): media plate `rounded-sm bg-media`; the prompt is
-  the serif-italic figure caption (same voice as GenerationCard); download is the
-  ink/hairline-underline→vermillion-hover text action (small vermillion text
-  breaks the design.md §2 contrast policy). Behavior and i18n untouched.
+- v3 terminal restyle: media plate `rounded-lg bg-abyss` — one surface step
+  BELOW the modal's steel sheet so the user's work reads as recessed film; the
+  prompt is the quiet mono mist caption (same voice as GenerationCard);
+  download is a portal-blue link (the sanctioned prose-link color, v3 §2).
+  Behavior and i18n untouched.
 
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

@@ -15,7 +15,7 @@ kind labels and signed, colored amounts.
   `TransactionsListProps`. Private `TransactionRow` subcomponent.
 - Inputs → Outputs: `isOpen` gates the `useTransactions` query → dialog listing
   `credits.kinds.*` labels, `Intl.DateTimeFormat` dates, `+n`/`-n` amounts
-  (`text-success` / `text-danger`).
+  (`text-glow-green` / `text-glow-red`).
 - Side effects (I/O, network, state): GET `/api/credits/transactions` while open (via
   `useTransactions`); none while closed.
 
@@ -46,13 +46,14 @@ flowchart LR
 - Kind labels come from `credits.kinds.<kind>` keys — adding a ledger kind requires new
   locale entries in BOTH en.json and ru.json.
 
-- Stage 3 restyle (2026-07-07): rows became an editorial LEDGER — hairline
-  `divide-y divide-ink/10` between rows (the v1 rounded hover-chip is retired: a
-  read-only row must not pretend to be interactive); amounts are serif display
-  numerals. The `text-success`/`text-danger` classes stay on the amount span —
-  tests assert them, and sign (+/-) still carries the meaning, never color alone.
+- v3 terminal restyle: the LEDGER rows divide on `divide-white/10` (a read-only
+  row must not pretend to be interactive — no hover chips); amounts are mono
+  weight-400 numerals in the triad status glows — positive `text-glow-green`
+  (succeeded family), negative `text-glow-red`. Tests assert those exact
+  classes; sign (+/-) still carries the meaning, never color alone.
 
 ## Commits
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

@@ -3,36 +3,39 @@
 React 19 + Vite 8 SPA of the openCreate MVP: create AI images and videos, watch async
 video progress live, browse a per-account library, and read an honest EN/RU landing
 with verified price comparisons. TanStack Router (file-based) + Query v5, Zustand,
-Tailwind v4 ("Light Editorial" design system v2 — cream/ink/vermillion tokens,
-Fraunces + Space Grotesk variable fonts via @fontsource), react-hook-form + zod, i18next.
+Tailwind v4 ("Bioluminescent Terminal" design system v3 — cosmic-void surface ladder,
+specimen pill triad, JetBrains Mono + DM Sans via @fontsource, NO gradients),
+react-hook-form + zod, i18next.
 
 ## What it does
 
-- **Landing (`/`)** — editorial magazine page: giant Fraunces hero with one
-  vermillion italic word + the three approved claims (images from $0.01, 5s videos
-  from $0.35, credits never expire), "Selected works" poster spread (6 honest
+- **Landing (`/`)** — terminal page on the flat void: whisper-weight mono hero with
+  one portal-blue accent word + the three approved claims (images from $0.01, 5s
+  videos from $0.35, credits never expire), "Selected works" spread (6 honest
   "sample style" figures, one video-marked), "The index" price comparison table
-  ("verified July 2026"), numbered how-it-works rows, FAQ rows, colophon footer.
-  Standalone hairline masthead with LangSwitch and a session-aware CTA (`/create`
-  signed in, `/login` otherwise). EN/RU.
-- **Auth (`/login`)** — editorial split: serif manifesto panel on sand (brand quote +
-  the approved claims) beside the email+password sign-in/register form (better-auth
-  client), zod validation, localized server-error mapping, optional Google button.
-- **Create (`/create`, guarded)** — the generator as an editorial "commission sheet"
+  ("verified July 2026", ours in glow-green), numbered how-it-works rows, FAQ rows,
+  colophon footer. Standalone sticky steel masthead with LangSwitch and a
+  session-aware CTA (`/create` signed in, `/login` otherwise). EN/RU.
+- **Auth (`/login`)** — terminal split: mono manifesto panel on the abyss step
+  (brand quote + the approved claims) beside the email+password sign-in/register
+  form (better-auth client) on the void — steel fields, zod validation, localized
+  server-error mapping, optional Google button.
+- **Create (`/create`, guarded)** — the generator as a "commission sheet"
   (numbered hairline field groups: type → model cards with provider labels and
-  prices → prompt → aspect/duration → optional i2v upload; serif cost numeral),
+  prices → prompt → aspect/duration → optional i2v upload; white mono cost numeral),
   next to a live gallery column: a submit prepends its card instantly;
   processing video cards poll `GET /api/generations/:id` every 4s until terminal.
-- **Library (`/library`, guarded)** — infinite gallery of magazine-figure cards
-  (dark media plates + serif-italic prompt captions; 24/page, "Load more"),
+- **Library (`/library`, guarded)** — infinite gallery of figure cards
+  (abyss media plates + mono prompt captions; 24/page, "Load more"),
   client-side type filter chips, per-card download/delete (optimistic with rollback),
-  failed cards show the reason + "credits refunded" stamp.
+  failed cards show the reason + "credits refunded" chip; status triad
+  processing=amber / succeeded=green / failed=red.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
-  full per-model credit table from the catalog query, a "200 free credits" accent
-  stamp by the title, and the visitor signup CTA as a sand block.
-- **App shell** — hairline masthead: serif wordmark, uppercase grotesk nav
-  (Create/Library/Pricing), stamp-style balance chip (opens the credit history
-  ledger modal), LangSwitch, sign-out (clears personal query caches).
+  full per-model credit table from the catalog query, a "200 free credits" amber
+  chip by the title, and the visitor signup CTA as a steel card with a green pill.
+- **App shell** — sticky steel bar: mono wordmark with the portal dot, lowercase
+  mono nav (Create/Library/Pricing), amber balance chip (opens the credit history
+  ledger modal), LangSwitch, red-pill Sign in / sign-out (clears personal caches).
 - **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
   (loading skeletons / empty / error+retry / data) on every data surface.
 
@@ -54,7 +57,7 @@ src/
 │   └── Landing/                # hero, showcase spread, section heading, price tables,
 │                               # how-it-works, FAQ, pricingData
 └── shared/
-    ├── config/                 # theme.css (v2 editorial tokens + font tokens), i18n (EN/RU), queryClient
+    ├── config/                 # theme.css (v3 terminal tokens + font tokens), i18n (EN/RU), queryClient
     ├── libs/apiClient.ts       # fetch wrapper → ApiClientError with envelope codes
     └── ui/                     # Button, Input, Select, Modal, Skeleton, Badge, Progress,
                                 # PillGroup, EmptyState, ErrorState, AppShell, LangSwitch,

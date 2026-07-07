@@ -56,7 +56,7 @@ describe('LandingPage', () => {
 
   it('opens with the studio micro-label and a secondary pricing link', async () => {
     renderLanding('/login')
-    // The uppercase treatment is CSS-only — the DOM keeps the i18n string
+    // The kicker renders the raw i18n string (v3: plain lowercase mono)
     expect(await screen.findByText('AI image & video studio')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /see the price index/i })).toHaveAttribute(
       'href',

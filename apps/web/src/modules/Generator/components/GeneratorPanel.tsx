@@ -45,7 +45,7 @@ export function GeneratorPanel() {
     return (
       <section
         aria-label={t('generator.title')}
-        className="flex flex-col gap-4 rounded-sm border border-ink/15 p-6 md:p-7"
+        className="flex flex-col gap-4 rounded-lg border border-white/10 p-6 md:p-7"
       >
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-24 w-full" />
@@ -146,9 +146,8 @@ export function GeneratorPanel() {
       key: 'image',
       content: (
         <div className="flex flex-col gap-2">
-          <span className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase">
-            {t('generator.image.label')}
-          </span>
+          {/* Quiet mono caption — the v3 field-label voice (no uppercase) */}
+          <span className="text-xs text-mist-dim">{t('generator.image.label')}</span>
           <ImageDrop value={state.inputImage} onChange={state.setInputImage} />
         </div>
       ),
@@ -158,18 +157,17 @@ export function GeneratorPanel() {
   return (
     <section
       aria-label={t('generator.title')}
-      // The commission sheet: a hairline frame on cream — no white card, no
-      // shadow; the paper itself is the surface (design.md §2)
-      className="flex flex-col rounded-sm border border-ink/15 p-6 md:p-7"
+      // The commission sheet (v3): a white/10 hairline frame directly on the
+      // void — inputs INSIDE it are the steel surface steps, so the frame
+      // itself stays unfilled to keep the elevation ladder readable
+      className="flex flex-col rounded-lg border border-white/10 p-6 md:p-7"
     >
-      {/* Sheet head: uppercase micro-label over the sheet's opening hairline */}
-      <header className="mb-6 border-b border-ink/15 pb-4">
-        <span className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase">
-          {t('generator.sheet')}
-        </span>
+      {/* Sheet head: quiet mono caption over the sheet's opening hairline */}
+      <header className="mb-6 border-b border-white/10 pb-4">
+        <span className="text-xs text-mist-dim">{t('generator.sheet')}</span>
       </header>
 
-      <div className="flex flex-col divide-y divide-ink/10">
+      <div className="flex flex-col divide-y divide-white/10">
         {fields.map((field, index) => (
           <SheetField key={field.key} ordinal={String(index + 1).padStart(2, '0')}>
             {field.content}
@@ -179,9 +177,9 @@ export function GeneratorPanel() {
 
       {mutation.isError ? <SubmitErrorBanner error={mutation.error} /> : null}
 
-      {/* Sheet footer: the cost line as a serif numeral against the closing
+      {/* Sheet footer: the cost line as a mono numeral against the closing
           hairline — price and action are decided together */}
-      <footer className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-ink/15 pt-5">
+      <footer className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
         <CostLabel credits={cost} />
         <Button
           onClick={handleSubmit}

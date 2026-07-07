@@ -4,6 +4,9 @@
 // account area. Deliberately PRESENTATIONAL — session state, sign-out and the
 // BalanceChip are injected by the routes/_shell layout route, so shared/ui
 // never imports from modules/* (architecture law: shared has no business logic).
+// v3 terminal: the bar is a STICKY steel surface step over the void; nav is
+// lowercase mono (active = white, inactive = dimmed mist); the wordmark's
+// trailing dot is portal blue — the brand's cursor.
 import { useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -32,12 +35,12 @@ export type AppShellProps = {
   children: ReactNode
 }
 
-// Nav links are uppercase grotesk micro-labels (the editorial magazine masthead
-// voice — brief: "nav in grotesk uppercase micro-labels"). Color lives ONLY in
-// active/inactiveProps so the two text-* utilities never fight inside one
-// className; the active state is vermillion — the sanctioned accent use.
+// Nav links are quiet lowercase mono labels (the terminal voice — v3 killed
+// the v2 uppercase tracking). Color lives ONLY in active/inactiveProps so two
+// text-* utilities never fight inside one className; the active state is plain
+// white — presence, not a color accent (portal stays reserved for links/brand).
 const navLinkClass =
-  'inline-flex min-h-10 items-center rounded-full px-3 text-xs font-medium tracking-[0.18em] uppercase transition-colors duration-200 hover:text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none'
+  'inline-flex min-h-10 items-center rounded-full px-3 text-sm transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none'
 
 export function AppShell({
   user,
@@ -49,19 +52,21 @@ export function AppShell({
   const { t } = useTranslation()
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream">
-      {/* Hairline top bar — the only structure line the header needs */}
-      <header className="border-b border-ink/15">
+    <div className="flex min-h-screen flex-col bg-void">
+      {/* Sticky steel bar — one surface step above the void; elevation is the
+          color step, so no border/shadow is needed to separate it while
+          scrolling (reference: nav lives on #1d293d) */}
+      <header className="sticky top-0 z-40 bg-steel">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
-          {/* Serif wordmark "openCreate·" doubles as the home link. The
-              trailing middle dot is the brand's typographic period — vermillion
-              and aria-hidden so the accessible name stays "openCreate". */}
+          {/* Mono wordmark "openCreate·" doubles as the home link. The trailing
+              middle dot is the brand's cursor — portal blue and aria-hidden so
+              the accessible name stays "openCreate". */}
           <Link
             to="/"
-            className="rounded-sm font-display text-xl font-semibold tracking-tight text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+            className="rounded-lg text-xl font-medium text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
             openCreate
-            <span aria-hidden="true" className="text-vermillion">
+            <span aria-hidden="true" className="text-portal">
               ·
             </span>
           </Link>
@@ -69,24 +74,24 @@ export function AppShell({
             <Link
               to="/create"
               className={navLinkClass}
-              activeProps={{ className: 'text-vermillion' }}
-              inactiveProps={{ className: 'text-ink-soft' }}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
             >
               {t('nav.create')}
             </Link>
             <Link
               to="/library"
               className={navLinkClass}
-              activeProps={{ className: 'text-vermillion' }}
-              inactiveProps={{ className: 'text-ink-soft' }}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
             >
               {t('nav.library')}
             </Link>
             <Link
               to="/pricing"
               className={navLinkClass}
-              activeProps={{ className: 'text-vermillion' }}
-              inactiveProps={{ className: 'text-ink-soft' }}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
             >
               {t('nav.pricing')}
             </Link>
@@ -94,11 +99,7 @@ export function AppShell({
           <div className="ml-auto flex items-center gap-3">
             {balanceSlot}
             <LangSwitch />
-            <AccountArea
-              user={user}
-              isSessionPending={isSessionPending}
-              onSignOut={onSignOut}
-            />
+            <AccountArea user={user} isSessionPending={isSessionPending} onSignOut={onSignOut} />
           </div>
         </div>
       </header>
@@ -120,17 +121,17 @@ function AccountArea({ user, isSessionPending, onSignOut }: AccountAreaProps) {
   const { t } = useTranslation()
 
   if (isSessionPending) {
-    // Pill-shaped shimmer mirrors the sign-in pill / menu trigger silhouette
+    // Pill-shaped stepped pulse mirrors the sign-in pill / menu trigger silhouette
     return <Skeleton className="h-10 w-24 rounded-full" />
   }
 
   if (!user) {
-    // Link styled as the primary action — mirrors Button primary/md classes
-    // (ink pill, hover flips to vermillion: the editorial CTA gesture)
+    // Link styled as a RED specimen pill — the reference taxonomy files
+    // login/auth actions under the red tint (mirrors Button danger classes)
     return (
       <Link
         to="/login"
-        className="inline-flex min-h-10 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none"
+        className="inline-flex min-h-10 items-center justify-center rounded-full border border-white/10 bg-specimen-red/20 px-5 py-2 text-sm font-medium text-lumen-red shadow-pill transition-colors duration-200 hover:bg-specimen-red/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         {t('nav.signIn')}
       </Link>
@@ -172,13 +173,13 @@ function UserMenu({ user, onSignOut }: UserMenuProps) {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
-        // Quiet trigger: sand wash on hover (the editorial "tinted block"),
-        // never a hard fill — the account is chrome, not a call to action
-        className="inline-flex min-h-10 max-w-48 items-center gap-1 truncate rounded-full px-3 py-2 text-sm font-medium text-ink transition-colors duration-200 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+        // Quiet trigger: the hover steps the surface up to ridge — the account
+        // is chrome, not a call to action, so it never gets a triad tint
+        className="inline-flex min-h-10 max-w-48 items-center gap-1 truncate rounded-full px-3 py-2 text-sm font-medium text-mist transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         <span className="truncate">{label}</span>
         {/* Decorative chevron — the aria-expanded state carries the meaning */}
-        <span aria-hidden="true" className="text-xs text-ink-soft">
+        <span aria-hidden="true" className="text-xs text-mist-dim">
           ▾
         </span>
       </button>
@@ -190,18 +191,18 @@ function UserMenu({ user, onSignOut }: UserMenuProps) {
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
-          {/* Menu panel = a small cream sheet with a hairline border (same
-              editorial surface language as Modal — no heavy white cards) */}
+          {/* Menu panel = a ridge surface step above the steel bar with a
+              white/10 hairline, 8px radius — elevation by color, no shadow */}
           <div
             role="menu"
             aria-label={label}
-            className="absolute top-full right-0 z-20 mt-2 w-48 rounded-sm border border-ink/15 bg-cream p-1.5 shadow-lg"
+            className="absolute top-full right-0 z-20 mt-2 w-48 rounded-lg border border-white/10 bg-ridge p-1.5"
           >
             <button
               type="button"
               role="menuitem"
               onClick={handleSignOut}
-              className="flex min-h-10 w-full items-center rounded-sm px-3 py-2 text-sm font-medium text-ink transition-colors duration-200 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+              className="flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-mist transition-colors duration-200 hover:bg-steel hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
             >
               {t('nav.signOut')}
             </button>

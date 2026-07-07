@@ -37,11 +37,13 @@ flowchart LR
   a language change made anywhere else keeps every LangSwitch instance in sync.
 - The e2e contract (plan Task 21) clicks this switch on the LANDING page — that
   is why it lives in `shared/ui`, not inside AppShell.
-- v2 editorial restyle: hairline `border-ink/20` pill container (transparent —
-  sits on the cream, no white chip); the ACTIVE locale is a solid ink mini-pill
-  (`bg-ink text-cream`) instead of a tinted wash — unmistakable state + AA
+- v3 terminal restyle intent: white/10 hairline pill container (transparent —
+  sits on whatever surface hosts it); the ACTIVE locale is a `bg-ridge text-white`
+  mini-pill — a LIT SEGMENT one surface step up, because v3 bans solid brand
+  fills and the surface ladder carries state instead. White on ridge keeps AA
   contrast at 12px. `aria-pressed`/labels unchanged.
 
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

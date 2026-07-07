@@ -1,31 +1,27 @@
 // apps/web/src/shared/ui/NotFoundPage.tsx
-// Custom 404 (frontend-error-ux contract): calm standalone screen on paper with
-// a way home. Wired as the root route's notFoundComponent in routes/__root.tsx.
+// Custom 404 (frontend-error-ux contract): calm standalone screen on the void
+// with a way home. Wired as the root route's notFoundComponent in routes/__root.tsx.
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 export function NotFoundPage() {
   const { t } = useTranslation()
   return (
-    // Editorial voice (brief: "serif headline, one line, one action"): a
-    // vermillion micro-label stamp, an oversized Fraunces headline, one ink
-    // pill home. The 404 numeral is decorative — the heading carries meaning.
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-cream px-6 text-center">
-      <p
-        aria-hidden="true"
-        className="text-[11px] font-medium tracking-[0.3em] text-vermillion uppercase"
-      >
+    // Terminal voice: a portal-blue mono "404" status line, a whisper-weight
+    // mono headline (30px, weight 400 — headings never bold), one green
+    // specimen pill home. The 404 numeral is decorative — the heading carries
+    // the meaning for screen readers.
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-void px-6 text-center">
+      <p aria-hidden="true" className="text-sm text-portal">
         404
       </p>
-      <h1 className="font-display text-5xl leading-[1.02] font-semibold tracking-tight text-ink md:text-6xl">
-        {t('errors.notFound.title')}
-      </h1>
-      <p className="max-w-md text-ink-soft">{t('errors.notFound.description')}</p>
-      {/* Link styled as the primary action — mirrors Button primary/md (ink
-          pill, hover flips to vermillion) */}
+      <h1 className="max-w-xl text-3xl font-normal text-white">{t('errors.notFound.title')}</h1>
+      <p className="max-w-md text-mist-dim">{t('errors.notFound.description')}</p>
+      {/* Link styled as the primary action — mirrors Button primary/md (green
+          specimen pill: going home is the constructive next step) */}
       <Link
         to="/"
-        className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none"
+        className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-white/10 bg-specimen-green/20 px-5 py-2 text-sm font-medium text-glow-green shadow-pill transition-colors duration-200 hover:bg-specimen-green/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         {t('common.goHome')}
       </Link>

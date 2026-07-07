@@ -1,8 +1,8 @@
 // apps/web/src/routes/login.tsx
 // Login/registration screen ('/login') — a standalone screen (no AppShell) in
-// the stage-3 editorial split: serif manifesto block on sand left, the form on
-// cream right (design.md §11). Composition only: the Auth module owns both
-// columns' content. Signed-in visitors are forwarded to /create.
+// the v3 terminal split: mono manifesto block on the abyss step left, the form
+// on the void right (design.md §11). Composition only: the Auth module owns
+// both columns' content. Signed-in visitors are forwarded to /create.
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -14,11 +14,11 @@ export const Route = createFileRoute('/login')({
 })
 
 // Shared split frame so the pending and form states keep one silhouette:
-// manifesto column (sand) + centered right column. On mobile the manifesto
-// stacks above as a compact block; from lg it becomes the fixed left page.
+// manifesto column (abyss step) + centered right column. On mobile the
+// manifesto stacks above as a compact block; from lg it is the fixed left page.
 function LoginSplit({ children }: { children: ReactNode }) {
   return (
-    <main className="grid min-h-screen bg-cream lg:grid-cols-[5fr_7fr]">
+    <main className="grid min-h-screen bg-void lg:grid-cols-[5fr_7fr]">
       <AuthManifesto />
       <div className="flex items-start justify-center px-6 py-12 lg:items-center lg:py-16">
         {children}

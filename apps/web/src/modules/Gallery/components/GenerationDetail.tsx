@@ -27,26 +27,25 @@ export function GenerationDetail({ generation, isOpen, onClose }: GenerationDeta
     <Modal isOpen={isOpen} onClose={onClose} title={t('gallery.detail.title')}>
       <div className="flex flex-col gap-4">
         {mediaUrl ? (
-          // Media sits on the dark media well — the only dark surface
-          // (design.md §2); rounded-sm = the editorial near-flat plate
+          // Media sits on the abyss well — one surface step BELOW the modal's
+          // steel sheet, so the user's work reads as recessed film (v3 §2)
           generation.type === 'video' ? (
-            <video controls src={mediaUrl} className="w-full rounded-sm bg-media" />
+            <video controls src={mediaUrl} className="w-full rounded-lg bg-abyss" />
           ) : (
-            <img src={mediaUrl} alt={generation.prompt} className="w-full rounded-sm bg-media" />
+            <img src={mediaUrl} alt={generation.prompt} className="w-full rounded-lg bg-abyss" />
           )
         ) : null}
-        {/* Figure caption voice — the same serif-italic prompt as the card */}
-        <p className="font-display text-base leading-snug text-ink italic">{generation.prompt}</p>
-        <p className="text-xs text-ink-soft">
+        {/* Figure caption voice — the same quiet mono prompt as the card */}
+        <p className="text-base leading-snug text-mist">{generation.prompt}</p>
+        <p className="text-xs text-mist-dim">
           {t('gallery.cost', { count: generation.costCredits })} · {createdAt}
         </p>
         {mediaUrl ? (
-          // Ink text + hairline underline→vermillion hover: small vermillion
-          // text would break the design.md §2 contrast policy
+          // Portal blue — the sanctioned prose-link color (v3 §2)
           <a
             href={mediaUrl}
             download
-            className="self-start text-sm font-medium text-ink underline decoration-ink/30 underline-offset-4 transition-colors duration-200 hover:decoration-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+            className="self-start text-sm font-medium text-portal underline decoration-portal/40 underline-offset-4 transition-colors duration-200 hover:decoration-portal focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
             {t('gallery.download')}
           </a>

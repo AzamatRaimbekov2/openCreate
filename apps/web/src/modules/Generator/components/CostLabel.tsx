@@ -14,12 +14,9 @@ export function CostLabel({ credits }: CostLabelProps) {
   // No model/duration resolved yet — show nothing rather than a wrong number
   if (credits === null) return null
   return (
-    // Serif display numeral (brief: "cost line as serif numeral") — the price
-    // is the sheet's most honest line, so it gets the headline voice
-    <p
-      className="font-display text-2xl leading-none font-semibold tracking-tight text-ink"
-      data-testid="cost-label"
-    >
+    // Mono weight-400 numeral in white — the price is the sheet's most honest
+    // line, so it gets the heading color; weight stays at 400 (ceiling law)
+    <p className="text-2xl leading-none font-normal text-white" data-testid="cost-label">
       {t('generator.cost', { count: credits })}
     </p>
   )

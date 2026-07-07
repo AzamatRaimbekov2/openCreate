@@ -16,11 +16,12 @@ export type SheetFieldProps = {
 export function SheetField({ ordinal, children }: SheetFieldProps) {
   return (
     <div className="flex gap-4 py-5 first:pt-0 last:pb-0 md:gap-5">
-      {/* Ghost serif ordinal — the sheet's line numbering, decorative only
-          (the same magazine gesture as the landing's SectionHeading) */}
+      {/* Ghost mono ordinal — the sheet's line numbering, decorative only
+          (the same gesture as the landing's SectionHeading; white/20 keeps it
+          whisper-quiet on the void, weight 400 per the ceiling law) */}
       <span
         aria-hidden="true"
-        className="w-7 shrink-0 pt-0.5 font-display text-lg leading-none font-semibold tracking-tight text-ink/25"
+        className="w-7 shrink-0 pt-0.5 text-lg leading-none font-normal text-white/20"
       >
         {ordinal}
       </span>

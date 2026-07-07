@@ -5,9 +5,9 @@
 
 ## Purpose
 
-The left panel of the `/login` editorial split (brief: "serif quote/manifesto block on
-sand background"): brand quote, wordmark escape hatch to `/`, and the three approved
-claims as hairline rows on the sand tint.
+The left panel of the `/login` split (v3 terminal: mono weight-400 quote on the
+ABYSS surface step): brand quote, wordmark escape hatch to `/`, and the three
+approved claims as white/10 hairline rows.
 
 ## What it does (for an AI reader)
 
@@ -29,9 +29,9 @@ claims as hairline rows on the sand tint.
 
 ```mermaid
 flowchart LR
-  I18N[i18n auth.manifesto.* + landing.claims.*] --> M[AuthManifesto aside on sand]
+  I18N[i18n auth.manifesto.* + landing.claims.*] --> M[AuthManifesto aside on abyss]
   M --> W[wordmark Link → /]
-  M --> Q[serif display quote]
+  M --> Q[mono weight-400 quote]
   M --> C[3 approved claims — hairline rows]
   R[routes/login.tsx split layout] -->|left column| M
 ```
@@ -40,13 +40,16 @@ flowchart LR
 
 - Claims reuse `landing.claims.*` deliberately — inventing login-only claim copy would
   create a second place where the four approved claims could drift.
-- The vermillion wordmark dot is `aria-hidden`, so the link's accessible name stays
+- The portal-blue wordmark dot is `aria-hidden`, so the link's accessible name stays
   exactly "openCreate" (tests query it by that name).
-- Uppercase kicker/caption are CSS `uppercase` only — DOM text stays sentence case so
-  i18n-string queries keep matching.
-- `lg:min-h-screen` + `lg:justify-between` pins wordmark/quote/claims into the magazine
+- v3 intent: the panel sits on `bg-abyss` — the SUNKEN surface step — so the form
+  column (on the plain void) and the manifesto read as two depths of one terminal;
+  the quote obeys the 30px/weight-400 heading law (whisper-weight IS the gesture);
+  kicker/caption dropped the uppercase treatment entirely (terminal voice).
+- `lg:min-h-screen` + `lg:justify-between` pins wordmark/quote/claims into the tall
   column on desktop; on mobile the panel stacks above the form as a compact block.
 
 ## Commits
 
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

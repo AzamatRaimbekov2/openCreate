@@ -1,6 +1,6 @@
 // apps/web/src/modules/Generator/components/PromptField.tsx
-// The commission sheet's prompt group: micro-label + hairline underline
-// textarea (the editorial "printed form" line — same recipe as shared Input,
+// The commission sheet's prompt group: quiet mono caption + steel filled
+// textarea (the v3 field recipe — same surface-step treatment as shared Input,
 // which only ships as <input>, hence this local textarea twin). Extracted from
 // GeneratorPanel to keep the panel under the 200-line component cap.
 import { useId } from 'react'
@@ -19,24 +19,21 @@ export function PromptField({ value, onChange }: PromptFieldProps) {
   const promptId = useId()
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Micro-label voice, matching shared Input: uppercase is CSS-only so
-          getByLabelText('Prompt') keeps matching the i18n string */}
-      <label
-        htmlFor={promptId}
-        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
-      >
+      {/* Quiet mono caption, matching shared Input — getByLabelText('Prompt')
+          keeps matching the i18n string (label text itself is unchanged) */}
+      <label htmlFor={promptId} className="text-xs text-mist-dim">
         {t('generator.prompt.label')}
       </label>
-      {/* Hairline underline field: transparent body, 1px rule that turns
-          vermillion on focus — the extra px comes from a box-shadow so the
-          layout never shifts (identical treatment to shared/ui Input) */}
+      {/* Steel filled field, 8px radius: identical surface-step treatment to
+          shared/ui Input so the whole sheet reads as one form system; focus
+          swaps the white/10 hairline for portal blue */}
       <textarea
         id={promptId}
         rows={3}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={t('generator.prompt.placeholder')}
-        className="border-0 border-b border-ink/30 bg-transparent px-0.5 py-2 text-base text-ink transition-colors duration-200 placeholder:text-ink-soft/50 focus-visible:border-vermillion focus-visible:shadow-[0_1px_0_0_var(--color-vermillion)] focus-visible:outline-none"
+        className="rounded-lg border border-white/10 bg-steel px-3 py-2 text-base text-mist transition-colors duration-200 placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none"
       />
     </div>
   )

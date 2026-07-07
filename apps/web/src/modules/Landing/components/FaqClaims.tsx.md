@@ -11,8 +11,8 @@ not boxy cards (brief: "FAQ as clean rows").
 
 ## What it does (for an AI reader)
 - Responsibilities: `SectionHeading` (ordinal 04 + `landing.faq.title`) +
-  `<ul>` of three hairline Q&A rows — serif h3 question (12-col span 5),
-  ink-soft answer (span 7), baseline-aligned.
+  `<ul>` of three white/10 hairline Q&A rows — white mono weight-400 h3
+  question (12-col span 5), mist-dim answer (span 7), baseline-aligned.
 - Public API / exports: `FaqClaims` (no props).
 - Inputs → Outputs: `ITEMS` const (`expire`/`credit`/`models`, doubling as
   i18n key segments `landing.faq.items.<id>.*`) → stacked hairline rows.
@@ -33,9 +33,11 @@ flowchart LR
   don't earn extra interaction cost (and stay findable with in-page search).
 - The fourth approved claim («No subscription required») lives inside the
   `expire` answer — the FAQ must NOT grow topics beyond the approved claims.
-- Rows have `border-b` only — SectionHeading draws the opening rule; the serif
-  question/quiet answer contrast replaces the removed card chrome.
+- Rows have `border-b` only — SectionHeading draws the opening rule; the
+  white-question/dimmed-answer contrast replaces the removed card chrome
+  (v3: hierarchy by color, not weight — questions stay weight 400).
 
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

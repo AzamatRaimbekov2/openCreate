@@ -16,17 +16,17 @@ export type EmptyStateProps = {
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    // Editorial empty state: a hairline-ruled frame on the cream canvas (no
-    // raised white card — empty space IS the paper) with a serif headline.
-    <div className="flex flex-col items-center gap-3 border border-ink/15 px-6 py-16 text-center">
+    // Terminal empty state: a white/10 hairline frame directly on the void
+    // (prose sits on the void, not in cards — reference law) with an 8px radius
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-white/10 px-6 py-16 text-center">
       {icon ? (
-        <div aria-hidden="true" className="text-3xl text-ink-soft/80">
+        <div aria-hidden="true" className="text-3xl text-mist-dim/80">
           {icon}
         </div>
       ) : null}
-      {/* Serif display voice — even "nothing here" is typeset deliberately */}
-      <h3 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h3>
-      {description ? <p className="max-w-md text-sm text-ink-soft">{description}</p> : null}
+      {/* Mono weight-400 30px heading — "nothing here" whispers, never bolds */}
+      <h3 className="text-3xl font-normal text-white">{title}</h3>
+      {description ? <p className="max-w-md text-sm text-mist-dim">{description}</p> : null}
       {action ? <div className="mt-3">{action}</div> : null}
     </div>
   )

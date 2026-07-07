@@ -1,7 +1,7 @@
 // apps/web/src/shared/ui/index.ts
-// Public API of the "Light Editorial" design-system kit. Modules and routes
-// import ONLY from 'shared/ui' — never from the individual component files.
-// Component inventory + variants: docs/frontend/design.md §6.
+// Public API of the v3 "Bioluminescent Terminal" design-system kit. Modules and
+// routes import ONLY from 'shared/ui' — never from the individual component
+// files. Component inventory + variants: docs/frontend/design.md §6.
 export { AppErrorBoundary } from './AppErrorBoundary'
 export { AppShell } from './AppShell'
 export type { AppShellProps, AppShellUser } from './AppShell'

@@ -1,7 +1,7 @@
 // apps/web/src/shared/ui/Progress.tsx
-// Determinate progress bar (video generation %). Editorial treatment: a thin
-// square-ended rule — vermillion fill (progress IS an active state, the
-// sanctioned accent use) advancing over a hairline ink track.
+// Determinate progress bar (video generation %). v3 terminal treatment: a
+// FLAT glow-green fill advancing over the ridge surface step — success-color
+// progress on the elevation track, no gradient, no shine, square ends.
 import { useTranslation } from 'react-i18next'
 
 export type ProgressProps = {
@@ -21,11 +21,12 @@ export function Progress({ value, label }: ProgressProps) {
       aria-valuemax={100}
       aria-valuenow={clamped}
       aria-label={label ?? t('common.loading')}
-      // Square ends (no rounding) — the bar reads as a printed rule, not a pill
-      className="h-1.5 w-full overflow-hidden bg-ink/10"
+      // Square ends (no rounding): v3 allows only pill and 8px radii, and a
+      // 6px-tall rule earns neither — it reads as a terminal meter line
+      className="h-1.5 w-full overflow-hidden bg-ridge"
     >
       <div
-        className="h-full bg-vermillion transition-[width] duration-200"
+        className="h-full bg-glow-green transition-[width] duration-200"
         // Documented exception to the no-inline-styles rule (design.md §9):
         // a runtime-computed width cannot be a static Tailwind utility
         style={{ width: `${clamped}%` }}

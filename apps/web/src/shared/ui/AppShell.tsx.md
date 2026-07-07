@@ -3,17 +3,17 @@
 > AI-facing sidecar for `AppShell.tsx`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Application chrome (header + canvas) for in-app screens, in the "Light Editorial"
-masthead voice: serif wordmark "openCreate·" (vermillion dot), hairline top bar,
-uppercase grotesk nav micro-labels (Create/Library/Pricing), credits balance slot,
-EN/RU LangSwitch, account area. Presentational by design so `shared/ui` never
-imports `modules/*`.
+Application chrome (header + canvas) for in-app screens, in the v3 "Bioluminescent
+Terminal" voice: sticky STEEL bar (`bg-steel`) over the void, mono wordmark
+"openCreate·" (portal-blue dot), lowercase mono nav (Create/Library/Pricing),
+credits balance slot, EN/RU LangSwitch, account area. Presentational by design so
+`shared/ui` never imports `modules/*`.
 
 ## What it does (for an AI reader)
-- Responsibilities: render the hairline header row and the `bg-cream` page canvas;
+- Responsibilities: render the sticky steel header row and the `bg-void` page canvas;
   decide between three account-area states (session pending → pill `Skeleton`,
-  signed out → ink-pill Sign in `Link` (hover vermillion), signed in → `UserMenu`
-  with a Sign out `menuitem` in a cream hairline panel).
+  signed out → RED specimen-pill Sign in `Link` (reference taxonomy: auth = red tint),
+  signed in → `UserMenu` with a Sign out `menuitem` in a ridge surface panel).
 - Public API / exports / props / endpoints: `AppShell`, `AppShellProps`,
   `AppShellUser`. Props: `user: AppShellUser | null`, `isSessionPending?`,
   `onSignOut: () => void`, `balanceSlot?: ReactNode`, `children`.
@@ -53,13 +53,18 @@ flowchart LR
   typed `Link` with the same active/inactive styling as the other nav items.
 - Account name can be an empty string in better-auth — trigger label falls back
   to the email via `user.name?.trim()`.
-- v2 editorial restyle: wordmark is Fraunces (`font-display`) with an aria-hidden
-  vermillion "·" (accessible name stays "openCreate"); nav = `text-xs uppercase
-  tracking-[0.18em]`, active `text-vermillion`; hovers use the sand tint; menu
-  panel matches Modal's cream + hairline surface. Roles/labels unchanged —
+- v3 terminal restyle intent: the bar became STICKY `bg-steel` (a surface step needs
+  no border/shadow to separate from the void while scrolling); the wordmark stays the
+  default mono with an aria-hidden portal "·" — the brand's cursor (accessible name
+  stays "openCreate"); nav = lowercase `text-sm` mono, active = plain `text-white`
+  (presence, not an accent — portal is reserved for links/brand, the triad for
+  actions); Sign in = red specimen pill because the reference taxonomy files
+  login/auth under red; the user-menu panel = `bg-ridge` + white/10 hairline, 8px
+  (elevation by color step, hover steps back down to steel). Roles/labels unchanged —
   `AppShell.test.tsx` queries by role/name only.
 
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
 - 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

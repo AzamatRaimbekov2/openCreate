@@ -3,7 +3,7 @@
 > AI-facing sidecar for `NotFoundPage.tsx`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Custom 404 screen — the frontend-error-ux contract's unknown-route surface, in the "Light Editorial" voice: vermillion micro-label stamp ("404"), oversized Fraunces serif headline, one line, one ink-pill action home. Wired as the root route's `notFoundComponent`.
+Custom 404 screen — the frontend-error-ux contract's unknown-route surface, in the v3 "Bioluminescent Terminal" voice: portal-blue mono "404" status line, mono weight-400 30px headline, one line, one green specimen-pill action home. Wired as the root route's `notFoundComponent`.
 
 ## What it does (for an AI reader)
 - Responsibilities: render the 404 marker (decorative, `aria-hidden`), localized title/description (`errors.notFound.*`), and a TanStack `<Link to="/">` styled with the Button-primary classes.
@@ -25,9 +25,10 @@ flowchart LR
 ## Key decisions / gotchas
 - Uses `Link` (not `<a>`) because `notFoundComponent` always renders inside `RouterProvider` — tests therefore mount it through a real router at a bad path (`routes/__root.test.tsx`), which also proves the wiring.
 - The link intentionally mirrors `Button` primary/md classes — a navigation is a link semantically, but the single main action visually (design.md §5).
-- Copy is calm and blame-free per design.md error-UX rules; standalone screens sit directly on the cream canvas.
-- v2 editorial restyle: headline moved to `font-display text-5xl/6xl` (serif), the "404" became an uppercase tracked micro-label in vermillion (decorative, aria-hidden), the home link is the ink pill with vermillion hover. i18n keys and roles unchanged.
+- Copy is calm and blame-free per design.md error-UX rules; standalone screens sit directly on the void.
+- v3 terminal restyle intent: headline = `text-3xl font-normal text-white` (the 30px/400 heading law — a 404 whispers, it doesn't shout, so the v2 oversized serif is gone); "404" = a small `text-portal` status line (decorative, aria-hidden — portal blue is the prose accent, not an alarm color); home link = GREEN specimen pill (going home is the constructive action; red would wrongly read as destructive). i18n keys and roles unchanged.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
 - 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

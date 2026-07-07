@@ -92,7 +92,7 @@ describe('GalleryGrid', () => {
     apiMock.mockReturnValue(new Promise(() => {}))
     const { container } = renderGrid()
     await waitFor(() => {
-      expect(container.querySelectorAll('.animate-pulse')).toHaveLength(8)
+      expect(container.querySelectorAll('.animate-skeleton')).toHaveLength(8)
     })
   })
 

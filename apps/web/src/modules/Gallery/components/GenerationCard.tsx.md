@@ -4,11 +4,12 @@
 
 ## Purpose
 
-One generation in the gallery grid as a magazine FIGURE (stage-3 redesign: dark
-media plate + serif-italic prompt caption on cream + hairline meta row — the white
-card is retired), covering the three per-item states: processing (progress + serif
-percent), succeeded (playable/enlargeable media + actions), failed (danger-hairline
-well + reason + refunded stamp).
+One generation in the gallery grid as a FIGURE (v3 terminal: abyss media plate +
+quiet mono prompt caption + white/10 hairline meta row — no card wrapper),
+covering the three per-item states in the status triad (processing=amber,
+succeeded=green, failed=red): processing (progress + amber percent), succeeded
+(playable/enlargeable media + actions), failed (glow-red hairline well + reason +
+refunded chip).
 
 ## What it does (for an AI reader)
 
@@ -17,14 +18,13 @@ well + reason + refunded stamp).
 - Public API / exports: `GenerationCard` with `GenerationCardProps = { generation: Generation }`
   (the list-cache item as seed).
 - Inputs → Outputs:
-  - processing → pulsing `bg-media` well (real aspect) + `Progress` + serif "n%"
-    numeral, NO `<video>`.
-  - succeeded video → `<video controls src>` on the media well; image → media
-    button (print-lift hover, motion-safe) opening `GenerationDetail`; hairline
-    footer: cost + underline download link + ghost delete.
-  - failed → danger-HAIRLINE media well (`border-danger` on the well, quiet
-    `bg-ink/5` fill), stored failure reason, success-variant "Credits refunded"
-    stamp badge, delete.
+  - processing → `animate-skeleton` abyss well (real aspect, the stepped surface
+    pulse) + `Progress` + glow-amber "n%" numeral, NO `<video>`.
+  - succeeded video → `<video controls src>` on the abyss well; image → media
+    button (lift hover, motion-safe) opening `GenerationDetail`; hairline
+    footer: cost + portal download link + danger-pill delete.
+  - failed → glow-red-HAIRLINE abyss well (`border-glow-red` on the well),
+    stored failure reason, success-variant "Credits refunded" chip, delete.
 - Side effects: polling + invalidations via `useLiveGeneration`; DELETE via `useDeleteGeneration`.
 
 ## Dependencies
@@ -41,7 +41,7 @@ flowchart TD
   SEED[list item seed] --> UL[useLiveGeneration 4s poll while processing]
   UL -->|processing| P[media well pulse + Progress %]
   UL -->|succeeded| S[video controls / img button -> GenerationDetail]
-  UL -->|failed| F[danger border + reason + refunded Badge]
+  UL -->|failed| F[glow-red border + reason + refunded Badge]
   F -->|errorCode content_blocked| CB[localized safety-filter copy]
   S & F --> A[footer: cost · download · delete -> useDeleteGeneration]
 ```
@@ -57,20 +57,24 @@ flowchart TD
 - EXCEPT safety blocks: when `errorCode === 'content_blocked'` the card renders
   the localized `gallery.contentBlocked` copy instead of the raw provider
   message — moderation failures are user-facing product copy, never provider text.
-- Status is never color-only (a11y §7): danger border + "Generation failed"
-  text + refunded badge all carry it together.
+- Status is never color-only (a11y §7): glow-red border + "Generation failed"
+  text + refunded chip all carry it together.
 - Delete is offered only for terminal states — a processing task can't be
   cancelled in the MVP API.
-- Stage 3 restyle (2026-07-07): white card wrapper retired — the figure sits
-  directly on cream (media plate `rounded-sm bg-media`, prompt = serif-italic
-  figure caption, meta/actions over a `border-ink/10` hairline). The failed
-  state's `border-danger` moved from the card wrapper to the media well itself
-  (tests query the class, not its host). Download became the ink/hairline-underline
-  text action (small vermillion text breaks §2 contrast policy). Percent numeral is
-  serif display per the brief. Behavior, roles and i18n untouched.
+- v3 terminal restyle intent: media plates moved to `bg-abyss rounded-lg` (the
+  recessed surface step reserved for user media); the processing well now runs
+  `animate-skeleton` — the SAME stepped surface pulse as Skeleton, because a
+  loading well IS a skeleton (tests query `.animate-skeleton`); the percent
+  numeral wears glow-AMBER (processing status color, weight 400); download is a
+  portal-blue link (prose-link law); delete graduated from ghost+red-text to the
+  real `variant="danger"` red specimen pill — v2 faked the destructive tint
+  because its danger was a solid fill, v3's is translucent so it can be used
+  honestly. Tests updated: `.border-danger` → `.border-glow-red`. Behavior,
+  roles and i18n untouched.
 
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

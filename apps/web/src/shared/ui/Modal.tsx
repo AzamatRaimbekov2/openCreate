@@ -2,6 +2,8 @@
 // Accessible modal dialog: portal render, Escape + overlay close, body scroll
 // lock, focus restore. With role="alertdialog" it is the project's blocking
 // error-modal pattern (frontend-error-ux) — compose with ErrorState inside.
+// v3 terminal: the sheet is a STEEL surface step (#1d293d, 8px radius) over a
+// dimmed void — elevation comes from the surface color, not blur or shadows.
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -51,15 +53,15 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
 
   return createPortal(
     // The overlay is presentational (click target only) — it must NOT be
-    // aria-hidden: that would hide the dialog inside it from the a11y tree
+    // aria-hidden: that would hide the dialog inside it from the a11y tree.
+    // bg-void/70 dims the page in the void's own hue instead of flat black.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 px-4"
       onClick={onClose}
       role="presentation"
     >
-      {/* Editorial dialog: a cream sheet with a hairline border and near-flat
-          corners — reads as a card of the same paper, not a floating glass
-          panel. Depth comes from the dimmed page + hairline, not heavy blur. */}
+      {/* Terminal dialog sheet: one surface step above the void (steel), 8px
+          radius, white/10 hairline — depth is the color step, never a shadow */}
       <div
         ref={dialogRef}
         role={role}
@@ -68,16 +70,16 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
         tabIndex={-1}
         // Clicks inside must not bubble to the overlay's close handler
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-lg rounded-sm border border-ink/15 bg-cream p-8 shadow-lg"
+        className="w-full max-w-lg rounded-lg border border-white/10 bg-steel p-8"
       >
-        <div className="mb-5 flex items-start justify-between gap-4 border-b border-ink/15 pb-4">
-          {/* Serif display title — dialogs carry the same headline voice as pages */}
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h2>
+        <div className="mb-5 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+          {/* Mono weight-400 title — headings are never bold in v3 */}
+          <h2 className="text-2xl font-normal text-white">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={t('common.close')}
-            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-ink/20 text-ink-soft transition-colors duration-200 hover:border-ink hover:text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
             ✕
           </button>

@@ -40,12 +40,14 @@ flowchart LR
   switch re-localizes a visible error.
 - Hidden-but-labelled real `<input type=file>` (sr-only): native picker,
   `userEvent.upload`-testable, visible button/dropzone stays a plain button.
-- Stage 3 restyle (2026-07-07): dropzone = dashed hairline directly on cream
-  (`rounded-sm`, white fill retired) that solidifies + sand-washes on hover; the
-  preview thumbnail sits on the dark media well (`bg-media`) — user media is the
-  app's only dark element. Behavior and labels untouched.
+- v3 terminal restyle: dropzone = dashed white/15 hairline directly on the void
+  (`rounded-lg`) that brightens + steps toward `bg-ridge/30` on hover; the
+  preview thumbnail sits on the ABYSS well (`bg-abyss` — the recessed surface
+  step reserved for user media); validation errors are `text-glow-red` (the
+  triad's failure color). Behavior and labels untouched.
 
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

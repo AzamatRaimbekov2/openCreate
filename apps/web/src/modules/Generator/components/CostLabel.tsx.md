@@ -32,12 +32,13 @@ flowchart LR
   `cost_one/few/many/other` ru) — never string-concatenated.
 - Renders nothing for `null` (no model/duration resolved) — a wrong or empty
   number would undermine the product's honest-pricing promise.
-- Stage 3 restyle (2026-07-07): the line is now a serif display numeral
-  (`font-display text-2xl`, brief: "cost line as serif numeral") in the sheet
-  footer — the same headline voice as the landing's price index. Text content and
-  `data-testid="cost-label"` untouched.
+- v3 terminal restyle: the line is a mono weight-400 numeral in white
+  (`text-2xl font-normal text-white`) in the sheet footer — same numeral voice
+  as the landing's price index; weight 400 obeys the ceiling law. Text content
+  and `data-testid="cost-label"` untouched.
 
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

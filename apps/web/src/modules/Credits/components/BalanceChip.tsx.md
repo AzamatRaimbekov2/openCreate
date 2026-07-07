@@ -49,14 +49,16 @@ flowchart LR
 - Balance updates arrive through the shared `['me']` cache (login invalidation now,
   charge/refund invalidations in Tasks 16-17) — the chip itself never mutates anything.
 
-- Stage 3 restyle (2026-07-07): the chip is now the brief's STAMP — `rounded-[3px]`
-  hairline vermillion outline (Badge treatment scaled to a 40px hit area) with a
-  serif display numeral, replacing the v1 sand-filled pill; the loading skeleton
-  mirrors the stamp silhouette. Vermillion lettering on the stamp is the recorded
-  design.md §2/§8 exception. States, roles and aria-labels untouched.
+- v3 terminal restyle: the chip is the Badge mono-caption-chip voice scaled to a
+  40px control — `rounded-full` white/10 hairline + white/5 wash, glow-AMBER
+  lettering and numeral (amber = the triad's pricing/credits family, v3 §2;
+  contrast-safe at caption size on steel), hover steps to `bg-ridge`; the
+  loading skeleton mirrors the pill silhouette (`rounded-full`); numeral weight
+  is `font-medium` — the 500 ceiling. States, roles and aria-labels untouched.
 
 ## Commits
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 59cf4f9 2026-07-07 restyle(web): qa round 1 refinements
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

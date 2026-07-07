@@ -1,8 +1,9 @@
 // apps/web/src/shared/ui/Badge.tsx
-// Stamp-style status badge ("Light Editorial"): an uppercase, letter-spaced
-// hairline-outlined rectangle — reads like an ink stamp on paper, replacing
-// the v1 tinted pill. Status is never color-only — the badge text carries the
-// meaning; color reinforces it (a11y rule, docs/frontend/design.md §7).
+// Status badge (v3 terminal): a quiet MONO CAPTION CHIP — a small translucent
+// pill with a white/10 hairline and lowercase 12px mono text. Status is never
+// color-only — the badge text carries the meaning; color reinforces it via the
+// triad glows (a11y rule, docs/frontend/design.md §7). Status mapping:
+// processing = amber · succeeded/positive = green · failed/destructive = red.
 import type { ReactNode } from 'react'
 
 export type BadgeVariant = 'neutral' | 'accent' | 'success' | 'danger'
@@ -10,26 +11,26 @@ export type BadgeVariant = 'neutral' | 'accent' | 'success' | 'danger'
 export type BadgeProps = {
   // Localized badge text, e.g. "credits refunded"
   children: ReactNode
-  // neutral = meta info, accent = tier/selection, success = positive, danger = failure
+  // neutral = meta info, accent = tier/selection (amber), success = positive (green), danger = failure (red)
   variant?: BadgeVariant
 }
 
-// Outline (not fill) carries the variant — a stamp is a border and lettering,
-// never a solid chip. The accent stamp is one of the few sanctioned vermillion
-// text uses (brief: "small stamps/badges"; noted in design.md contrast rules).
+// Text color carries the variant over a shared translucent chip body — the
+// closed triad's glow accents (green/amber/red) plus dimmed mist for neutral
+// meta. No solid fills, no uppercase shouting: the chip is a caption, not a stamp.
 const variantClasses: Record<BadgeVariant, string> = {
-  neutral: 'border-ink/30 text-ink-soft',
-  accent: 'border-vermillion/70 text-vermillion',
-  success: 'border-success/60 text-success',
-  danger: 'border-danger/60 text-danger',
+  neutral: 'text-mist-dim',
+  accent: 'text-glow-amber',
+  success: 'text-glow-green',
+  danger: 'text-glow-red',
 }
 
 export function Badge({ children, variant = 'neutral' }: BadgeProps) {
   return (
-    // Uppercase via CSS only — DOM text (and i18n strings queried by tests)
-    // stays untouched. rounded-[3px] keeps corners stamp-crisp, not pill-soft.
+    // Pill silhouette (the only non-8px radius in v3) at caption size; the
+    // white/5 wash + white/10 hairline reads on every surface step
     <span
-      className={`inline-flex items-center rounded-[3px] border px-2 py-0.5 text-[11px] font-medium tracking-[0.14em] uppercase ${variantClasses[variant]}`}
+      className={`inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs ${variantClasses[variant]}`}
     >
       {children}
     </span>

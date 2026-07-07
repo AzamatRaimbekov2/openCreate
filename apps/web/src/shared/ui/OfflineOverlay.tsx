@@ -28,18 +28,17 @@ export function OfflineOverlay() {
 
   return (
     // z-[60] sits above the Modal layer (z-50) — connectivity outranks any
-    // dialog. Editorial voice: serif headline + one line on the cream canvas;
-    // no action button because the overlay clears itself on reconnect.
+    // dialog. Terminal voice (v3): mono weight-400 30px headline + one line on
+    // the flat void; no action button because the overlay clears itself on
+    // reconnect (the browser is the retry mechanism here).
     <div
       role="alertdialog"
       aria-modal="true"
       aria-label={t('errors.offline.title')}
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-cream px-6 text-center"
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-void px-6 text-center"
     >
-      <h1 className="font-display text-4xl leading-[1.02] font-semibold tracking-tight text-ink md:text-5xl">
-        {t('errors.offline.title')}
-      </h1>
-      <p className="max-w-md text-ink-soft">{t('errors.offline.description')}</p>
+      <h1 className="max-w-xl text-3xl font-normal text-white">{t('errors.offline.title')}</h1>
+      <p className="max-w-md text-mist-dim">{t('errors.offline.description')}</p>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 // apps/web/src/modules/Auth/components/AuthForm.tsx
-// Email/password login-or-register card ("Light Editorial" card on cream).
+// Email/password login-or-register form (v3 terminal: printed directly on the
+// void, steel input fields, mono weight-400 heading).
 // One component serves both modes: switching remounts the fields (key={mode})
 // so RHF state, zod errors and the server alert reset predictably. Server
 // failures surface as LOCALIZED copy in a role="alert" banner — never raw text.
@@ -44,22 +45,21 @@ export function AuthForm() {
   const [mode, setMode] = useState<AuthMode>('login')
   const isLogin = mode === 'login'
   return (
-    // Stage 3 restyle: no white card — the form is "printed" directly on the
-    // cream page (the split's manifesto panel provides the structure), opened
-    // by a serif display heading over the standard hairline rule
+    // No card — the form is printed directly on the void (the split's
+    // manifesto panel provides the structure), opened by a mono weight-400
+    // 30px heading over the standard white/10 hairline (v3 heading law)
     <section className="flex w-full max-w-md flex-col gap-8">
-      <h1 className="border-b border-ink/15 pb-5 font-display text-3xl font-semibold tracking-tight text-ink md:text-4xl">
+      <h1 className="border-b border-white/10 pb-5 text-3xl font-normal text-white">
         {t(isLogin ? 'auth.signIn' : 'auth.signUp')}
       </h1>
       {/* key={mode}: a mode switch is a new form — old errors must not linger */}
       <AuthFields key={mode} mode={mode} />
-      {/* Quiet text link in the editorial idiom (hairline underline that turns
-          vermillion on hover) — ink text keeps small-size contrast, the accent
-          appears only as a reaction (design.md §2 vermillion policy) */}
+      {/* Mode switch is prose navigation → portal blue, the sanctioned
+          prose-link color (v3 §2) */}
       <button
         type="button"
         onClick={() => setMode(isLogin ? 'register' : 'login')}
-        className="min-h-10 self-start text-sm font-medium text-ink underline decoration-ink/30 underline-offset-4 transition-colors duration-200 hover:decoration-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+        className="min-h-10 self-start text-sm font-medium text-portal underline decoration-portal/40 underline-offset-4 transition-colors duration-200 hover:decoration-portal focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         {t(isLogin ? 'auth.switchToRegister' : 'auth.switchToLogin')}
       </button>
@@ -134,11 +134,11 @@ function AuthFields({ mode }: { mode: AuthMode }) {
       />
       {serverErrorKey ? (
         // Inline non-blocking failure banner (design.md §8); alert = announced.
-        // Editorial treatment: a sand tinted block with a danger left rule —
-        // calm, never a red panic panel (danger stays the status color of the text)
+        // v3 treatment: a calm steel surface block with a glow-red left rule —
+        // red stays on the rule + text (the failure STATUS), never a red panel
         <p
           role="alert"
-          className="rounded-sm border-l-2 border-danger bg-sand px-4 py-3 text-sm text-danger"
+          className="rounded-lg border-l-2 border-glow-red bg-steel px-4 py-3 text-sm text-glow-red"
         >
           {t(serverErrorKey)}
         </p>

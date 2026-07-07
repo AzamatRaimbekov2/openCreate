@@ -1,8 +1,9 @@
 // apps/web/src/shared/ui/Input.tsx
-// Labelled text input in the editorial "hairline underline" style: no box, a
-// single rule under the text that thickens/recolors on focus — form fields
-// read like lines on a printed form. Accepts a ref through props (React 19)
-// so react-hook-form's register() spreads straight in.
+// Labelled text input (v3 terminal): a filled field on the steel surface with
+// an 8px radius — elevation by surface step, not by outline drama. The label
+// is a quiet mono caption (lowercase — the terminal voice never shouts).
+// Accepts a ref through props (React 19) so react-hook-form's register()
+// spreads straight in.
 import { useId } from 'react'
 import type { ComponentPropsWithRef } from 'react'
 
@@ -21,31 +22,28 @@ export function Input({ label, error, id, className = '', ...rest }: InputProps)
   const errorId = `${inputId}-error`
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Uppercase micro-label — the editorial form voice (tracking-[0.18em]
-          at 11px reads as print marginalia). text-transform is CSS-only, so
-          the accessible name / getByLabelText queries stay unchanged. */}
-      <label
-        htmlFor={inputId}
-        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
-      >
+      {/* Mono caption label — 12px dimmed mist; no uppercase transform (v3
+          kills the editorial tracking/uppercase voice), so the accessible
+          name / getByLabelText queries stay the raw i18n string as before */}
+      <label htmlFor={inputId} className="text-xs text-mist-dim">
         {label}
       </label>
-      {/* Hairline underline field: transparent body, 1px rule that turns
-          vermillion + visually 2px on focus (the extra px comes from a
-          box-shadow so the layout never shifts). Error keeps the danger rule
-          — never the accent, failure and accent must not share a color. */}
+      {/* Steel field: bg one surface step above the void, 8px radius, hairline
+          white/10 border. Focus swaps the hairline for portal blue — the only
+          chromatic prose accent. Error keeps the glow-red border: failure and
+          focus must never share a color. */}
       <input
         id={inputId}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`min-h-10 border-0 border-b bg-transparent px-0.5 py-2 text-base text-ink transition-colors duration-200 placeholder:text-ink-soft/50 focus-visible:border-vermillion focus-visible:shadow-[0_1px_0_0_var(--color-vermillion)] focus-visible:outline-none ${
-          error ? 'border-danger' : 'border-ink/30'
+        className={`min-h-10 rounded-lg border bg-steel px-3 py-2 text-base text-mist transition-colors duration-200 placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none ${
+          error ? 'border-glow-red' : 'border-white/10'
         } ${className}`}
         {...rest}
       />
       {error ? (
         // role=alert announces validation immediately to screen readers
-        <span id={errorId} role="alert" className="text-sm text-danger">
+        <span id={errorId} role="alert" className="text-sm text-glow-red">
           {error}
         </span>
       ) : null}

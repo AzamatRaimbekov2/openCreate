@@ -5,9 +5,9 @@
 ## Purpose
 
 The Generator module's main surface (create page): the full generation form as the
-stage-3 editorial "commission sheet" — a hairline-framed sheet of NUMBERED field
-groups (type toggle, model cards, prompt, aspect/duration, optional i2v upload)
-separated by hairlines, closed by a serif cost numeral + Generate footer —
+"commission sheet" (v3 terminal skin) — a white/10 hairline-framed sheet of NUMBERED
+field groups (type toggle, model cards, prompt, aspect/duration, optional i2v upload)
+separated by white/10 hairlines, closed by a mono cost numeral + Generate footer —
 orchestrating the store, the catalog query, and the mutation.
 
 ## What it does (for an AI reader)
@@ -41,7 +41,7 @@ flowchart TD
   UC[useCatalog] -->|models| ST[(generatorStore)]
   ST --> FLD[ordered fields array → SheetField rows 01…]
   FLD --> TT[PillGroup type] & MP[ModelPicker] & PR[PromptField] & AP[AspectPicker] & DP[DurationPicker video-only] & ID[ImageDrop i2v-only]
-  ST --> CL[CostLabel serif numeral]
+  ST --> CL[CostLabel mono numeral]
   ST -->|selectCreateInput| SUB[Generate button]
   SUB --> M[useCreateGeneration]
   M -->|error| SEB[SubmitErrorBanner: insufficient/blocked/generic]
@@ -71,3 +71,4 @@ flowchart TD
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (v3: frame → `rounded-lg border-white/10` on the void — deliberately UNFILLED so the steel inputs inside keep a readable elevation step; labels → quiet lowercase mono captions)

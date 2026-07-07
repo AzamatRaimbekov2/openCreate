@@ -11,8 +11,8 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@fontsource-variable/fraunces": "^5.2.9",
-    "@fontsource-variable/space-grotesk": "^5.2.10",
+    "@fontsource/dm-sans": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@hookform/resolvers": "^5.4.0",
     "@opencreate/contracts": "workspace:*",
     "@tanstack/react-query": "^5.101.2",

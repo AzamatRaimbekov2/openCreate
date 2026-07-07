@@ -28,40 +28,36 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-2">
-      {/* Visible caption in the editorial micro-label voice (uppercase is
-          CSS-only); the group carries the accessible name */}
-      <span
-        aria-hidden="true"
-        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
-      >
+      {/* Visible caption in the quiet mono voice (v3: lowercase, no tracking);
+          the group carries the accessible name */}
+      <span aria-hidden="true" className="text-xs text-mist-dim">
         {t('generator.model.label')}
       </span>
       <div role="group" aria-label={t('generator.model.label')} className="grid grid-cols-2 gap-2">
         {models.map((model) => {
           const isSelected = model.id === selectedId
           return (
-            // Editorial catalog card: a hairline frame on the cream paper —
-            // the serif name reads like a specimen entry; selection is the
-            // vermillion hairline + sand wash (active state = sanctioned accent)
+            // Terminal catalog card: selection glows in the AMBER specimen
+            // tint — the reference explicitly files "model picker highlights"
+            // under amber; unselected cards are quiet white/10 hairlines that
+            // step toward ridge on hover. Never a solid fill.
             <button
               key={model.id}
               type="button"
               aria-pressed={isSelected}
               onClick={() => onSelect(model.id)}
-              className={`flex flex-col items-start gap-0.5 rounded-sm border p-3 text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none ${
+              className={`flex flex-col items-start gap-0.5 rounded-lg border p-3 text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
                 isSelected
-                  ? 'border-vermillion bg-sand'
-                  : 'border-ink/15 bg-transparent hover:border-ink/40 hover:bg-sand/60'
+                  ? 'border-glow-amber/60 bg-specimen-amber/20'
+                  : 'border-white/10 bg-transparent hover:border-white/25 hover:bg-ridge/40'
               }`}
             >
-              {/* Display serif for the product name — the card's "headline" */}
-              <span className="font-display text-base leading-tight font-semibold tracking-tight text-ink">
-                {model.name}
-              </span>
+              {/* The product name — font-medium (500) is the weight ceiling */}
+              <span className="text-base leading-tight font-medium text-white">{model.name}</span>
               {/* Honest provider attribution — users see what actually runs */}
-              <span className="text-xs text-ink-soft">{model.providerLabel}</span>
+              <span className="text-xs text-mist-dim">{model.providerLabel}</span>
               <span
-                className={`text-xs font-medium ${isSelected ? 'text-vermillion' : 'text-ink-soft'}`}
+                className={`text-xs font-medium ${isSelected ? 'text-glow-amber' : 'text-mist-dim'}`}
               >
                 {priceHint(model, t)}
               </span>

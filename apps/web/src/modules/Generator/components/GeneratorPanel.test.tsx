@@ -131,7 +131,7 @@ describe('GeneratorPanel', () => {
   it('shows skeletons while the catalog loads', () => {
     apiMock.mockReturnValue(new Promise(() => {}))
     const { container } = renderPanel()
-    expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
+    expect(container.querySelector('.animate-skeleton')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /generate/i })).not.toBeInTheDocument()
   })
 

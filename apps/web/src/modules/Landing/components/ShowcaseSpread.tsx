@@ -84,14 +84,15 @@ export function ShowcaseSpread() {
             {/* Poster window: crops the 4:5 art to the card's aspect; hover is
                 a FELT print-lift — ≤1deg tilt + tiny scale, motion-safe only */}
             <div
-              className={`relative overflow-hidden rounded-sm transition-transform duration-200 motion-safe:hover:-rotate-[0.6deg] motion-safe:hover:scale-[1.015] ${item.aspectClass}`}
+              className={`relative overflow-hidden rounded-lg transition-transform duration-200 motion-safe:hover:-rotate-[0.6deg] motion-safe:hover:scale-[1.015] ${item.aspectClass}`}
             >
               <ShowcasePoster palette={item.id} className="h-full w-full" />
               {item.isVideo ? (
-                // The video sample marker: stamp-style (Badge accent classes)
-                // with a cream backing so it stays legible on any art; the play
-                // triangle is decorative — the localized text carries meaning
-                <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-[3px] border border-vermillion/70 bg-cream/90 px-2 py-0.5 text-[11px] font-medium tracking-[0.14em] text-vermillion uppercase">
+                // The video sample marker: a mono caption chip (Badge voice)
+                // on a void/80 backing so it stays legible on any art; amber =
+                // the triad's "explore/highlight" tint. The play triangle is
+                // decorative — the localized text carries the meaning.
+                <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-void/80 px-2.5 py-0.5 text-xs font-medium text-glow-amber">
                   <svg aria-hidden="true" viewBox="0 0 8 8" className="h-2 w-2 fill-current">
                     <path d="M1 0l6 4-6 4Z" />
                   </svg>
@@ -99,12 +100,12 @@ export function ShowcaseSpread() {
                 </span>
               ) : null}
             </div>
-            {/* Editorial figure caption: fig number (serif italic) — honest
-                sample title — the REAL model behind the style + sample stamp */}
-            <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-soft">
-              <span className="font-display text-sm italic">
+            {/* Figure caption in the quiet mono voice: fig number — honest
+                sample title — the REAL model behind the style + sample chip */}
+            <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-mist-dim">
+              <span className="text-sm text-mist">
                 {t('landing.showcase.figure', {
-                  // Position in reading order, not a key — magazine numbering
+                  // Position in reading order, not a key — spread numbering
                   number: String(index + 1).padStart(2, '0'),
                 })}
               </span>

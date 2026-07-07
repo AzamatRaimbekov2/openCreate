@@ -1,22 +1,23 @@
 // apps/web/src/modules/Landing/components/PriceTable.tsx
-// "The index" — the honest price comparison as an editorial index table:
-// hairline rules instead of a card, serif display numerals, the vermillion
-// openCreate column, and the verification date as a footnote. Our column vs
-// ONE named competitor item per row, never a blanket "cheaper than
-// everything" claim. The <caption> stays the table's accessible name on
-// purpose, so the honesty marker is announced before any number.
+// "The index" — the honest price comparison as a terminal index table (v3):
+// white/10 hairline rules on the void instead of a card, mono weight-400
+// numerals, OUR column glowing green (green = "go/us" in the triad; the
+// comparison still stays visually even), and the verification date as a
+// footnote. Our column vs ONE named competitor item per row, never a blanket
+// "cheaper than everything" claim. The <caption> stays the table's accessible
+// name on purpose, so the honesty marker is announced before any number.
 import { useTranslation } from 'react-i18next'
 import { PRICE_COMPARISON_ROWS, formatUsd } from '../model/pricingData'
 import { SectionHeading } from './SectionHeading'
 
 export type PriceTableProps = {
-  // Magazine ordinal of the section — the landing runs it as 02 (after the
+  // Ordinal of the section — the landing runs it as 02 (after the
   // showcase), the /pricing page as its opening 01 section
   ordinal?: string
 }
 
-// Column headers share the micro-label voice of the index (uppercase via CSS)
-const columnHeaderClass = 'py-3 pr-4 text-[11px] font-medium tracking-[0.18em] uppercase'
+// Column headers in the quiet mono caption voice (v3: lowercase, no tracking)
+const columnHeaderClass = 'py-3 pr-4 text-xs font-normal'
 
 export function PriceTable({ ordinal = '01' }: PriceTableProps) {
   const { t } = useTranslation()
@@ -34,48 +35,48 @@ export function PriceTable({ ordinal = '01' }: PriceTableProps) {
         <table className="w-full min-w-[36rem] border-collapse text-left">
           {/* caption-bottom = the verification footnote; still the table's
               accessible name (tests query the table BY this honesty marker) */}
-          <caption className="caption-bottom border-t border-ink/15 pt-3 text-left text-xs text-ink-soft">
+          <caption className="caption-bottom border-t border-white/10 pt-3 text-left text-xs text-mist-dim">
             {t('landing.price.caption', { date: t('landing.price.date') })}
           </caption>
           <thead>
             <tr>
-              <th scope="col" className={`${columnHeaderClass} text-ink-soft`}>
+              <th scope="col" className={`${columnHeaderClass} text-mist-dim`}>
                 {t('landing.price.columns.useCase')}
               </th>
-              {/* The vermillion "us" column header — the index's one accent
-                  column (brief-sanctioned micro-label use, design.md §2) */}
-              <th scope="col" className={`${columnHeaderClass} px-4 text-vermillion`}>
+              {/* The portal "us" column header — the prose accent marks our
+                  column without borrowing a status color at caption size */}
+              <th scope="col" className={`${columnHeaderClass} px-4 text-portal`}>
                 {t('landing.price.columns.ours')}
               </th>
-              <th scope="col" className={`${columnHeaderClass} px-4 text-ink-soft`}>
+              <th scope="col" className={`${columnHeaderClass} px-4 text-mist-dim`}>
                 {t('landing.price.columns.competitor')}
               </th>
             </tr>
           </thead>
           <tbody>
             {PRICE_COMPARISON_ROWS.map((row) => (
-              <tr key={row.id} className="border-t border-ink/15 align-baseline">
-                <th scope="row" className="py-5 pr-4 text-sm font-medium text-ink">
+              <tr key={row.id} className="border-t border-white/10 align-baseline">
+                <th scope="row" className="py-5 pr-4 text-sm font-medium text-mist">
                   {t(`landing.price.rows.${row.id}.useCase`)}
                 </th>
-                {/* Our column: serif display numeral in vermillion (large bold
-                    text — the sanctioned use); the model label stays ink-soft
-                    so no small vermillion text ships (design.md §2) */}
+                {/* Our column: mono weight-400 numeral in glow-green — the
+                    triad's "go" color says "ours/cheaper" while the model
+                    label stays dimmed mist (status glows never carry prose) */}
                 <td className="px-4 py-5">
-                  <span className="block font-display text-2xl font-semibold tracking-tight text-vermillion md:text-3xl">
+                  <span className="block text-2xl font-normal text-glow-green md:text-3xl">
                     {formatUsd(row.ourPriceUsd)}
                   </span>
-                  <span className="mt-1 block text-xs text-ink-soft">
+                  <span className="mt-1 block text-xs text-mist-dim">
                     {t(`landing.price.rows.${row.id}.ourModel`)}
                   </span>
                 </td>
-                {/* Competitor column: same serif numeral in ink — an even,
+                {/* Competitor column: same mono numeral in white — an even,
                     honest comparison, differentiated by color only in OUR favor */}
                 <td className="px-4 py-5">
-                  <span className="block font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                  <span className="block text-2xl font-normal text-white md:text-3xl">
                     {formatUsd(row.competitorPriceUsd)}
                   </span>
-                  <span className="mt-1 block text-xs text-ink-soft">
+                  <span className="mt-1 block text-xs text-mist-dim">
                     {t(`landing.price.rows.${row.id}.competitorItem`)} ·{' '}
                     {t(`landing.price.rows.${row.id}.competitorNote`)}
                   </span>

@@ -33,9 +33,9 @@ export function TransactionsList({ isOpen, onClose }: TransactionsListProps) {
       ) : data.items.length === 0 ? (
         <EmptyState title={t('credits.empty.title')} description={t('credits.empty.description')} />
       ) : (
-        // Editorial ledger: hairline-divided rows, no hover chips — the modal
-        // sheet is the surface, the rules are the structure (design.md §4)
-        <ul className="flex max-h-96 flex-col divide-y divide-ink/10 overflow-y-auto">
+        // Terminal ledger: white/10 hairline-divided rows, no hover chips —
+        // the modal's steel sheet is the surface, the rules are the structure
+        <ul className="flex max-h-96 flex-col divide-y divide-white/10 overflow-y-auto">
           {data.items.map((transaction) => (
             <TransactionRow key={transaction.id} transaction={transaction} />
           ))}
@@ -59,16 +59,16 @@ function TransactionRow({ transaction }: { transaction: CreditTransaction }) {
     // read-only row should not pretend to be interactive
     <li className="flex items-center justify-between gap-4 px-1 py-3">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-ink">
+        <span className="text-sm font-medium text-mist">
           {t(`credits.kinds.${transaction.kind}`)}
         </span>
-        <span className="text-xs text-ink-soft">{date}</span>
+        <span className="text-xs text-mist-dim">{date}</span>
       </div>
       {/* Sign is explicit (+/-) — color reinforces it but never carries it
-          alone. Serif display numeral: the ledger speaks in the same numeral
-          voice as the price index and the cost line. */}
+          alone. Triad status glows (v3 §2): positive = glow-green (the
+          succeeded family), negative = glow-red; weight 400 per the ceiling. */}
       <span
-        className={`font-display text-lg leading-none font-semibold tracking-tight ${isPositive ? 'text-success' : 'text-danger'}`}
+        className={`text-lg leading-none font-normal ${isPositive ? 'text-glow-green' : 'text-glow-red'}`}
       >
         {isPositive ? `+${transaction.amount}` : String(transaction.amount)}
       </span>

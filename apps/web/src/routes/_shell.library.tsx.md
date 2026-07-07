@@ -44,12 +44,13 @@ flowchart LR
   the page canvas (`bg-paper` + min-height + header), so the old
   `min-h-screen bg-paper` wrapper was removed from this screen.
 
-- Stage 3 restyle (2026-07-07): serif display h1 over the standard hairline —
-  the same editorial opener as /create and /pricing (brief QA #6). Filter chips and
-  grid behavior untouched.
+- v3 terminal restyle: h1 = `text-3xl font-normal text-white` over the standard
+  `border-white/10` hairline — the same terminal opener as /create and /pricing
+  (brief QA #6). Filter chips and grid behavior untouched.
 
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

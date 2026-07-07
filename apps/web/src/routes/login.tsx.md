@@ -4,8 +4,8 @@
 
 ## Purpose
 
-The `/login` file-based route: the stage-3 editorial split — `AuthManifesto` on sand
-left, `AuthForm` on cream right — and the redirect of already-signed-in visitors to
+The `/login` file-based route: the v3 terminal split — `AuthManifesto` on the abyss
+step left, `AuthForm` on the void right — and the redirect of already-signed-in visitors to
 `/create`.
 
 ## What it does (for an AI reader)
@@ -45,13 +45,14 @@ flowchart LR
 - Post-login redirect also flows through here: AuthForm succeeds → session store
   updates → this component re-renders and the redirect effect fires.
 - Skeleton during `isPending` prevents a form flash for already-authenticated users.
-- Stage 3 restyle (2026-07-07): centered-card layout replaced by the brief's editorial
-  split (`grid lg:grid-cols-[5fr_7fr]`); `LoginSplit` keeps pending/form states on ONE
-  silhouette so the manifesto never flashes in/out while the session resolves. The
-  route stays composition-only — both columns' content lives in `modules/Auth`.
+- Split layout (`grid lg:grid-cols-[5fr_7fr]`); `LoginSplit` keeps pending/form
+  states on ONE silhouette so the manifesto never flashes in/out while the session
+  resolves. The route stays composition-only — both columns' content lives in
+  `modules/Auth`. v3: the frame is `bg-void` (flat cosmic void, no gradient).
 
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (typed /create redirect)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

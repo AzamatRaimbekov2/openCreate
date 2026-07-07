@@ -38,13 +38,16 @@ flowchart LR
   comparable before a duration is picked.
 - Custom cards instead of shared `PillGroup`: cards carry three lines of
   content, not a single label — different component class (module-owned UI).
-- Stage 3 restyle (2026-07-07): editorial catalog cards — `rounded-sm` hairline
-  frames on cream (white fill retired), serif display model name, caption in the
-  uppercase micro-label voice; selected stays vermillion hairline + sand wash
-  (active state = sanctioned accent), hover solidifies the hairline + sand wash.
+- v3 terminal restyle: catalog cards — `rounded-lg` white/10 hairline frames on
+  the void, `font-medium text-white` model name (500 = the weight ceiling),
+  quiet lowercase mono caption; SELECTED = amber specimen tint
+  (`border-glow-amber/60 bg-specimen-amber/20`, price hint `text-glow-amber`)
+  because the reference explicitly files "model picker highlights" under amber;
+  hover steps toward `bg-ridge/40`. Never a solid fill.
   Roles (`aria-pressed`, group name) and i18n untouched.
 
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

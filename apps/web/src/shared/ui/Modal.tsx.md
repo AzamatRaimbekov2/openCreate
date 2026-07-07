@@ -47,12 +47,15 @@ flowchart LR
 - Clicks inside the dialog call `stopPropagation()` so they never reach the overlay's
   close handler.
 - Focus restore uses the element that was active before opening (`previousFocusRef`).
-- v2 editorial restyle: the sheet is `bg-cream` with a hairline `border-ink/15`, near-flat
-  corners (`rounded-sm`) and only `shadow-lg` (no heavy glass panels — brief bans heavy
-  shadows); the title is Fraunces (`font-display text-2xl`) over a hairline rule; the close
-  button is a hairline circle that solidifies on hover. Behavior/roles unchanged.
+- v3 terminal restyle: the sheet is a STEEL surface step (`bg-steel`, 8px `rounded-lg`,
+  `border-white/10`) over a `bg-void/70` overlay — elevation is the surface color, so the
+  v2 `shadow-lg` is gone (the pill double-shadow is the only allowed shadow app-wide);
+  the title is JetBrains Mono weight 400 (`text-2xl font-normal text-white` — headings are
+  never bold in v3); the close button is a white/10 hairline circle that steps up to
+  `bg-ridge` on hover. Behavior/roles unchanged.
 
 ## Commits
 
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal (overlay aria-hidden → role=presentation a11y fix)
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

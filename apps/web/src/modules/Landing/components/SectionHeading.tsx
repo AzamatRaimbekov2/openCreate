@@ -1,38 +1,37 @@
 // apps/web/src/modules/Landing/components/SectionHeading.tsx
-// Editorial section header ("Light Editorial" v2): oversized ghost serif
-// ordinal (01/02/…) + optional uppercase micro-label kicker + the serif
-// section title, closed by the standard hairline rule. The ordinal and the
-// kicker live OUTSIDE the <h2> so the heading's accessible name stays exactly
-// the i18n title (tests and the prerender grep rely on it).
+// Section header (v3 terminal): ghost mono ordinal (01/02/…) + optional quiet
+// mono kicker + the mono weight-400 section title, closed by the standard
+// white/10 hairline rule. The ordinal and the kicker live OUTSIDE the <h2> so
+// the heading's accessible name stays exactly the i18n title (tests and the
+// prerender grep rely on it).
 export type SectionHeadingProps = {
-  // Two-digit magazine ordinal ("01"…) — purely decorative, aria-hidden
+  // Two-digit ordinal ("01"…) — purely decorative, aria-hidden
   ordinal: string
   // Localized section title — becomes the <h2> text verbatim
   title: string
-  // Optional uppercase micro-label above the title (e.g. "The index")
+  // Optional quiet caption above the title (e.g. "The index")
   kicker?: string
 }
 
 export function SectionHeading({ ordinal, title, kicker }: SectionHeadingProps) {
   return (
-    <div className="flex items-end gap-5 border-b border-ink/15 pb-6 md:gap-7">
-      {/* Ghost serif ordinal — the magazine's section numbering, decorative only */}
+    <div className="flex items-end gap-5 border-b border-white/10 pb-6 md:gap-7">
+      {/* Ghost mono ordinal — section numbering as faint terminal line marks;
+          white/10 keeps it present but whisper-quiet on the void */}
       <span
         aria-hidden="true"
-        className="font-display text-5xl leading-none font-semibold tracking-tight text-ink/15 md:text-7xl"
+        className="text-5xl leading-none font-normal text-white/10 md:text-7xl"
       >
         {ordinal}
       </span>
       <div className="flex flex-col gap-2">
         {kicker ? (
-          // Uppercase via CSS only — the DOM keeps the sentence-case i18n string
-          <span className="text-[11px] font-medium tracking-[0.2em] text-ink-soft uppercase">
-            {kicker}
-          </span>
+          // Quiet lowercase mono caption — v3 dropped the uppercase tracking
+          <span className="text-xs text-mist-dim">{kicker}</span>
         ) : null}
-        <h2 className="font-display text-3xl font-semibold tracking-tight text-ink md:text-5xl">
-          {title}
-        </h2>
+        {/* The 30px/weight-400 heading law: section titles never bold, never
+            grow past text-3xl — hierarchy comes from color (white) and space */}
+        <h2 className="text-3xl font-normal text-white">{title}</h2>
       </div>
     </div>
   )

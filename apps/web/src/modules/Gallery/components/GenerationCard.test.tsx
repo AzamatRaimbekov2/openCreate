@@ -97,7 +97,7 @@ describe('GenerationCard', () => {
     const progressbar = await screen.findByRole('progressbar')
     expect(progressbar).toHaveAttribute('aria-valuenow', '40')
     expect(screen.getByText('40%')).toBeInTheDocument()
-    expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
+    expect(container.querySelector('.animate-skeleton')).toBeInTheDocument()
     expect(container.querySelector('video')).not.toBeInTheDocument()
   })
 
@@ -117,7 +117,8 @@ describe('GenerationCard', () => {
 
   it('failed: shows danger border, error text, refunded badge and delete', () => {
     const { container } = renderCard(failedVideo)
-    expect(container.querySelector('.border-danger')).toBeInTheDocument()
+    // v3 triad: failed status = glow-red border on the well
+    expect(container.querySelector('.border-glow-red')).toBeInTheDocument()
     expect(screen.getByText('timeoutProvider')).toBeInTheDocument()
     expect(screen.getByText(/credits refunded/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()

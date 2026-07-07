@@ -1,12 +1,13 @@
 // apps/web/src/modules/Gallery/components/GenerationCard.tsx
-// One generation as a magazine FIGURE (stage-3 redesign): the dark media well
-// is the plate, the prompt is a serif-italic figure caption printed on the
-// cream below it, and the meta/actions row closes it over a hairline — the
-// white card wrapper is retired (the user's work is the hero, not a box).
+// One generation as a FIGURE (v3 terminal): the abyss media well is the plate
+// (the recessed surface step reserved for user media), the prompt is a quiet
+// mono caption below it, and the meta/actions row closes it over a white/10
+// hairline — no card wrapper (the user's work is the hero, not a box).
 // Three live states (the list's Empty state is the grid's): processing →
-// pulsing media well + Progress + serif percent; succeeded → playable video or
-// image (image opens the detail modal) with download/delete; failed → danger
-// hairline well, failure reason, "credits refunded" stamp, delete.
+// stepped-pulse well + Progress + mono percent; succeeded → playable video or
+// image (image opens the detail modal) with download/delete; failed →
+// glow-red hairline well, failure reason, "credits refunded" chip, delete.
+// Status triad (design.md v3 §2): processing=amber, succeeded=green, failed=red.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AspectRatio, Generation } from '@opencreate/contracts'
@@ -43,18 +44,18 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
     <article className="flex flex-col gap-3">
       {generation.status === 'processing' ? (
         <>
-          {/* Pulsing dark media well — the asset is on its way */}
+          {/* Stepped-pulse media well — the same surface-ladder loading pulse
+              as Skeleton (animate-skeleton, never a gradient shimmer); the
+              asset is on its way */}
           <div
             aria-hidden="true"
-            className={`${aspectClass} w-full animate-pulse rounded-sm bg-media`}
+            className={`${aspectClass} w-full animate-skeleton rounded-lg bg-abyss`}
           />
           <div className="flex items-center gap-3">
             <Progress value={progress} label={t('gallery.processing')} />
-            {/* Serif display percent (brief: "processing state with serif
-                percent") — the number is the state, so it gets the numeral voice */}
-            <span className="font-display text-lg leading-none font-semibold tracking-tight text-ink">
-              {progress}%
-            </span>
+            {/* Mono weight-400 percent in the processing AMBER — the number IS
+                the status, so it wears the triad's processing color */}
+            <span className="text-lg leading-none font-normal text-glow-amber">{progress}%</span>
           </div>
         </>
       ) : null}
@@ -66,22 +67,22 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
             src={mediaUrl}
             preload="metadata"
             aria-label={generation.prompt}
-            className={`${aspectClass} w-full rounded-sm bg-media`}
+            className={`${aspectClass} w-full rounded-lg bg-abyss`}
           />
         ) : (
           // Images enlarge in the detail modal — the media itself is the
-          // button. The print-lift hover (motion-safe only) makes the plate
-          // FELT as interactive without any shadow.
+          // button. The lift hover (motion-safe only) makes the plate FELT as
+          // interactive without any shadow (elevation stays color-only).
           <button
             type="button"
             onClick={() => setIsDetailOpen(true)}
-            className="rounded-sm transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
+            className="rounded-lg transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
           >
             <img
               src={mediaUrl}
               alt={generation.prompt}
               loading="lazy"
-              className={`${aspectClass} w-full rounded-sm bg-media object-cover`}
+              className={`${aspectClass} w-full rounded-lg bg-abyss object-cover`}
             />
           </button>
         )
@@ -89,19 +90,19 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
 
       {isFailed ? (
         <>
-          {/* Quiet neutral well framed by the danger hairline — the border +
-              text carry the status together (never color alone) */}
+          {/* Quiet abyss well framed by the glow-red hairline — the border +
+              text carry the FAILED status together (never color alone) */}
           <div
-            className={`${aspectClass} flex w-full items-center justify-center rounded-sm border border-danger bg-ink/5`}
+            className={`${aspectClass} flex w-full items-center justify-center rounded-lg border border-glow-red bg-abyss`}
           >
-            <span className="text-sm font-medium text-danger">{t('gallery.failed')}</span>
+            <span className="text-sm font-medium text-glow-red">{t('gallery.failed')}</span>
           </div>
           {/* Safety blocks carry the machine-readable errorCode — render OUR
               localized copy; the raw provider message is not user copy */}
           {generation.errorCode === 'content_blocked' ? (
-            <p className="text-xs text-ink-soft">{t('gallery.contentBlocked')}</p>
+            <p className="text-xs text-mist-dim">{t('gallery.contentBlocked')}</p>
           ) : generation.errorMessage ? (
-            <p className="text-xs text-ink-soft">{generation.errorMessage}</p>
+            <p className="text-xs text-mist-dim">{generation.errorMessage}</p>
           ) : null}
           <div>
             {/* The charge was refunded server-side — say so explicitly (the
@@ -111,36 +112,34 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
         </>
       ) : null}
 
-      {/* The figure caption: the prompt in serif italic, printed on the cream
-          under the plate — magazine "fig." voice, not a card body */}
-      <p className="line-clamp-2 font-display text-sm leading-snug text-ink italic">
-        {generation.prompt}
-      </p>
+      {/* The figure caption: the prompt in quiet mono mist under the plate —
+          the terminal "fig." voice, not a card body */}
+      <p className="line-clamp-2 text-sm leading-snug text-mist">{generation.prompt}</p>
 
       {generation.status !== 'processing' ? (
         // Meta/actions close the figure over a hairline — cost left, actions right
-        <footer className="flex items-center justify-between gap-2 border-t border-ink/10 pt-2">
-          <span className="text-xs text-ink-soft">
+        <footer className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
+          <span className="text-xs text-mist-dim">
             {t('gallery.cost', { count: generation.costCredits })}
           </span>
           <div className="flex items-center gap-3">
             {generation.status === 'succeeded' && mediaUrl ? (
-              // Quiet text action in the editorial idiom: ink + hairline
-              // underline that turns vermillion on hover (small vermillion
-              // text would break the §2 contrast policy)
+              // Quiet text action: portal blue — the sanctioned prose-link
+              // color (v3 §2); downloads are navigation, not status
               <a
                 href={mediaUrl}
                 download
-                className="inline-flex min-h-10 items-center text-sm font-medium text-ink underline decoration-ink/30 underline-offset-4 transition-colors duration-200 hover:decoration-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
+                className="inline-flex min-h-10 items-center text-sm font-medium text-portal underline decoration-portal/40 underline-offset-4 transition-colors duration-200 hover:decoration-portal focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
               >
                 {t('gallery.download')}
               </a>
             ) : null}
+            {/* Delete is destructive → the RED specimen pill (v3 triad);
+                v2 faked this with a ghost + red text override */}
             <Button
-              variant="ghost"
+              variant="danger"
               onClick={() => deleteMutation.mutate(generation.id)}
               isLoading={deleteMutation.isPending}
-              className="text-danger"
             >
               {t('gallery.delete')}
             </Button>

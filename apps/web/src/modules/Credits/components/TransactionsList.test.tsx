@@ -63,7 +63,7 @@ describe('TransactionsList', () => {
     apiMock.mockReturnValue(new Promise(() => {}))
     renderList()
     const dialog = screen.getByRole('dialog', { name: /credit history/i })
-    expect(dialog.querySelector('.animate-pulse')).toBeInTheDocument()
+    expect(dialog.querySelector('.animate-skeleton')).toBeInTheDocument()
   })
 
   it('shows an error state with a working retry', async () => {
@@ -87,10 +87,11 @@ describe('TransactionsList', () => {
     expect(await screen.findByText('Signup bonus')).toBeInTheDocument()
     expect(screen.getByText('Generation')).toBeInTheDocument()
     expect(screen.getByText('Refund')).toBeInTheDocument()
-    // Positive amounts show a plus and use the success color; negative → danger
-    expect(screen.getByText('+200')).toHaveClass('text-success')
-    expect(screen.getByText('-35')).toHaveClass('text-danger')
-    expect(screen.getByText('+35')).toHaveClass('text-success')
+    // Positive amounts show a plus and use the green status glow; negative → red
+    // (v3 triad: succeeded/positive = glow-green, failed/negative = glow-red)
+    expect(screen.getByText('+200')).toHaveClass('text-glow-green')
+    expect(screen.getByText('-35')).toHaveClass('text-glow-red')
+    expect(screen.getByText('+35')).toHaveClass('text-glow-green')
   })
 
   it('renders nothing when closed', () => {

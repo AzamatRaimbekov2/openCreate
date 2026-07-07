@@ -1,7 +1,7 @@
 // apps/web/src/shared/ui/Select.tsx
-// Labelled native select in the editorial "hairline underline" style — same
-// contract and field voice as Input (uppercase micro-label, transparent body,
-// vermillion focus rule; RHF register() spreads in via ref-as-prop).
+// Labelled native select (v3 terminal) — same contract and field treatment as
+// Input (lowercase mono caption, steel filled body, 8px radius, portal focus;
+// RHF register() spreads in via ref-as-prop).
 import { useId } from 'react'
 import type { ComponentPropsWithRef } from 'react'
 
@@ -27,21 +27,18 @@ export function Select({ label, options, error, id, className = '', ...rest }: S
   const errorId = `${selectId}-error`
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Same editorial field voice as Input: uppercase micro-label over a
-          hairline-underlined control (CSS-only transform — accessible name
-          and getByLabelText queries stay unchanged) */}
-      <label
-        htmlFor={selectId}
-        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
-      >
+      {/* Same quiet mono caption as Input — the terminal field voice */}
+      <label htmlFor={selectId} className="text-xs text-mist-dim">
         {label}
       </label>
+      {/* Steel filled control, 8px radius — identical surface recipe to Input
+          so forms read as one system; the native picker is kept on purpose */}
       <select
         id={selectId}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`min-h-10 border-0 border-b bg-transparent px-0.5 py-2 text-base text-ink transition-colors duration-200 focus-visible:border-vermillion focus-visible:shadow-[0_1px_0_0_var(--color-vermillion)] focus-visible:outline-none ${
-          error ? 'border-danger' : 'border-ink/30'
+        className={`min-h-10 rounded-lg border bg-steel px-3 py-2 text-base text-mist transition-colors duration-200 focus-visible:border-portal focus-visible:outline-none ${
+          error ? 'border-glow-red' : 'border-white/10'
         } ${className}`}
         {...rest}
       >
@@ -52,7 +49,7 @@ export function Select({ label, options, error, id, className = '', ...rest }: S
         ))}
       </select>
       {error ? (
-        <span id={errorId} role="alert" className="text-sm text-danger">
+        <span id={errorId} role="alert" className="text-sm text-glow-red">
           {error}
         </span>
       ) : null}

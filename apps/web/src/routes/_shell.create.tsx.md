@@ -47,10 +47,9 @@ flowchart LR
   `min-h-screen bg-paper` wrapper was removed from this screen — keeping it
   would double the viewport height under the header.
 
-- Stage 3 restyle (2026-07-07): page opener promoted to the serif display voice
-  (`font-display text-4xl md:text-5xl` h1; gallery h2 = serif over a hairline) and
-  the grid gaps widened to `gap-10` — brief QA #6 ("/create must visibly belong to
-  the same brand as the landing"). Composition/behavior untouched; the commission
+- v3 terminal restyle: page opener obeys the heading law — `text-3xl font-normal
+  text-white` h1 (mono 30px weight 400, no upscaling); gallery h2 = mono 400 over
+  a `border-white/10` hairline. Composition/behavior untouched; the commission
   sheet itself lives in `modules/Generator`.
 
 ## Commits
@@ -59,3 +58,4 @@ flowchart LR
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items (adds the gallery column)
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

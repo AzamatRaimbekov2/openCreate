@@ -48,13 +48,14 @@ flowchart TD
 - "Load more" is an explicit button (not scroll-triggered): the grid also lives
   beside the Generator form where an auto-loader would fight the page scroll.
 - The CTA `Link` is styled with the primary Button classes (NotFoundPage
-  convention) — semantically navigation, visually the main action.
-- Stage 3 restyle (2026-07-07): loading skeletons dropped the v1 `rounded-2xl`
-  soft-card silhouette — they now mirror the figure's near-flat media plate
-  (Skeleton's default `rounded-sm`). Still exactly 8 `animate-pulse` nodes
-  (the test counts them).
+  convention) — semantically navigation, visually the main action. v3: the
+  GREEN specimen pill, because creating is THE green action in the triad.
+- v3 terminal restyle: skeletons are the shared Skeleton's stepped surface
+  pulse (`animate-skeleton bg-steel rounded-lg`) — exactly 8 nodes (the test
+  counts `.animate-skeleton`).
 
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
+- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
