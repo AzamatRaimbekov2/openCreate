@@ -47,3 +47,4 @@ flowchart LR
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
+- cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery

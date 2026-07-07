@@ -45,4 +45,4 @@ flowchart LR
 
 ## Commits
 
-- (pending) restyle(web): editorial app shell, auth, generator, gallery
+- cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery

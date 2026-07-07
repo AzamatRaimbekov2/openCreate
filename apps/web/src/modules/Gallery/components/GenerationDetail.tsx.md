@@ -46,3 +46,4 @@ flowchart LR
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
+- cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery

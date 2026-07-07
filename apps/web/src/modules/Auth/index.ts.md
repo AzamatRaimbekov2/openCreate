@@ -45,4 +45,4 @@ flowchart LR
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `requireSession`)
-- (pending) restyle(web): editorial app shell, auth, generator, gallery (adds `AuthManifesto`)
+- cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery (adds `AuthManifesto`)
