@@ -87,3 +87,4 @@ flowchart TD
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- e5888a4 2026-07-07 restyle(web): terminal app shell, auth, generator, gallery, credits
