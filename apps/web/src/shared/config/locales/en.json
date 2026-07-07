@@ -121,8 +121,8 @@
       "email": "Enter a valid email",
       "password": "At least 8 characters",
       "name": "Enter your name",
-      "invalidCredentials": "Wrong email or password",
-      "emailTaken": "An account with this email already exists"
+      "invalidCredentials": "Wrong email or password.",
+      "emailTaken": "This email is already registered — try signing in."
     }
   },
   "credits": {

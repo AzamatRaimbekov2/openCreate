@@ -13,10 +13,11 @@ Google button. The submit pill is tinted by mode per the reference taxonomy
 ## What it does (for an AI reader)
 
 - Responsibilities: collect email/password (+ name in register mode), validate via zod,
-  call `signIn.email` / `signUp.email`, map server errors to localized alert copy,
-  invalidate the shared `['me']` query on success.
+  call `signIn.email` / `signUp.email`, map server errors to ACTIONABLE localized alert
+  copy (by better-auth code, HTTP status as fallback), and on an email-already-registered
+  sign-up offer an inline switch-to-login shortcut; invalidate `['me']` on success.
 - Public API / exports / props / endpoints: `AuthForm` (no props). Private `AuthFields`
-  subcomponent remounted per mode via `key={mode}`.
+  subcomponent (props: `mode`, `onSwitchToLogin`) remounted per mode via `key={mode}`.
 - Inputs → Outputs: user keystrokes → better-auth calls → session cookie set by the API;
   UI states: idle form, submitting (button spinner), field errors (`role="alert"` per
   input), server error banner (`role="alert"`), success (session change → route redirects).
@@ -38,7 +39,9 @@ flowchart LR
   U[user] --> F[AuthFields RHF+zod]
   F -->|valid login| SI[signIn.email]
   F -->|valid register| SU[signUp.email]
-  SI & SU -->|error| AL[role=alert localized banner]
+  SI & SU -->|error| MAP[mapServerError code/status]
+  MAP --> AL[role=alert localized banner]
+  AL -->|email taken| SW[Sign in link] -->|onSwitchToLogin| LM[login mode remount]
   SI & SU -->|success| INV[invalidate 'me'] --> RT[login route redirects]
   G[Google button VITE_GOOGLE_AUTH=1] --> SO[signIn.social]
 ```
@@ -50,8 +53,17 @@ flowchart LR
 - Mode switch remounts the fields (`key={mode}`) instead of swapping the resolver on a
   live form — stale-resolver/stale-error bugs are impossible by construction.
 - `noValidate` on the form: native `type=email` bubbles must not preempt zod messages.
-- Server errors map through `serverErrorKeyFor` (INVALID_EMAIL_OR_PASSWORD,
-  USER_ALREADY_EXISTS); raw server text is never rendered (design.md §8).
+- Server errors map through `mapServerError(error, mode)` → `{ key, offerSwitchToLogin }`.
+  It branches on the better-auth code first, HTTP status as a fallback: sign-up conflict
+  is `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` (HTTP 422) in better-auth 1.6.x — NOT
+  `USER_ALREADY_EXISTS` (the old check missed it and showed the generic line; both
+  spellings + `register && 422` now map to `auth.errors.emailTaken`). Login failure =
+  `INVALID_EMAIL_OR_PASSWORD`/401 → `invalidCredentials`; `PASSWORD_TOO_SHORT` reuses
+  `auth.errors.password`; anything else → `errors.actionFailed`. Raw server text is
+  never rendered (design.md §8).
+- The email-conflict banner alone renders an inline `auth.signIn` link that calls
+  `onSwitchToLogin` → parent `setMode('login')`; the `key={mode}` remount then clears
+  the banner and fields. One `setMode` path serves both this link and the toggle.
 - login schema carries a no-op `name: z.string()` so both schemas infer one
   `AuthFormValues` type.
 - v3 terminal restyle: h1 = `text-3xl font-normal text-white` over a white/10
@@ -73,3 +85,4 @@ flowchart LR
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
 - e5888a4 2026-07-07 restyle(web): terminal app shell, auth, generator, gallery, credits
+- 0a5d252 2026-07-07 fix(web): actionable localized auth error messages

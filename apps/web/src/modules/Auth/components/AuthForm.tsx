@@ -34,12 +34,48 @@ const registerSchema = loginSchema.extend({
 
 type AuthFormValues = z.infer<typeof loginSchema>
 
-// Map better-auth error codes to safe localized copy (design.md §8: never raw
-// server text). Anything unknown falls back to the generic action-failed line.
-function serverErrorKeyFor(code: string | undefined): string {
-  if (code === 'INVALID_EMAIL_OR_PASSWORD') return 'auth.errors.invalidCredentials'
-  if (code === 'USER_ALREADY_EXISTS') return 'auth.errors.emailTaken'
-  return 'errors.actionFailed'
+// A mapped server failure: the localized i18n key to render, plus whether it is
+// the "email already registered" case — the only one that offers a shortcut to
+// switch the form to login (design.md §8: never render raw server text).
+type ServerError = {
+  // i18n key for the alert copy
+  key: string
+  // true only for the sign-up email-conflict case → render the switch-to-login link
+  offerSwitchToLogin: boolean
+}
+
+// The better-auth client returns { error } with a code/status we branch on.
+type AuthClientError = {
+  // UpperSnakeCase error code (may be absent on some failures)
+  code?: string
+  // HTTP status — our fallback when the code is missing/unrecognised
+  status?: number
+}
+
+// Map a better-auth client error to safe localized copy. better-auth 1.6.x
+// returns UpperSnakeCase codes; the sign-up conflict is
+// USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL (HTTP 422) — NOT USER_ALREADY_EXISTS —
+// so we match both spellings and fall back to the status when the code is absent.
+function mapServerError(error: AuthClientError, mode: AuthMode): ServerError {
+  const { code, status } = error
+  // Sign-up with an already-registered email → actionable copy + login shortcut
+  if (
+    code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL' ||
+    code === 'USER_ALREADY_EXISTS' ||
+    (mode === 'register' && status === 422)
+  ) {
+    return { key: 'auth.errors.emailTaken', offerSwitchToLogin: true }
+  }
+  // Wrong credentials on login (INVALID_EMAIL_OR_PASSWORD → HTTP 401)
+  if (code === 'INVALID_EMAIL_OR_PASSWORD' || status === 401) {
+    return { key: 'auth.errors.invalidCredentials', offerSwitchToLogin: false }
+  }
+  // Password below the 8-char minimum — reuse the field-level requirement copy
+  if (code === 'PASSWORD_TOO_SHORT') {
+    return { key: 'auth.errors.password', offerSwitchToLogin: false }
+  }
+  // Unknown/other → generic action-failed fallback
+  return { key: 'errors.actionFailed', offerSwitchToLogin: false }
 }
 
 export function AuthForm() {
@@ -54,8 +90,11 @@ export function AuthForm() {
       <h1 className="border-b border-white/10 pb-5 text-3xl font-normal text-white">
         {t(isLogin ? 'auth.signIn' : 'auth.signUp')}
       </h1>
-      {/* key={mode}: a mode switch is a new form — old errors must not linger */}
-      <AuthFields key={mode} mode={mode} />
+      {/* key={mode}: a mode switch is a new form — old errors must not linger.
+          onSwitchToLogin lets the email-conflict banner flip register → login
+          through the SAME setMode path as the toggle below (one source of truth
+          for the mode); the remount then clears the fields and the banner. */}
+      <AuthFields key={mode} mode={mode} onSwitchToLogin={() => setMode('login')} />
       {/* Mode switch is prose navigation → portal blue, the sanctioned
           prose-link color (v3 §2) */}
       <button
@@ -69,12 +108,15 @@ export function AuthForm() {
   )
 }
 
-// Private fields+submit component — remounted per mode by the parent
-function AuthFields({ mode }: { mode: AuthMode }) {
+// Private fields+submit component — remounted per mode by the parent.
+// onSwitchToLogin: flip the whole form to login mode (used by the email-conflict
+// banner so a user who already has an account is one click from signing in).
+function AuthFields({ mode, onSwitchToLogin }: { mode: AuthMode; onSwitchToLogin: () => void }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  // Server-side failure as an i18n key ('' state impossible: null = no error)
-  const [serverErrorKey, setServerErrorKey] = useState<string | null>(null)
+  // Server-side failure (null = no error). Carries the localized key AND whether
+  // to offer the switch-to-login shortcut, so the banner needs no re-derivation.
+  const [serverError, setServerError] = useState<ServerError | null>(null)
   const {
     register,
     handleSubmit,
@@ -85,7 +127,7 @@ function AuthFields({ mode }: { mode: AuthMode }) {
   })
 
   const onSubmit = async (values: AuthFormValues) => {
-    setServerErrorKey(null)
+    setServerError(null)
     // better-auth returns { data, error } instead of throwing
     const result =
       mode === 'login'
@@ -96,7 +138,8 @@ function AuthFields({ mode }: { mode: AuthMode }) {
             name: values.name.trim(),
           })
     if (result.error) {
-      setServerErrorKey(serverErrorKeyFor(result.error.code))
+      // Map by code first, status as fallback (design.md §8: localized, safe copy)
+      setServerError(mapServerError({ code: result.error.code, status: result.error.status }, mode))
       return
     }
     // Fresh session → the shared ['me'] profile/balance must refetch; the
@@ -134,18 +177,31 @@ function AuthFields({ mode }: { mode: AuthMode }) {
         error={errors.password ? t(errors.password.message ?? 'errors.actionFailed') : undefined}
         {...register('password')}
       />
-      {serverErrorKey ? (
+      {serverError ? (
         // Inline non-blocking failure banner (design.md §8); alert = announced.
         // v3 treatment: a calm RECESSED block with a glow-red left rule — red
         // stays on the rule + text (the failure STATUS), never a red panel.
         // bg-abyss (not steel): the form now sits on the login card's steel
         // surface, so the banner steps DOWN the ladder to stay visible.
-        <p
+        <div
           role="alert"
           className="rounded-lg border-l-2 border-glow-red bg-abyss px-4 py-3 text-sm text-glow-red"
         >
-          {t(serverErrorKey)}
-        </p>
+          <p>{t(serverError.key)}</p>
+          {/* Email-conflict only: a portal-blue prose link (design.md §2 link
+              law) that flips register → login, so an existing user acts on the
+              message instead of re-reading it. The affordance carries the login
+              STATUS forward — it is not a red control. */}
+          {serverError.offerSwitchToLogin ? (
+            <button
+              type="button"
+              onClick={onSwitchToLogin}
+              className="mt-2 min-h-10 self-start text-portal underline decoration-portal/40 underline-offset-4 transition-colors duration-200 hover:decoration-portal focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            >
+              {t('auth.signIn')}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {/* Submit tint follows the reference taxonomy (design.md v3 §2): log-in
           is an auth-entry action → RED specimen pill; sign-up creates an

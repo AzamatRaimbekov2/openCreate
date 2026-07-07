@@ -76,6 +76,87 @@ describe('AuthForm', () => {
     expect(alert).not.toHaveTextContent('raw server text')
   })
 
+  it('maps a sign-up conflict (USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL, 422) to actionable copy', async () => {
+    // better-auth 1.6.x returns this exact code (NOT USER_ALREADY_EXISTS) on
+    // sign-up with a taken email — the bug: it used to fall through to generic
+    signUpEmail.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL',
+        message: 'User already exists. Use another email.',
+        status: 422,
+      },
+    })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: /create an account/i }))
+    await userEvent.type(screen.getByLabelText('Name'), 'Ada')
+    await userEvent.type(screen.getByLabelText('Email'), 'ada@b.co')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    const alert = await screen.findByRole('alert')
+    // Localized, actionable copy — never the raw server text (design.md §8)
+    expect(alert).toHaveTextContent(/already registered/i)
+    expect(alert).not.toHaveTextContent('User already exists. Use another email.')
+  })
+
+  it('offers a switch-to-login shortcut on email conflict and flips the form to login', async () => {
+    signUpEmail.mockResolvedValue({
+      data: null,
+      error: { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'raw', status: 422 },
+    })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: /create an account/i }))
+    await userEvent.type(screen.getByLabelText('Name'), 'Ada')
+    await userEvent.type(screen.getByLabelText('Email'), 'ada@b.co')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    // The inline affordance flips the form to login mode on click
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
+    // Login mode: submit is now "Sign in", the name field is gone, error cleared
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+    expect(screen.queryByText(/already registered/i)).not.toBeInTheDocument()
+  })
+
+  it('maps a 422 sign-up conflict by HTTP status when the code is absent', async () => {
+    signUpEmail.mockResolvedValue({ data: null, error: { message: 'raw', status: 422 } })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: /create an account/i }))
+    await userEvent.type(screen.getByLabelText('Name'), 'Ada')
+    await userEvent.type(screen.getByLabelText('Email'), 'ada@b.co')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/already registered/i)
+  })
+
+  it('maps PASSWORD_TOO_SHORT to the password requirement copy', async () => {
+    signInEmail.mockResolvedValue({
+      data: null,
+      error: { code: 'PASSWORD_TOO_SHORT', message: 'Password too short', status: 400 },
+    })
+    renderForm()
+    await userEvent.type(screen.getByLabelText('Email'), 'a@b.co')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/at least 8 characters/i)
+  })
+
+  it('falls back to the generic message for unknown server error codes', async () => {
+    signInEmail.mockResolvedValue({
+      data: null,
+      error: { code: 'SOME_UNKNOWN_CODE', message: 'weird internal detail', status: 500 },
+    })
+    renderForm()
+    await userEvent.type(screen.getByLabelText('Email'), 'a@b.co')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not complete the action/i)
+    expect(alert).not.toHaveTextContent('weird internal detail')
+  })
+
   it('switches to register mode and submits name+email+password', async () => {
     renderForm()
     await userEvent.click(screen.getByRole('button', { name: /create an account/i }))

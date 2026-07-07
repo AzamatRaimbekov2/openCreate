@@ -121,8 +121,8 @@
       "email": "Введите корректный email",
       "password": "Минимум 8 символов",
       "name": "Введите имя",
-      "invalidCredentials": "Неверная почта или пароль",
-      "emailTaken": "Аккаунт с этой почтой уже существует"
+      "invalidCredentials": "Неверный email или пароль.",
+      "emailTaken": "Этот email уже зарегистрирован — попробуйте войти."
     }
   },
   "credits": {

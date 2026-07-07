@@ -22,9 +22,11 @@ react-hook-form + zod, i18next.
   `/login` otherwise). EN/RU.
 - **Auth (`/login`)** — one centered steel card on the void under the mono
   wordmark home link: email+password sign-in/register form (better-auth client),
-  steel fields, zod validation, localized server-error mapping, optional Google
-  button; the submit pill is red for log-in and green for sign-up (reference
-  taxonomy).
+  steel fields, zod validation, actionable localized server-error mapping (by
+  better-auth code + HTTP status: wrong credentials, password-too-short, and a
+  sign-up email conflict that offers an inline switch-to-login shortcut),
+  optional Google button; the submit pill is red for log-in and green for
+  sign-up (reference taxonomy).
 - **Create (`/create`, guarded)** — the generator as a "commission sheet"
   (numbered hairline field groups: type → steel model tiles with provider labels,
   prices and an amber selection ring → prompt → aspect/duration → optional i2v
