@@ -34,4 +34,4 @@ flowchart LR
 - Behavior tests: `ShowcasePoster.test.tsx` (decorative contract, grain present, 6 distinct paint fingerprints, unique ids, className merge).
 
 ## Commits
-- (pending) feat(web): showcase poster art component
+- 9d0106d 2026-07-07 feat(web): showcase poster art component

@@ -62,4 +62,4 @@ flowchart LR
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
-- (pending) restyle(web): editorial design system — tokens, fonts, ui kit
+- 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit

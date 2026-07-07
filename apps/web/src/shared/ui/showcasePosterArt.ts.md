@@ -29,4 +29,4 @@ flowchart LR
 - `koi` is the 6th palette (brief lists five + asks for 6 posters): the brand plate reusing vermillion/ink/cream.
 
 ## Commits
-- (pending) feat(web): showcase poster art component
+- 9d0106d 2026-07-07 feat(web): showcase poster art component

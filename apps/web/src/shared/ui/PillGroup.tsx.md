@@ -46,4 +46,4 @@ flowchart LR
 ## Commits
 
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost
-- (pending) restyle(web): editorial design system — tokens, fonts, ui kit
+- 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit

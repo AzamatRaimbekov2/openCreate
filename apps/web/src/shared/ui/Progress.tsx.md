@@ -28,4 +28,4 @@ flowchart LR
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
-- (pending) restyle(web): editorial design system — tokens, fonts, ui kit
+- 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit
