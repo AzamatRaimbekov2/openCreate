@@ -69,8 +69,16 @@ const MEDIA_URL = `/media/${GENERATION_ID}.mp4`
 export const START_BALANCE = 200
 export const COST = 35
 
-// One Generation DTO per lifecycle stage (contracts generationSchema shape)
-function generationFixture(prompt: string, stage: 'processing' | 'polling' | 'succeeded') {
+// One Generation DTO per lifecycle stage (contracts generationSchema shape).
+// createdAt MUST be fresh (per test run, injected by the caller): the SPA
+// enforces a 20-minute polling budget (GENERATION_STALL_MS) measured from
+// createdAt — a fixed past timestamp would render the stalled "taking longer"
+// card and never poll to success.
+function generationFixture(
+  prompt: string,
+  createdAt: string,
+  stage: 'processing' | 'polling' | 'succeeded',
+) {
   return {
     id: GENERATION_ID,
     type: 'video',
@@ -83,8 +91,8 @@ function generationFixture(prompt: string, stage: 'processing' | 'polling' | 'su
     mediaUrls: stage === 'succeeded' ? [MEDIA_URL] : [],
     progress: stage === 'processing' ? 0 : stage === 'polling' ? 40 : 100,
     errorMessage: null,
-    createdAt: '2026-07-06T10:00:00.000Z',
-    completedAt: stage === 'succeeded' ? '2026-07-06T10:01:00.000Z' : null,
+    createdAt,
+    completedAt: stage === 'succeeded' ? new Date().toISOString() : null,
   }
 }
 
@@ -101,6 +109,10 @@ export async function installApiMocks(page: Page, { signedIn = true }: MockOptio
     created: false, // POST /api/generations happened
     prompt: '',
     polls: 0, // GET /api/generations/:id calls since creation
+    // Stamped at POST time so the generation is always inside the SPA's
+    // 20-minute polling budget — the pre-hardening fixed timestamp made the
+    // card render as stalled instead of polling to success (final-gate fix)
+    createdAt: '',
   }
 
   const json = (route: Route, body: unknown, status = 200) =>
@@ -110,9 +122,9 @@ export async function installApiMocks(page: Page, { signedIn = true }: MockOptio
   // answers processing/40 (progress UI must render), the next one succeeds —
   // exactly the transition the SPA's 4s polling is built around.
   const currentGeneration = () => {
-    if (state.polls === 0) return generationFixture(state.prompt, 'processing')
-    if (state.polls === 1) return generationFixture(state.prompt, 'polling')
-    return generationFixture(state.prompt, 'succeeded')
+    if (state.polls === 0) return generationFixture(state.prompt, state.createdAt, 'processing')
+    if (state.polls === 1) return generationFixture(state.prompt, state.createdAt, 'polling')
+    return generationFixture(state.prompt, state.createdAt, 'succeeded')
   }
 
   await page.route('**/api/**', async (route) => {
@@ -146,8 +158,11 @@ export async function installApiMocks(page: Page, { signedIn = true }: MockOptio
       const body = route.request().postDataJSON() as { prompt: string }
       state.created = true
       state.prompt = body.prompt
+      // "Just created" — keeps useLiveGeneration's stall check (now() −
+      // createdAt < GENERATION_STALL_MS) true for the whole test
+      state.createdAt = new Date().toISOString()
       // 202 = video accepted, still processing (images would be 201)
-      return json(route, generationFixture(state.prompt, 'processing'), 202)
+      return json(route, generationFixture(state.prompt, state.createdAt, 'processing'), 202)
     }
 
     // The list must agree with the poll state: after the terminal transition
