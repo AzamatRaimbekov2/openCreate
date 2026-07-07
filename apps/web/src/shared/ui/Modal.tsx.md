@@ -80,3 +80,4 @@ flowchart LR
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal (overlay aria-hidden → role=presentation a11y fix)
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 9db4082 2026-07-07 fix(web): modal focus trap + escape/restore
