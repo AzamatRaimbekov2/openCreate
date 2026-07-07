@@ -46,6 +46,10 @@ hairline), `border-ink/20`–`/30` (controls), `bg-ink/5`, `bg-ink/10` — do no
 tokens. `bg-white` is retired from the kit; module surfaces migrate to cream/hairline
 in redesign stage 2.
 
+Decorative glyphs (bolts, play marks, arrows) are inline SVG in `currentColor` or
+plain text characters — **never OS color emoji**, which render in their own palette
+(yellow ⚡, blue ▶️) and smuggle a second accent past the token system (QA r1 fix).
+
 ### Contrast rules (checked against cream #faf7f2)
 
 - ink 16.6:1, ink-soft 5.5:1 — body/secondary text AA+.
@@ -235,7 +239,7 @@ and `rounded-xl/2xl` are fully retired from `src/`.
 |---|---|---|
 | Auth | `AuthForm` (`/login`) | No card — printed on cream: serif h1 over a hairline, underline `Input` fields + `Button`; login↔register switch as an ink-underline text link; zod errors per field (`role="alert"`); server banner = sand block + danger left rule; Google button behind `VITE_GOOGLE_AUTH=1`. |
 | Auth | `AuthManifesto` (`/login` left) | Sand panel: wordmark→`/`, `landing.kicker` micro-label, serif display quote (`auth.manifesto.*`), the three `landing.claims.*` as hairline rows (claims copy has ONE source of truth). |
-| Credits | `BalanceChip` (header) | STAMP chip `⚡ n`: `rounded-[3px]` vermillion hairline outline + serif numeral (vermillion lettering = recorded §2/§8 stamp exception); loading = stamp `Skeleton`; failure = ↻ icon-button; signed-out hidden. Opens history modal. |
+| Credits | `BalanceChip` (header) | STAMP chip (bolt + n): `rounded-[3px]` vermillion hairline outline + serif numeral (vermillion lettering = recorded §2/§8 stamp exception); the bolt is a decorative `currentColor` outline SVG — NEVER an OS emoji, which paints its own yellow and breaks the one-accent rule (QA r1); loading = stamp `Skeleton`; failure = ↻ icon-button; signed-out hidden. Opens history modal. |
 | Credits | `TransactionsList` (modal) | `Modal` + 4 states; editorial ledger — `divide-ink/10` rows (no hover chips), serif display amounts (`+n` success / `-n` danger; the sign carries meaning, color reinforces). |
 | Generator | `GeneratorPanel` (`/create`) | The "commission sheet": hairline `rounded-sm` frame, `generator.sheet` micro-label head, ordered `SheetField` rows (hairline-divided), serif `CostLabel` + Generate against the closing hairline. Catalog 4 states (loading mirrors the sheet frame). Submit failures inline via `SubmitErrorBanner`. |
 | Generator | `SheetField` | One sheet row: decorative serif ordinal (derived from render order, aria-hidden) + field group; separators owned by the parent `divide-y`. |

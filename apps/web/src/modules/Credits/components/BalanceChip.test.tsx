@@ -1,7 +1,7 @@
 // apps/web/src/modules/Credits/components/BalanceChip.test.tsx
 // Behavior (4-states rule): loading → skeleton chip; error → compact retry
 // icon-button that refetches; unauthorized → renders nothing (signed-out shell
-// shows "Sign in" instead); data → ⚡ balance chip that opens the history modal.
+// shows "Sign in" instead); data → bolt-stamped balance chip that opens the history modal.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

@@ -1,5 +1,5 @@
 // apps/web/src/modules/Credits/components/BalanceChip.tsx
-// Header credit-balance chip (⚡ 165). 4 UI states: skeleton while loading,
+// Header credit-balance chip (bolt + 165). 4 UI states: skeleton while loading,
 // compact retry icon-button on failure, hidden entirely when signed out
 // (the shell shows "Sign in" instead), and the vermillion stamp chip on data — clicking
 // it opens the TransactionsList history modal.
@@ -51,10 +51,22 @@ export function BalanceChip() {
         aria-label={t('credits.balance')}
         className="inline-flex min-h-10 items-center gap-1.5 rounded-[3px] border border-vermillion/70 px-3 py-2 text-vermillion transition-colors duration-200 hover:border-vermillion hover:bg-vermillion/5 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
       >
-        {/* Decorative bolt — the aria-label already names the control */}
-        <span aria-hidden="true" className="text-xs">
-          ⚡
-        </span>
+        {/* Decorative bolt — the aria-label already names the control.
+            Inline SVG (currentColor) instead of the ⚡ emoji: OS emoji render
+            in their own yellow and can't be tinted, which would put a second
+            accent color into the shell (QA r1, brief: "exactly one accent").
+            Outline stroke matches the chip's hairline stamp aesthetic. */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          className="size-3.5"
+        >
+          <path d="M13 2 4.5 13.5H11L9.5 22 19.5 9.5H12.5L13 2Z" />
+        </svg>
         {/* Serif display numeral — the same numeral voice as the price index */}
         <span className="font-display text-base leading-none font-semibold tracking-tight">
           {data.creditsBalance}

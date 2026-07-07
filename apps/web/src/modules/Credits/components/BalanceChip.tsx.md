@@ -4,8 +4,8 @@
 
 ## Purpose
 
-The header credit-balance chip (`⚡ 165`) — the always-visible entry point to the
-credit system; clicking it opens the transaction-history modal.
+The header credit-balance chip (bolt + `165`) — the always-visible entry point to
+the credit system; clicking it opens the transaction-history modal.
 
 ## What it does (for an AI reader)
 
@@ -32,7 +32,7 @@ flowchart LR
   ST -->|pending| SK[Skeleton chip]
   ST -->|401 unauthorized| N[null - shell shows Sign in]
   ST -->|other error| RB[retry icon-button → refetch]
-  ST -->|data| CH[⚡ balance chip]
+  ST -->|data| CH[bolt + balance chip]
   CH -->|click| TL[TransactionsList modal]
 ```
 
@@ -42,7 +42,10 @@ flowchart LR
   `code === 'unauthorized'` — signed-out users get NO chip and NO retry noise.
 - The retry affordance is a compact icon-button (aria-label `credits.reload`), not a
   full `ErrorState` card — the chip lives in the header and must stay small.
-- The bolt emoji is `aria-hidden`; the accessible name comes from `credits.balance`.
+- The bolt is a decorative inline SVG (`aria-hidden`, `currentColor` outline stroke);
+  the accessible name comes from `credits.balance`. QA round 1 replaced the previous
+  `⚡` emoji: OS emoji render in their own yellow and can't be tinted, which put a
+  second accent color into the shell (brief: "exactly one accent color in play").
 - Balance updates arrive through the shared `['me']` cache (login invalidation now,
   charge/refund invalidations in Tasks 16-17) — the chip itself never mutates anything.
 
