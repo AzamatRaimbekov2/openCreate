@@ -61,4 +61,4 @@ flowchart LR
 
 ## Commits
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
-- (pending) restyle(web): editorial landing + pricing
+- 2f56573 2026-07-07 restyle(web): editorial landing + pricing

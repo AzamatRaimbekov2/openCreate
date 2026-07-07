@@ -50,4 +50,4 @@ flowchart LR
   marker, distinct palettes, honest model labels).
 
 ## Commits
-- (pending) restyle(web): editorial landing + pricing
+- 2f56573 2026-07-07 restyle(web): editorial landing + pricing

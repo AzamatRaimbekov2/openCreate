@@ -39,4 +39,4 @@ flowchart LR
 
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
-- (pending) restyle(web): editorial landing + pricing
+- 2f56573 2026-07-07 restyle(web): editorial landing + pricing

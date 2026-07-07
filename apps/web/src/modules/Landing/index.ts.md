@@ -40,4 +40,4 @@ flowchart LR
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (adds `ModelCreditTable`)
-- (pending) restyle(web): editorial landing + pricing (adds `SectionHeading`)
+- 2f56573 2026-07-07 restyle(web): editorial landing + pricing (adds `SectionHeading`)

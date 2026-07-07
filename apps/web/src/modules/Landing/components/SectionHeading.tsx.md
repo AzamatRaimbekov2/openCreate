@@ -39,4 +39,4 @@ flowchart LR
   for its "Credits per model" section (same index treatment, brief §Page-by-page).
 
 ## Commits
-- (pending) restyle(web): editorial landing + pricing
+- 2f56573 2026-07-07 restyle(web): editorial landing + pricing
