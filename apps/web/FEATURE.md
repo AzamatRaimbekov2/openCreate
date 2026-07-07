@@ -8,10 +8,13 @@ Fraunces + Space Grotesk variable fonts via @fontsource), react-hook-form + zod,
 
 ## What it does
 
-- **Landing (`/`)** — hero with the three approved claims (images from $0.01,
-  5s videos from $0.35, credits never expire), honest price comparison table
-  ("verified July 2026"), how-it-works, FAQ. Standalone top bar with LangSwitch and a
-  session-aware CTA (`/create` signed in, `/login` otherwise). EN/RU.
+- **Landing (`/`)** — editorial magazine page: giant Fraunces hero with one
+  vermillion italic word + the three approved claims (images from $0.01, 5s videos
+  from $0.35, credits never expire), "Selected works" poster spread (6 honest
+  "sample style" figures, one video-marked), "The index" price comparison table
+  ("verified July 2026"), numbered how-it-works rows, FAQ rows, colophon footer.
+  Standalone hairline masthead with LangSwitch and a session-aware CTA (`/create`
+  signed in, `/login` otherwise). EN/RU.
 - **Auth (`/login`)** — email+password sign-in/register (better-auth client), zod
   validation, localized server-error mapping, optional Google button.
 - **Create (`/create`, guarded)** — generator form (type → model cards with provider
@@ -21,8 +24,9 @@ Fraunces + Space Grotesk variable fonts via @fontsource), react-hook-form + zod,
 - **Library (`/library`, guarded)** — infinite gallery (24/page, "Load more"),
   client-side type filter chips, per-card download/delete (optimistic with rollback),
   failed cards show the reason + "credits refunded" badge.
-- **Pricing (`/pricing`, public)** — comparison table + full per-model credit table
-  from the catalog query + "200 free credits" signup CTA.
+- **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
+  full per-model credit table from the catalog query, a "200 free credits" accent
+  stamp by the title, and the visitor signup CTA as a sand block.
 - **App shell** — header nav (Create/Library/Pricing), balance chip (opens the credit
   history modal), LangSwitch, sign-out (clears personal query caches).
 - **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
@@ -42,7 +46,8 @@ src/
 │   ├── Generator/              # generatorStore (draft), catalog query, create mutation, panel
 │   ├── Gallery/                # generations list/poll/delete hooks, cards, grid, detail
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
-│   └── Landing/                # hero, price table, how-it-works, FAQ, pricingData
+│   └── Landing/                # hero, showcase spread, section heading, price tables,
+│                               # how-it-works, FAQ, pricingData
 └── shared/
     ├── config/                 # theme.css (v2 editorial tokens + font tokens), i18n (EN/RU), queryClient
     ├── libs/apiClient.ts       # fetch wrapper → ApiClientError with envelope codes
@@ -60,7 +65,7 @@ Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and com
 
 ```bash
 pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
-pnpm --filter @opencreate/web test       # vitest + RTL — 79 tests (jsdom)
+pnpm --filter @opencreate/web test       # vitest + RTL — 92 tests (jsdom)
 pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
 pnpm --filter @opencreate/web lint       # eslint src
 pnpm --filter @opencreate/web typecheck  # tsc --noEmit

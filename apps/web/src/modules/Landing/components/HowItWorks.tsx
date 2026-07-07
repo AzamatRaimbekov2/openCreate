@@ -1,7 +1,9 @@
 // apps/web/src/modules/Landing/components/HowItWorks.tsx
-// The three-step product story (prompt → model → result) as an ordered list —
-// semantics match the meaning: the steps ARE a sequence.
+// The three-step product story (prompt → model → result) as numbered editorial
+// rows: serif 01/02/03 ordinals over hairline rules instead of the v1 card
+// grid. Semantics stay an ordered list — the steps ARE a sequence.
 import { useTranslation } from 'react-i18next'
+import { SectionHeading } from './SectionHeading'
 
 // Step ids double as i18n key segments: landing.how.steps.<id>.*
 const STEPS = ['prompt', 'model', 'result'] as const
@@ -10,25 +12,30 @@ export function HowItWorks() {
   const { t } = useTranslation()
 
   return (
-    <section className="flex flex-col gap-6">
-      <h2 className="text-xl font-semibold text-ink">{t('landing.how.title')}</h2>
-      <ol className="grid gap-4 sm:grid-cols-3">
+    <section className="flex flex-col gap-2">
+      <SectionHeading ordinal="03" title={t('landing.how.title')} />
+      <ol className="flex flex-col">
         {STEPS.map((step, index) => (
+          // Row = hairline-separated grid line: ordinal / title / description.
+          // SectionHeading already draws the rule above the first row.
           <li
             key={step}
-            className="flex flex-col gap-2 rounded-2xl border border-ink/10 bg-white p-6 shadow-sm"
+            className="grid gap-x-8 gap-y-2 border-b border-ink/15 py-8 md:grid-cols-12 md:items-baseline"
           >
-            {/* Visible ordinal — the ol already conveys order to screen readers */}
+            {/* Serif vermillion ordinal — display-size accent (sanctioned
+                ≥18px/bold use); the ol already conveys order to screen readers */}
             <span
               aria-hidden="true"
-              className="flex size-8 items-center justify-center rounded-full bg-sand text-sm font-semibold text-vermillion"
+              className="font-display text-2xl leading-none font-semibold text-vermillion md:col-span-2 md:text-3xl"
             >
-              {index + 1}
+              {`0${index + 1}`}
             </span>
-            <h3 className="text-base font-semibold text-ink">
+            <h3 className="font-display text-2xl font-semibold tracking-tight text-ink md:col-span-4">
               {t(`landing.how.steps.${step}.title`)}
             </h3>
-            <p className="text-sm text-ink-soft">{t(`landing.how.steps.${step}.description`)}</p>
+            <p className="text-base text-ink-soft md:col-span-6">
+              {t(`landing.how.steps.${step}.description`)}
+            </p>
           </li>
         ))}
       </ol>

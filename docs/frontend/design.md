@@ -121,8 +121,14 @@ Poster-grade **SVG compositions** replace all placeholder gradients. Component:
 | `ultraviolet` | after-dark aura | magenta core in a violet glow, lilac orbit + comet line |
 | `koi` | brand plate (vermillion/cream) | vermillion koi form, ink eye, faint pond ring |
 
-Spread layout (stage 2): cards vary in size (some span 2 cols, one tall 9:16), slight
-hover scale/rotate ≤1deg, one poster carries a `video · 5s` marker with a play glyph.
+Spread layout (done, stage 2 — `modules/Landing/ShowcaseSpread`): asymmetric 12-col
+grid in reading order fig. 01–06 (spans 7+5 / 4-tall-9:16+4+4 / full-width 21:9 plate,
+two cards vertically offset), hover = print-lift (≤1deg tilt + 1.5% scale,
+`motion-safe` only). Captions: serif-italic `fig. 0N` — localized sample title in
+typographic quotes — the REAL catalog model (`Flash (FLUX schnell)` / `Studio (FLUX
+dev)` / `Cinema (Wan 2.7)`) + neutral "sample style" stamp `Badge`. The one video
+sample (sea) carries a vermillion `video · 5s` stamp with a play glyph on a
+`bg-cream/90` backing so it reads on dark art.
 
 ## 6. Component inventory (`apps/web/src/shared/ui/`)
 
@@ -171,7 +177,9 @@ No blank screens, no raw error text, ever.
 - Hit area ≥40px (`min-h-10`); 44px+ on touch layouts. Icon-only buttons get `aria-label`.
 - Inputs always have visible labels; errors via `aria-describedby` + `role="alert"`.
 - Vermillion text policy: see §2 contrast rules. Recorded brief-sanctioned exceptions:
-  stamp badges (11px outline stamps), active nav micro-labels, the balance stamp chip.
+  stamp badges (11px outline stamps), active nav micro-labels, the balance stamp chip,
+  the index tables' "openCreate" column header (11px uppercase micro-label — the
+  brief's "vermillion us column"), and the showcase `video · 5s` marker stamp.
 - Status is never color-only: failed cards pair the danger border with text + stamp.
 - Decorative art (`ShowcasePoster`, ordinals, the wordmark dot) is `aria-hidden`;
   uppercase is CSS-only so accessible names match i18n strings.
@@ -208,8 +216,8 @@ styling; every error screen = serif headline, one line, one action; both locales
 
 | Page | Treatment |
 |---|---|
-| Landing `/` | Hero: micro-label kicker, giant Fraunces headline with ONE vermillion italic word, claims line, ink CTA + text link. "Selected works" ShowcasePoster spread with fig. captions. "The index" price table (serif numerals, vermillion "us" column, verified-July-2026 footnote). How-it-works as 01/02/03 hairline rows. FAQ as clean rows. Colophon footer. |
-| `/pricing` | Same "index" table treatment + "200 free credits" stamp `Badge`. |
+| Landing `/` | Done (stage 2). Hero: micro-label kicker, giant Fraunces headline with ONE vermillion italic word (EN "video", RU «копейки» — locale-driven via `landing.headlineAccent`, split inline so the h1 accessible name and the prerender grep stay intact), claims line, ink CTA + underlined text link to /pricing. "Selected works" ShowcasePoster spread (§5). "The index" price table: `SectionHeading` (ghost serif ordinal + kicker + serif h2 over a hairline), hairline rows, serif display numerals (ours vermillion / competitor ink), caption-bottom verified footnote. How-it-works as vermillion-serif 01/02/03 hairline rows. FAQ as serif-question hairline rows. Colophon footer (wordmark, tagline, rights micro-label). Sections sit ≥96px apart on desktop (`md:gap-28`). |
+| `/pricing` | Done (stage 2). Kicker + serif display h1 + "200 free credits" accent stamp `Badge`; PriceTable as section 01, `SectionHeading 02` + `ModelCreditTable` in the same hairline index treatment (serif credit numerals); visitor signup CTA as a sand tinted block with an ink-pill link. |
 | `/login` | Editorial split: serif manifesto block on sand left; underline-field form right (RHF/Zod + roles intact). |
 | `/create`, `/library` | Cream canvas, hairline masthead (done, AppShell); generator = numbered "commission sheet" groups with hairline separators, serif cost numeral; library media wells stay `bg-media` with cream figure captions. |
 | 404 / crash / offline | Done (stage 1): serif headline, one line, one action. |
@@ -231,7 +239,7 @@ ink-pill CTA mirrors); their full editorial restyle lands in stage 2 per §11.
 | Gallery | `GalleryGrid` | 4 states: 8 skeletons / `ErrorState` / `EmptyState` + ink-pill `/create` CTA / 1-2-3-col grid + ghost Load more. |
 | Gallery | `GenerationCard` | Media well in real aspect on `bg-media`; processing = pulse + `Progress` + %; succeeded = media + download/delete; failed = danger border + reason + "Credits refunded" stamp. |
 | Gallery | `GalleryFilterChips` | `PillGroup` All/Images/Videos. |
-| Landing | `LandingPage`, `Hero`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable` | See §11 for the stage-2 target treatments; claims and honesty markers ("verified July 2026" caption, one named competitor per row) are unchangeable. |
+| Landing | `LandingPage`, `Hero`, `ShowcaseSpread`, `SectionHeading`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable` | Stage-2 editorial rebuild landed (§11). `SectionHeading` (ordinal outside the h2 — heading names are behavior) and `PriceTable` (`ordinal` prop) are also consumed by the /pricing route via the module index. Claims and honesty markers ("verified July 2026" caption as the table's accessible name, one named competitor per row, per-card "sample style" labels) are unchangeable. |
 
 Recorded exceptions: `Modal` overlay is `role="presentation"` (2026-07-06 a11y fix);
 failed cards show the stored provider failure reason as a secondary caption

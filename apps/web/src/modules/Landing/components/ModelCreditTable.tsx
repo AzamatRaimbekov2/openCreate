@@ -38,44 +38,53 @@ function usdLabel(model: CatalogModel, t: TFunction): string {
   return t('pricing.models.from', { price: formatUsd(cheapest * CREDIT_USD) })
 }
 
+// Column headers share the index's micro-label voice (uppercase via CSS)
+const columnHeaderClass =
+  'py-3 pr-4 text-[11px] font-medium tracking-[0.18em] uppercase text-ink-soft'
+
 export function ModelCreditTable({ models }: ModelCreditTableProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-ink/10 bg-white p-6 shadow-sm">
+    // Index treatment (stage 2): hairline rules on cream instead of a white
+    // card — horizontal scroll keeps four readable columns on phones
+    <div className="overflow-x-auto">
       <table
         aria-label={t('pricing.models.title')}
-        className="w-full min-w-[36rem] border-collapse text-left text-sm"
+        className="w-full min-w-[36rem] border-collapse border-b border-ink/15 text-left text-sm"
       >
         <thead>
-          <tr className="text-xs text-ink-soft">
-            <th scope="col" className="py-2 pr-4 font-medium">
+          <tr>
+            <th scope="col" className={columnHeaderClass}>
               {t('pricing.models.model')}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={`${columnHeaderClass} px-4`}>
               {t('pricing.models.type')}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={`${columnHeaderClass} px-4`}>
               {t('pricing.models.credits')}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={`${columnHeaderClass} px-4`}>
               {t('pricing.models.price')}
             </th>
           </tr>
         </thead>
         <tbody>
           {models.map((model) => (
-            <tr key={model.id} className="border-t border-ink/10 align-top">
-              <th scope="row" className="py-3 pr-4">
+            <tr key={model.id} className="border-t border-ink/15 align-baseline">
+              <th scope="row" className="py-4 pr-4">
                 <span className="block font-medium text-ink">{model.name}</span>
                 {/* Honest provider label — the real model behind our name */}
                 <span className="block text-xs font-normal text-ink-soft">
                   {model.providerLabel}
                 </span>
               </th>
-              <td className="px-4 py-3 text-ink-soft">{t(`generator.type.${model.type}`)}</td>
-              <td className="px-4 py-3 font-medium text-ink">{creditsLabel(model, t)}</td>
-              <td className="px-4 py-3 text-ink-soft">{usdLabel(model, t)}</td>
+              <td className="px-4 py-4 text-ink-soft">{t(`generator.type.${model.type}`)}</td>
+              {/* Credits are the index's numerals — serif, like the price table */}
+              <td className="px-4 py-4 font-display text-lg font-semibold tracking-tight text-ink">
+                {creditsLabel(model, t)}
+              </td>
+              <td className="px-4 py-4 text-ink-soft">{usdLabel(model, t)}</td>
             </tr>
           ))}
         </tbody>

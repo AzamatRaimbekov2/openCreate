@@ -36,16 +36,38 @@ function renderLanding(ctaTo: LandingPageProps['ctaTo']) {
 }
 
 describe('LandingPage', () => {
-  it('renders hero, price comparison, how-it-works and FAQ in order', async () => {
+  it('renders hero, showcase, price comparison, how-it-works and FAQ in order', async () => {
     renderLanding('/login')
     expect(
       await screen.findByRole('heading', { level: 1, name: /create images & video/i }),
     ).toBeInTheDocument()
-    // Section order = document order of the level-2 headings
+    // Section order = document order of the level-2 headings (editorial brief:
+    // hero → selected works → the index → how-it-works → FAQ)
     const sectionTitles = screen
       .getAllByRole('heading', { level: 2 })
       .map((heading) => heading.textContent)
-    expect(sectionTitles).toEqual(['Honest price comparison', 'How it works', 'Fair questions'])
+    expect(sectionTitles).toEqual([
+      'Selected works',
+      'Honest price comparison',
+      'How it works',
+      'Fair questions',
+    ])
+  })
+
+  it('opens with the studio micro-label and a secondary pricing link', async () => {
+    renderLanding('/login')
+    // The uppercase treatment is CSS-only — the DOM keeps the i18n string
+    expect(await screen.findByText('AI image & video studio')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /see the price index/i })).toHaveAttribute(
+      'href',
+      '/pricing',
+    )
+  })
+
+  it('closes with a colophon footer', async () => {
+    renderLanding('/login')
+    const footer = await screen.findByRole('contentinfo')
+    expect(footer).toHaveTextContent(/© 2026 openCreate/)
   })
 
   it('shows the three hero claims and no blanket cheapest claim', async () => {

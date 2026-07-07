@@ -8,3 +8,8 @@ export type { LandingPageProps } from './components/LandingPage'
 export { ModelCreditTable } from './components/ModelCreditTable'
 export type { ModelCreditTableProps } from './components/ModelCreditTable'
 export { PriceTable } from './components/PriceTable'
+export type { PriceTableProps } from './components/PriceTable'
+// The editorial section header (ordinal + kicker + serif h2) — exported so the
+// /pricing route can run the same "index" section treatment as the landing
+export { SectionHeading } from './components/SectionHeading'
+export type { SectionHeadingProps } from './components/SectionHeading'
