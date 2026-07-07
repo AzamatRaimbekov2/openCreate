@@ -103,6 +103,25 @@ describe('loadConfig production settings', () => {
     expect(cfg.assetHostAllowlist).toEqual(['runware.ai', 'assets.example.com'])
   })
 
+  // Asset download limits (review finding): saveFromUrl gets a hard deadline
+  // and a size cap so a stalled or oversized provider stream can neither hang
+  // a settlement forever nor fill the disk. Env-tunable, safe defaults.
+  it('defaults asset download limits to 120s timeout and 512MB cap', () => {
+    const cfg = loadConfig({ ...baseEnv })
+    expect(cfg.assetFetchTimeoutMs).toBe(120_000)
+    expect(cfg.assetMaxBytes).toBe(512 * 1024 * 1024)
+  })
+
+  it('parses ASSET_FETCH_TIMEOUT_MS and ASSET_MAX_BYTES overrides', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      ASSET_FETCH_TIMEOUT_MS: '5000',
+      ASSET_MAX_BYTES: '1048576',
+    })
+    expect(cfg.assetFetchTimeoutMs).toBe(5000)
+    expect(cfg.assetMaxBytes).toBe(1048576)
+  })
+
   // TRUST_PROXY (review finding): without it, req.ip behind the documented
   // reverse proxy (PROD.md) is always the proxy's loopback address, so every
   // user shares ONE rate-limit bucket — 10 cheap requests/min lock all users

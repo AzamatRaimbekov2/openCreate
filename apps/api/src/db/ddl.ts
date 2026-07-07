@@ -77,3 +77,20 @@ CREATE TABLE IF NOT EXISTS credit_transaction (
 CREATE INDEX IF NOT EXISTS idx_generation_user_created ON generation(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transaction(user_id, created_at DESC);
 `
+
+// DB-level refund-once backstop (review finding). The ledger's app-level
+// guard (applyRefund's in-transaction "already refunded?" check) is correct,
+// but nothing at the DATABASE level stopped a future code path from inserting
+// a second refund (or charge) row for the same generation. UNIQUE on
+// (generation_id, kind) makes that physically impossible; signup bonuses are
+// exempt because their generation_id is NULL and SQLite treats NULLs as
+// distinct in unique indexes.
+// Kept OUT of the main DDL string on purpose: db/client.ts execs it
+// SEPARATELY inside a try/catch, because a legacy database that already
+// contains duplicate (generation_id, kind) rows would make CREATE UNIQUE
+// INDEX throw — and a mid-string failure would abort the rest of the
+// bootstrap. Boot must survive on the app-level guard alone in that case.
+export const REFUND_ONCE_INDEX_DDL = `
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_generation_kind
+  ON credit_transaction(generation_id, kind);
+`

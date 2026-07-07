@@ -39,6 +39,7 @@ flowchart LR
 - `registerAndGetCookie` keeps only the `name=value` pair of each Set-Cookie (drops Path/HttpOnly attrs) and joins with `; ` — that is what a browser would send back; better-auth may set more than one cookie.
 - `logLevel` defaults to `'silent'` — the suite must stay quiet; the `logStream` spread is conditional because `AppDeps.logStream` is optional under `exactOptionalPropertyTypes` (passing an explicit `undefined` would not typecheck).
 - `assetHostAllowlist: ['runware.ai']` in the test config mirrors the storage default (the SSRF gate); the helper's storage is built directly with the default list — SSRF-allowlist tests construct their own `createLocalStorage(dir, hosts)` instead of going through the app.
+- `assetFetchTimeoutMs: 120_000` / `assetMaxBytes: 512MB` in the test config mirror the production defaults (download limits, review finding); tests probing the limits construct their own `createLocalStorage(dir, hosts, { fetchTimeoutMs, maxBytes })` with tight values instead of going through the app.
 
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route

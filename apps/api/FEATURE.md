@@ -10,7 +10,11 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   `/api/auth/*` with a signup bonus (default 200 credits) granted through the ledger.
 - **Credits** — append-only ledger (`signup_bonus` / `charge` / `refund`) with the
   denormalized `user.creditsBalance` mutated only inside the same SQLite transaction.
-  Invariants: balance never below 0; refund at most once per generation.
+  Invariants: balance never below 0; refund at most once per generation — enforced
+  app-level (transactional guard in the ledger) AND db-level (UNIQUE index on
+  `credit_transaction(generation_id, kind)`; NULL generation_ids, i.e. signup
+  bonuses, stay unconstrained; boot survives legacy dupes by skipping the index
+  with a warning).
 - **Catalog** — curated model list (2 image + 5 video models) with honest provider
   labels, Runware AIR ids, aspect ratios and credit prices. Single source of truth for
   validation, pricing and resolution mapping.
@@ -33,6 +37,10 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   https URLs whose host is on `ASSET_HOST_ALLOWLIST` (default `runware.ai` + true
   subdomains), and never follows redirects (`redirect: 'manual'`, any 30x = error) —
   an open redirect on an allowlisted host cannot re-point the server-side fetch.
+  Every download is bounded: a hard deadline covering headers AND body streaming
+  (`ASSET_FETCH_TIMEOUT_MS`, default 120s) and a byte cap counted while streaming
+  (`ASSET_MAX_BYTES`, default 512MB — headers are never trusted); on violation the
+  download aborts and the partial file is unlinked.
 - **Errors** — every failure leaves as the shared envelope
   `{ error: { code, message } }` with stable codes from `@opencreate/contracts`.
   Unexpected 5xx are sanitized to `internal_error` / "Something went wrong" — the real
@@ -93,7 +101,7 @@ Every `.ts` has a `.ts.md` sidecar doc with responsibilities, diagrams and commi
 ```bash
 pnpm --filter @opencreate/api dev         # tsx watch, http://localhost:8787
 pnpm --filter @opencreate/api db:migrate  # create SQLite + tables (also runs on boot)
-pnpm --filter @opencreate/api test        # vitest — 93 tests, all HTTP-level or unit
+pnpm --filter @opencreate/api test        # vitest — 104 tests, all HTTP-level or unit
 pnpm --filter @opencreate/api lint        # eslint src test
 pnpm --filter @opencreate/api typecheck   # tsc --noEmit
 pnpm --filter @opencreate/api build       # tsc type gate + esbuild → dist/index.js
@@ -104,9 +112,10 @@ pnpm start                                # same, from the repo root
 Env (see `.env.example`): `RUNWARE_API_KEY`, `BETTER_AUTH_SECRET` are required;
 `DATABASE_PATH`, `STORAGE_DIR`, `SIGNUP_BONUS_CREDITS`, `GOOGLE_CLIENT_ID/SECRET`,
 `LOG_LEVEL`, `NODE_ENV`, `TRUSTED_ORIGINS`, `WEB_DIST_PATH`, `ASSET_HOST_ALLOWLIST`
-(SSRF allowlist for asset downloads, default `runware.ai`), `TRUST_PROXY`
-(reverse-proxy header trust for rate-limit attribution, default off), `ENV_FILE`
-optional.
+(SSRF allowlist for asset downloads, default `runware.ai`), `ASSET_FETCH_TIMEOUT_MS`
+(asset download deadline, default 120000), `ASSET_MAX_BYTES` (asset download size
+cap, default 536870912), `TRUST_PROXY` (reverse-proxy header trust for rate-limit
+attribution, default off), `ENV_FILE` optional.
 The nearest `.env` (repo root) is loaded natively at boot via Node 22
 `process.loadEnvFile` — no manual sourcing; real env vars always win. In prod,
 `BETTER_AUTH_URL` must be the public https origin. Tests never need env — they

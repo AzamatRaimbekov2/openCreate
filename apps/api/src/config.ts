@@ -67,6 +67,17 @@ const envSchema = z.object({
   // PROVIDER RESPONSES, so this is default-deny with only Runware's domain —
   // a provider/CDN change becomes an env edit instead of a code change.
   ASSET_HOST_ALLOWLIST: z.string().default('runware.ai'),
+  // Asset download limits (review finding): a hard deadline for the whole
+  // download and a max size counted while streaming — a stalled provider
+  // stream must not hang a settlement forever, and an oversized body must not
+  // fill the disk that also holds the SQLite database. Defaults mirror
+  // storage/local.ts (120s / 512MB) so an unset env keeps behavior identical.
+  ASSET_FETCH_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  ASSET_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(512 * 1024 * 1024),
   // Reverse-proxy header trust (review finding). Production terminates TLS in
   // a proxy that forwards everyone from loopback (PROD.md), so without this
   // req.ip is ALWAYS the proxy's address and every user shares one rate-limit
@@ -100,6 +111,10 @@ export type AppConfig = {
   trustedOrigins: string[]
   // Host suffixes storage.saveFromUrl may fetch assets from (SSRF allowlist).
   assetHostAllowlist: string[]
+  // Asset download limits handed to storage.saveFromUrl: hard deadline for
+  // the whole download (ms) and max accepted bytes, counted while streaming.
+  assetFetchTimeoutMs: number
+  assetMaxBytes: number
   // Fastify trustProxy value: false = never trust proxy headers (default),
   // true = trust X-Forwarded-For from any peer, string = fastify/proxy-addr
   // address/CIDR/keyword list of peers whose headers are trusted.
@@ -161,6 +176,8 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     assetHostAllowlist: e.ASSET_HOST_ALLOWLIST.split(',')
       .map((h) => h.trim())
       .filter(Boolean),
+    assetFetchTimeoutMs: e.ASSET_FETCH_TIMEOUT_MS,
+    assetMaxBytes: e.ASSET_MAX_BYTES,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
   }
 }

@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as schema from './schema'
-import { DDL } from './ddl'
+import { DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
 
 export type Db = ReturnType<typeof createDb>['db']
 
@@ -31,6 +31,23 @@ export function createDb(path: string) {
     // error_code: machine-readable failure reason (e.g. 'content_blocked') —
     // added for the NSFW safety-filter handling; see modules/generations.
     sqlite.exec('ALTER TABLE generation ADD COLUMN error_code TEXT')
+  }
+  // DB-level refund-once backstop (review finding): UNIQUE(generation_id,
+  // kind) makes a duplicate refund (or charge) ledger row physically
+  // impossible even if a future code path bypasses the ledger's transactional
+  // guard. Exec'd SEPARATELY from the main DDL and wrapped in try/catch on
+  // purpose: no healthy database should contain duplicates (the app-level
+  // guard has enforced refund-once since day one), but IF a legacy file does,
+  // CREATE UNIQUE INDEX throws — and bricking the boot over a backstop we can
+  // live without is worse than running on the app-level guard alone. Log the
+  // skip so the operator knows the ledger needs manual repair.
+  try {
+    sqlite.exec(REFUND_ONCE_INDEX_DDL)
+  } catch (err) {
+    console.warn(
+      '[db] refund-once unique index skipped (legacy duplicate ledger rows?) —',
+      err instanceof Error ? err.message : err,
+    )
   }
   // Pass the schema so db.query.* and better-auth's drizzle adapter can
   // resolve tables by name.

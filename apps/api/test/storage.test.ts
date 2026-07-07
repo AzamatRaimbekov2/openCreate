@@ -140,6 +140,69 @@ describe('saveFromUrl host allowlist (SSRF)', () => {
   })
 })
 
+// Download hardening (review finding): a provider asset download had no
+// timeout and no size cap — a stalled or endless provider stream could hold
+// the settlement forever, and an arbitrarily large body could fill the disk.
+// Both limits are enforced by saveFromUrl itself: an AbortController deadline
+// spanning the WHOLE download (headers + body) and a byte counter on the
+// stream; on violation the download aborts and the partial file is unlinked.
+describe('saveFromUrl download limits', () => {
+  it('times out a stalled download and removes the partial file', async () => {
+    // Body sends one chunk and then stalls forever — only the timeout can end
+    // this download. The pipeline shares the AbortController's signal, so the
+    // deadline covers the streaming phase, not just the response headers.
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(4))
+        // never close, never enqueue again
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })))
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir, ['runware.ai'], { fetchTimeoutMs: 30 })
+    await expect(
+      storage.saveFromUrl('https://vm.runware.ai/slow.mp4', 'gen12', 'mp4'),
+    ).rejects.toThrow(/timed out/)
+    // The partial file (first chunk may already be on disk) must be gone.
+    expect(existsSync(join(dir, 'gen12.mp4'))).toBe(false)
+  })
+
+  it('aborts a download that exceeds the byte cap and removes the partial file', async () => {
+    // 12 bytes against an 8-byte cap: the counter trips on the second chunk,
+    // mid-stream — a Content-Length header is never trusted (it can lie).
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(6))
+        controller.enqueue(new Uint8Array(6))
+        controller.close()
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })))
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir, ['runware.ai'], { maxBytes: 8 })
+    await expect(
+      storage.saveFromUrl('https://vm.runware.ai/huge.mp4', 'gen13', 'mp4'),
+    ).rejects.toThrow(/too large/)
+    expect(existsSync(join(dir, 'gen13.mp4'))).toBe(false)
+  })
+
+  it('a download within both limits still succeeds', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(Buffer.from('ok-bytes'), { status: 200 })),
+    )
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir, ['runware.ai'], {
+      fetchTimeoutMs: 5000,
+      maxBytes: 1024,
+    })
+    await expect(storage.saveFromUrl('https://vm.runware.ai/v.mp4', 'gen14', 'mp4')).resolves.toBe(
+      '/media/gen14.mp4',
+    )
+    expect(existsSync(join(dir, 'gen14.mp4'))).toBe(true)
+  })
+})
+
 describe('GET /media/*', () => {
   it('serves files from the storage dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'oc-media-'))

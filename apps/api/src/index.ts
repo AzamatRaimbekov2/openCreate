@@ -13,8 +13,14 @@ const config = loadConfig()
 const { db } = createDb(config.databasePath)
 // Local disk storage (mkdir -p'd on boot); assets are served back at /media/*.
 // The allowlist locks server-side asset fetches to the provider's domain
-// (SSRF gate — asset URLs come from provider responses, not our code).
-const storage = createLocalStorage(config.storageDir, config.assetHostAllowlist)
+// (SSRF gate — asset URLs come from provider responses, not our code). The
+// limits bound every download: a hard deadline (a stalled provider stream
+// must not hang a settlement forever) and a streaming byte cap (an oversized
+// body must not fill the disk that also holds the SQLite database).
+const storage = createLocalStorage(config.storageDir, config.assetHostAllowlist, {
+  fetchTimeoutMs: config.assetFetchTimeoutMs,
+  maxBytes: config.assetMaxBytes,
+})
 // The ONLY place the real Runware key leaves config — the client keeps it in a
 // closure and never exposes it (tests always inject a fake instead).
 const runware = createRunwareClient({ apiKey: config.runwareApiKey })

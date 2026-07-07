@@ -70,6 +70,10 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // Matches the storage default; tests that probe the SSRF allowlist
       // construct their own createLocalStorage with a custom list instead.
       assetHostAllowlist: ['runware.ai'],
+      // Production defaults (120s / 512MB); tests that probe the download
+      // limits construct their own createLocalStorage with tight limits.
+      assetFetchTimeoutMs: 120_000,
+      assetMaxBytes: 512 * 1024 * 1024,
       // Default-deny like production: proxy headers are only trusted when a
       // test opts in — mirrors the TRUST_PROXY env knob (unset → false).
       trustProxy: overrides.trustProxy ?? false,

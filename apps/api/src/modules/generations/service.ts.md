@@ -78,3 +78,4 @@ flowchart TD
 - 1cdb3a8 fix(api): atomic charge+insert and failure settlement — one tx for charge+row insert, one tx in failGeneration for flip+refund
 - 2859858 fix(api): forbid deleting processing generations — ConflictError 409 in remove()
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — compound (createdAt,id) cursor, per-generation lastPolledAt throttle (DEFAULT_POLL_MIN_INTERVAL_MS)
+- ecb7c7f fix(api): guard refund against succeeded race + atomic video submit failure — failGeneration check-and-set covers the refund too; video submit catch reuses it
