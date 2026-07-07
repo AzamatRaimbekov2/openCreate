@@ -1,6 +1,7 @@
 // apps/web/src/modules/Generator/components/SheetField.tsx
-// One numbered row of the "commission sheet" (stage-3 editorial GeneratorPanel):
-// a small serif ordinal in the margin + the field group beside it. The panel
+// One numbered row of the GeneratorPanel "commission sheet" (v3 terminal skin):
+// a ghost mono ordinal (white/20, weight 400) in the margin + the field group
+// beside it. The panel
 // stacks these inside a divide-y container, so the hairline separators come
 // from the parent — this row only owns its numeral column and breathing room.
 import type { ReactNode } from 'react'

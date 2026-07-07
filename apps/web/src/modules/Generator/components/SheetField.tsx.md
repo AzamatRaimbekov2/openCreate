@@ -43,6 +43,9 @@ flowchart LR
   that drew its own borders would double the hairline at conditional boundaries.
 - `min-w-0 flex-1` on the content column: without it the model-card grid and the
   textarea can overflow the sheet's hairline frame.
+- v4 QA round 1 (2026-07-07): header comment de-staled — "small serif ordinal"
+  (v2 editorial wording) → the actual v3 ghost mono ordinal (white/20, weight 400).
+  Comment-only change, zero runtime diff.
 
 ## Commits
 

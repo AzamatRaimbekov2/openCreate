@@ -1,8 +1,9 @@
 // apps/web/src/modules/Generator/components/GeneratorPanel.tsx
-// The create-page form as an editorial "commission sheet" (stage-3 redesign):
-// a hairline-framed sheet whose field groups — type → model cards → prompt →
-// aspect/duration → optional i2v upload — are numbered serif rows separated by
-// hairlines, closed by a footer with the serif cost numeral + Generate.
+// The create-page form as the v3 terminal "commission sheet": a white/10
+// hairline-framed sheet whose field groups — type → model cards → prompt →
+// aspect/duration → optional i2v upload — are rows numbered by ghost mono
+// ordinals and separated by hairlines, closed by a footer with the mono cost
+// numeral + the Generate pill.
 // Catalog state (loading/error/empty/data) follows the 4-states rule; submit
 // failures surface inline via SubmitErrorBanner (never a blocking modal).
 import { useEffect } from 'react'

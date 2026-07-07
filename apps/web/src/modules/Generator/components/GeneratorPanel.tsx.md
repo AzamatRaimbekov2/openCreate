@@ -62,8 +62,11 @@ flowchart TD
 - Stage 3 restyle (2026-07-07): white card → hairline sheet frame; field groups →
   `SheetField` rows with derived decorative ordinals; prompt + error banner extracted
   to `PromptField` / `SubmitErrorBanner` (200-line cap); footer = closing hairline
-  with the serif cost numeral. Behavior, roles, i18n keys and tests untouched; new
+  with the mono cost numeral. Behavior, roles, i18n keys and tests untouched; new
   key `generator.sheet` names the sheet head in both locales.
+- v4 QA round 1 (2026-07-07): header comment de-staled — it still described the v2
+  "editorial / serif ordinal" skin while the rendered code had long been v3 mono
+  (JetBrains Mono ghost ordinals, weight 400). Comment-only change, zero runtime diff.
 
 ## Commits
 
