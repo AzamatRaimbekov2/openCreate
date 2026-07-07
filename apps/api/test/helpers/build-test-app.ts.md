@@ -48,3 +48,4 @@ flowchart LR
 - 5e8de3d feat(api): native env loading + structured logging — logLevel/logStream overrides, silent default
 - b21a116 feat(api): production single-origin serving — nodeEnv/webDistPath/trustedOrigins overrides
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs override (default 0), assetHostAllowlist in test config
+- eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — trustProxy override (default false)

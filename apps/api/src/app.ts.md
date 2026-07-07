@@ -48,3 +48,4 @@ flowchart LR
 - cdd94a3 feat(api): sanitized errors + rate limits — sanitized 5xx envelope, @fastify/rate-limit global 300/min
 - b21a116 feat(api): production single-origin serving — prod SPA static + index.html fallback
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs test seam on AppDeps
+- eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — trustProxy on the Fastify constructor

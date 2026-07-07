@@ -38,3 +38,4 @@ flowchart LR
 - 5e8de3d feat(api): native env loading + structured logging — loadEnvFromFile + LOG_LEVEL
 - b21a116 feat(api): production single-origin serving — NODE_ENV/WEB_DIST_PATH/TRUSTED_ORIGINS added
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — ASSET_HOST_ALLOWLIST → assetHostAllowlist
+- eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — TRUST_PROXY → trustProxy (parseTrustProxy tri-state)
