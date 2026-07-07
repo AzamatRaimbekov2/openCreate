@@ -26,7 +26,7 @@ lowercase mono headers (the weight/uppercase laws).
 ## Dependencies
 - Imports / depends on: `i18next` (`TFunction` type), `react-i18next`,
   `@opencreate/contracts` (`CatalogModel`), `../model/pricingData`
-  (`CREDIT_USD`, `formatUsd`).
+  (`CREDIT_USD`, `formatUsd`), `./TableScrollRegion` (overflow wrapper).
 - Used by: `routes/_shell.pricing.tsx` (data state of its catalog query).
 
 ## Diagram
@@ -35,6 +35,7 @@ flowchart LR
   RQ[route useCatalog query] -- models --> MCT[ModelCreditTable.tsx]
   PD[pricingData CREDIT_USD/formatUsd] --> MCT
   I18N[pricing.models.* + generator.type.*] --> MCT
+  TSR[TableScrollRegion] --> MCT
   MCT --> Table[semantic table on /pricing]
 ```
 
@@ -47,6 +48,9 @@ flowchart LR
 - Type column reuses `generator.type.*` keys instead of duplicating copy.
 - The table draws its own bottom hairline (`border-b` on `<table>`) because its
   rows only carry `border-t` — the index needs a closing rule.
+- v4 QA round 2 swapped the bare `overflow-x-auto` div for `TableScrollRegion`
+  (label = `pricing.models.title`): phones get the no-gradient "scroll →" hint
+  and the overflow area becomes keyboard-focusable.
 
 ## Commits
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table

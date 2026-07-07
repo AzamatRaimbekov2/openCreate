@@ -48,8 +48,9 @@ describe('LandingPage', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: /create images & video/i }),
     ).toBeInTheDocument()
-    // Section order = document order of the level-2 headings (editorial brief:
-    // hero → selected works → the index → how-it-works → FAQ)
+    // Section order = document order of the level-2 headings — set by the v2
+    // editorial brief and kept by the v3 style law (style-reference-v3.md):
+    // hero → selected works → the index → how-it-works → FAQ
     const sectionTitles = screen
       .getAllByRole('heading', { level: 2 })
       .map((heading) => heading.textContent)

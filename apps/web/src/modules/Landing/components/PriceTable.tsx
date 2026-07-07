@@ -11,6 +11,7 @@
 import { useTranslation } from 'react-i18next'
 import { PRICE_COMPARISON_ROWS, formatUsd } from '../model/pricingData'
 import { SectionHeading } from './SectionHeading'
+import { TableScrollRegion } from './TableScrollRegion'
 
 // Column headers in the quiet mono caption voice (v3: lowercase, no tracking)
 const columnHeaderClass = 'py-3 pr-4 text-xs font-normal'
@@ -22,8 +23,9 @@ export function PriceTable() {
     <section className="flex flex-col gap-8">
       <SectionHeading kicker={t('landing.price.kicker')} title={t('landing.price.title')} />
       {/* Horizontal scroll instead of squashing on phones — the page itself
-          never scrolls sideways (brief QA #5) */}
-      <div className="overflow-x-auto">
+          never scrolls sideways (brief QA #5). TableScrollRegion adds the
+          no-gradient "scroll →" hint + keyboard focus (v4 QA round 2) */}
+      <TableScrollRegion label={t('landing.price.title')}>
         <table className="w-full min-w-[36rem] border-collapse text-left">
           {/* caption-bottom = the verification footnote; still the table's
               accessible name (tests query the table BY this honesty marker).
@@ -78,7 +80,7 @@ export function PriceTable() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollRegion>
     </section>
   )
 }

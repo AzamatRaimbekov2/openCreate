@@ -6,6 +6,7 @@ import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import type { CatalogModel } from '@opencreate/contracts'
 import { CREDIT_USD, formatUsd } from '../model/pricingData'
+import { TableScrollRegion } from './TableScrollRegion'
 
 export type ModelCreditTableProps = {
   // Catalog models in the API's display order (image + video)
@@ -46,8 +47,10 @@ export function ModelCreditTable({ models }: ModelCreditTableProps) {
 
   return (
     // Index treatment (v3): white/10 hairline rules directly on the void —
-    // horizontal scroll keeps four readable columns on phones
-    <div className="overflow-x-auto">
+    // horizontal scroll keeps four readable columns on phones, and the
+    // TableScrollRegion wrapper adds the no-gradient "scroll →" hint +
+    // keyboard focus for the overflow area (v4 QA round 2)
+    <TableScrollRegion label={t('pricing.models.title')}>
       <table
         aria-label={t('pricing.models.title')}
         className="w-full min-w-[36rem] border-collapse border-b border-white/10 text-left text-sm"
@@ -90,6 +93,6 @@ export function ModelCreditTable({ models }: ModelCreditTableProps) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScrollRegion>
   )
 }

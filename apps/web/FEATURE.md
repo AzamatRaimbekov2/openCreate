@@ -40,6 +40,9 @@ react-hook-form + zod, i18next.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
   full per-model credit table from the catalog query, a "200 free credits" amber
   chip by the title, and the visitor signup CTA as a steel card with a green pill.
+  Both wide tables sit in `TableScrollRegion` — a keyboard-focusable overflow
+  region with a dynamic mono "scroll →" hint (`common.scrollHint`, EN/RU) that
+  appears only while columns overflow (the no-gradient scroll affordance).
 - **App shell** — sticky steel bar: mono wordmark with the portal dot, lowercase
   mono nav (Create/Library/Pricing), amber specimen-pill balance chip (opens the
   credit history ledger modal on the steel sheet with triad-signed amounts),
@@ -62,8 +65,9 @@ src/
 │   │                           # commission-sheet panel (SheetField/PromptField/SubmitErrorBanner)
 │   ├── Gallery/                # generations list/poll/delete hooks, cards, grid, detail
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
-│   └── Landing/                # hero, showcase spread, section heading, price tables,
-│                               # how-it-works, FAQ, pricingData
+│   └── Landing/                # hero, showcase spread, section heading, price tables
+│                               # (+ TableScrollRegion overflow wrapper), how-it-works,
+│                               # FAQ, pricingData
 └── shared/
     ├── config/                 # theme.css (v3 terminal tokens + font tokens), i18n (EN/RU), queryClient
     ├── libs/apiClient.ts       # fetch wrapper → ApiClientError with envelope codes
@@ -82,7 +86,7 @@ Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and com
 
 ```bash
 pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
-pnpm --filter @opencreate/web test       # vitest + RTL — 97 tests (jsdom)
+pnpm --filter @opencreate/web test       # vitest + RTL — 100 tests (jsdom)
 pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
 pnpm --filter @opencreate/web lint       # eslint src
 pnpm --filter @opencreate/web typecheck  # tsc --noEmit

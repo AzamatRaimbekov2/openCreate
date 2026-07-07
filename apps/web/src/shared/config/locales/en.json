@@ -237,7 +237,8 @@
     "retry": "Try again",
     "close": "Close",
     "loading": "Loading",
-    "goHome": "Go to home page"
+    "goHome": "Go to home page",
+    "scrollHint": "scroll →"
   },
   "errors": {
     "notFound": {

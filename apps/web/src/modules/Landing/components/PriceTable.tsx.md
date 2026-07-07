@@ -24,7 +24,7 @@ ONE named competitor item per row.
 
 ## Dependencies
 - Imports / depends on: `react-i18next`, `../model/pricingData`,
-  `./SectionHeading`.
+  `./SectionHeading`, `./TableScrollRegion` (the overflow wrapper).
 - Used by: `LandingPage.tsx` (section 02) and `routes/_shell.pricing.tsx`
   (opening 01 section above the per-model credit table).
 
@@ -34,6 +34,7 @@ flowchart LR
   Data[pricingData rows] --> PT[PriceTable.tsx]
   I18N[landing.price.* keys EN/RU] --> PT
   SH[SectionHeading] --> PT
+  TSR[TableScrollRegion] --> PT
   PT --> LP[LandingPage research column]
   PT --> PR[/pricing route — opening section/]
 ```
@@ -50,8 +51,10 @@ flowchart LR
   ceiling law). Small model notes stay mist-dim.
 - No blanket "cheapest" wording anywhere — copy rules allow only the four
   approved claims plus per-row comparisons.
-- `min-w-[36rem]` + `overflow-x-auto` keeps three readable columns on phones
-  without horizontal page scroll (brief QA #5).
+- `min-w-[36rem]` + the `TableScrollRegion` overflow wrapper keeps three
+  readable columns on phones without horizontal page scroll (brief QA #5);
+  v4 QA round 2 swapped the bare `overflow-x-auto` div for `TableScrollRegion`
+  so phones get the no-gradient "scroll →" hint and keyboard focus.
 - **Stage 2**: the verification footnote (`<caption>`) turned PORTAL-BLUE —
   the brief's "portal-blue footnote": the one prose accent now marks the
   honesty line (caption-size portal is ~9:1 on the void, AA-safe).
