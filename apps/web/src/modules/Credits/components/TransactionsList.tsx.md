@@ -56,4 +56,4 @@ flowchart LR
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

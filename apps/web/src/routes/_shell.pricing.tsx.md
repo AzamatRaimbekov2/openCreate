@@ -64,4 +64,4 @@ flowchart LR
 ## Commits
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

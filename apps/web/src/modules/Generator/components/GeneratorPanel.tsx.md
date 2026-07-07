@@ -71,4 +71,4 @@ flowchart TD
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (v3: frame → `rounded-lg border-white/10` on the void — deliberately UNFILLED so the steel inputs inside keep a readable elevation step; labels → quiet lowercase mono captions)
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (v3: frame → `rounded-lg border-white/10` on the void — deliberately UNFILLED so the steel inputs inside keep a readable elevation step; labels → quiet lowercase mono captions)

@@ -41,4 +41,4 @@ flowchart LR
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

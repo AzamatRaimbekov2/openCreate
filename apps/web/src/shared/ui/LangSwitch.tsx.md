@@ -46,4 +46,4 @@ flowchart LR
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

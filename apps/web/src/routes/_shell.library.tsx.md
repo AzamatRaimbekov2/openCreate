@@ -53,4 +53,4 @@ flowchart LR
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

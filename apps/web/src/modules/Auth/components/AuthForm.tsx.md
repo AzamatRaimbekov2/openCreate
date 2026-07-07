@@ -65,4 +65,4 @@ flowchart LR
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs

@@ -32,4 +32,4 @@ flowchart LR
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `PillGroup` — first component needed by 2+ modules per design.md §9)
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (adds `AppShell` + `LangSwitch`)
 - 9d0106d 2026-07-07 feat(web): showcase poster art component (adds `ShowcasePoster` + palettes)
-- (pending) restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (comment-only: kit renamed to v3 terminal)
+- 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (comment-only: kit renamed to v3 terminal)
