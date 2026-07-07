@@ -86,4 +86,20 @@ describe('loadConfig production settings', () => {
     const cfg = loadConfig({ ...baseEnv, WEB_DIST_PATH: '/srv/web-dist' })
     expect(cfg.webDistPath).toBe('/srv/web-dist')
   })
+
+  // SSRF allowlist for provider asset downloads (review finding): the storage
+  // layer only fetches hosts on this list — runware.ai by default, override
+  // via ASSET_HOST_ALLOWLIST for a future provider/CDN change without code.
+  it('defaults assetHostAllowlist to runware.ai', () => {
+    const cfg = loadConfig({ ...baseEnv })
+    expect(cfg.assetHostAllowlist).toEqual(['runware.ai'])
+  })
+
+  it('parses ASSET_HOST_ALLOWLIST as a comma-separated host suffix list', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      ASSET_HOST_ALLOWLIST: 'runware.ai, assets.example.com',
+    })
+    expect(cfg.assetHostAllowlist).toEqual(['runware.ai', 'assets.example.com'])
+  })
 })

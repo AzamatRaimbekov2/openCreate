@@ -12,7 +12,9 @@ const config = loadConfig()
 // even before `pnpm db:migrate` was ever run.
 const { db } = createDb(config.databasePath)
 // Local disk storage (mkdir -p'd on boot); assets are served back at /media/*.
-const storage = createLocalStorage(config.storageDir)
+// The allowlist locks server-side asset fetches to the provider's domain
+// (SSRF gate — asset URLs come from provider responses, not our code).
+const storage = createLocalStorage(config.storageDir, config.assetHostAllowlist)
 // The ONLY place the real Runware key leaves config — the client keeps it in a
 // closure and never exposes it (tests always inject a fake instead).
 const runware = createRunwareClient({ apiKey: config.runwareApiKey })

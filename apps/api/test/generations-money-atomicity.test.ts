@@ -83,6 +83,9 @@ describe('money-path atomicity', () => {
       db,
       runware: rw as unknown as RunwareClient,
       storage: stubStorage(),
+      // This test polls twice back-to-back on purpose (sabotaged settlement,
+      // then recovery) — disable the poll throttle so both hit Runware.
+      pollMinIntervalMs: 0,
     })
     const { dto } = await service.create(uid, {
       modelId: 'pixverse-v6',

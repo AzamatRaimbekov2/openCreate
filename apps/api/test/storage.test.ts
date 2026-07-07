@@ -47,6 +47,57 @@ describe('local storage', () => {
   })
 })
 
+// SSRF defense (review finding): saveFromUrl's input is a provider-reported
+// asset URL. A compromised/misbehaving provider response must not be able to
+// point our server-side fetch at internal targets (cloud metadata endpoints,
+// localhost admin ports). Default-deny: only hosts on the allowlist (default
+// runware.ai + subdomains) are ever fetched.
+describe('saveFromUrl host allowlist (SSRF)', () => {
+  it('refuses a host outside the allowlist and never fetches it', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir)
+    await expect(
+      storage.saveFromUrl('https://169.254.169.254/latest/meta-data', 'gen4', 'webp'),
+    ).rejects.toThrow(/not allowed/)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(existsSync(join(dir, 'gen4.webp'))).toBe(false)
+  })
+
+  it('refuses a suffix-spoof host — evilrunware.ai is not a runware.ai subdomain', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir)
+    await expect(
+      storage.saveFromUrl('https://evilrunware.ai/x.webp', 'gen5', 'webp'),
+    ).rejects.toThrow(/not allowed/)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('allows the bare allowlisted domain and honors a custom allowlist', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(Buffer.from('fake-bytes'), { status: 200 })),
+    )
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    // Bare apex of the default allowlist passes (not only subdomains).
+    const byDefault = createLocalStorage(dir)
+    await expect(byDefault.saveFromUrl('https://runware.ai/a.webp', 'gen6', 'webp')).resolves.toBe(
+      '/media/gen6.webp',
+    )
+    // Custom allowlist (ASSET_HOST_ALLOWLIST) replaces the default entirely.
+    const custom = createLocalStorage(dir, ['assets.example.com'])
+    await expect(
+      custom.saveFromUrl('https://cdn.assets.example.com/a.webp', 'gen7', 'webp'),
+    ).resolves.toBe('/media/gen7.webp')
+    await expect(custom.saveFromUrl('https://vm.runware.ai/v.mp4', 'gen8', 'mp4')).rejects.toThrow(
+      /not allowed/,
+    )
+  })
+})
+
 describe('GET /media/*', () => {
   it('serves files from the storage dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'oc-media-'))

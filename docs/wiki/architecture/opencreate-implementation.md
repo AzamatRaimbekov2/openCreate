@@ -1,7 +1,7 @@
 ---
 type: architecture
 status: current
-updated: 2026-07-06
+updated: 2026-07-07
 sources:
   - ../decisions/opencreate-mvp-architecture.md
   - ../../superpowers/specs/2026-07-06-opencreate-mvp-design.md
@@ -33,6 +33,31 @@ Feature docs: `apps/api/FEATURE.md`, `apps/web/FEATURE.md`. Every source file ha
 | 8. Curated model catalog | `apps/api/src/modules/catalog/catalog.ts` — 2 image + 5 video models with AIR ids, credits, aspect→resolution mapping; `scripts/verify-catalog.ts` checks AIR ids against Runware `modelSearch` |
 | 9. Moderation on | Runware client sends `safety.checkContent` (images) and `safety: { checkContent, mode: 'fast' }` (video) |
 | 10. Landing with verified claims only | `apps/web/src/modules/Landing/` — hero claims, price table marked "verified July 2026" (`model/pricingData.ts`); prerender deferred (plan Task 23, stretch) — `index.html` carries full meta/OG |
+
+## Money-path & data-correctness hardening (2026-07-07 review fixes)
+
+Closes the open review findings on the generation money path (`apps/api`):
+
+- **Atomic charge+insert** — `service.create()` runs `chargeCredits` (tx mode) and
+  the generation row insert in ONE SQLite transaction; a crash between them can no
+  longer charge for a row that never existed. Ledger API grew an optional `tx`
+  param + `logCharge`/`logRefund` after-commit emitters (`credits/ledger.ts`).
+- **Atomic failure settlement** — `failGeneration` flips processing→failed AND
+  refunds in ONE transaction (was flip-then-refund in two; a crash in between
+  stranded a failed row whose charge was kept forever).
+- **DELETE of processing → 409 `conflict`** — new contracts error code (additive);
+  deleting mid-flight forfeited the refund and orphaned the Runware task.
+- **SSRF allowlist** — `storage.saveFromUrl` only fetches hosts on
+  `ASSET_HOST_ALLOWLIST` (default `runware.ai`, exact-or-true-subdomain match;
+  provider asset URLs arrive in provider responses and are untrusted input).
+- **Pagination tiebreaker** — compound `(createdAt, id)` cursor (`<ms>_<id>`,
+  zod-validated at the route); same-millisecond rows are never skipped.
+- **Poll throttle** — per-generation in-memory min interval (3s) between Runware
+  `getResponse` calls; in-window polls answer from DB state.
+
+Tests: `generations-money-atomicity`, `generations-delete`,
+`generations-pagination`, `generations-poll-throttle`, plus storage/config cases —
+api suite 68 → 85 tests.
 
 ## Delta vs ADR (recorded deviations)
 

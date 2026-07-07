@@ -62,6 +62,11 @@ const envSchema = z.object({
   // Comma-separated allowlist for better-auth's CSRF origin check; falls back
   // to WEB_ORIGIN below so a single-origin deploy needs no extra config.
   TRUSTED_ORIGINS: z.string().optional(),
+  // SSRF gate for asset downloads (storage.saveFromUrl): comma-separated host
+  // suffixes the storage layer may fetch from. Provider asset URLs arrive in
+  // PROVIDER RESPONSES, so this is default-deny with only Runware's domain —
+  // a provider/CDN change becomes an env edit instead of a code change.
+  ASSET_HOST_ALLOWLIST: z.string().default('runware.ai'),
 })
 
 export type LogLevel = z.infer<typeof envSchema.shape.LOG_LEVEL>
@@ -83,6 +88,8 @@ export type AppConfig = {
   webDistPath: string
   // Origins allowed to make cookie-carrying state changes (better-auth CSRF).
   trustedOrigins: string[]
+  // Host suffixes storage.saveFromUrl may fetch assets from (SSRF allowlist).
+  assetHostAllowlist: string[]
 }
 
 export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
@@ -120,5 +127,11 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
           .map((o) => o.trim())
           .filter(Boolean)
       : [e.WEB_ORIGIN],
+    // Comma list → trimmed host-suffix allowlist for asset downloads. The
+    // schema default ('runware.ai') means a fresh deploy is locked to the
+    // provider's own domain unless the operator explicitly widens it.
+    assetHostAllowlist: e.ASSET_HOST_ALLOWLIST.split(',')
+      .map((h) => h.trim())
+      .filter(Boolean),
   }
 }

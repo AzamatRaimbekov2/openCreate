@@ -6,8 +6,8 @@
 Single source of typed configuration for the API (plan Task 3). Validates `process.env` with Zod at boot (fail fast on misconfiguration) and maps it to a camelCase `AppConfig`; no other file reads `process.env`. Ops hardening added native `.env` loading: `loadEnvFromFile()` wraps Node 22's `process.loadEnvFile` so `pnpm dev` / `db:migrate` work without manually sourcing the repo-root `.env`.
 
 ## What it does (for an AI reader)
-- Responsibilities: parse + default env vars; normalize empty Google OAuth creds to `null`; hydrate `process.env` from the nearest `.env` file on the default boot path; resolve `WEB_DIST_PATH` to an absolute path anchored at the api package root; parse `TRUSTED_ORIGINS` (comma list, default `[WEB_ORIGIN]`).
-- Public API / exports: `AppConfig` (type — includes `nodeEnv`, `webDistPath`, `trustedOrigins`), `LogLevel` (type), `loadConfig(env?): AppConfig`, `loadEnvFromFile(path?): void`.
+- Responsibilities: parse + default env vars; normalize empty Google OAuth creds to `null`; hydrate `process.env` from the nearest `.env` file on the default boot path; resolve `WEB_DIST_PATH` to an absolute path anchored at the api package root; parse `TRUSTED_ORIGINS` (comma list, default `[WEB_ORIGIN]`) and `ASSET_HOST_ALLOWLIST` (comma list, default `['runware.ai']`).
+- Public API / exports: `AppConfig` (type — includes `nodeEnv`, `webDistPath`, `trustedOrigins`, `assetHostAllowlist`), `LogLevel` (type), `loadConfig(env?): AppConfig`, `loadEnvFromFile(path?): void`.
 - Inputs → Outputs: `NodeJS.ProcessEnv` → validated `AppConfig`; throws `ZodError` on invalid env. `loadEnvFromFile`: explicit path → `ENV_FILE` env var → nearest `.env` walking up from cwd (repo root in this workspace).
 - Side effects: `loadConfig()` with NO argument calls `loadEnvFromFile()` (mutates `process.env` via Node's loader); `loadConfig(env)` with an explicit env object stays pure — tests rely on that.
 
@@ -30,6 +30,7 @@ flowchart LR
 - `webDistPath`: relative values resolve against the PACKAGE root (`fileURLToPath(new URL('..', import.meta.url))` — apps/api from both `src/` and the bundled `dist/`), NOT cwd: `pnpm start` runs from the repo root while `pnpm dev` runs from apps/api, and `../web/dist` must mean apps/web/dist in both.
 - `trustedOrigins`: `TRUSTED_ORIGINS` comma list (trimmed, empties dropped) or `[WEB_ORIGIN]` — the allowlist for better-auth's CSRF origin check; single-origin deploys need no extra var.
 - `NODE_ENV` stays a free string (default `development`); only the exact value `production` flips prod behaviors in `app.ts`.
+- `assetHostAllowlist` (SSRF, review finding): host suffixes `storage.saveFromUrl` may fetch — provider asset URLs arrive in PROVIDER RESPONSES, so downloads are default-deny-locked to Runware's domain; a provider/CDN change is an env edit (`ASSET_HOST_ALLOWLIST`), not code. Consumed by `index.ts` → `createLocalStorage(dir, allowlist)`.
 
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route

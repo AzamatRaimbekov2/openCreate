@@ -5,7 +5,7 @@
 // and refund exactly once on failure. Injected deps (db/runware/storage) keep
 // it fully testable with the scripted fake in test/helpers/build-test-app.ts.
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, lt } from 'drizzle-orm'
+import { and, desc, eq, lt, or } from 'drizzle-orm'
 import type { CreateGenerationInput, Generation } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
@@ -46,7 +46,25 @@ export class ContentBlockedError extends Error {
 // `log` is the BASE app logger — the fallback for money-path events. Routes
 // additionally pass their per-request child logger (req.log) into create/get
 // so charge/refund/settle/provider-error lines carry the request's reqId.
-type Deps = { db: Db; runware: RunwareClient; storage: StorageProvider; log?: MoneyLog }
+// `pollMinIntervalMs` (default DEFAULT_POLL_MIN_INTERVAL_MS) throttles how
+// often ONE generation may hit Runware getResponse — injectable so tests can
+// disable (0) or exercise it without real clocks.
+type Deps = {
+  db: Db
+  runware: RunwareClient
+  storage: StorageProvider
+  log?: MoneyLog
+  pollMinIntervalMs?: number
+}
+
+// Minimum wall-clock gap between two Runware getResponse calls for the SAME
+// generation (review finding): get() doubles as the poll, so N open tabs (or
+// a scripted client) polling one processing row translated 1:1 into provider
+// calls. 3s stays under the SPA's own 4s poll cadence — a single well-behaved
+// client is never throttled — while capping what any number of concurrent
+// pollers can do to the provider. Polls inside the window are answered from
+// the DB state, which is at most one interval stale.
+export const DEFAULT_POLL_MIN_INTERVAL_MS = 3000
 
 // How long a row may stay 'processing' before it counts as abandoned. There
 // are no background workers in the MVP — settlement is driven entirely by the
@@ -144,7 +162,19 @@ function toDto(row: typeof generation.$inferSelect): Generation {
 
 export type GenerationService = ReturnType<typeof createGenerationService>
 
-export function createGenerationService({ db, runware, storage, log: baseLog }: Deps) {
+export function createGenerationService({
+  db,
+  runware,
+  storage,
+  log: baseLog,
+  pollMinIntervalMs = DEFAULT_POLL_MIN_INTERVAL_MS,
+}: Deps) {
+  // Per-generation timestamp of the last REAL Runware poll. In-memory on
+  // purpose (MVP is a single process): losing it on restart merely allows one
+  // extra provider call per generation, which is harmless. Entries are
+  // dropped on every terminal transition observed by get() so the map only
+  // ever holds currently-processing generations.
+  const lastPolledAt = new Map<string, number>()
   // `created: true` → the asset is final (image, sync) → route answers 201.
   // `created: false` → accepted for async processing (video) → route answers 202.
   // `reqLog` is the caller's request-scoped logger (req.log) so every money
@@ -348,6 +378,7 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
     // — settle it as failed + refund instead of holding the charge forever.
     if (Date.now() - row.createdAt.getTime() > STALE_PROCESSING_MS) {
       failGeneration(db, userId, id, 'generation timed out', null, log)
+      lastPolledAt.delete(id)
       const settled = db.select().from(generation).where(eq(generation.id, id)).get()
       return toDto(settled!)
     }
@@ -357,6 +388,18 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
     // (and refund a job that is about to succeed). Return the row as-is; the
     // SPA's next poll will find the uuid once the submit completes.
     if (!row.runwareTaskUuid) return toDto(row)
+
+    // Poll throttle: a getResponse call for this generation happened inside
+    // the min interval → answer from the DB state (at most one interval
+    // stale) without touching Runware. The timestamp is written BEFORE the
+    // await, so concurrent handlers racing on the same generation observe it
+    // synchronously — N simultaneous GETs still cost exactly one provider
+    // call. (If the poll itself then fails, the row simply stays processing
+    // and becomes pollable again after the window — no state is lost.)
+    const lastPoll = lastPolledAt.get(id)
+    const nowMs = Date.now()
+    if (lastPoll !== undefined && nowMs - lastPoll < pollMinIntervalMs) return toDto(row)
+    lastPolledAt.set(id, nowMs)
 
     const poll = await runware.getResponse(row.runwareTaskUuid)
     if (poll.status === 'processing') {
@@ -377,6 +420,7 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
           'content_blocked',
           log,
         )
+        lastPolledAt.delete(id)
         const settled = db.select().from(generation).where(eq(generation.id, id)).get()
         return toDto(settled!)
       }
@@ -391,6 +435,7 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
           'provider returned no asset',
         )
         failGeneration(db, userId, id, 'provider returned no asset', null, log)
+        lastPolledAt.delete(id)
         const settled = db.select().from(generation).where(eq(generation.id, id)).get()
         return toDto(settled!)
       }
@@ -438,25 +483,49 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
       failGeneration(db, userId, id, poll.message, null, log)
     }
     const updated = db.select().from(generation).where(eq(generation.id, id)).get()
+    // Terminal transition observed (settle above or failGeneration) → drop the
+    // throttle entry; only currently-processing rows may occupy the map.
+    if (updated!.status !== 'processing') lastPolledAt.delete(id)
     return toDto(updated!)
   }
 
-  // Cursor = createdAt epoch-ms of the last returned row; fetch limit+1 to
-  // learn whether another page exists without a COUNT query.
+  // Compound cursor `<createdAtMs>_<id>` of the last returned row (review
+  // finding): a createdAt-only cursor with strict `<` SKIPPED rows sharing
+  // the boundary millisecond — sqlite timestamps are ms-resolution, so a
+  // burst of generations (or a batch import) lands several rows on the same
+  // tick, and whichever ones fell after the page boundary vanished from the
+  // library forever. The order and the WHERE now use (createdAt, id) with id
+  // as the total-order tiebreaker: same-ms rows resume exactly where the
+  // previous page stopped. A bare `<createdAtMs>` cursor (pre-tiebreaker
+  // format, possibly still held by an open SPA session) keeps working with
+  // the old timestamp-only semantics. Fetch limit+1 to learn whether another
+  // page exists without a COUNT query.
   function list(userId: string, limit: number, cursor?: string) {
+    let cursorFilter
+    if (cursor) {
+      const [tsRaw, cursorId] = cursor.split('_')
+      const ts = new Date(Number(tsRaw))
+      cursorFilter = cursorId
+        ? or(
+            lt(generation.createdAt, ts),
+            and(eq(generation.createdAt, ts), lt(generation.id, cursorId)),
+          )
+        : lt(generation.createdAt, ts)
+    }
     const rows = db
       .select()
       .from(generation)
       .where(
-        cursor
-          ? and(eq(generation.userId, userId), lt(generation.createdAt, new Date(Number(cursor))))
+        cursorFilter
+          ? and(eq(generation.userId, userId), cursorFilter)
           : eq(generation.userId, userId),
       )
-      .orderBy(desc(generation.createdAt))
+      .orderBy(desc(generation.createdAt), desc(generation.id))
       .limit(limit + 1)
       .all()
     const items = rows.slice(0, limit).map(toDto)
-    const nextCursor = rows.length > limit ? String(rows[limit - 1]!.createdAt.getTime()) : null
+    const last = rows.length > limit ? rows[limit - 1]! : null
+    const nextCursor = last ? `${last.createdAt.getTime()}_${last.id}` : null
     return { items, nextCursor }
   }
 

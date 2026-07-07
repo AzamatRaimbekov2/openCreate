@@ -3,6 +3,7 @@
 // (validation, charging, refunds) live in service.ts; all error → envelope
 // mapping lives in the app.ts central handler. Every route requires a session.
 import type { FastifyInstance } from 'fastify'
+import { z } from 'zod'
 import { createGenerationInputSchema } from '@opencreate/contracts'
 import type { GenerationService } from './service'
 
@@ -10,6 +11,13 @@ import type { GenerationService } from './service'
 // ?limit= so one request can't dump an unbounded result set.
 const DEFAULT_LIMIT = 24
 const MAX_LIMIT = 50
+
+// ?cursor= is attacker-controlled input — allowlist-validate it at the route
+// boundary instead of feeding it into Number()/SQL params blindly. Accepted
+// shapes: `<epochMs>_<id>` (the compound cursor list() hands out; ids are our
+// UUIDs) and bare `<epochMs>` (legacy pre-tiebreaker cursors an open SPA
+// session may still hold). Anything else → 400 validation envelope.
+const cursorSchema = z.string().regex(/^\d{1,15}(_[0-9a-fA-F-]{1,64})?$/, 'invalid cursor')
 
 export function registerGenerationRoutes(app: FastifyInstance, service: GenerationService) {
   // Strict rate bucket (ops hardening): every submit spends provider money —
@@ -38,13 +46,28 @@ export function registerGenerationRoutes(app: FastifyInstance, service: Generati
     return reply.status(created ? 201 : 202).send(dto)
   })
 
-  app.get<{ Querystring: { limit?: string; cursor?: string } }>('/api/generations', async (req) => {
-    const sessionUser = await app.requireUser(req)
-    const raw = Number(req.query.limit ?? DEFAULT_LIMIT)
-    // NaN/0/negative fall back to the default; big values clamp to MAX.
-    const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, MAX_LIMIT) : DEFAULT_LIMIT
-    return service.list(sessionUser.id, limit, req.query.cursor)
-  })
+  app.get<{ Querystring: { limit?: string; cursor?: string } }>(
+    '/api/generations',
+    async (req, reply) => {
+      const sessionUser = await app.requireUser(req)
+      const raw = Number(req.query.limit ?? DEFAULT_LIMIT)
+      // NaN/0/negative fall back to the default; big values clamp to MAX.
+      const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, MAX_LIMIT) : DEFAULT_LIMIT
+      // Malformed cursors are a client error, not something to guess about:
+      // reject up front so the service only ever parses the shapes it minted.
+      let cursor: string | undefined
+      if (req.query.cursor !== undefined) {
+        const parsed = cursorSchema.safeParse(req.query.cursor)
+        if (!parsed.success) {
+          return reply
+            .status(400)
+            .send({ error: { code: 'validation_failed', message: 'invalid cursor' } })
+        }
+        cursor = parsed.data
+      }
+      return service.list(sessionUser.id, limit, cursor)
+    },
+  )
 
   app.get<{ Params: { id: string } }>('/api/generations/:id', async (req) => {
     const sessionUser = await app.requireUser(req)

@@ -18,9 +18,15 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   asset in our own storage → poll-on-read for async video → refund on failure.
   Images are synchronous (201); video is async (202 + SPA polls `GET /:id` every 4s,
   each poll re-asks Runware `getResponse`). Finished assets are downloaded immediately
-  because Runware URLs expire in 7 days.
+  because Runware URLs expire in 7 days. Money-path atomicity: charge+row-insert and
+  fail-flip+refund are each ONE SQLite transaction (a crash between the halves can
+  neither eat credits nor strand a failed row without its refund). Per-generation
+  poll throttle (3s min between provider polls; in-window polls answer from DB) and
+  a compound `(createdAt, id)` pagination cursor (same-ms rows are never skipped).
+  Deleting a processing generation is refused with 409 `conflict`.
 - **Media** — `@fastify/static` serves `STORAGE_DIR` at `/media/*` (UUID keys, public
-  by design for the MVP).
+  by design for the MVP). Asset downloads are SSRF-gated: `saveFromUrl` only fetches
+  hosts on `ASSET_HOST_ALLOWLIST` (default `runware.ai` + true subdomains).
 - **Errors** — every failure leaves as the shared envelope
   `{ error: { code, message } }` with stable codes from `@opencreate/contracts`.
   Unexpected 5xx are sanitized to `internal_error` / "Something went wrong" — the real
@@ -44,8 +50,8 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | GET | `/api/credits/transactions` | ✓ | last 100 ledger rows, newest first |
 | GET | `/api/catalog` | – | `{ models: CatalogModel[] }` |
 | POST | `/api/generations` | ✓ | body `CreateGenerationInput`; 201 image / 202 video; 400/402/502 |
-| GET | `/api/generations` | ✓ | `?limit` (≤50, default 24) `&cursor`; `{ items, nextCursor }` |
-| GET | `/api/generations/:id` | ✓ | doubles as the Runware poll while processing |
+| GET | `/api/generations` | ✓ | `?limit` (≤50, default 24) `&cursor` (zod-validated, 400 on garbage); `{ items, nextCursor }` |
+| GET | `/api/generations/:id` | ✓ | doubles as the Runware poll while processing (throttled to 1 provider call / 3s / generation) |
 | DELETE | `/api/generations/:id` | ✓ | 204; removes media file + row; 409 `conflict` while processing |
 | GET | `/media/:file` | – | stored generation assets |
 | GET | `/*` | – | production only: built SPA + index.html fallback |
@@ -77,7 +83,7 @@ Every `.ts` has a `.ts.md` sidecar doc with responsibilities, diagrams and commi
 ```bash
 pnpm --filter @opencreate/api dev         # tsx watch, http://localhost:8787
 pnpm --filter @opencreate/api db:migrate  # create SQLite + tables (also runs on boot)
-pnpm --filter @opencreate/api test        # vitest — 68 tests, all HTTP-level or unit
+pnpm --filter @opencreate/api test        # vitest — 85 tests, all HTTP-level or unit
 pnpm --filter @opencreate/api lint        # eslint src test
 pnpm --filter @opencreate/api typecheck   # tsc --noEmit
 pnpm --filter @opencreate/api build       # tsc type gate + esbuild → dist/index.js
@@ -87,7 +93,8 @@ pnpm start                                # same, from the repo root
 
 Env (see `.env.example`): `RUNWARE_API_KEY`, `BETTER_AUTH_SECRET` are required;
 `DATABASE_PATH`, `STORAGE_DIR`, `SIGNUP_BONUS_CREDITS`, `GOOGLE_CLIENT_ID/SECRET`,
-`LOG_LEVEL`, `NODE_ENV`, `TRUSTED_ORIGINS`, `WEB_DIST_PATH`, `ENV_FILE` optional.
+`LOG_LEVEL`, `NODE_ENV`, `TRUSTED_ORIGINS`, `WEB_DIST_PATH`, `ASSET_HOST_ALLOWLIST`
+(SSRF allowlist for asset downloads, default `runware.ai`), `ENV_FILE` optional.
 The nearest `.env` (repo root) is loaded natively at boot via Node 22
 `process.loadEnvFile` — no manual sourcing; real env vars always win. In prod,
 `BETTER_AUTH_URL` must be the public https origin. Tests never need env — they

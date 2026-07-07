@@ -34,6 +34,12 @@ export type TestAppOverrides = {
   nodeEnv?: string
   webDistPath?: string
   trustedOrigins?: string[]
+  // Poll throttle seam. Tests default to 0 (disabled) because many suites
+  // deliberately script back-to-back polls of one generation (processing →
+  // succeeded etc.) and must see Runware answer each step; the throttle's own
+  // tests opt in with a real interval. Production keeps the service's 3s
+  // default (pinned by a service-level test in generations-poll-throttle).
+  pollMinIntervalMs?: number
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -44,6 +50,8 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
     storage: createLocalStorage(storageDir),
     runware: overrides.runware ?? (fakeRunware() as unknown as RunwareClient),
     ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
+    // 0 disables the poll throttle by default (see TestAppOverrides note).
+    pollMinIntervalMs: overrides.pollMinIntervalMs ?? 0,
     config: {
       databasePath: ':memory:',
       storageDir,
@@ -56,6 +64,9 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       googleClientId: null,
       googleClientSecret: null,
       logLevel: overrides.logLevel ?? 'silent',
+      // Matches the storage default; tests that probe the SSRF allowlist
+      // construct their own createLocalStorage with a custom list instead.
+      assetHostAllowlist: ['runware.ai'],
       // 'test' (NOT 'production') by default: prod-only behaviors like SPA
       // serving must be opted into explicitly by the tests that pin them.
       nodeEnv: overrides.nodeEnv ?? 'test',

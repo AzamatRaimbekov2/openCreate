@@ -29,6 +29,11 @@ export type AppDeps = {
   // Optional pino destination override. Tests inject a capture stream to
   // assert on structured log lines; production leaves it unset (stdout).
   logStream?: { write: (msg: string) => void }
+  // Per-generation min interval between Runware getResponse calls (service
+  // poll throttle). Unset in production (service default 3s); tests inject 0
+  // to keep back-to-back poll scripts deterministic, or a real value to
+  // exercise the throttle itself.
+  pollMinIntervalMs?: number
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -128,6 +133,10 @@ export async function buildApp(deps: AppDeps) {
       runware: deps.runware,
       storage: deps.storage,
       log: app.log,
+      // undefined → the service's own 3s default; only tests override this.
+      ...(deps.pollMinIntervalMs !== undefined
+        ? { pollMinIntervalMs: deps.pollMinIntervalMs }
+        : {}),
     }),
   )
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
