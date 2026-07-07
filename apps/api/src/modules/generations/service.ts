@@ -74,10 +74,14 @@ export const DEFAULT_POLL_MIN_INTERVAL_MS = 3000
 // is far beyond any legitimate in-flight generation.
 export const STALE_PROCESSING_MS = 60 * 60 * 1000
 
-// Guarded terminal transition shared by every failure path: only a row that
-// is STILL processing is flipped (concurrent pollers/creators race each
-// other), and refundCredits is idempotent (once-per-generation guard in the
-// ledger) — so no combination of callers can double-refund or resurrect a row.
+// Guarded terminal transition shared by EVERY failure path (image catch,
+// video submit catch, poll error, NSFW, no-asset, stale sweep): a single
+// check-and-set transaction in which ONLY a row still 'processing' is flipped
+// to failed, and ONLY that flip triggers the refund. A row that raced to
+// 'succeeded' is left completely alone — refunding it would hand the user the
+// asset AND the money. refundCredits stays idempotent on top (once-per-
+// generation guard in the ledger), so no combination of callers can
+// double-refund or resurrect a row.
 function failGeneration(
   db: Db,
   userId: string,
@@ -98,14 +102,21 @@ function failGeneration(
   // both commit or neither does: a refund failure aborts the flip too, the row
   // stays processing, and the next poll (or the sweep) re-runs the settlement.
   db.transaction((tx) => {
+    // Check-and-set guards the WHOLE settlement, refund included (review
+    // finding: refund-after-success race). The refund used to run
+    // unconditionally here while only the flip was status-guarded — a row a
+    // concurrent settler had already flipped to 'succeeded' stayed succeeded
+    // but was REFUNDED anyway: the user kept both the asset and the money.
+    // Only the processing → failed transition may trigger the refund; any
+    // other current status (succeeded, or already failed = already refunded,
+    // since flip+refund commit together) means there is nothing to settle.
     const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
-    if (fresh?.status === 'processing') {
-      tx.update(generation)
-        .set({ status: 'failed', errorMessage, errorCode, completedAt: new Date() })
-        .where(eq(generation.id, id))
-        .run()
-      failed = true
-    }
+    if (fresh?.status !== 'processing') return
+    tx.update(generation)
+      .set({ status: 'failed', errorMessage, errorCode, completedAt: new Date() })
+      .where(eq(generation.id, id))
+      .run()
+    failed = true
     // Refund joins the same transaction (idempotent inside the ledger — the
     // once-per-generation guard runs on this tx too, so concurrent settlers
     // still cannot double-credit).
@@ -347,15 +358,22 @@ export function createGenerationService({
         { event: 'provider.error', userId, generationId: id, err },
         'video submit failed',
       )
-      refundCredits(db, userId, id, log)
-      db.update(generation)
-        .set({
-          status: 'failed',
-          errorMessage: err instanceof Error ? err.message : 'submit failed',
-          completedAt: new Date(),
-        })
-        .where(eq(generation.id, id))
-        .run()
+      // Settlement reuses the guarded atomic failGeneration (review finding):
+      // this block used to run refundCredits and the failed-status flip as TWO
+      // separate transactions in refund-then-flip order — a crash between them
+      // committed a refund while the row stayed 'processing' (a later sweep
+      // would re-run the settlement and only the ledger's idempotence guard
+      // stood between that and a double credit), and the flip itself carried
+      // no status check. One transaction now: flip + refund commit or roll
+      // back together, and a row that somehow already settled is untouched.
+      failGeneration(
+        db,
+        userId,
+        id,
+        err instanceof Error ? err.message : 'submit failed',
+        null,
+        log,
+      )
       throw err
     }
     const row = db.select().from(generation).where(eq(generation.id, id)).get()

@@ -32,8 +32,8 @@ flowchart TD
   C --> R[+ insert processing row, NO task uuid yet]
   R -- image --> I[runware.imageInference] --> S[storage.saveFromUrl] --> GTX[guarded flip → succeeded → 201]
   R -- video --> SV[runware.submitVideo] --> PU[publish runwareTaskUuid, guarded] --> A[202 processing]
-  I -- throw --> RF[refund + mark failed + rethrow]
-  SV -- throw --> RF
+  I -- throw --> TF
+  SV -- throw --> TF
   G[GET /api/generations/:id] --> Q{processing?}
   Q -- no --> DTO[return row as-is]
   Q -- yes --> ST{older than 1h?}
@@ -44,7 +44,7 @@ flowchart TD
   PL -- processing --> UP[update progress]
   PL -- success w/o URL --> TF
   PL -- success --> DL[download asset] --> TX[guarded flip → succeeded]
-  PL -- error --> TF[failGeneration: guarded flip → failed + idempotent refund]
+  PL -- error --> TF[failGeneration: ONE tx check-and-set — only processing → failed, ONLY the flip triggers the refund]
   B[app.ts boot] --> SW[settleStaleGenerations sweep] --> TF
 ```
 
@@ -52,6 +52,8 @@ flowchart TD
 - Charge happens BEFORE any provider call: a 402 means Runware was never contacted (asserted in tests).
 - **Atomic charge+insert (review finding)**: the credit charge and the processing-row insert run in ONE `db.transaction` (`chargeCredits` in tx mode) — as two transactions, a crash between them charged the user for a row that never existed (nothing to settle or refund). The `credits.charge` audit line is emitted only after the combined commit (`logCharge`). Pinned by `test/generations-money-atomicity.test.ts`.
 - **Atomic failure settlement (review finding)**: `failGeneration` runs the processing→failed flip AND the idempotent refund in ONE transaction (`refundCredits` in tx mode). The old flip-then-refund pair could crash in between, leaving a failed row whose charge was kept forever (the stale sweep only rescues 'processing' rows). Now a refund failure aborts the flip too — the row stays processing and the next poll/sweep re-runs the settlement. Fail/refund logs are emitted after the commit, gated on the flip/mutation actually applying.
+- **Refund-after-success race (review finding)**: the check-and-set inside `failGeneration`'s transaction guards the WHOLE settlement, refund included — only the processing → failed flip triggers `refundCredits`. Previously the refund ran unconditionally while only the flip was guarded, so a row a concurrent settler had already flipped to 'succeeded' stayed succeeded but was refunded anyway (user keeps asset + money). A non-processing row is now left completely untouched. Pinned by `test/generations-money-atomicity.test.ts` ("raced to succeeded").
+- **Atomic video submit settlement (review finding)**: `create()`'s video catch block reuses `failGeneration` instead of running `refundCredits` and an unguarded failed-flip as two separate transactions (refund-then-flip order could commit the refund while the row stayed processing). Pinned by `test/generations-money-atomicity.test.ts` (sabotaged-flip + happy-failure cases).
 - **Anti-double-spend (create/poll race)**: the processing row is inserted WITHOUT `runwareTaskUuid`; the uuid is published only after the provider call is acknowledged (video) — and images never need it. `get()` refuses to poll a row with a null uuid. This closes the window where a concurrent GET /:id polled Runware for a task it didn't know yet, misread the error as terminal, refunded, and create() then flipped the row to succeeded anyway (charge + refund = 0, asset delivered). Pinned by `test/generations-races.test.ts`.
 - The image success transition is a status-guarded transaction (only processing → succeeded); if the row was settled elsewhere, the downloaded asset is discarded instead of delivered.
 - Every failure path after the charge refunds; `refundCredits` is idempotent (once-per-generation guard lives in the ledger), so concurrent polls cannot double-refund.

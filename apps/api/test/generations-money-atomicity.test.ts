@@ -15,7 +15,11 @@ import type { CreateGenerationInput } from '@opencreate/contracts'
 import { createDb, type Db } from '../src/db/client'
 import { creditTransaction, generation, user } from '../src/db/schema'
 import { grantSignupBonus } from '../src/modules/credits/ledger'
-import { createGenerationService } from '../src/modules/generations/service'
+import {
+  createGenerationService,
+  settleStaleGenerations,
+  STALE_PROCESSING_MS,
+} from '../src/modules/generations/service'
 import type { RunwareClient } from '../src/integrations/runware/client'
 import type { StorageProvider } from '../src/storage/local'
 import { fakeRunware } from './helpers/build-test-app'
@@ -106,6 +110,111 @@ describe('money-path atomicity', () => {
     // Recovery: the next poll settles fail + refund together — exactly once.
     const settled = await service.get(uid, dto.id)
     expect(settled.status).toBe('failed')
+    expect(balance(db, uid)).toBe(200)
+    expect(ledgerRows(db, uid, 'refund')).toHaveLength(1)
+  })
+
+  it('failGeneration: a row that raced to succeeded is left alone — no refund, status keeps succeeded', async () => {
+    // Refund-after-success race (review finding): the fail path used to run
+    // refundCredits UNCONDITIONALLY — the status guard only gated the flip.
+    // A row that another settler flipped to 'succeeded' between get()'s read
+    // and the failure settlement was left succeeded but REFUNDED: the user
+    // keeps the asset and the money. The whole fail path must be a
+    // check-and-set inside one transaction — only processing → failed refunds.
+    const { db } = createDb(':memory:')
+    const uid = seedUser(db)
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const service = createGenerationService({
+      db,
+      runware: rw as unknown as RunwareClient,
+      storage: stubStorage(),
+      pollMinIntervalMs: 0,
+    })
+    const { dto } = await service.create(uid, {
+      modelId: 'pixverse-v6',
+      prompt: 'waves',
+      aspectRatio: '9:16',
+      duration: 5,
+    })
+    expect(balance(db, uid)).toBe(165)
+    // The provider poll reports an error, but WHILE it is in flight a
+    // concurrent settler (other tab / other poll) lands the success: the row
+    // is 'succeeded' by the time the failure settlement transaction runs.
+    // better-sqlite3 is synchronous, so mutating inside the mock is exactly
+    // "between get()'s initial read and failGeneration's transaction".
+    rw.getResponse.mockImplementation(async () => {
+      db.update(generation)
+        .set({ status: 'succeeded', mediaJson: '["/media/x.mp4"]', completedAt: new Date() })
+        .where(eq(generation.id, dto.id))
+        .run()
+      return { status: 'error', message: 'provider exploded' }
+    })
+    const out = await service.get(uid, dto.id)
+    // Succeeded wins: no flip, no refund, the charge stays settled.
+    expect(out.status).toBe('succeeded')
+    const row = db.select().from(generation).where(eq(generation.id, dto.id)).get()
+    expect(row?.status).toBe('succeeded')
+    expect(balance(db, uid)).toBe(165)
+    expect(ledgerRows(db, uid, 'refund')).toHaveLength(0)
+  })
+
+  it('create(): video submit-failure settlement is ONE transaction — a flip failure rolls the refund back', async () => {
+    // Review finding: the video catch block ran refundCredits and the failed
+    // flip as TWO transactions (refund first). A crash between them committed
+    // the refund while the row stayed processing — inconsistent ledger state.
+    // Sabotage the flip half (generation table gone): the refund must abort
+    // WITH it, leaving the charge held and the row processing for recovery.
+    const { db, sqlite } = createDb(':memory:')
+    const uid = seedUser(db)
+    const rw = fakeRunware()
+    rw.submitVideo.mockImplementation(async () => {
+      sqlite.exec('ALTER TABLE generation RENAME TO generation_disabled')
+      throw new Error('runware down')
+    })
+    const service = createGenerationService({
+      db,
+      runware: rw as unknown as RunwareClient,
+      storage: stubStorage(),
+    })
+    const input: CreateGenerationInput = {
+      modelId: 'pixverse-v6',
+      prompt: 'waves',
+      aspectRatio: '9:16',
+      duration: 5,
+    }
+    await expect(service.create(uid, input)).rejects.toThrow()
+    sqlite.exec('ALTER TABLE generation_disabled RENAME TO generation')
+    // Atomic: no committed refund without the failed flip.
+    const rows = db.select().from(generation).where(eq(generation.userId, uid)).all()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.status).toBe('processing')
+    expect(balance(db, uid)).toBe(165)
+    expect(ledgerRows(db, uid, 'refund')).toHaveLength(0)
+    // Recovery: the stale sweep settles fail + refund together — exactly once.
+    settleStaleGenerations(db, Date.now() + STALE_PROCESSING_MS + 1000)
+    const settled = db.select().from(generation).where(eq(generation.id, rows[0]!.id)).get()
+    expect(settled?.status).toBe('failed')
+    expect(balance(db, uid)).toBe(200)
+    expect(ledgerRows(db, uid, 'refund')).toHaveLength(1)
+  })
+
+  it('create(): video submit failure settles fail + refund together (happy failure path)', async () => {
+    const { db } = createDb(':memory:')
+    const uid = seedUser(db)
+    const rw = fakeRunware()
+    rw.submitVideo.mockRejectedValue(new Error('runware down'))
+    const service = createGenerationService({
+      db,
+      runware: rw as unknown as RunwareClient,
+      storage: stubStorage(),
+    })
+    await expect(
+      service.create(uid, { modelId: 'pixverse-v6', prompt: 'waves', aspectRatio: '9:16', duration: 5 }),
+    ).rejects.toThrow('runware down')
+    const row = db.select().from(generation).where(eq(generation.userId, uid)).get()
+    expect(row?.status).toBe('failed')
+    expect(row?.errorMessage).toBe('runware down')
     expect(balance(db, uid)).toBe(200)
     expect(ledgerRows(db, uid, 'refund')).toHaveLength(1)
   })

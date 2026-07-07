@@ -20,7 +20,11 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   each poll re-asks Runware `getResponse`). Finished assets are downloaded immediately
   because Runware URLs expire in 7 days. Money-path atomicity: charge+row-insert and
   fail-flip+refund are each ONE SQLite transaction (a crash between the halves can
-  neither eat credits nor strand a failed row without its refund). Per-generation
+  neither eat credits nor strand a failed row without its refund). The failure
+  settlement is a check-and-set guarding the WHOLE path, refund included: only the
+  processing → failed flip triggers the refund, so a row that raced to `succeeded`
+  is never refunded (asset + money), and the video submit-failure path reuses the
+  same atomic settlement instead of a separate refund-then-flip pair. Per-generation
   poll throttle (3s min between provider polls; in-window polls answer from DB) and
   a compound `(createdAt, id)` pagination cursor (same-ms rows are never skipped).
   Deleting a processing generation is refused with 409 `conflict`.
