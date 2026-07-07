@@ -1,0 +1,46 @@
+# Secrets — runtime env comes from `docker compose --env-file`/env_file,
+# NEVER baked into the image or the build context.
+.env
+.env.*
+
+# VCS / agent-runtime / local workspace state
+.git
+.gitignore
+.ai
+.claude
+.claude-flow
+.claude-flow-bootstrap.log
+.codex
+.swarm
+.rtk
+.mcp.json
+.AI.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+ruvector.db
+*.db
+*.log
+.DS_Store
+docs
+
+# Dependencies & build output — installed and built inside the image
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+
+# Runtime data (sqlite + media) — lives in the ./data volume, never in the image
+data
+apps/api/data
+
+# Test artifacts / local caches
+apps/web/test-results
+apps/web/playwright-report
+apps/web/.tanstack
+
+# Packaging files themselves (not needed inside the build context)
+Dockerfile
+docker-compose.yml
+PROD.md
+README.md

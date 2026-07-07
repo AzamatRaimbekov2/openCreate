@@ -1,0 +1,34 @@
+# openCreate production compose — one container: API + built SPA on :8787.
+# First run: cp .env.example .env, fill RUNWARE_API_KEY + BETTER_AUTH_SECRET,
+# then `docker compose up -d --build`. Runbook: PROD.md.
+services:
+  opencreate:
+    build: .
+    ports:
+      - '8787:8787'
+    # Secrets and config come from the repo-root .env (gitignored, dockerignored).
+    env_file: .env
+    environment:
+      # Wins over env_file: a dev .env with NODE_ENV=development must not
+      # switch off single-origin SPA serving inside the container.
+      NODE_ENV: production
+    volumes:
+      # SQLite db + downloaded media. Backup = copy this directory.
+      # On Linux hosts make it writable by uid 1000: chown -R 1000:1000 ./data
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      # node's global fetch — the slim image ships no curl/wget.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          # NOTE: string concat, not a template literal — compose would try to
+          # interpolate `${p}` as a compose variable.
+          "const p=process.env.API_PORT||8787;fetch('http://127.0.0.1:'+p+'/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
