@@ -264,6 +264,18 @@
       "reload": "Refresh the page"
     },
     "loadFailed": "We could not load the data. Try refreshing the page.",
-    "actionFailed": "We could not complete the action. Please try again."
+    "actionFailed": "We could not complete the action. Please try again.",
+    "codes": {
+      "unauthorized": "Please sign in to continue.",
+      "notFound": "This item no longer exists.",
+      "validationFailed": "The request looks invalid — check the fields and try again.",
+      "insufficientCredits": "Not enough credits for this generation.",
+      "contentBlocked": "Blocked by the safety filter — try a different prompt.",
+      "providerError": "The model provider could not finish this generation.",
+      "rateLimited": "Too many requests — wait a moment and try again.",
+      "conflict": "This generation is still processing — wait for it to finish.",
+      "internalError": "Something went wrong on our side. Please try again.",
+      "unknown": "Something went wrong. Please try again."
+    }
   }
 }

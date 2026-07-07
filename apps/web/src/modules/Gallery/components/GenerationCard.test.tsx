@@ -134,6 +134,24 @@ describe('GenerationCard', () => {
     expect(container.querySelector('video')).not.toBeInTheDocument()
   })
 
+  it('failed without a code: localized generic primary, raw text only as the secondary line', () => {
+    renderCard(failedVideo)
+    // The primary reason is OUR copy — never the raw server string
+    expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
+    // The raw provider text may only be the quiet secondary diagnostic line
+    expect(screen.getByText('timeoutProvider')).toHaveClass('text-mist-dim')
+  })
+
+  it('failed with provider_error: localized provider copy as the primary message', () => {
+    renderCard({
+      ...failedVideo,
+      errorCode: 'provider_error',
+      errorMessage: 'Runware task xyz failed',
+    })
+    expect(screen.getByText(/provider could not finish/i)).toBeInTheDocument()
+    expect(screen.getByText('Runware task xyz failed')).toHaveClass('text-mist-dim')
+  })
+
   it('failed with content_blocked: shows the localized safety message, not the raw provider text', () => {
     renderCard(blockedVideo)
     expect(screen.getByText(/blocked by the safety filter/i)).toBeInTheDocument()

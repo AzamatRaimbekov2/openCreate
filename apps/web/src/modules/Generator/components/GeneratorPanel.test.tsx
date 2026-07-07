@@ -282,4 +282,50 @@ describe('GeneratorPanel', () => {
       '/pricing',
     )
   })
+
+  // QA finding 3: every envelope code gets OUR localized primary copy; the raw
+  // server message may only appear as a quiet secondary diagnostic line.
+  it('maps provider errors to localized copy with the raw detail as a secondary line', async () => {
+    apiMock.mockImplementation((path) => {
+      if (path === '/api/catalog') return Promise.resolve({ models })
+      return Promise.reject(new ApiClientError('provider_error', 'Runware task xyz failed', 502))
+    })
+    renderPanel()
+    const prompt = await screen.findByLabelText(/prompt/i)
+    await userEvent.type(prompt, 'red fox in the snow')
+    await userEvent.click(screen.getByRole('button', { name: /generate/i }))
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent(/provider could not finish/i)
+    // Raw text present, but only as the secondary mist-dim line
+    expect(within(banner).getByText('Runware task xyz failed')).toHaveClass('text-mist-dim')
+  })
+
+  it('maps a conflict failure to its dedicated localized copy', async () => {
+    apiMock.mockImplementation((path) => {
+      if (path === '/api/catalog') return Promise.resolve({ models })
+      return Promise.reject(new ApiClientError('conflict', 'Generation still processing', 409))
+    })
+    renderPanel()
+    const prompt = await screen.findByLabelText(/prompt/i)
+    await userEvent.type(prompt, 'red fox in the snow')
+    await userEvent.click(screen.getByRole('button', { name: /generate/i }))
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent(/wait for it to finish/i)
+  })
+
+  it('shows the generic localized message for non-API failures without leaking raw text', async () => {
+    apiMock.mockImplementation((path) => {
+      if (path === '/api/catalog') return Promise.resolve({ models })
+      // A plain network failure — no envelope, no code
+      return Promise.reject(new Error('Failed to fetch'))
+    })
+    renderPanel()
+    const prompt = await screen.findByLabelText(/prompt/i)
+    await userEvent.type(prompt, 'red fox in the snow')
+    await userEvent.click(screen.getByRole('button', { name: /generate/i }))
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent(/something went wrong/i)
+    // Not server envelope text — a raw exception message is never user copy
+    expect(within(banner).queryByText('Failed to fetch')).not.toBeInTheDocument()
+  })
 })

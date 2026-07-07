@@ -44,8 +44,9 @@ paid generation is only removed after an explicit confirm.
 ## Dependencies
 
 - Imports: `react` (`useState`), `react-i18next`, `@opencreate/contracts`,
-  `shared/ui` (`Badge`, `Button`, `ErrorState`, `Modal`, `Progress`), module
-  model (`generationsApi`), sibling `GenerationDetail`.
+  `shared/ui` (`Badge`, `Button`, `ErrorState`, `Modal`, `Progress`),
+  `shared/libs/errorCopy` (`errorCodeMessageKey`), module model
+  (`generationsApi`), sibling `GenerationDetail`.
 - Used by: `components/GalleryGrid.tsx`.
 
 ## Diagram
@@ -58,8 +59,9 @@ flowchart TD
   UL -->|isPollError| PE[ErrorState gallery.pollFailed + retry]
   ST & PE -->|refresh| UL
   UL -->|succeeded| S[video controls / img button -> GenerationDetail + ready Badge]
-  UL -->|failed| F[glow-red border + reason + refunded Badge]
-  F -->|errorCode content_blocked| CB[localized safety-filter copy]
+  UL -->|failed| F[glow-red border + refunded Badge]
+  F --> PR[primary: errorCodeMessageKey errorCode -> errors.codes.*]
+  F -->|errorMessage, unless content_blocked| RAW[secondary mist-dim raw line]
   S & F --> A[footer: cost · download · icon DeleteButton]
   A -->|click| CD[Modal role=alertdialog gallery.deleteConfirm]
   CD -->|ghost cancel| A
@@ -74,12 +76,14 @@ flowchart TD
   letterbox on the abyss plate, and the full frame lives in `GenerationDetail`.
   The fixed square keeps CLS at zero across all states (the earlier
   real-aspect `aspectClasses` map is gone with the uniform tile).
-- Failed cards show the stored `errorMessage` as a secondary caption per the
-  plan's card contract — a deliberate, recorded exception to design.md §8's
-  "no raw server text" (the primary line stays localized).
-- EXCEPT safety blocks: when `errorCode === 'content_blocked'` the card renders
-  the localized `gallery.contentBlocked` copy instead of the raw provider
-  message — moderation failures are user-facing product copy, never provider text.
+- Failed cards (QA finding 3): the PRIMARY reason line is always OUR copy —
+  `t(errorCodeMessageKey(errorCode))` from `shared/libs/errorCopy`
+  (`errors.codes.*`; unknown/missing code → generic). The stored raw
+  `errorMessage` may follow only as the secondary `text-mist-dim` caption —
+  the deliberate, recorded exception to design.md §9's "no raw server text".
+- EXCEPT safety blocks: when `errorCode === 'content_blocked'` the raw provider
+  message is suppressed entirely — moderation strings are never user copy
+  (review decision 2026-07-07); the localized primary still explains the block.
 - Status is never color-only (a11y §7): glow-red border + "Generation failed"
   text + refunded chip all carry it together.
 - ADDED 2026-07-07 (QA findings 1-2): the stalled sub-state stays AMBER (still

@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
 import { Badge, Button, ErrorState, Modal, Progress } from 'shared/ui'
+import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { useDeleteGeneration, useLiveGeneration } from '../model/generationsApi'
 import { GenerationDetail } from './GenerationDetail'
 
@@ -138,12 +139,15 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
           <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-glow-red bg-abyss">
             <span className="text-sm font-medium text-glow-red">{t('gallery.failed')}</span>
           </div>
-          {/* Safety blocks carry the machine-readable errorCode — render OUR
-              localized copy; the raw provider message is not user copy */}
-          {generation.errorCode === 'content_blocked' ? (
-            <p className="text-xs text-mist-dim">{t('gallery.contentBlocked')}</p>
-          ) : generation.errorMessage ? (
-            <p className="text-xs text-mist-dim">{generation.errorMessage}</p>
+          {/* The PRIMARY reason is always OUR copy, keyed by the machine-
+              readable errorCode (errorCopy map; unknown/missing → generic) —
+              raw server text never leads (QA finding 3, design.md §9) */}
+          <p className="text-xs text-mist">{t(errorCodeMessageKey(generation.errorCode))}</p>
+          {/* The raw provider detail may follow as the quiet secondary mono
+              line — EXCEPT safety blocks, whose moderation strings are not
+              user copy at all (recorded review decision, 2026-07-07) */}
+          {generation.errorMessage && generation.errorCode !== 'content_blocked' ? (
+            <p className="text-xs break-words text-mist-dim">{generation.errorMessage}</p>
           ) : null}
           <div>
             {/* The charge was refunded server-side — say so explicitly (the
