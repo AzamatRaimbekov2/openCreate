@@ -40,3 +40,4 @@ flowchart LR
 - b21a116 feat(api): production single-origin serving — NODE_ENV/WEB_DIST_PATH/TRUSTED_ORIGINS added
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — ASSET_HOST_ALLOWLIST → assetHostAllowlist
 - eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — TRUST_PROXY → trustProxy (parseTrustProxy tri-state)
+- de61e59 feat(api): db-level refund-once index + asset download limits — ASSET_FETCH_TIMEOUT_MS/ASSET_MAX_BYTES → assetFetchTimeoutMs/assetMaxBytes

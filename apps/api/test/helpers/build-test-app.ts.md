@@ -50,3 +50,4 @@ flowchart LR
 - b21a116 feat(api): production single-origin serving — nodeEnv/webDistPath/trustedOrigins overrides
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs override (default 0), assetHostAllowlist in test config
 - eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — trustProxy override (default false)
+- de61e59 feat(api): db-level refund-once index + asset download limits — assetFetchTimeoutMs/assetMaxBytes in the test config (production defaults)

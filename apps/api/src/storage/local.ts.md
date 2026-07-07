@@ -46,3 +46,4 @@ flowchart LR
 - 6c4e94f feat(api): local media storage with /media serving
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — assertAllowedAssetUrl gate + allowedHosts param
 - fc3a0f5 fix(api): ssrf redirect bypass — redirect: 'manual' + any-30x error + https-only scheme
+- de61e59 feat(api): db-level refund-once index + asset download limits — StorageLimits (fetchTimeoutMs/maxBytes), whole-download abort deadline, streaming byte cap, partial-file unlink

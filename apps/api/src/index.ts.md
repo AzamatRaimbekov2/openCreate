@@ -31,3 +31,4 @@ flowchart LR
 - 6c4e94f feat(api): local media storage with /media serving — real storage wired into boot
 - 03a8567 feat(api): assembled application entrypoint — real Runware client wired into boot (AppDeps complete)
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — assetHostAllowlist passed to createLocalStorage
+- de61e59 feat(api): db-level refund-once index + asset download limits — fetchTimeoutMs/maxBytes limits passed to createLocalStorage
