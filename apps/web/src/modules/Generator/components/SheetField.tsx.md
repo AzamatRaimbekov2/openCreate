@@ -51,3 +51,4 @@ flowchart LR
 
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- e96d1d0 2026-07-07 restyle(web): v4 qa round 1 (de-staled v2 "serif ordinal" header comment)
