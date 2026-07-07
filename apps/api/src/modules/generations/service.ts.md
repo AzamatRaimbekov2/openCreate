@@ -73,3 +73,6 @@ flowchart TD
 - 5d16801 fix(api): settle stuck processing generations — no-asset polls fail with refund, stale rows reaped on poll and boot
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - 5e8de3d feat(api): native env loading + structured logging — settle/fail/provider.error events, req.log threading
+- 1cdb3a8 fix(api): atomic charge+insert and failure settlement — one tx for charge+row insert, one tx in failGeneration for flip+refund
+- 2859858 fix(api): forbid deleting processing generations — ConflictError 409 in remove()
+- a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — compound (createdAt,id) cursor, per-generation lastPolledAt throttle (DEFAULT_POLL_MIN_INTERVAL_MS)

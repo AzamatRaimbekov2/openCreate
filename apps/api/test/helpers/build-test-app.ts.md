@@ -47,3 +47,4 @@ flowchart LR
 - 681e20f feat(api): generation lifecycle — `fakeRunware`, `registerAndGetCookie`, `runware`/`signupBonusCredits` overrides
 - 5e8de3d feat(api): native env loading + structured logging — logLevel/logStream overrides, silent default
 - b21a116 feat(api): production single-origin serving — nodeEnv/webDistPath/trustedOrigins overrides
+- a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs override (default 0), assetHostAllowlist in test config

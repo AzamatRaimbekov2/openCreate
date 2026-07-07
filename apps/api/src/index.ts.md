@@ -30,3 +30,4 @@ flowchart LR
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — real db wired into boot
 - 6c4e94f feat(api): local media storage with /media serving — real storage wired into boot
 - 03a8567 feat(api): assembled application entrypoint — real Runware client wired into boot (AppDeps complete)
+- a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — assetHostAllowlist passed to createLocalStorage

@@ -46,3 +46,4 @@ flowchart LR
 - 5e8de3d feat(api): native env loading + structured logging — pino logger, redaction, logStream dep, log wiring
 - cdd94a3 feat(api): sanitized errors + rate limits — sanitized 5xx envelope, @fastify/rate-limit global 300/min
 - b21a116 feat(api): production single-origin serving — prod SPA static + index.html fallback
+- a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs test seam on AppDeps
