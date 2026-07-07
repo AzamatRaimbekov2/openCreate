@@ -27,16 +27,20 @@ export type StorageProvider = {
 // Default-deny: a host passes only if it IS an allowlisted domain or a true
 // subdomain of one ('vm.runware.ai' → 'runware.ai'). Plain suffix matching
 // would be spoofable ('evilrunware.ai' ends with 'runware.ai'), hence the
-// exact-or-dot-boundary comparison.
+// exact-or-dot-boundary comparison. Scheme is https-only: provider asset URLs
+// are always https, and plain http to an allowlisted host would hand the
+// bytes (and the request) to any on-path attacker.
 function assertAllowedAssetUrl(url: string, allowedHosts: string[]): void {
-  let host: string
+  let parsed: URL
   try {
-    // Also rejects non-URL garbage and hostless schemes (file:, data:) —
-    // their hostname is empty and never matches an allowlist entry.
-    host = new URL(url).hostname.toLowerCase()
+    parsed = new URL(url)
   } catch {
     throw new Error('asset url not allowed: unparseable')
   }
+  // Rejects file:, data:, ftp: and downgraded http: in one check — hostless
+  // schemes never reach the host comparison at all.
+  if (parsed.protocol !== 'https:') throw new Error('asset url not allowed: https required')
+  const host = parsed.hostname.toLowerCase()
   const ok = allowedHosts.some((allowed) => {
     const a = allowed.toLowerCase()
     return host === a || host.endsWith(`.${a}`)
@@ -61,7 +65,16 @@ export function createLocalStorage(
     async saveFromUrl(url, key, ext) {
       // Gate BEFORE the fetch — a forbidden host must never see the request.
       assertAllowedAssetUrl(url, allowedHosts)
-      const res = await fetch(url)
+      // redirect: 'manual' closes the allowlist-bypass hop: the gate above only
+      // ever saw the FIRST url, so with fetch's default ('follow') a single 30x
+      // on an allowlisted host (open redirect, compromised provider) would
+      // re-point this server-side request at internal targets — metadata
+      // endpoints, localhost admin ports — and publish the response under
+      // /media/*. Provider asset URLs are direct links; a redirect is treated
+      // as hostile and fails the download outright instead of being re-vetted.
+      const res = await fetch(url, { redirect: 'manual' })
+      if (res.status >= 300 && res.status < 400)
+        throw new Error(`asset redirect not allowed: ${res.status}`)
       if (!res.ok || !res.body) throw new Error(`asset download failed: ${res.status}`)
       const file = join(root, `${key}.${ext}`)
       // Stream to disk — videos can be tens of MB; never buffer them in memory.

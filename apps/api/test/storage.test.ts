@@ -76,6 +76,48 @@ describe('saveFromUrl host allowlist (SSRF)', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('refuses to follow redirects — a 30x from an allowlisted host is an error, not a hop', async () => {
+    // The allowlist gates only the FIRST url. If fetch() followed redirects
+    // (its default), an open redirect on an allowlisted host would re-point the
+    // server-side request anywhere (metadata endpoints, localhost admin ports)
+    // AFTER the gate passed. The fetch must be issued with redirect: 'manual'
+    // and any 30x answer must fail the download outright.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: 'http://169.254.169.254/latest/meta-data' },
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir)
+    await expect(
+      storage.saveFromUrl('https://vm.runware.ai/redirect.mp4', 'gen10', 'mp4'),
+    ).rejects.toThrow(/redirect/)
+    // Exactly one request — the Location target must never be fetched.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // Pins the option that stops undici from transparently following the hop
+    // before our code ever sees the 30x status.
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://vm.runware.ai/redirect.mp4',
+      expect.objectContaining({ redirect: 'manual' }),
+    )
+    expect(existsSync(join(dir, 'gen10.mp4'))).toBe(false)
+  })
+
+  it('refuses plain http even to an allowlisted host — https only', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const dir = mkdtempSync(join(tmpdir(), 'oc-storage-'))
+    const storage = createLocalStorage(dir)
+    await expect(
+      storage.saveFromUrl('http://vm.runware.ai/v.mp4', 'gen11', 'mp4'),
+    ).rejects.toThrow(/not allowed/)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(existsSync(join(dir, 'gen11.mp4'))).toBe(false)
+  })
+
   it('allows the bare allowlisted domain and honors a custom allowlist', async () => {
     vi.stubGlobal(
       'fetch',

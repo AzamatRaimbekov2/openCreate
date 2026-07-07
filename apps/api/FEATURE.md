@@ -26,7 +26,9 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   Deleting a processing generation is refused with 409 `conflict`.
 - **Media** — `@fastify/static` serves `STORAGE_DIR` at `/media/*` (UUID keys, public
   by design for the MVP). Asset downloads are SSRF-gated: `saveFromUrl` only fetches
-  hosts on `ASSET_HOST_ALLOWLIST` (default `runware.ai` + true subdomains).
+  https URLs whose host is on `ASSET_HOST_ALLOWLIST` (default `runware.ai` + true
+  subdomains), and never follows redirects (`redirect: 'manual'`, any 30x = error) —
+  an open redirect on an allowlisted host cannot re-point the server-side fetch.
 - **Errors** — every failure leaves as the shared envelope
   `{ error: { code, message } }` with stable codes from `@opencreate/contracts`.
   Unexpected 5xx are sanitized to `internal_error` / "Something went wrong" — the real
