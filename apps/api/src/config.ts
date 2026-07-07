@@ -67,6 +67,16 @@ const envSchema = z.object({
   // PROVIDER RESPONSES, so this is default-deny with only Runware's domain —
   // a provider/CDN change becomes an env edit instead of a code change.
   ASSET_HOST_ALLOWLIST: z.string().default('runware.ai'),
+  // Reverse-proxy header trust (review finding). Production terminates TLS in
+  // a proxy that forwards everyone from loopback (PROD.md), so without this
+  // req.ip is ALWAYS the proxy's address and every user shares one rate-limit
+  // bucket — 10 cheap auth requests/min lock ALL users out of sign-in.
+  // 'true' trusts X-Forwarded-For outright (the proxy MUST then overwrite the
+  // inbound header); anything else is passed to fastify verbatim as an
+  // address/CIDR/keyword list (e.g. '127.0.0.1', 'loopback,uniquelocal').
+  // Unset/empty/'false' = no trust: direct-exposure deploys must never honor
+  // a client-forged X-Forwarded-For.
+  TRUST_PROXY: z.string().optional(),
 })
 
 export type LogLevel = z.infer<typeof envSchema.shape.LOG_LEVEL>
@@ -90,6 +100,24 @@ export type AppConfig = {
   trustedOrigins: string[]
   // Host suffixes storage.saveFromUrl may fetch assets from (SSRF allowlist).
   assetHostAllowlist: string[]
+  // Fastify trustProxy value: false = never trust proxy headers (default),
+  // true = trust X-Forwarded-For from any peer, string = fastify/proxy-addr
+  // address/CIDR/keyword list of peers whose headers are trusted.
+  trustProxy: boolean | string
+}
+
+// TRUST_PROXY env → fastify trustProxy. Default-deny: only an explicit opt-in
+// makes the app read client identity from X-Forwarded-For. The tri-state keeps
+// both deployment shapes safe: direct exposure ignores forgeable headers
+// (unset/'false'), the documented reverse-proxy deploy sets 'true' or — better —
+// restricts trust to the proxy's own address so even an appended inbound
+// X-Forwarded-For chain resolves to the real client (proxy-addr walks from the
+// socket peer and stops at the first untrusted hop).
+function parseTrustProxy(raw: string | undefined): boolean | string {
+  const value = raw?.trim() ?? ''
+  if (value === '' || value.toLowerCase() === 'false') return false
+  if (value.toLowerCase() === 'true') return true
+  return value
 }
 
 export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
@@ -133,5 +161,6 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     assetHostAllowlist: e.ASSET_HOST_ALLOWLIST.split(',')
       .map((h) => h.trim())
       .filter(Boolean),
+    trustProxy: parseTrustProxy(e.TRUST_PROXY),
   }
 }

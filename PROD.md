@@ -22,7 +22,8 @@ commit `.env`; it is git- and docker-ignored.
 | `DATABASE_PATH` | no | `./data/opencreate.db` | Resolves to `/app/data/opencreate.db` (inside the `./data` volume). |
 | `STORAGE_DIR` | no | `./data/media` | Downloaded generation assets, served at `/media/*`. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | no | – | Set both to enable Google OAuth; empty/unset keeps it disabled. |
-| `ASSET_HOST_ALLOWLIST` | no | `runware.ai` | SSRF gate: host suffixes the server may download assets from. Widen only if the provider changes CDNs. |
+| `ASSET_HOST_ALLOWLIST` | no | `runware.ai` | SSRF gate: host suffixes the server may download assets from (https only, redirects refused). Widen only if the provider changes CDNs. |
+| `TRUST_PROXY` | proxy deploys: yes | unset (no trust) | Behind the reverse proxy below, set `TRUST_PROXY=true` — otherwise every user shares the proxy's IP and ONE rate-limit bucket (one attacker's 10 requests/min lock everyone out of sign-in). Values: `true` (trust `X-Forwarded-For`; the proxy **must overwrite** the inbound header, see below), or a comma list of trusted peer addresses/CIDRs/keywords (e.g. `loopback,uniquelocal` — safest, covers the docker bridge). Leave unset when the container is exposed directly: a client-forged `X-Forwarded-For` must never be honored. |
 | `NODE_ENV` | – | forced `production` by compose | Enables single-origin SPA serving. |
 
 ## First run
@@ -48,7 +49,18 @@ curl -fsS localhost:8787/health # → {"ok":true}
 ## Reverse proxy / TLS
 
 Terminate TLS in front of the container and forward to `127.0.0.1:8787`.
-`BETTER_AUTH_URL` and `TRUSTED_ORIGINS` must be the public https origin.
+`BETTER_AUTH_URL` and `TRUSTED_ORIGINS` must be the public https origin, and
+`TRUST_PROXY` must be set (see the env table) so rate limits key on the real
+client IP instead of the proxy's — otherwise all users share one bucket.
+
+**`X-Forwarded-For` hygiene**: with `TRUST_PROXY=true` the app believes the
+leftmost header entry, so the proxy must REPLACE the inbound header with the
+client address, never append to it (an attacker could otherwise pick their own
+"IP" per request and bypass rate limiting). Caddy does this by default
+(inbound `X-Forwarded-For` is dropped unless the peer is in `trusted_proxies`);
+in nginx use `$remote_addr`, **not** `$proxy_add_x_forwarded_for` (which
+appends). Alternatively set `TRUST_PROXY=loopback,uniquelocal` — then only the
+hop added by your own proxy is trusted and appended client junk is ignored.
 
 Caddy (automatic TLS):
 
@@ -70,7 +82,9 @@ server {
     location / {
         proxy_pass http://127.0.0.1:8787;
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # $remote_addr, NOT $proxy_add_x_forwarded_for: the app must only ever
+        # see the address nginx itself observed (see TRUST_PROXY above).
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }

@@ -48,6 +48,14 @@ export async function buildApp(deps: AppDeps) {
   // them. Fastify's default request logging gives each request a reqId that
   // pino stamps on every req.log line (correlation requirement).
   const app = Fastify({
+    // Reverse-proxy header trust (review finding): production terminates TLS
+    // in a proxy forwarding everyone from loopback (PROD.md), so without this
+    // req.ip — the @fastify/rate-limit bucket key — is ALWAYS the proxy's
+    // address: 10 cheap auth requests/min from one attacker would lock every
+    // user out of sign-in, and per-client attribution is impossible. false
+    // (the default) keeps direct-exposure deploys deaf to client-forged
+    // X-Forwarded-For; TRUST_PROXY opts in ('true' or an address/CIDR list).
+    trustProxy: deps.config.trustProxy,
     logger: {
       level: deps.config.logLevel,
       redact: [

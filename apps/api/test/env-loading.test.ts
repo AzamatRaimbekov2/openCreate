@@ -102,4 +102,30 @@ describe('loadConfig production settings', () => {
     })
     expect(cfg.assetHostAllowlist).toEqual(['runware.ai', 'assets.example.com'])
   })
+
+  // TRUST_PROXY (review finding): without it, req.ip behind the documented
+  // reverse proxy (PROD.md) is always the proxy's loopback address, so every
+  // user shares ONE rate-limit bucket — 10 cheap requests/min lock all users
+  // out of sign-in. Default-deny: proxy headers are NOT trusted unless the
+  // operator explicitly opts in (direct-exposure deploys must never honor a
+  // client-forged X-Forwarded-For).
+  it('defaults trustProxy to false — proxy headers are never trusted implicitly', () => {
+    const cfg = loadConfig({ ...baseEnv })
+    expect(cfg.trustProxy).toBe(false)
+  })
+
+  it('parses TRUST_PROXY=true as boolean trust (proxy must overwrite X-Forwarded-For)', () => {
+    const cfg = loadConfig({ ...baseEnv, TRUST_PROXY: 'true' })
+    expect(cfg.trustProxy).toBe(true)
+  })
+
+  it('treats TRUST_PROXY=false and empty as no trust', () => {
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: 'false' }).trustProxy).toBe(false)
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: '' }).trustProxy).toBe(false)
+  })
+
+  it('passes a TRUST_PROXY address/CIDR list through for fastify verbatim', () => {
+    const cfg = loadConfig({ ...baseEnv, TRUST_PROXY: '127.0.0.1,10.0.0.0/8' })
+    expect(cfg.trustProxy).toBe('127.0.0.1,10.0.0.0/8')
+  })
 })

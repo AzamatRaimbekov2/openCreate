@@ -34,6 +34,9 @@ export type TestAppOverrides = {
   nodeEnv?: string
   webDistPath?: string
   trustedOrigins?: string[]
+  // Reverse-proxy header trust (TRUST_PROXY): rate-limit tests flip this to
+  // pin per-forwarded-client buckets vs the default deny (header ignored).
+  trustProxy?: boolean | string
   // Poll throttle seam. Tests default to 0 (disabled) because many suites
   // deliberately script back-to-back polls of one generation (processing →
   // succeeded etc.) and must see Runware answer each step; the throttle's own
@@ -67,6 +70,9 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // Matches the storage default; tests that probe the SSRF allowlist
       // construct their own createLocalStorage with a custom list instead.
       assetHostAllowlist: ['runware.ai'],
+      // Default-deny like production: proxy headers are only trusted when a
+      // test opts in — mirrors the TRUST_PROXY env knob (unset → false).
+      trustProxy: overrides.trustProxy ?? false,
       // 'test' (NOT 'production') by default: prod-only behaviors like SPA
       // serving must be opted into explicitly by the tests that pin them.
       nodeEnv: overrides.nodeEnv ?? 'test',

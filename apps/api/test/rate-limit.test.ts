@@ -56,6 +56,45 @@ describe('rate limiting', () => {
     expect(blocked.json().error.code).toBe('rate_limited')
   })
 
+  // trustProxy (review finding): production runs behind a reverse proxy
+  // (PROD.md) that forwards everyone from 127.0.0.1 — without trustProxy every
+  // user shares ONE bucket per limit (an attacker's 10 cheap auth requests/min
+  // lock ALL users out of sign-in). With TRUST_PROXY set, req.ip comes from
+  // X-Forwarded-For, so buckets are per real client again.
+  it('with trustProxy enabled, rate-limit buckets are per forwarded client, not per socket', async () => {
+    const app = await buildTestApp({ trustProxy: true })
+    const attempt = (forwardedFor: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/auth/sign-in/email',
+        headers: { 'x-forwarded-for': forwardedFor },
+        payload: { email: 'nobody@example.com', password: 'wrong-password' },
+      })
+    // The attacker exhausts THEIR bucket…
+    for (let i = 0; i < 10; i++) {
+      const res = await attempt('203.0.113.9')
+      expect(res.statusCode).not.toBe(429)
+    }
+    expect((await attempt('203.0.113.9')).statusCode).toBe(429)
+    // …while a different forwarded client is untouched (no auth-lockout DoS).
+    expect((await attempt('198.51.100.7')).statusCode).not.toBe(429)
+  })
+
+  it('without trustProxy (default), X-Forwarded-For is ignored — a forged header cannot reset buckets', async () => {
+    const app = await buildTestApp()
+    const attempt = (forwardedFor: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/auth/sign-in/email',
+        headers: { 'x-forwarded-for': forwardedFor },
+        payload: { email: 'nobody@example.com', password: 'wrong-password' },
+      })
+    // Ten "different clients" by header only — all land in the ONE socket
+    // bucket, so the 11th is blocked no matter what the header claims.
+    for (let i = 0; i < 10; i++) await attempt(`203.0.113.${i}`)
+    expect((await attempt('198.51.100.7')).statusCode).toBe(429)
+  })
+
   it('the strict generations bucket does not throttle reads (list/get)', async () => {
     const app = await buildTestApp()
     const cookie = await registerAndGetCookie(app)

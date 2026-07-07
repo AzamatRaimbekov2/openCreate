@@ -38,6 +38,10 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   events: `credits.signup_bonus|charge|refund`, `generation.settle|fail`, `provider.error`.
 - **Rate limits** — `@fastify/rate-limit`: global 300/min per IP; strict buckets
   `/api/auth/*` 10/min and `POST /api/generations` 20/min; 429 = envelope `rate_limited`.
+  Behind the documented reverse proxy set `TRUST_PROXY` (`true` or a trusted
+  peer address/CIDR list) so buckets key on the real client from
+  `X-Forwarded-For` — unset (default) the header is ignored and a forged one
+  can neither reset nor pollute buckets.
 - **Production single-origin** — with `NODE_ENV=production` and a built SPA at
   `WEB_DIST_PATH` (default `../web/dist`), the API serves it at `/` with an index.html
   fallback for non-`/api`, non-`/media` GETs (one origin, first-party cookies, no CORS).
@@ -85,7 +89,7 @@ Every `.ts` has a `.ts.md` sidecar doc with responsibilities, diagrams and commi
 ```bash
 pnpm --filter @opencreate/api dev         # tsx watch, http://localhost:8787
 pnpm --filter @opencreate/api db:migrate  # create SQLite + tables (also runs on boot)
-pnpm --filter @opencreate/api test        # vitest — 85 tests, all HTTP-level or unit
+pnpm --filter @opencreate/api test        # vitest — 93 tests, all HTTP-level or unit
 pnpm --filter @opencreate/api lint        # eslint src test
 pnpm --filter @opencreate/api typecheck   # tsc --noEmit
 pnpm --filter @opencreate/api build       # tsc type gate + esbuild → dist/index.js
@@ -96,7 +100,9 @@ pnpm start                                # same, from the repo root
 Env (see `.env.example`): `RUNWARE_API_KEY`, `BETTER_AUTH_SECRET` are required;
 `DATABASE_PATH`, `STORAGE_DIR`, `SIGNUP_BONUS_CREDITS`, `GOOGLE_CLIENT_ID/SECRET`,
 `LOG_LEVEL`, `NODE_ENV`, `TRUSTED_ORIGINS`, `WEB_DIST_PATH`, `ASSET_HOST_ALLOWLIST`
-(SSRF allowlist for asset downloads, default `runware.ai`), `ENV_FILE` optional.
+(SSRF allowlist for asset downloads, default `runware.ai`), `TRUST_PROXY`
+(reverse-proxy header trust for rate-limit attribution, default off), `ENV_FILE`
+optional.
 The nearest `.env` (repo root) is loaded natively at boot via Node 22
 `process.loadEnvFile` — no manual sourcing; real env vars always win. In prod,
 `BETTER_AUTH_URL` must be the public https origin. Tests never need env — they
