@@ -1,9 +1,10 @@
 // apps/web/src/modules/Landing/components/TableScrollRegion.test.tsx
 // Behavior: the wide-table wrapper is a keyboard-focusable, labelled scroll
-// region, and it shows the quiet mono "scroll →" hint ONLY while the content
-// is actually wider than the region (the no-gradient scroll affordance —
-// an edge fade would need a gradient, which the owner rule bans).
-import { render, screen } from '@testing-library/react'
+// region, and it shows TWO no-gradient scroll affordances only while the
+// content is actually wider than the region: the quiet mono "scroll →" hint
+// and a solid right-edge overlay strip (a gradient edge fade is banned by the
+// owner rule) that disappears once the user reaches the far right.
+import { fireEvent, render, screen } from '@testing-library/react'
 import { TableScrollRegion } from './TableScrollRegion'
 // i18n init side effect — the hint renders localized copy (EN default)
 import 'shared/config/i18n'
@@ -59,5 +60,42 @@ describe('TableScrollRegion', () => {
       </TableScrollRegion>,
     )
     expect(screen.queryByText('scroll →')).not.toBeInTheDocument()
+  })
+
+  it('shows a decorative solid edge strip while more columns hide to the right', () => {
+    // A 36rem-min table inside a 390px phone column — scrollLeft starts at 0
+    mockWidths(576, 390)
+    render(
+      <TableScrollRegion label="Credits per model">
+        <table />
+      </TableScrollRegion>,
+    )
+    const strip = screen.getByTestId('table-scroll-edge')
+    // Purely visual — AT users get the labelled focusable region instead
+    expect(strip).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('hides the edge strip once scrolled to the far right', () => {
+    mockWidths(576, 390)
+    render(
+      <TableScrollRegion label="Credits per model">
+        <table />
+      </TableScrollRegion>,
+    )
+    const region = screen.getByRole('region', { name: 'Credits per model' })
+    // 576 - 390 = 186: the far-right scroll position for the mocked geometry
+    region.scrollLeft = 186
+    fireEvent.scroll(region)
+    expect(screen.queryByTestId('table-scroll-edge')).not.toBeInTheDocument()
+  })
+
+  it('keeps the edge strip off when the content fits', () => {
+    mockWidths(576, 576)
+    render(
+      <TableScrollRegion label="Credits per model">
+        <table />
+      </TableScrollRegion>,
+    )
+    expect(screen.queryByTestId('table-scroll-edge')).not.toBeInTheDocument()
   })
 })

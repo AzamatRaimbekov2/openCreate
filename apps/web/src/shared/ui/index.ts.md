@@ -7,7 +7,7 @@ Public API of the v3 "Bioluminescent Terminal" design-system kit (`shared/ui`). 
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export every kit component and its prop types; nothing else (no logic, no side effects).
-- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `AsciiSphere`(+`AsciiSphereProps`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `SpecimenTile`(+`SpecimenTileProps`,`SpecimenKind`,`SPECIMEN_KINDS`), `Skeleton`(+`SkeletonProps`).
+- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `AsciiSphere`(+`AsciiSphereProps`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `SpecimenTile`(+`SpecimenTileProps`,`SpecimenKind`,`SPECIMEN_KINDS`), `Skeleton`(+`SkeletonProps`).
 - Inputs → Outputs: import from `'shared/ui'` → any kit component.
 - Side effects (I/O, network, state): none.
 
@@ -27,6 +27,7 @@ flowchart LR
 - New shared components must be added here AND to design.md §6 in the same task.
 - `SPECIMEN_KINDS` (a value, not just a type) is exported so the landing can iterate the whole grid without hardcoding specimen names.
 - Stage 2 (2026-07-07): `ShowcasePoster`/`SHOWCASE_PALETTES`/`showcasePosterArt` were RETIRED and replaced by `SpecimenTile`/`SPECIMEN_KINDS`/`specimenTileArt` (v3 duotone specimen art); `AsciiSphere` joined the kit as the hero visual.
+- Dead-code cleanup (2026-07-07 QA): `Select` (+`SelectProps`,`SelectOption`) was DELETED — grep confirmed zero consumers anywhere in src/e2e (the generator uses `PillGroup` pills, not native selects). Revive it from git history only when a real product need appears (design.md §10: 2+ modules).
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

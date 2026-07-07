@@ -46,8 +46,9 @@ react-hook-form + zod, i18next.
   full per-model credit table from the catalog query, a "200 free credits" amber
   chip by the title, and the visitor signup CTA as a steel card with a green pill.
   Both wide tables sit in `TableScrollRegion` — a keyboard-focusable overflow
-  region with a dynamic mono "scroll →" hint (`common.scrollHint`, EN/RU) that
-  appears only while columns overflow (the no-gradient scroll affordance).
+  region with a dynamic mono "scroll →" hint (`common.scrollHint`, EN/RU) plus
+  a solid right-edge overlay strip that retires at the far right, both shown
+  only while columns overflow (the no-gradient scroll affordances).
 - **App shell** — sticky steel bar: mono wordmark with the portal dot, lowercase
   mono nav (Create/Library/Pricing), amber specimen-pill balance chip (opens the
   credit history ledger modal on the steel sheet with triad-signed amounts),
@@ -76,7 +77,7 @@ src/
 └── shared/
     ├── config/                 # theme.css (v3 terminal tokens + font tokens), i18n (EN/RU), queryClient
     ├── libs/apiClient.ts       # fetch wrapper → ApiClientError with envelope codes
-    └── ui/                     # Button, Input, Select, Modal, Skeleton, Badge, Progress,
+    └── ui/                     # Button, Input, Modal, Skeleton, Badge, Progress,
                                 # PillGroup, EmptyState, ErrorState, AppShell, LangSwitch,
                                 # AppErrorBoundary, OfflineOverlay, NotFoundPage,
                                 # AsciiSphere (hero canvas), SpecimenTile (+ specimenTileArt
@@ -91,7 +92,7 @@ Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and com
 
 ```bash
 pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
-pnpm --filter @opencreate/web test       # vitest + RTL — 108 tests (jsdom)
+pnpm --filter @opencreate/web test       # vitest + RTL — 135 tests (jsdom)
 pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
 pnpm --filter @opencreate/web lint       # eslint src
 pnpm --filter @opencreate/web typecheck  # tsc --noEmit

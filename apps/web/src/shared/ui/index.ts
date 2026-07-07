@@ -27,8 +27,6 @@ export { PillGroup } from './PillGroup'
 export type { PillGroupProps, PillOption } from './PillGroup'
 export { Progress } from './Progress'
 export type { ProgressProps } from './Progress'
-export { Select } from './Select'
-export type { SelectOption, SelectProps } from './Select'
 // Specimen art + the kind list so consumers can lay out the whole grid
 export { SPECIMEN_KINDS, SpecimenTile } from './SpecimenTile'
 export type { SpecimenKind, SpecimenTileProps } from './SpecimenTile'
