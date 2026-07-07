@@ -8,7 +8,8 @@
     "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json && node scripts/build.mjs",
+    "start": "NODE_ENV=production node --enable-source-maps dist/index.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -26,6 +27,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.1.0",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.1",
     "eslint": "^10.6.0",
     "prettier": "^3.9.4",
     "tsx": "^4.23.0",

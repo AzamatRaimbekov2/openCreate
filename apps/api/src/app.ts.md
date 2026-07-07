@@ -22,6 +22,7 @@ flowchart LR
   B --> EH[setErrorHandler → ApiError envelope]
   B --> SW[settleStaleGenerations boot sweep]
   B --> LG[pino logger: level, redaction, reqId] --> ML[money-path structured events]
+  B -->|prod + web dist exists| SPA[static / + index.html fallback]
 ```
 
 ## Key decisions / gotchas
@@ -30,6 +31,7 @@ flowchart LR
 - **`setErrorHandler` is FIRST, before any `await app.register(...)`**: awaiting a register boots the avvio plugin tree, and an error handler set after boot never binds (Task 9 regression: 401s fell back to Fastify's default `{statusCode,error,message}` shape). Keep it at the top when adding plugins.
 - `AppDeps` intentionally grows per plan tasks; keep the exact shape so `build-test-app.ts` stays the one place tests configure it.
 - `/media/*` is public by design for the MVP: keys are unguessable UUIDs minted by us, and `<img>/<video>` tags need plain GETs without auth headers. `index: false, list: false` — asset files only, no listings.
+- **Production single-origin serving**: when `nodeEnv === 'production'` AND `webDistPath/index.html` exists, a second `@fastify/static` serves the built SPA at `/` (`decorateReply: false` — the /media registration already added `sendFile`), and a `setNotFoundHandler` answers `index.html` for non-`/api`, non-`/media` GETs (SPA deep links) while API/media misses return the JSON `not_found` envelope. Gated on the file existing so an api-only prod deploy boots clean. Pinned by `test/static-web.test.ts`.
 - Logging: session cookies ARE the credential — `redact` covers `req.headers.cookie`/`authorization` and `res.headers["set-cookie"]` (plus bare `headers.*` for hand-rolled objects) so no serializer can leak them. `app.log` is handed to the auth factory (signup bonus) and the generation service as the non-request fallback; routes pass `req.log` per call for reqId correlation. Tests keep `logLevel: 'silent'` via `build-test-app.ts`.
 
 ## Commits

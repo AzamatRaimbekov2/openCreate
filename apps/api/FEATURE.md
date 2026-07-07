@@ -23,6 +23,16 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   by design for the MVP).
 - **Errors** — every failure leaves as the shared envelope
   `{ error: { code, message } }` with stable codes from `@opencreate/contracts`.
+  Unexpected 5xx are sanitized to `internal_error` / "Something went wrong" — the real
+  message and stack go to the logs only; domain ApiErrors keep their messages.
+- **Logging** — pino via fastify (`LOG_LEVEL`, default `info`, silent in tests),
+  authorization/cookie/set-cookie redaction, reqId correlation; structured money-path
+  events: `credits.signup_bonus|charge|refund`, `generation.settle|fail`, `provider.error`.
+- **Rate limits** — `@fastify/rate-limit`: global 300/min per IP; strict buckets
+  `/api/auth/*` 10/min and `POST /api/generations` 20/min; 429 = envelope `rate_limited`.
+- **Production single-origin** — with `NODE_ENV=production` and a built SPA at
+  `WEB_DIST_PATH` (default `../web/dist`), the API serves it at `/` with an index.html
+  fallback for non-`/api`, non-`/media` GETs (one origin, first-party cookies, no CORS).
 
 ## HTTP surface
 
@@ -38,6 +48,7 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | GET | `/api/generations/:id` | ✓ | doubles as the Runware poll while processing |
 | DELETE | `/api/generations/:id` | ✓ | 204; removes media file + row |
 | GET | `/media/:file` | – | stored generation assets |
+| GET | `/*` | – | production only: built SPA + index.html fallback |
 
 ## Module map
 
@@ -56,6 +67,7 @@ src/
 ├── integrations/runware/       # REST client (fetch, no SDK): image/video/getResponse
 ├── storage/local.ts            # StorageProvider: save-from-url → /media/<key>.<ext>
 └── scripts/verify-catalog.ts   # AIR id verification against Runware modelSearch
+scripts/build.mjs               # esbuild bundle → runnable dist/index.js (contracts inlined)
 ```
 
 Every `.ts` has a `.ts.md` sidecar doc with responsibilities, diagrams and commit refs.
@@ -65,16 +77,22 @@ Every `.ts` has a `.ts.md` sidecar doc with responsibilities, diagrams and commi
 ```bash
 pnpm --filter @opencreate/api dev         # tsx watch, http://localhost:8787
 pnpm --filter @opencreate/api db:migrate  # create SQLite + tables (also runs on boot)
-pnpm --filter @opencreate/api test        # vitest — 31 tests, all HTTP-level or unit
+pnpm --filter @opencreate/api test        # vitest — 68 tests, all HTTP-level or unit
 pnpm --filter @opencreate/api lint        # eslint src test
 pnpm --filter @opencreate/api typecheck   # tsc --noEmit
-pnpm --filter @opencreate/api build       # tsc -p tsconfig.build.json → dist/
+pnpm --filter @opencreate/api build       # tsc type gate + esbuild → dist/index.js
+pnpm --filter @opencreate/api start       # NODE_ENV=production node dist/index.js
+pnpm start                                # same, from the repo root
 ```
 
 Env (see `.env.example`): `RUNWARE_API_KEY`, `BETTER_AUTH_SECRET` are required;
-`DATABASE_PATH`, `STORAGE_DIR`, `SIGNUP_BONUS_CREDITS`, `GOOGLE_CLIENT_ID/SECRET`
-optional. Tests never need env — they inject an in-memory config and a scripted
-Runware fake (`test/helpers/build-test-app.ts`).
+`DATABASE_PATH`, `STORAGE_DIR`, `SIGNUP_BONUS_CREDITS`, `GOOGLE_CLIENT_ID/SECRET`,
+`LOG_LEVEL`, `NODE_ENV`, `TRUSTED_ORIGINS`, `WEB_DIST_PATH`, `ENV_FILE` optional.
+The nearest `.env` (repo root) is loaded natively at boot via Node 22
+`process.loadEnvFile` — no manual sourcing; real env vars always win. In prod,
+`BETTER_AUTH_URL` must be the public https origin. Tests never need env — they
+inject an in-memory config and a scripted Runware fake
+(`test/helpers/build-test-app.ts`).
 
 ## Design references
 

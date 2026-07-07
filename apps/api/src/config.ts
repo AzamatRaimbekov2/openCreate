@@ -4,8 +4,15 @@
 // Ops hardening: loadEnvFromFile() wraps Node 22's native process.loadEnvFile
 // so `pnpm dev` / `db:migrate` pick up the repo-root .env without sourcing.
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+
+// The api package root (apps/api), derived from THIS file's location — both
+// src/config.ts and the bundled dist/index.js sit one level below it. Used to
+// anchor the WEB_DIST_PATH default so it works no matter what cwd the process
+// was started from (repo root `pnpm start` vs apps/api `pnpm dev`).
+const pkgRoot = fileURLToPath(new URL('..', import.meta.url))
 
 // Walk up from cwd to the nearest .env (repo root in this workspace). Stops at
 // the filesystem root; returns null when no file exists anywhere up the tree.
@@ -48,6 +55,13 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  // production enables single-origin serving of the built SPA (app.ts).
+  NODE_ENV: z.string().default('development'),
+  // Where the built SPA lives; relative values are anchored at apps/api.
+  WEB_DIST_PATH: z.string().default('../web/dist'),
+  // Comma-separated allowlist for better-auth's CSRF origin check; falls back
+  // to WEB_ORIGIN below so a single-origin deploy needs no extra config.
+  TRUSTED_ORIGINS: z.string().optional(),
 })
 
 export type LogLevel = z.infer<typeof envSchema.shape.LOG_LEVEL>
@@ -64,6 +78,11 @@ export type AppConfig = {
   googleClientId: string | null
   googleClientSecret: string | null
   logLevel: LogLevel
+  nodeEnv: string
+  // Always absolute after loadConfig — app.ts can existsSync it directly.
+  webDistPath: string
+  // Origins allowed to make cookie-carrying state changes (better-auth CSRF).
+  trustedOrigins: string[]
 }
 
 export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
@@ -89,5 +108,17 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     googleClientId: e.GOOGLE_CLIENT_ID || null,
     googleClientSecret: e.GOOGLE_CLIENT_SECRET || null,
     logLevel: e.LOG_LEVEL,
+    nodeEnv: e.NODE_ENV,
+    // Anchor relative paths at the PACKAGE root, not cwd: `pnpm start` runs
+    // from the repo root while `pnpm dev` runs from apps/api — the default
+    // ../web/dist must mean apps/web/dist in both cases.
+    webDistPath: isAbsolute(e.WEB_DIST_PATH) ? e.WEB_DIST_PATH : resolve(pkgRoot, e.WEB_DIST_PATH),
+    // Comma list → trimmed allowlist; empty/omitted falls back to the SPA
+    // origin so the default dev setup keeps working with zero extra vars.
+    trustedOrigins: e.TRUSTED_ORIGINS
+      ? e.TRUSTED_ORIGINS.split(',')
+          .map((o) => o.trim())
+          .filter(Boolean)
+      : [e.WEB_ORIGIN],
   }
 }

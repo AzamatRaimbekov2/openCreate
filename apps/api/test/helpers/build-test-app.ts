@@ -29,6 +29,11 @@ export type TestAppOverrides = {
   // tests raise the level and capture pino's NDJSON via a write stub.
   logLevel?: import('../../src/config').LogLevel
   logStream?: { write: (msg: string) => void }
+  // Ops hardening: production single-origin serving (static-web tests point
+  // webDistPath at a fixture dist) and better-auth trusted origins.
+  nodeEnv?: string
+  webDistPath?: string
+  trustedOrigins?: string[]
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -51,6 +56,11 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       googleClientId: null,
       googleClientSecret: null,
       logLevel: overrides.logLevel ?? 'silent',
+      // 'test' (NOT 'production') by default: prod-only behaviors like SPA
+      // serving must be opted into explicitly by the tests that pin them.
+      nodeEnv: overrides.nodeEnv ?? 'test',
+      webDistPath: overrides.webDistPath ?? '/nonexistent-web-dist',
+      trustedOrigins: overrides.trustedOrigins ?? ['http://localhost:5173'],
     },
   })
 }

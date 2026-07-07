@@ -1,6 +1,8 @@
 // buildApp(deps) — DI composition root (plan Task 3). The app is a pure function
 // of its dependencies so tests can inject an in-memory config/db (see
 // test/helpers/build-test-app.ts) and production boot (index.ts) injects real ones.
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import Fastify from 'fastify'
 import fastifyRateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
@@ -142,6 +144,34 @@ export async function buildApp(deps: AppDeps) {
     index: false,
     list: false,
   })
+
+  // Production single-origin serving (ops hardening): when the API is the only
+  // public process (NODE_ENV=production) AND the built SPA exists, serve it at
+  // `/` so app + API share one origin (no CORS, first-party cookies). Gated on
+  // index.html actually existing — a prod boot without a web build must still
+  // come up as a pure API (e.g. api-only deployments).
+  const webDist = deps.config.webDistPath
+  if (deps.config.nodeEnv === 'production' && existsSync(join(webDist, 'index.html'))) {
+    await app.register(fastifyStatic, {
+      root: webDist,
+      prefix: '/',
+      // The /media registration above already added the sendFile decorator;
+      // a second decoration would throw. sendFile still works here because it
+      // accepts an explicit root argument (used in the fallback below).
+      decorateReply: false,
+      index: ['index.html'],
+    })
+    // SPA fallback: client-routed deep links (/library/xyz) are files that do
+    // not exist — answer index.html and let the router take over. API and
+    // media misses must stay real 404s (a JSON client should never receive
+    // HTML), and non-GETs keep 404 semantics too.
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/media')) {
+        return reply.sendFile('index.html', webDist)
+      }
+      reply.status(404).send({ error: { code: 'not_found', message: 'Not found' } })
+    })
+  }
 
   return app
 }

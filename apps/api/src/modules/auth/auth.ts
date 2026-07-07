@@ -18,7 +18,15 @@ export function createAuth(db: Db, config: AppConfig, log?: MoneyLog) {
     secret: config.betterAuthSecret,
     baseURL: config.betterAuthUrl,
     basePath: '/api/auth',
-    trustedOrigins: [config.webOrigin],
+    // Allowlist for the CSRF origin check (and OAuth callback validation):
+    // TRUSTED_ORIGINS env (comma list) or [WEB_ORIGIN]. In prod BETTER_AUTH_URL
+    // must be the public https origin — cookies and callbacks derive from it.
+    trustedOrigins: config.trustedOrigins,
+    // better-auth silently sets skipOriginCheck=true under NODE_ENV=test
+    // (isTest() default), which would leave the CSRF wall untested. Explicit
+    // `false` = the documented production default, applied in EVERY env, so
+    // test/trusted-origins.test.ts exercises the real prod behavior.
+    advanced: { disableOriginCheck: false },
     database: drizzleAdapter(db, {
       provider: 'sqlite',
       schema: { user, session, account, verification },
