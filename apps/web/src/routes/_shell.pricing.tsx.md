@@ -71,4 +71,4 @@ flowchart LR
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
-- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (research column, no ordinals)
+- 3ce8dbf 2026-07-07 restyle(web): terminal landing with ascii-sphere hero + pricing (research column, no ordinals)

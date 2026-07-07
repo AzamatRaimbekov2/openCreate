@@ -62,4 +62,4 @@ flowchart LR
   minimal structural subset of `CanvasRenderingContext2D`.
 
 ## Commits
-- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing
+- 3ce8dbf 2026-07-07 restyle(web): terminal landing with ascii-sphere hero + pricing

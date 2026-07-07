@@ -50,4 +50,4 @@ flowchart LR
 - Pattern ids arrive as props so multiple tiles never collide on defs ids.
 
 ## Commits
-- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing
+- 3ce8dbf 2026-07-07 restyle(web): terminal landing with ascii-sphere hero + pricing
