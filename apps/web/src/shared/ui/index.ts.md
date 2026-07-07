@@ -3,11 +3,11 @@
 > AI-facing sidecar for `shared/ui/index.ts`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Public API of the "Paper & Ink" design-system kit (`shared/ui`). The modular-architecture law says consumers import from `'shared/ui'` only — this barrel is the single legal entry point.
+Public API of the "Light Editorial" design-system kit (`shared/ui`). The modular-architecture law says consumers import from `'shared/ui'` only — this barrel is the single legal entry point.
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export every kit component and its prop types; nothing else (no logic, no side effects).
-- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `Skeleton`(+`SkeletonProps`).
+- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `ShowcasePoster`(+`ShowcasePosterProps`,`ShowcasePalette`,`SHOWCASE_PALETTES`), `Skeleton`(+`SkeletonProps`).
 - Inputs → Outputs: import from `'shared/ui'` → any kit component.
 - Side effects (I/O, network, state): none.
 
@@ -22,11 +22,13 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
-- Deep imports (`shared/ui/Button`) are banned outside this folder — keeps the kit swappable and the inventory in design.md §5 authoritative.
+- Deep imports (`shared/ui/Button`) are banned outside this folder — keeps the kit swappable and the inventory in design.md §6 authoritative.
 - Type re-exports use `export type` (required by `verbatimModuleSyntax`).
-- New shared components must be added here AND to design.md §5 in the same task.
+- New shared components must be added here AND to design.md §6 in the same task.
+- `SHOWCASE_PALETTES` (a value, not just a type) is exported so the landing can iterate the whole spread without hardcoding palette names.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
 - 2b7dd54 2026-07-06 feat(web): generator module — prompt, model/aspect/duration, i2v upload, cost (adds `PillGroup` — first component needed by 2+ modules per design.md §9)
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (adds `AppShell` + `LangSwitch`)
+- (pending) feat(web): showcase poster art component (adds `ShowcasePoster` + palettes)

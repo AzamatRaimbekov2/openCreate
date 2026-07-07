@@ -1,7 +1,7 @@
 // apps/web/src/shared/ui/index.ts
-// Public API of the "Paper & Ink" design-system kit. Modules and routes import
-// ONLY from 'shared/ui' — never from the individual component files.
-// Component inventory + variants: docs/frontend/design.md §5.
+// Public API of the "Light Editorial" design-system kit. Modules and routes
+// import ONLY from 'shared/ui' — never from the individual component files.
+// Component inventory + variants: docs/frontend/design.md §6.
 export { AppErrorBoundary } from './AppErrorBoundary'
 export { AppShell } from './AppShell'
 export type { AppShellProps, AppShellUser } from './AppShell'
@@ -26,5 +26,8 @@ export { Progress } from './Progress'
 export type { ProgressProps } from './Progress'
 export { Select } from './Select'
 export type { SelectOption, SelectProps } from './Select'
+// Poster art + the palette list so consumers can lay out the whole spread
+export { SHOWCASE_PALETTES, ShowcasePoster } from './ShowcasePoster'
+export type { ShowcasePalette, ShowcasePosterProps } from './ShowcasePoster'
 export { Skeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'
