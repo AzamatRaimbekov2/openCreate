@@ -124,3 +124,5 @@ flowchart TD
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
 - e5888a4 2026-07-07 restyle(web): terminal app shell, auth, generator, gallery, credits
 - dd795f7 2026-07-07 fix(web): delete confirmation dialog for generations
+- 74f4c59 2026-07-07 fix(web): polling bounds + stalled/error card states
+- cc81faa 2026-07-07 fix(web): localized generation errors

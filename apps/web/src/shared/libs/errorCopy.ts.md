@@ -57,4 +57,4 @@ flowchart LR
 
 ## Commits
 
-- _no commit yet_
+- cc81faa 2026-07-07 fix(web): localized generation errors

@@ -36,3 +36,4 @@ flowchart LR
 - 9d0106d 2026-07-07 feat(web): showcase poster art component (adds `ShowcasePoster` + palettes)
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (comment-only: kit renamed to v3 terminal)
 - 3ce8dbf 2026-07-07 restyle(web): terminal landing with ascii-sphere hero + pricing (adds `AsciiSphere` + `SpecimenTile`, retires `ShowcasePoster`)
+- f4c7cff 2026-07-07 chore(web): dead export cleanup + mobile table affordance (deletes `Select`)

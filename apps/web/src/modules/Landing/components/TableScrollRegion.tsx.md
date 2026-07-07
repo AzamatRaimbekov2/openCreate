@@ -68,3 +68,4 @@ flowchart LR
 
 ## Commits
 - 70fb5cc 2026-07-07 restyle(web): v4 qa round 2 (component introduced — no-gradient scroll affordance + keyboard-focusable region)
+- f4c7cff 2026-07-07 chore(web): dead export cleanup + mobile table affordance (adds the solid right-edge strip)

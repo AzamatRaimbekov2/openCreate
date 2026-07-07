@@ -77,3 +77,4 @@ flowchart LR
 ## Commits
 
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
+- 74f4c59 2026-07-07 fix(web): polling bounds + stalled/error card states
