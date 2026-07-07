@@ -17,11 +17,12 @@
       "expire": "Credits never expire"
     },
     "cta": "Start creating",
-    "secondaryCta": "See the price index",
+    "secondaryCta": "See pricing",
     "showcase": {
       "kicker": "sample styles",
       "title": "Selected works",
       "sampleLabel": "sample style",
+      "caption": "specimen renders, not user generations — image styles: Flash (FLUX schnell) & Studio (FLUX dev) · video: Cinema (Wan 2.7)",
       "videoMarker": "video · 5s",
       "figure": "fig. {{number}}",
       "items": {
@@ -99,7 +100,7 @@
       }
     },
     "footer": {
-      "tagline": "An honest studio for AI images and video. Set in Fraunces and Space Grotesk.",
+      "tagline": "An honest studio for AI images and video. Set in JetBrains Mono.",
       "rights": "© 2026 openCreate"
     }
   },

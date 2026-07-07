@@ -7,7 +7,7 @@ Public API of the v3 "Bioluminescent Terminal" design-system kit (`shared/ui`). 
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export every kit component and its prop types; nothing else (no logic, no side effects).
-- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `ShowcasePoster`(+`ShowcasePosterProps`,`ShowcasePalette`,`SHOWCASE_PALETTES`), `Skeleton`(+`SkeletonProps`).
+- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `AsciiSphere`(+`AsciiSphereProps`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `Select`(+`SelectProps`,`SelectOption`), `SpecimenTile`(+`SpecimenTileProps`,`SpecimenKind`,`SPECIMEN_KINDS`), `Skeleton`(+`SkeletonProps`).
 - Inputs → Outputs: import from `'shared/ui'` → any kit component.
 - Side effects (I/O, network, state): none.
 
@@ -25,7 +25,8 @@ flowchart LR
 - Deep imports (`shared/ui/Button`) are banned outside this folder — keeps the kit swappable and the inventory in design.md §6 authoritative.
 - Type re-exports use `export type` (required by `verbatimModuleSyntax`).
 - New shared components must be added here AND to design.md §6 in the same task.
-- `SHOWCASE_PALETTES` (a value, not just a type) is exported so the landing can iterate the whole spread without hardcoding palette names.
+- `SPECIMEN_KINDS` (a value, not just a type) is exported so the landing can iterate the whole grid without hardcoding specimen names.
+- Stage 2 (2026-07-07): `ShowcasePoster`/`SHOWCASE_PALETTES`/`showcasePosterArt` were RETIRED and replaced by `SpecimenTile`/`SPECIMEN_KINDS`/`specimenTileArt` (v3 duotone specimen art); `AsciiSphere` joined the kit as the hero visual.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
@@ -33,3 +34,4 @@ flowchart LR
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (adds `AppShell` + `LangSwitch`)
 - 9d0106d 2026-07-07 feat(web): showcase poster art component (adds `ShowcasePoster` + palettes)
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs (comment-only: kit renamed to v3 terminal)
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (adds `AsciiSphere` + `SpecimenTile`, retires `ShowcasePoster`)

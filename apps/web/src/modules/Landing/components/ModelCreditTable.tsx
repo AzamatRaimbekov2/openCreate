@@ -79,9 +79,12 @@ export function ModelCreditTable({ models }: ModelCreditTableProps) {
                 </span>
               </th>
               <td className="px-4 py-4 text-mist-dim">{t(`generator.type.${model.type}`)}</td>
-              {/* Credits are the index's numerals — mono weight-400 in white,
-                  matching the price table's numeral voice */}
-              <td className="px-4 py-4 text-lg font-normal text-white">{creditsLabel(model, t)}</td>
+              {/* Credits are the index's numerals — mono weight-400 in
+                  SPECIMEN GREEN (Stage 2): our credit prices are the "go/us"
+                  numbers, same glow the comparison table gives OUR column */}
+              <td className="px-4 py-4 text-lg font-normal text-glow-green">
+                {creditsLabel(model, t)}
+              </td>
               <td className="px-4 py-4 text-mist-dim">{usdLabel(model, t)}</td>
             </tr>
           ))}

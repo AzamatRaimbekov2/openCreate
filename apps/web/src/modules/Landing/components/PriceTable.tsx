@@ -1,41 +1,34 @@
 // apps/web/src/modules/Landing/components/PriceTable.tsx
-// "The index" — the honest price comparison as a terminal index table (v3):
-// white/10 hairline rules on the void instead of a card, mono weight-400
-// numerals, OUR column glowing green (green = "go/us" in the triad; the
-// comparison still stays visually even), and the verification date as a
-// footnote. Our column vs ONE named competitor item per row, never a blanket
-// "cheaper than everything" claim. The <caption> stays the table's accessible
-// name on purpose, so the honesty marker is announced before any number.
+// "The index" — the honest price comparison as a mono terminal table (v3
+// Stage 2): white/10 hairline rules on the void instead of a card, mono
+// weight-400 numerals, OUR column glowing green (green = "go/us" in the
+// triad; the comparison still stays visually even), and the verification date
+// as a PORTAL-BLUE footnote (the sanctioned prose accent — the honesty marker
+// deserves the one prose highlight). Our column vs ONE named competitor item
+// per row, never a blanket "cheaper than everything" claim. The <caption>
+// stays the table's accessible name on purpose, so the honesty marker is
+// announced before any number.
 import { useTranslation } from 'react-i18next'
 import { PRICE_COMPARISON_ROWS, formatUsd } from '../model/pricingData'
 import { SectionHeading } from './SectionHeading'
 
-export type PriceTableProps = {
-  // Ordinal of the section — the landing runs it as 02 (after the
-  // showcase), the /pricing page as its opening 01 section
-  ordinal?: string
-}
-
 // Column headers in the quiet mono caption voice (v3: lowercase, no tracking)
 const columnHeaderClass = 'py-3 pr-4 text-xs font-normal'
 
-export function PriceTable({ ordinal = '01' }: PriceTableProps) {
+export function PriceTable() {
   const { t } = useTranslation()
 
   return (
     <section className="flex flex-col gap-8">
-      <SectionHeading
-        ordinal={ordinal}
-        kicker={t('landing.price.kicker')}
-        title={t('landing.price.title')}
-      />
+      <SectionHeading kicker={t('landing.price.kicker')} title={t('landing.price.title')} />
       {/* Horizontal scroll instead of squashing on phones — the page itself
           never scrolls sideways (brief QA #5) */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] border-collapse text-left">
           {/* caption-bottom = the verification footnote; still the table's
-              accessible name (tests query the table BY this honesty marker) */}
-          <caption className="caption-bottom border-t border-white/10 pt-3 text-left text-xs text-mist-dim">
+              accessible name (tests query the table BY this honesty marker).
+              Portal blue: the one prose accent marks the honesty line. */}
+          <caption className="caption-bottom border-t border-white/10 pt-3 text-left text-xs text-portal">
             {t('landing.price.caption', { date: t('landing.price.date') })}
           </caption>
           <thead>

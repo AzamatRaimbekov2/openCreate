@@ -9,8 +9,10 @@ internal files (`components/`, `model/`) are private.
 ## What it does (for an AI reader)
 - Responsibilities: re-export the module surface; no logic.
 - Public API / exports: `LandingPage` (+`LandingPageProps`), `PriceTable`
-  (+`PriceTableProps`), `ModelCreditTable` (+`ModelCreditTableProps`),
-  `SectionHeading` (+`SectionHeadingProps`).
+  (no props since Stage 2 — the `ordinal` prop and its `PriceTableProps` type
+  were retired with the section ordinals), `ModelCreditTable`
+  (+`ModelCreditTableProps`), `SectionHeading` (+`SectionHeadingProps` —
+  now `title` + optional `kicker`).
 - Inputs → Outputs: `import { LandingPage, PriceTable, ModelCreditTable, SectionHeading } from 'modules/Landing'`.
 - Side effects: none.
 
@@ -35,9 +37,11 @@ flowchart LR
 - `ModelCreditTable` went public in Task 20: the /pricing route owns the
   catalog query and passes `models` in — presentation stays in the module.
 - `SectionHeading` went public in stage 2: the /pricing route runs the same
-  editorial "index" section treatment (ordinal + serif h2 over a hairline).
+  terminal section treatment (Stage 2: amber spark icon + mono 30px h2 over a
+  hairline — the ghost ordinals are gone).
 
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (adds `ModelCreditTable`)
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing (adds `SectionHeading`)
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (drops `PriceTableProps`/ordinals)

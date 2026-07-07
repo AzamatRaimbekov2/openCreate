@@ -1,19 +1,21 @@
 # LandingPage.tsx — AI component doc
 
 > AI-facing sidecar for `LandingPage.tsx`. Created 2026-07-06, rebuilt
-> 2026-07-07 (stage-2 editorial redesign). Keep this in sync with the code on every change.
+> 2026-07-07 twice (stage-2 editorial, then Stage 2 ascii-sphere terminal).
+> Keep this in sync with the code on every change.
 
 ## Purpose
-The whole standalone landing screen (`/`) in the v3 terminal voice: sticky steel
-masthead (mono wordmark "openCreate·" with the portal dot, lowercase mono nav,
-EN/RU LangSwitch, session-aware action) + the reading order — Hero, Selected
-works spread, The index, numbered How-it-works rows, FAQ rows — closed by a
-colophon footer. Everything sits on the flat void.
+The whole standalone landing screen (`/`) in the v3 Stage 2 terminal voice: a
+FLOATING transparent masthead (nav only) over the full-viewport ascii-sphere
+Hero, then the narrow ~800px RESEARCH COLUMN — specimen showcase grid, the
+mono terminal price index, plain how-it-works prose rows, FAQ prose — closed
+by a minimal one-line footer. Everything sits on the flat void.
 
 ## What it does (for an AI reader)
 - Responsibilities: assemble the marketing page; own its masthead and footer
-  (the landing is standalone — NOT inside AppShell, design.md §10). Sections
-  sit ≥96px apart on desktop (`md:gap-28`, brief QA #3).
+  (the landing is standalone — NOT inside AppShell, design.md §10). The hero
+  is full-bleed; the rest lives in `max-w-[50rem]` with ≥96px section gaps on
+  desktop (`md:gap-28`).
 - Public API / exports: `LandingPage`, `LandingPageProps`
   (`ctaTo: '/create' | '/login'`).
 - Inputs → Outputs: `ctaTo` (route decides from the session) → page JSX; the
@@ -30,26 +32,32 @@ colophon footer. Everything sits on the flat void.
 ```mermaid
 flowchart LR
   Route[routes/index.tsx] -- "ctaTo (from session)" --> LP[LandingPage.tsx]
-  LP --> TB[masthead: mono wordmark · /pricing · LangSwitch · session action]
-  LP --> H[Hero] --> SW[ShowcaseSpread 01] --> PT2[PriceTable 02] --> HIW[HowItWorks 03] --> FAQ[FaqClaims 04]
-  LP --> CF[colophon footer: wordmark · tagline · rights]
+  LP --> TB[floating masthead: /pricing · LangSwitch · session action]
+  LP --> H[Hero full-viewport + AsciiSphere]
+  LP --> COL[800px research column] --> SW[ShowcaseSpread] --> PT2[PriceTable] --> HIW[HowItWorks] --> FAQ[FaqClaims]
+  LP --> CF[minimal footer: tagline · rights]
 ```
 
 ## Key decisions / gotchas
 - `ctaTo` is a PROP, not a session read — `modules/Landing` must not import
   `modules/Auth` (cross-module imports are banned); the route composes them.
 - The LangSwitch in this masthead is the control the e2e RU-hero scenario
-  (plan Task 21) clicks — do not remove it when restyling.
-- Masthead mirrors the AppShell top bar (same sticky `bg-steel` surface, same
-  mono wordmark with the aria-hidden portal dot, same lowercase mono nav voice)
-  so '/' and the app read as one brand (brief QA #6). v3 intent: the steel bar
-  needs no border — the surface step itself separates it from the void.
+  clicks — do not remove it when restyling.
+- **Stage 2 masthead change**: the bar went TRANSPARENT + `absolute` (not
+  sticky steel) and DROPPED the wordmark — the big centered wordmark in the
+  hero is the brand plate now; a second top-left wordmark would double it.
+  Nav links keep the AppShell's quiet lowercase mono voice so '/' and the app
+  still read as one product. AppShell itself keeps its sticky steel bar.
+- The research column (`max-w-[50rem]` ≈ 800px) is landing/prose law only
+  (design.md §4); app screens keep the wider grid.
 - Section h2 order is behavior: `LandingPage.test.tsx` asserts
   `['Selected works', 'Honest price comparison', 'How it works',
-  'Fair questions']`; the footer is queried as `contentinfo`.
+  'Fair questions']`; the footer is queried as `contentinfo` and must keep
+  the `© 2026 openCreate` rights line.
 
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing

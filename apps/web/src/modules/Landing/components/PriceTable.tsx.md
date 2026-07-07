@@ -15,9 +15,9 @@ ONE named competitor item per row.
   column headers (ours in portal blue), `border-white/10` row hairlines, mono
   weight-400 price numerals (ours glow-green 2xl/3xl, competitor same size in
   white), model/competitor notes in mist-dim, `caption-bottom` footnote.
-- Public API / exports: `PriceTable`, `PriceTableProps`
-  (`ordinal?: string`, default `'01'` — landing passes `'02'`; data comes from
-  the module's own `pricingData`).
+- Public API / exports: `PriceTable` (no props — Stage 2 removed the
+  `ordinal` prop together with SectionHeading's ghost numerals; data comes
+  from the module's own `pricingData`).
 - Inputs → Outputs: static rows + i18n keys `landing.price.*` → section with
   SectionHeading + captioned table; prices printed via `formatUsd`.
 - Side effects: none.
@@ -34,8 +34,8 @@ flowchart LR
   Data[pricingData rows] --> PT[PriceTable.tsx]
   I18N[landing.price.* keys EN/RU] --> PT
   SH[SectionHeading] --> PT
-  PT --> LP[LandingPage ordinal 02]
-  PT --> PR[/pricing route ordinal 01/]
+  PT --> LP[LandingPage research column]
+  PT --> PR[/pricing route — opening section/]
 ```
 
 ## Key decisions / gotchas
@@ -52,8 +52,12 @@ flowchart LR
   approved claims plus per-row comparisons.
 - `min-w-[36rem]` + `overflow-x-auto` keeps three readable columns on phones
   without horizontal page scroll (brief QA #5).
+- **Stage 2**: the verification footnote (`<caption>`) turned PORTAL-BLUE —
+  the brief's "portal-blue footnote": the one prose accent now marks the
+  honesty line (caption-size portal is ~9:1 on the void, AA-safe).
 
 ## Commits
 - f2fe5d7 2026-07-06 feat(web): landing with honest price comparison (EN/RU)
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (portal footnote, ordinal prop removed)

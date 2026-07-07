@@ -1,9 +1,9 @@
 // apps/web/src/modules/Landing/components/FaqClaims.tsx
 // The claims FAQ — exactly the three honest topics the copy rules allow:
 // credits never expire (+ no subscription required), what a credit is, and
-// which models are behind the product. Clean white/10 hairline rows (mono
-// weight-400 question, dimmed answer): three short answers don't earn a
-// disclosure widget, and the terminal page needs rules, not boxes.
+// which models are behind the product. v3 Stage 2: PROSE DIRECTLY ON THE VOID
+// — no cards, no hairline rows, no disclosure widgets; question in white mono,
+// answer in dimmed mist right under it, like Q&A notes in a research doc.
 import { useTranslation } from 'react-i18next'
 import { SectionHeading } from './SectionHeading'
 
@@ -14,22 +14,18 @@ export function FaqClaims() {
   const { t } = useTranslation()
 
   return (
-    <section className="flex flex-col gap-2">
-      <SectionHeading ordinal="04" title={t('landing.faq.title')} />
-      <ul className="flex flex-col">
+    <section className="flex flex-col gap-8">
+      <SectionHeading title={t('landing.faq.title')} />
+      <ul className="flex flex-col gap-7">
         {ITEMS.map((item) => (
-          // Q&A row on a hairline — question in white mono weight 400, answer
-          // in dimmed mist; SectionHeading draws the rule above row one
-          <li
-            key={item}
-            className="grid gap-x-8 gap-y-2 border-b border-white/10 py-7 md:grid-cols-12 md:items-baseline"
-          >
-            <h3 className="text-xl font-normal text-white md:col-span-5 md:text-2xl">
+          // Q&A as plain prose: the question is a white body-size h3 (color
+          // carries hierarchy, not size/weight), the answer sits directly
+          // beneath on the void — three short answers never earned boxes
+          <li key={item} className="flex flex-col gap-1.5">
+            <h3 className="text-base leading-6 font-normal text-white">
               {t(`landing.faq.items.${item}.q`)}
             </h3>
-            <p className="text-base text-mist-dim md:col-span-7">
-              {t(`landing.faq.items.${item}.a`)}
-            </p>
+            <p className="max-w-prose text-sm text-mist-dim">{t(`landing.faq.items.${item}.a`)}</p>
           </li>
         ))}
       </ul>

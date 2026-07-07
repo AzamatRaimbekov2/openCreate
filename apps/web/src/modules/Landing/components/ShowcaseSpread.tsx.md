@@ -1,56 +1,60 @@
 # ShowcaseSpread.tsx — AI component doc
 
-> AI-facing sidecar for `ShowcaseSpread.tsx`. Created 2026-07-07 (stage-2 editorial
-> landing rebuild). Keep this in sync with the code on every change.
+> AI-facing sidecar for `ShowcaseSpread.tsx`. Created 2026-07-07 (editorial
+> spread), rebuilt 2026-07-07 for Stage 2 (specimen grid). Keep this in sync
+> with the code on every change.
 
 ## Purpose
-The landing's "Selected works" magazine spread: six poster-grade `ShowcasePoster`
-art cards in an asymmetric 12-col grid with honest editorial figure captions —
-the section that replaces the v1 gradient-placeholder strip the product owner
-rejected (brief §Showcase art, design.md §5).
+"Selected works" as the v3 Stage 2 SPECIMEN GRID: eight blue-violet duotone
+`SpecimenTile` plates in a square 4-col grid (2-col mobile), 8px gap + radius +
+white/10 fog border — replacing the v2 asymmetric magazine spread of
+ShowcasePoster figures. Chrome is minimal: one small mono caption UNDER the
+grid instead of per-tile figure captions.
 
 ## What it does (for an AI reader)
-- Responsibilities: section header (`SectionHeading` 01 + "sample styles"
-  kicker), 12-col spread (spans 7+5 / 4-tall-9:16+4+4 / full-width 21:9),
-  per-card `<figure>` with slice-cropped poster, hover print-lift
-  (≤1deg tilt + 1.5% scale, `motion-safe` only), and `<figcaption>`:
-  `fig. 0N — “title” · Model (provider)` + neutral "sample style" `Badge` chip.
-  Exactly ONE card (sea) carries the glow-amber `video · 5s` chip overlay with
-  a decorative play glyph.
+- Responsibilities: render the `SectionHeading` (kicker + "Selected works"),
+  ONE `<figure>` wrapping the 4×2 tile grid, the amber `video · 5s` chip on
+  exactly one tile (the moon), and ONE `<figcaption>` carrying the honest
+  labeling: the `landing.showcase.sampleLabel` Badge chip + the
+  `landing.showcase.caption` line that names the REAL catalog models
+  (Flash/FLUX schnell, Studio/FLUX dev, Cinema/Wan 2.7).
 - Public API / exports: `ShowcaseSpread` (no props).
-- Inputs → Outputs: i18n strings (`landing.showcase.*`) + static
-  `SHOWCASE_ITEMS` art-direction data → section JSX. No state, no data fetching.
+- Inputs → Outputs: i18n strings + the module-level `SHOWCASE_TILES` reading
+  order (kind + isVideo) → static showcase JSX. No state, no data fetching.
 - Side effects: none.
 
 ## Dependencies
-- Imports / depends on: `react-i18next`, `shared/ui` (`Badge`, `ShowcasePoster`,
-  `ShowcasePalette`), `./SectionHeading`.
-- Used by: `LandingPage.tsx` (second block, between Hero and PriceTable).
+- Imports / depends on: `react-i18next`, `shared/ui` (`Badge`, `SpecimenTile`,
+  `SpecimenKind`), `./SectionHeading`.
+- Used by: `LandingPage.tsx` (first section of the 800px research column).
 
 ## Diagram
 ```mermaid
 flowchart LR
-  ART[shared/ui ShowcasePoster 6 palettes] --> Spread[ShowcaseSpread.tsx]
-  I18N[landing.showcase.* EN/RU] --> Spread
-  Spread -- fig. 01..06 captions + sample stamps --> Landing[LandingPage]
+  I18N[landing.showcase.* strings] --> SS[ShowcaseSpread.tsx]
+  Tiles[SHOWCASE_TILES: eye/brain/hand/arch/moon video /koi/cell/orbit] --> SS
+  SS -- kind per cell --> ST[SpecimenTile]
+  SS -- one figcaption --> Caption[sampleLabel Badge + caption naming real models]
 ```
 
 ## Key decisions / gotchas
-- Honesty rules: every caption carries the localized "sample style" stamp and a
-  REAL catalog model (Flash = FLUX schnell, Studio = FLUX dev, Cinema = Wan 2.7)
-  — we never imply the posters are user generations. Model names are proper
-  nouns and deliberately not translated.
-- v3 restyle: the video marker is the Badge mono-caption-chip voice in
-  glow-amber (amber = explore/highlight in the triad) on a `bg-void/80` backing
-  (a bare chip would drown on busy art); poster windows moved to `rounded-lg`
-  (the 8px card radius). The poster ART itself is still the v2 editorial set —
-  Stage 2 replaces it with blue-violet duotone specimens (design.md v3 §5).
-- fig numbers come from reading-order position (`index + 1`, padStart 2) but
-  keys stay the palette ids — index-as-key is still banned.
-- The art is `aria-hidden` (inside ShowcasePoster); screen readers hear only
-  the honest caption. Tests: `ShowcaseSpread.test.tsx` (6 figures, 1 video
-  marker, distinct palettes, honest model labels).
+- **Stage 2 replaced the v2 spread**: 6 asymmetric poster figures with
+  per-figure `fig. 0N` captions → 8 square specimen tiles + ONE caption under
+  the grid (the reference's "minimal chrome" rule). The old
+  `landing.showcase.figure`/`items.*` keys remain in the locale files
+  (i18n keys stay intact) but are no longer rendered.
+- **Honesty markers survive the chrome diet**: the `sampleLabel` chip and the
+  real model names moved INTO the single caption (`landing.showcase.caption`,
+  new key in BOTH locales); exactly one tile stays video-marked
+  (`landing.showcase.videoMarker`). Tests assert all three.
+- The grid geometry is the reference verbatim: `gap-2` (8px), `rounded-lg`
+  (8px), `border-white/10` fog border, `aspect-square`, `grid-cols-2
+  md:grid-cols-4`. The v2 hover print-lift tilt was retired with the spread.
+- The play triangle in the video chip is decorative `currentColor` SVG — the
+  localized text carries the meaning (never an OS emoji). Tiles are
+  `aria-hidden` inside SpecimenTile; screen readers hear only the caption.
 
 ## Commits
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (specimen grid)

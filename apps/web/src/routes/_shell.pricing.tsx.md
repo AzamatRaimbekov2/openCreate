@@ -11,10 +11,12 @@ per-model credit table, and the signup CTA for visitors as a steel surface card.
 ## What it does (for an AI reader)
 - Responsibilities: terminal header (lowercase `pricing.kicker`, mono h1,
   `Badge variant="accent"` chip `pricing.stamp`), compose `PriceTable`
-  (modules/Landing, opening 01 section), the catalog query (`useCatalog` from
+  (modules/Landing, opening section), the catalog query (`useCatalog` from
   modules/Generator) with all 4 UI states around `ModelCreditTable` under a
-  `SectionHeading ordinal="02"`, and a session-aware signup CTA (steel card,
-  green specimen-pill link). Composition only.
+  `SectionHeading` (Stage 2: amber spark icon, no ordinals), and a
+  session-aware signup CTA (steel card, green specimen-pill link).
+  Composition only. Stage 2 narrowed the main column to `max-w-[50rem]` —
+  /pricing reads as the same ~800px research document as the landing.
 - Public API / exports: `Route` only (`PricingPage` stays private — the router
   plugin cannot code-split route files with extra exports).
 - Inputs → Outputs: catalog query → skeleton rows / `ErrorState` retry /
@@ -61,7 +63,12 @@ flowchart LR
   pill (sign-up = create action); the h1 obeys the 30px/400 heading law — no
   more `md:text-6xl` escalation, hierarchy comes from white-vs-mist color.
 
+- Stage 2 restyle: `ModelCreditTable` credit numerals glow specimen-green
+  (the "go/us" numbers), the comparison footnote is portal-blue — the same
+  terminal treatment as the landing's index section.
+
 ## Commits
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (research column, no ordinals)

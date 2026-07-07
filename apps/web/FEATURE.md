@@ -9,13 +9,17 @@ react-hook-form + zod, i18next.
 
 ## What it does
 
-- **Landing (`/`)** — terminal page on the flat void: whisper-weight mono hero with
-  one portal-blue accent word + the three approved claims (images from $0.01, 5s
-  videos from $0.35, credits never expire), "Selected works" spread (6 honest
-  "sample style" figures, one video-marked), "The index" price comparison table
-  ("verified July 2026", ours in glow-green), numbered how-it-works rows, FAQ rows,
-  colophon footer. Standalone sticky steel masthead with LangSwitch and a
-  session-aware CTA (`/create` signed in, `/login` otherwise). EN/RU.
+- **Landing (`/`)** — terminal page on the flat void: a FULL-VIEWPORT hero with the
+  animated ASCII-sphere canvas behind the centered mono wordmark, whisper-weight
+  headline (one portal-blue accent word) + the three approved claims (images from
+  $0.01, 5s videos from $0.35, credits never expire) and two specimen-pill CTAs
+  (green create + amber pricing); then the ~800px research column — "Selected
+  works" specimen grid (8 duotone SVG plates, one video-marked, one honest
+  "sample style" caption naming the real models), "The index" price comparison
+  table ("verified July 2026", ours in glow-green, portal footnote), plain mono
+  how-it-works prose rows, FAQ prose, minimal footer. Floating transparent
+  masthead with LangSwitch and a session-aware CTA (`/create` signed in,
+  `/login` otherwise). EN/RU.
 - **Auth (`/login`)** — terminal split: mono manifesto panel on the abyss step
   (brand quote + the approved claims) beside the email+password sign-in/register
   form (better-auth client) on the void — steel fields, zod validation, localized
@@ -62,7 +66,8 @@ src/
     └── ui/                     # Button, Input, Select, Modal, Skeleton, Badge, Progress,
                                 # PillGroup, EmptyState, ErrorState, AppShell, LangSwitch,
                                 # AppErrorBoundary, OfflineOverlay, NotFoundPage,
-                                # ShowcasePoster (+ showcasePosterArt — 6 poster palettes)
+                                # AsciiSphere (hero canvas), SpecimenTile (+ specimenTileArt
+                                # — 8 duotone specimen plates)
 ```
 
 Modules talk through the TanStack Query cache (`['me']`, `['generations']`,
@@ -73,7 +78,7 @@ Every `.ts/.tsx` has a `.md` sidecar doc with responsibilities, diagrams and com
 
 ```bash
 pnpm --filter @opencreate/web dev        # vite, http://localhost:5173 (proxies /api,/media → :8787)
-pnpm --filter @opencreate/web test       # vitest + RTL — 95 tests (jsdom)
+pnpm --filter @opencreate/web test       # vitest + RTL — 99 tests (jsdom)
 pnpm --filter @opencreate/web e2e        # playwright — mocked-API happy path + RU landing
 pnpm --filter @opencreate/web lint       # eslint src
 pnpm --filter @opencreate/web typecheck  # tsc --noEmit

@@ -31,7 +31,9 @@ translucent specimen pills — never a dashboard template, never a light theme.
 
 Defined once in `apps/web/src/shared/config/theme.css` via Tailwind v4 `@theme`.
 Use utility classes (`bg-void`, `text-mist`, `bg-specimen-green/20`, …) — never raw
-hex in components (single exception: `showcasePosterArt.ts` art data, §5).
+hex in components (single exception: `specimenTileArt.tsx` art data, §5; the
+`AsciiSphere` canvas resolves the mist token via `getComputedStyle` with the
+token-mirroring fallback — canvas `fillStyle` cannot consume `var()`).
 
 ### Surface ladder (elevation = color step)
 
@@ -131,20 +133,25 @@ Two self-hosted static families (imported in `main.tsx` via @fontsource, declare
   `steps(1,end)`) is the loading pulse — a stepped SOLID pulse, never a gradient
   shimmer. Media plates may lift ≤2px on hover, `motion-safe` only.
 
-## 5. Showcase art direction (`ShowcasePoster`)
+## 5. Showcase art direction (`SpecimenTile`) + hero visual (`AsciiSphere`)
 
-The v2 editorial poster set still ships (Stage 1 kept the component; only its chrome
-— `rounded-lg` window, glow-amber `video · 5s` chip on `bg-void/80` — was restyled).
-**Stage 2 replaces the art** per the reference adaptation: blue-violet duotone SVG
-"specimens" (eye/brain/hand/arch symbolism), FLAT fills + SVG patterns (no gradients,
-no feTurbulence grain), square tiles in a 4-col grid, 8px gap + radius, subtle fog
-border, no captions inside the art. Honest labeling stays: every tile carries the
-localized "sample style" chip (`landing.showcase.sampleLabel`) and a REAL catalog
-model; exactly one tile is video-marked. Art colors remain the only sanctioned
-raw-hex site (`showcasePosterArt.ts`).
+Stage 2 (2026-07-07) REPLACED the v2 editorial posters (`ShowcasePoster` +
+`showcasePosterArt` are deleted): the showcase is now eight blue-violet DUOTONE
+SVG "specimens" — `eye / brain / hand / arch / moon / koi / cell / orbit`
+(the reference symbolism family + three same-language lab plates) — drawn with
+FLAT fills, hairline strokes and SVG `<pattern>` textures ONLY (dots, 45°
+hatch, scanlines; no gradients, no filters, no text). Square tiles in a 4-col
+grid (2-col mobile), 8px gap + radius, `border-white/10` fog border. Chrome is
+minimal: NO per-tile captions — ONE small mono caption under the grid carries
+the honest "sample style" chip (`landing.showcase.sampleLabel`) and names the
+REAL catalog models (`landing.showcase.caption`); exactly one tile (the moon)
+is video-marked. The duotone (`SPECIMEN_GROUND #161233`, `SPECIMEN_INK
+#8fa3f2` in `specimenTileArt.tsx`) is the only sanctioned raw-hex art site.
 
-Stage 2 also lands the hero visual: a dependency-free animated ASCII ellipsoid canvas
-in `#cad5e2` at low opacity with a `prefers-reduced-motion` static frame.
+The hero visual also landed: `AsciiSphere` — a dependency-free animated ASCII
+ellipsoid canvas (2d context, no WebGL) in the mist token at low opacity,
+~30fps frame-capped rAF with full cleanup, `prefers-reduced-motion` → one
+static frame, aria-hidden, transparent background.
 
 ## 6. Component inventory (`apps/web/src/shared/ui/`)
 
@@ -165,7 +172,8 @@ anything new; new shared components must be added to this table in the same task
 | `PillGroup<T>` | `label`, `options`, `value`, `onChange` | Mono caption; selected = amber specimen tint, unselected = white/10 hairline → `hover:bg-ridge`; `aria-pressed` |
 | `LangSwitch` | none | White/10 hairline pill group; active locale = `bg-ridge text-white` lit segment |
 | `AppShell` | `user`, `isSessionPending?`, `onSignOut`, `balanceSlot?`, `children` | STICKY `bg-steel` bar; mono wordmark "openCreate·" (portal dot, aria-hidden); lowercase mono nav (active = white); Sign in = RED specimen pill; user menu = `bg-ridge` panel |
-| `ShowcasePoster` | `palette: 6 palettes (§5)`, `className?` | Decorative SVG poster (v2 art until Stage 2); consumer owns sizing + caption |
+| `AsciiSphere` | `className?` | Decorative aria-hidden `<canvas>`: animated ASCII ellipsoid in mist at 0.34 alpha on transparent bg; ~30fps rAF cap, cleanup on unmount, reduced-motion → static frame; caller sizes it (`absolute inset-0`) |
+| `SpecimenTile` | `kind: 8 specimens (§5)`, `className?` | Decorative duotone SVG specimen plate (flat fills + patterns, no gradients); consumer owns the grid cell, fog border and caption |
 | `AppErrorBoundary` | wraps the app | Crash → mono 400 30px headline on the void, one line, green pill reload |
 | `OfflineOverlay` | none (self-managed) | Full-screen `role="alertdialog"` on the void; mono 400 headline; auto-clears on reconnect |
 | `NotFoundPage` | none | Portal "404" status line, mono 400 30px headline, one green pill home link |
@@ -197,7 +205,8 @@ No blank screens, no raw error text, ever.
 - Status is never color-only: failed wells pair the glow-red border with text + chip;
   transaction amounts carry an explicit +/- sign.
 - Triad glows never carry prose; portal is the only prose accent. Contrast table §2.
-- Decorative art (`ShowcasePoster`, ordinals, the wordmark dot) is `aria-hidden`;
+- Decorative art (`SpecimenTile`, `AsciiSphere`, ordinals, the section spark,
+  the wordmark dot) is `aria-hidden`;
   headings/labels render the raw i18n strings (no CSS text-transform tricks needed —
   v3 has no uppercase anywhere).
 - `<html lang>` mirrors the active locale; RU copy is complete, not partial.
@@ -216,7 +225,7 @@ styling (red marks the status rule/text, never the whole surface); every error s
 mono headline, one line, one action; both locales (`errors.*` keys).
 
 Documented inline-style exception: `Progress` width % (runtime-computed). Documented
-raw-hex exception: `showcasePosterArt.ts` (§5). No others.
+raw-hex exception: `specimenTileArt.tsx` (§5) + the `AsciiSphere` mist fallback. No others.
 
 ## 10. Governance
 
@@ -237,8 +246,8 @@ raw-hex exception: `showcasePosterArt.ts` (§5). No others.
 
 | Page | Treatment |
 |---|---|
-| Landing `/` | Stage 1 done: sticky steel masthead (mono wordmark + portal dot, lowercase nav), whisper-weight mono hero with ONE portal accent word (EN "video", RU «копейки» — locale-driven via `landing.headlineAccent`, split inline so the h1 accessible name and the prerender grep stay intact), green pill CTA + portal pricing link; "The index" tables with glow-green "ours" numerals; portal mono how-it-works ordinals; white/10 hairline FAQ rows; colophon footer. **Stage 2 pending**: ASCII-sphere hero visual + specimen showcase art (§5). |
-| `/pricing` | Done: mono kicker + 30px h1 + glow-amber "200 free credits" chip; PriceTable 01 + ModelCreditTable 02 in the hairline index treatment; visitor signup CTA as a `bg-steel` card with a green pill link. |
+| Landing `/` | Stage 2 done: FLOATING transparent masthead (nav only — pricing link, LangSwitch, session action; the wordmark moved into the hero); FULL-VIEWPORT (`min-h-svh`) hero = `AsciiSphere` behind the centered mono wordmark, kicker, whisper-weight headline with ONE portal accent word (EN "video", RU «копейки» — locale-driven via `landing.headlineAccent`, split inline so the h1 accessible name and the prerender grep stay intact), MIST claims line, and TWO specimen pills (green "Start creating" + amber "See pricing"); below: the ~800px research column (`max-w-[50rem]`) — specimen grid (§5), the mono terminal price index (glow-green "ours" numerals, PORTAL footnote), plain mono how-it-works prose rows (small portal ordinals), FAQ as prose on the void (no rules, no cards); minimal one-line footer (tagline + rights). Section headers = amber spark icon + mono 30px h2 (ordinals retired). |
+| `/pricing` | Stage 2 done: the same ~800px research column; mono kicker + 30px h1 + glow-amber "200 free credits" chip; PriceTable (portal footnote) + ModelCreditTable with SPECIMEN-GREEN credit numerals under amber-spark SectionHeadings; visitor signup CTA as a `bg-steel` card with a green pill link. |
 | `/login` | Done: split `grid lg:grid-cols-[5fr_7fr]` — `AuthManifesto` on the ABYSS step (mono 400 quote, white/10 claim ledger) beside the form on the void (mono 30px h1 over a hairline, steel `Input` fields, portal mode-switch link, steel + glow-red-rule server banner). Pending state keeps the same split silhouette. |
 | `/create`, `/library` | Done: void canvas, sticky steel bar, mono 30px page h1s. Generator = the "commission sheet" (unfilled white/10 `rounded-lg` frame so the steel inputs inside keep an elevation step; ghost mono `SheetField` ordinals; steel prompt textarea; white mono `CostLabel`; amber-selected `ModelPicker` cards). Gallery cards = figures on `bg-abyss` plates with the triad status colors. |
 | 404 / crash / offline | Done: mono 400 30px headline, one line, one action, flat void. |
@@ -263,7 +272,7 @@ Module-owned components (inside `modules/*`, composed from §6 primitives).
 | Gallery | `GenerationCard` | A FIGURE (no card): `rounded-lg bg-abyss` plate in real aspect; mono mist prompt caption; white/10 meta row (cost · portal download · red pill delete). Processing = `animate-skeleton` well + `Progress` + glow-amber %; failed = glow-red hairline well + reason + "Credits refunded" green chip. Plates lift on hover (`motion-safe`). |
 | Gallery | `GenerationDetail` (modal) | `rounded-lg bg-abyss` plate, mono caption, portal download. |
 | Gallery | `GalleryFilterChips` | `PillGroup` All/Images/Videos (amber selection). |
-| Landing | `LandingPage`, `Hero`, `ShowcaseSpread`, `SectionHeading`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable` | v3 terminal skin landed (§11). `SectionHeading` (ordinal outside the h2 — heading names are behavior) and `PriceTable` (`ordinal` prop) are also consumed by the /pricing route via the module index. Claims and honesty markers ("verified July 2026" caption as the table's accessible name, one named competitor per row, per-card "sample style" labels) are unchangeable. |
+| Landing | `LandingPage`, `Hero`, `ShowcaseSpread`, `SectionHeading`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable` | Stage 2 terminal skin (§11): full-viewport `AsciiSphere` hero with two pill CTAs; `ShowcaseSpread` = ONE figure wrapping the 4×2 `SpecimenTile` grid + ONE honest figcaption (sampleLabel chip + `landing.showcase.caption` naming the real models) + one video-marked tile; `SectionHeading` (amber spark icon, decorative — heading names are behavior) and `PriceTable` (no props since Stage 2) are also consumed by the /pricing route via the module index. Claims and honesty markers ("verified July 2026" caption as the table's accessible name, one named competitor per row, the sample-style labeling) are unchangeable. |
 
 Recorded exceptions: `Modal` overlay is `role="presentation"` (2026-07-06 a11y fix);
 failed cards show the stored provider failure reason as a secondary caption

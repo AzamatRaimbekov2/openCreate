@@ -17,11 +17,12 @@
       "expire": "Кредиты не сгорают"
     },
     "cta": "Начать создавать",
-    "secondaryCta": "Смотреть индекс цен",
+    "secondaryCta": "Смотреть цены",
     "showcase": {
       "kicker": "примеры стилей",
       "title": "Избранные работы",
       "sampleLabel": "пример стиля",
+      "caption": "образцы-рендеры, а не работы пользователей — стили изображений: Flash (FLUX schnell) и Studio (FLUX dev) · видео: Cinema (Wan 2.7)",
       "videoMarker": "видео · 5 с",
       "figure": "рис. {{number}}",
       "items": {
@@ -99,7 +100,7 @@
       }
     },
     "footer": {
-      "tagline": "Честная студия AI-изображений и видео. Набрано шрифтами Fraunces и Space Grotesk.",
+      "tagline": "Честная студия AI-изображений и видео. Набрано шрифтом JetBrains Mono.",
       "rights": "© 2026 openCreate"
     }
   },

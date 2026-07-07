@@ -7,7 +7,9 @@ Full per-model credit table for the `/pricing` page: every catalog model with
 its honest provider label, localized type, credits (flat / per duration) and
 the ≈ USD conversion at $0.01/credit. v3 restyled it to the terminal "index"
 treatment — white/10 hairline rules on the void, mono weight-400 credit
-numerals in white, quiet lowercase mono headers (the weight/uppercase laws).
+numerals in SPECIMEN GREEN (`text-glow-green`, Stage 2 — our credit prices are
+the "go/us" numbers, same glow the comparison table gives OUR column), quiet
+lowercase mono headers (the weight/uppercase laws).
 
 ## What it does (for an AI reader)
 - Responsibilities: render `models` as a labelled `<table>` (aria-label =
@@ -50,3 +52,4 @@ flowchart LR
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table
 - 2f56573 2026-07-07 restyle(web): editorial landing + pricing
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+- (pending) restyle(web): terminal landing with ascii-sphere hero + pricing (glow-green credit numerals)

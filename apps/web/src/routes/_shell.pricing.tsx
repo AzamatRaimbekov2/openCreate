@@ -28,7 +28,10 @@ function PricingPage() {
   const catalog = useCatalog()
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-12 md:gap-24 md:py-16">
+    // Stage 2: /pricing reads as the same research document as the landing —
+    // the narrow ~800px column (app screens keep the wide grid; pricing is
+    // prose + tables, so the landing's column law applies)
+    <main className="mx-auto flex w-full max-w-[50rem] flex-col gap-16 px-6 py-12 md:gap-24 md:py-16">
       {/* Terminal page opener: quiet mono kicker, mono weight-400 30px title
           (the heading law) with the brief-mandated "200 free credits" chip */}
       <header className="flex flex-col gap-3">
@@ -43,11 +46,11 @@ function PricingPage() {
       </header>
 
       {/* The same verified comparison the landing shows — one source of truth,
-          here as the page's opening 01 index section */}
+          as the page's opening index section */}
       <PriceTable />
 
       <section className="flex flex-col gap-8">
-        <SectionHeading ordinal="02" title={t('pricing.models.title')} />
+        <SectionHeading title={t('pricing.models.title')} />
         {catalog.isPending ? (
           // Loading: table-silhouette rows inside the index's hairline frame,
           // no layout shift when data lands

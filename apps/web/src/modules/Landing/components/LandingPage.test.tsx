@@ -16,6 +16,13 @@ import type { LandingPageProps } from './LandingPage'
 // i18n init side effect — the page renders localized copy (EN default)
 import 'shared/config/i18n'
 
+// The hero mounts AsciiSphere (a canvas); jsdom has no 2d context — return
+// null explicitly so the sphere stays inert instead of logging jsdom errors
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+})
+afterEach(() => vi.restoreAllMocks())
+
 // The landing renders TanStack <Link>s, so it needs a live router that KNOWS
 // the destinations — their screens never render here.
 function renderLanding(ctaTo: LandingPageProps['ctaTo']) {
@@ -54,14 +61,20 @@ describe('LandingPage', () => {
     ])
   })
 
-  it('opens with the studio micro-label and a secondary pricing link', async () => {
+  it('opens with the studio micro-label and a secondary pricing pill', async () => {
     renderLanding('/login')
     // The kicker renders the raw i18n string (v3: plain lowercase mono)
     expect(await screen.findByText('AI image & video studio')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /see the price index/i })).toHaveAttribute(
-      'href',
-      '/pricing',
-    )
+    // Stage 2: the secondary CTA is the amber specimen pill "See pricing"
+    expect(screen.getByRole('link', { name: /see pricing/i })).toHaveAttribute('href', '/pricing')
+  })
+
+  it('renders the decorative ascii-sphere canvas behind the hero', async () => {
+    renderLanding('/login')
+    await screen.findByRole('heading', { level: 1 })
+    const canvas = document.querySelector('canvas')
+    expect(canvas).not.toBeNull()
+    expect(canvas).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('closes with a colophon footer', async () => {

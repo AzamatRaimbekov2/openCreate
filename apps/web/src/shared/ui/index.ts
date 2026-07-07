@@ -5,6 +5,9 @@
 export { AppErrorBoundary } from './AppErrorBoundary'
 export { AppShell } from './AppShell'
 export type { AppShellProps, AppShellUser } from './AppShell'
+// The landing hero's animated ASCII ellipsoid (canvas, dependency-free)
+export { AsciiSphere } from './AsciiSphere'
+export type { AsciiSphereProps } from './AsciiSphere'
 export { Badge } from './Badge'
 export type { BadgeProps, BadgeVariant } from './Badge'
 export { Button } from './Button'
@@ -26,8 +29,8 @@ export { Progress } from './Progress'
 export type { ProgressProps } from './Progress'
 export { Select } from './Select'
 export type { SelectOption, SelectProps } from './Select'
-// Poster art + the palette list so consumers can lay out the whole spread
-export { SHOWCASE_PALETTES, ShowcasePoster } from './ShowcasePoster'
-export type { ShowcasePalette, ShowcasePosterProps } from './ShowcasePoster'
+// Specimen art + the kind list so consumers can lay out the whole grid
+export { SPECIMEN_KINDS, SpecimenTile } from './SpecimenTile'
+export type { SpecimenKind, SpecimenTileProps } from './SpecimenTile'
 export { Skeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'
