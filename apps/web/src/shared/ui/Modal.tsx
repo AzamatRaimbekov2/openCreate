@@ -1,13 +1,56 @@
 // apps/web/src/shared/ui/Modal.tsx
-// Accessible modal dialog: portal render, Escape + overlay close, body scroll
-// lock, focus restore. With role="alertdialog" it is the project's blocking
-// error-modal pattern (frontend-error-ux) — compose with ErrorState inside.
+// Accessible modal dialog: portal render, dependency-free focus TRAP
+// (Tab/Shift+Tab cycle inside the dialog), Escape + overlay close, body
+// scroll lock, focus restore to the trigger. With role="alertdialog" it is
+// the project's blocking error-modal pattern (frontend-error-ux) — compose
+// with ErrorState inside.
 // v3 terminal: the sheet is a STEEL surface step (#1d293d, 8px radius) over a
 // dimmed void — elevation comes from the surface color, not blur or shadows.
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+
+// Everything keyboard-reachable inside the dialog. Enumerated at KEYDOWN time
+// (not once on open) so content that swaps while open — skeleton → data rows,
+// error → retry — never leaves the trap holding stale elements.
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'video[controls]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
+// Keep Tab/Shift+Tab cycling inside the dialog: wrap last→first (Tab) and
+// first→last (Shift+Tab); if focus somehow sits outside (or on the dialog
+// shell itself), pull it back to the boundary element for that direction.
+function trapTabKey(event: KeyboardEvent, dialog: HTMLDivElement) {
+  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+  const first = focusable.at(0)
+  const last = focusable.at(-1)
+  // Nothing focusable inside: park focus on the dialog so Tab cannot escape
+  if (!first || !last) {
+    event.preventDefault()
+    dialog.focus()
+    return
+  }
+  const active = document.activeElement
+  // "At the boundary" = outside the dialog, or on the dialog shell (tabindex
+  // -1 initial focus) — the browser default from there would leave the trap
+  const isInside = active instanceof HTMLElement && dialog.contains(active)
+  if (event.shiftKey) {
+    if (!isInside || active === dialog || active === first) {
+      event.preventDefault()
+      last.focus()
+    }
+  } else if (!isInside || active === dialog || active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 export type ModalProps = {
   // Controlled visibility — the modal renders nothing when closed
@@ -27,12 +70,31 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
   // Where focus returns when the dialog closes
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  // Latest onClose behind a stable ref: consumers pass fresh inline arrows on
+  // every render, and with onClose in the effect deps each parent re-render
+  // re-ran the cleanup — restoring focus to the TRIGGER while the dialog was
+  // still open. The lifecycle below now keys on isOpen alone.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
+  // One open/close lifecycle: capture the trigger, move focus in, trap Tab,
+  // close on Escape, lock scroll; cleanup unwinds everything and restores
+  // focus — so unmount-while-open behaves exactly like a normal close.
   useEffect(() => {
     if (!isOpen) return
-    previousFocusRef.current = document.activeElement as HTMLElement | null
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    // Capture BEFORE focusing the dialog, or the restore target is the dialog
+    dialogRef.current?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        onCloseRef.current()
+        return
+      }
+      const dialog = dialogRef.current
+      if (event.key === 'Tab' && dialog) trapTabKey(event, dialog)
     }
     document.addEventListener('keydown', handleKeyDown)
     // Lock the page behind the dialog
@@ -42,11 +104,6 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
       document.body.style.overflow = ''
       previousFocusRef.current?.focus()
     }
-  }, [isOpen, onClose])
-
-  // Move focus into the dialog when it opens
-  useEffect(() => {
-    if (isOpen) dialogRef.current?.focus()
   }, [isOpen])
 
   if (!isOpen) return null

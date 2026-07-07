@@ -164,7 +164,7 @@ anything new; new shared components must be added to this table in the same task
 | `Input` | `label`, `error`; native props incl. `ref` (RHF-ready) | Steel filled field: `bg-steel rounded-lg border-white/10`, mono caption label (`text-xs text-mist-dim`); focus = `border-portal`; error = `border-glow-red` + `role="alert"` glow-red message |
 | `Select` | `label`, `options`, `error` | Same steel field treatment as Input; native picker kept |
 | `Skeleton` | `className` for shape | `animate-skeleton bg-steel rounded-lg` — stepped solid pulse through the surface ladder (no gradient shimmer) |
-| `Modal` | `isOpen`, `onClose`, `title`, `role: dialog \| alertdialog` | Steel sheet: `bg-steel rounded-lg border-white/10` over `bg-void/70`, mono 400 title, white/10 hairline close circle (hover → ridge); portal, Escape + overlay close, scroll lock, focus restore; NO shadow |
+| `Modal` | `isOpen`, `onClose`, `title`, `role: dialog \| alertdialog` | Steel sheet: `bg-steel rounded-lg border-white/10` over `bg-void/70`, mono 400 title, white/10 hairline close circle (hover → ridge); portal, Escape + overlay close, scroll lock, dependency-free focus TRAP (Tab/Shift+Tab wrap inside), focus restore to the trigger; NO shadow |
 | `EmptyState` | `icon?`, `title`, `description?`, `action?` | White/10 hairline `rounded-lg` frame on the void, mono 400 30px white title |
 | `ErrorState` | `message`, `onRetry?` | Calm hairline frame + amber ghost retry, `role="alert"` — never red-primary |
 | `Badge` | `variant: neutral \| accent \| success \| danger` | Mono caption CHIP: `rounded-full border-white/10 bg-white/5 text-xs`, lowercase; text color = mist-dim / glow-amber / glow-green / glow-red |
