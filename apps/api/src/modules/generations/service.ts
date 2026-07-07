@@ -11,7 +11,7 @@ import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import type { StorageProvider } from '../../storage/local'
 import { generation } from '../../db/schema'
-import { chargeCredits, refundCredits, type MoneyLog } from '../credits/ledger'
+import { chargeCredits, logCharge, logRefund, refundCredits, type MoneyLog } from '../credits/ledger'
 import { creditsFor, getModel, resolutionFor } from '../catalog/catalog'
 
 // Domain errors carry statusCode + apiCode so the central error handler in
@@ -65,24 +65,37 @@ function failGeneration(
   log?: MoneyLog,
 ) {
   let failed = false
+  let refunded = 0
+  // Fail-flip AND refund in ONE transaction (review finding): they used to be
+  // two transactions in flip-then-refund order, so a crash between them left a
+  // permanently failed row whose charge was never given back — unrecoverable,
+  // because the stale sweep only rescues rows still 'processing'. Now either
+  // both commit or neither does: a refund failure aborts the flip too, the row
+  // stays processing, and the next poll (or the sweep) re-runs the settlement.
   db.transaction((tx) => {
     const fresh = tx.select().from(generation).where(eq(generation.id, id)).get()
-    if (fresh?.status !== 'processing') return
-    tx.update(generation)
-      .set({ status: 'failed', errorMessage, errorCode, completedAt: new Date() })
-      .where(eq(generation.id, id))
-      .run()
-    failed = true
+    if (fresh?.status === 'processing') {
+      tx.update(generation)
+        .set({ status: 'failed', errorMessage, errorCode, completedAt: new Date() })
+        .where(eq(generation.id, id))
+        .run()
+      failed = true
+    }
+    // Refund joins the same transaction (idempotent inside the ledger — the
+    // once-per-generation guard runs on this tx too, so concurrent settlers
+    // still cannot double-credit).
+    refunded = refundCredits(db, userId, id, undefined, tx)
   })
-  // Money-path log: the fail transition releases the user's charge (refund
-  // below), so it must be visible in logs. Only the call that actually flipped
-  // the row logs — losers of the concurrent-settle race stay silent.
+  // Money-path logs strictly AFTER the commit — an aborted settlement must
+  // never leave phantom fail/refund lines in the audit trail. Only the call
+  // that actually flipped the row logs — losers of the concurrent-settle race
+  // stay silent, and the refund line is gated on a real balance mutation.
   if (failed)
     log?.warn(
       { event: 'generation.fail', userId, generationId: id, errorMessage, errorCode },
       'generation failed',
     )
-  refundCredits(db, userId, id, log)
+  if (refunded > 0) logRefund(log, userId, id, refunded)
 }
 
 // Boot-time sweep (wired in app.ts): settles processing rows older than the
@@ -157,28 +170,37 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
     const now = new Date()
     const mode = input.inputImage ? 'image' : 'text'
 
-    // Charge first (throws 402 before any provider call), then persist the
-    // processing row — from here on every failure path must refund.
+    // Charge + row insert in ONE transaction (review finding): as two separate
+    // transactions, a crash between them charged the user for a generation row
+    // that never existed — nothing to poll, settle, or refund, credits gone.
+    // Atomic, either both exist (every failure path from here on refunds) or
+    // neither does. InsufficientCredits still throws 402 BEFORE any provider
+    // call and rolls the whole unit back. The charge audit line is emitted
+    // only after the commit (logCharge below) so a rolled-back submit never
+    // fabricates a 'credits.charge' entry.
     // runwareTaskUuid is deliberately NOT set yet: the row must not be
     // pollable before Runware knows the task. A concurrent GET /:id during the
     // in-flight provider call would otherwise ask Runware about an unknown
     // task, get an error, mark the row failed AND refund — while the provider
     // call still succeeds (free-generation double-spend).
-    chargeCredits(db, userId, cost, id, log)
-    db.insert(generation)
-      .values({
-        id,
-        userId,
-        type: model.type,
-        mode,
-        status: 'processing',
-        prompt: input.prompt,
-        modelId: model.id,
-        paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, duration: input.duration }),
-        costCredits: cost,
-        createdAt: now,
-      })
-      .run()
+    db.transaction((tx) => {
+      chargeCredits(db, userId, cost, id, undefined, tx)
+      tx.insert(generation)
+        .values({
+          id,
+          userId,
+          type: model.type,
+          mode,
+          status: 'processing',
+          prompt: input.prompt,
+          modelId: model.id,
+          paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, duration: input.duration }),
+          costCredits: cost,
+          createdAt: now,
+        })
+        .run()
+    })
+    logCharge(log, userId, id, cost)
 
     if (model.type === 'image') {
       // Images are synchronous: one provider call resolves to a URL we

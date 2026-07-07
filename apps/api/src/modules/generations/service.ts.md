@@ -20,16 +20,16 @@ The generation lifecycle service (plan Task 10) — the core money-touching sequ
 - Side effects (I/O, network, state): DB writes (generation rows + ledger rows inside ledger transactions), outbound Runware calls, asset downloads into `StorageProvider`, media file deletions, structured log lines on money-path transitions (settle/fail/provider error — success-guarded so racing pollers never emit duplicates; provider detail goes to logs ONLY, clients get the sanitized envelope).
 
 ## Dependencies
-- Imports / depends on: `@opencreate/contracts` (input/DTO types), `db/schema` (`generation`), `credits/ledger` (`chargeCredits`/`refundCredits`/`MoneyLog`), `catalog/catalog` (`getModel`/`creditsFor`/`resolutionFor`), `integrations/runware/client` (type), `storage/local` (type), drizzle operators, `node:crypto`.
-- Used by: `modules/generations/routes.ts` (wired in `app.ts`, Task 11); tested by `test/generations.test.ts`, `test/generations-races.test.ts` (scripted `fakeRunware`) and `test/logging.test.ts` (money-path log lines).
+- Imports / depends on: `@opencreate/contracts` (input/DTO types), `db/schema` (`generation`), `credits/ledger` (`chargeCredits`/`refundCredits`/`logCharge`/`logRefund`/`MoneyLog`), `catalog/catalog` (`getModel`/`creditsFor`/`resolutionFor`), `integrations/runware/client` (type), `storage/local` (type), drizzle operators, `node:crypto`.
+- Used by: `modules/generations/routes.ts` (wired in `app.ts`, Task 11); tested by `test/generations.test.ts`, `test/generations-races.test.ts` (scripted `fakeRunware`), `test/generations-money-atomicity.test.ts` (charge+insert / fail+refund atomicity) and `test/logging.test.ts` (money-path log lines).
 
 ## Diagram
 ```mermaid
 flowchart TD
   P[POST /api/generations] --> V{catalog valid?}
   V -- no --> E400[400 validation_failed]
-  V -- yes --> C[chargeCredits 402-guarded]
-  C --> R[insert processing row, NO task uuid yet]
+  V -- yes --> C[ONE tx: chargeCredits 402-guarded]
+  C --> R[+ insert processing row, NO task uuid yet]
   R -- image --> I[runware.imageInference] --> S[storage.saveFromUrl] --> GTX[guarded flip → succeeded → 201]
   R -- video --> SV[runware.submitVideo] --> PU[publish runwareTaskUuid, guarded] --> A[202 processing]
   I -- throw --> RF[refund + mark failed + rethrow]
@@ -50,6 +50,8 @@ flowchart TD
 
 ## Key decisions / gotchas
 - Charge happens BEFORE any provider call: a 402 means Runware was never contacted (asserted in tests).
+- **Atomic charge+insert (review finding)**: the credit charge and the processing-row insert run in ONE `db.transaction` (`chargeCredits` in tx mode) — as two transactions, a crash between them charged the user for a row that never existed (nothing to settle or refund). The `credits.charge` audit line is emitted only after the combined commit (`logCharge`). Pinned by `test/generations-money-atomicity.test.ts`.
+- **Atomic failure settlement (review finding)**: `failGeneration` runs the processing→failed flip AND the idempotent refund in ONE transaction (`refundCredits` in tx mode). The old flip-then-refund pair could crash in between, leaving a failed row whose charge was kept forever (the stale sweep only rescues 'processing' rows). Now a refund failure aborts the flip too — the row stays processing and the next poll/sweep re-runs the settlement. Fail/refund logs are emitted after the commit, gated on the flip/mutation actually applying.
 - **Anti-double-spend (create/poll race)**: the processing row is inserted WITHOUT `runwareTaskUuid`; the uuid is published only after the provider call is acknowledged (video) — and images never need it. `get()` refuses to poll a row with a null uuid. This closes the window where a concurrent GET /:id polled Runware for a task it didn't know yet, misread the error as terminal, refunded, and create() then flipped the row to succeeded anyway (charge + refund = 0, asset delivered). Pinned by `test/generations-races.test.ts`.
 - The image success transition is a status-guarded transaction (only processing → succeeded); if the row was settled elsewhere, the downloaded asset is discarded instead of delivered.
 - Every failure path after the charge refunds; `refundCredits` is idempotent (once-per-generation guard lives in the ledger), so concurrent polls cannot double-refund.
