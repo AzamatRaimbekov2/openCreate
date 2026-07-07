@@ -24,6 +24,13 @@ export class ValidationError extends Error {
   statusCode = 400
   apiCode = 'validation_failed'
 }
+// 409: the request is well-formed but the resource's current state forbids it
+// (contracts 'conflict'). Used when deleting a still-processing generation —
+// see remove() for why that must be refused rather than honored.
+export class ConflictError extends Error {
+  statusCode = 409
+  apiCode = 'conflict'
+}
 // Runware flagged the produced asset NSFW (safety.checkContent). The spec's
 // moderation stance (risk §9.4): flagged content is NEVER stored or served,
 // the user gets a clear safety message, and the charge is refunded. 422 —
@@ -460,6 +467,16 @@ export function createGenerationService({ db, runware, storage, log: baseLog }: 
       .where(and(eq(generation.id, id), eq(generation.userId, userId)))
       .get()
     if (!row) throw new NotFoundError('generation not found')
+    // A processing row must NOT be deletable (review finding): deleting it
+    // mid-flight would (a) forfeit the user's refund — every failure
+    // settlement path (poll error, NSFW, stale sweep) needs the row to flip
+    // and refund against, and refundCredits keyed on a vanished generation
+    // would still work but nothing would ever trigger it — and (b) orphan the
+    // Runware task the operator keeps paying for with no record of it.
+    // 409 'conflict': the request is fine, the state isn't; the SPA tells the
+    // user to wait for the generation to finish (or fail) first.
+    if (row.status === 'processing')
+      throw new ConflictError('generation is still processing — wait for it to finish')
     // Remove the media file first (idempotent), then the row — a re-run after
     // a crash between the two steps is harmless.
     await storage.remove(id, row.type === 'video' ? 'mp4' : 'webp')

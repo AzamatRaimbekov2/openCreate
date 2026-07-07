@@ -46,7 +46,7 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | POST | `/api/generations` | ✓ | body `CreateGenerationInput`; 201 image / 202 video; 400/402/502 |
 | GET | `/api/generations` | ✓ | `?limit` (≤50, default 24) `&cursor`; `{ items, nextCursor }` |
 | GET | `/api/generations/:id` | ✓ | doubles as the Runware poll while processing |
-| DELETE | `/api/generations/:id` | ✓ | 204; removes media file + row |
+| DELETE | `/api/generations/:id` | ✓ | 204; removes media file + row; 409 `conflict` while processing |
 | GET | `/media/:file` | – | stored generation assets |
 | GET | `/*` | – | production only: built SPA + index.html fallback |
 
