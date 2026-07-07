@@ -1,34 +1,41 @@
 /* apps/web/src/shared/config/theme.css
    The ONLY CSS file in the app (frontend law). Tailwind v4 entry + the
-   "Paper & Ink" design tokens — see docs/frontend/design.md for roles,
-   use-when/avoid-when rules and contrast notes. Components consume these
-   through utility classes (bg-paper, text-ink, ring-accent, …). */
+   "Light Editorial" design tokens — see docs/frontend/design.md (v2) for
+   roles, use-when/avoid-when rules and contrast notes. Components consume
+   these through utility classes (bg-cream, text-ink, ring-vermillion, …). */
 @import 'tailwindcss';
 
 @theme {
-  /* Warm paper canvas — the app-wide background */
-  --color-paper: #faf9f6;
-  /* Ink — primary text */
-  --color-ink: #111110;
-  /* Softened ink — secondary text, captions */
-  --color-ink-soft: #57534e;
-  /* The single electric accent — actions, focus, progress */
-  --color-accent: #4f46e5;
-  /* Accent wash — hovers, selected states, accent badges */
-  --color-accent-soft: #eef2ff;
+  /* Warm cream canvas — the app-wide background (the "paper" of the magazine) */
+  --color-cream: #faf7f2;
+  /* Ink — primary text, solid CTA fills, hairline rules (via opacity) */
+  --color-ink: #161412;
+  /* Softened ink — secondary text, captions, micro-labels */
+  --color-ink-soft: #6e675e;
+  /* Vermillion — THE editorial accent: key words, active states, stamps,
+     CTA hover. Sparingly; never body text (see design.md contrast rules) */
+  --color-vermillion: #e8442e;
+  /* Soft sand — tinted blocks, skeleton shimmer, quiet hovers */
+  --color-sand: #efe9df;
   /* Dark media well — ONLY behind image/video previews */
   --color-media: #141413;
-  /* Positive status — refunds, +credits */
-  --color-success: #16a34a;
-  /* Destructive/failure status — delete, failed generations */
-  --color-danger: #dc2626;
-  /* Card radius (rounded-2xl equivalent, kept as a named token) */
-  --radius-card: 1rem;
+  /* Positive status — refunds, +credits (deep editorial green, AA on cream) */
+  --color-success: #1e6b41;
+  /* Destructive/failure status — delete, failed generations (distinct from
+     the vermillion accent: deeper, browner, AA on cream) */
+  --color-danger: #b3261e;
+
+  /* Display serif — hero and section headings, oversized numerals, the
+     italic accent word. Fraunces ships no Cyrillic: RU falls back to Georgia */
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  /* UI grotesk — body, buttons, labels, tables (default sans app-wide) */
+  --font-sans:
+    'Space Grotesk Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-/* Base canvas: every screen starts on paper with ink text */
+/* Base canvas: every screen starts on cream with ink text in the grotesk */
 @layer base {
   body {
-    @apply bg-paper text-ink antialiased;
+    @apply bg-cream font-sans text-ink antialiased;
   }
 }

@@ -12,7 +12,7 @@ export function PriceTable() {
   return (
     <section className="flex flex-col gap-6">
       <h2 className="text-xl font-semibold text-ink">{t('landing.price.title')}</h2>
-      {/* White card on paper; horizontal scroll instead of squashing on phones */}
+      {/* White card on the cream canvas; horizontal scroll instead of squashing on phones */}
       <div className="overflow-x-auto rounded-2xl border border-ink/10 bg-white p-6 shadow-sm">
         <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
           <caption className="mb-4 text-left text-xs text-ink-soft">
@@ -23,8 +23,8 @@ export function PriceTable() {
               <th scope="col" className="py-2 pr-4 font-medium">
                 {t('landing.price.columns.useCase')}
               </th>
-              {/* Our column header pops in accent — the only colored header */}
-              <th scope="col" className="px-4 py-2 font-semibold text-accent">
+              {/* Our column header pops in vermillion — the only colored header */}
+              <th scope="col" className="px-4 py-2 font-semibold text-vermillion">
                 {t('landing.price.columns.ours')}
               </th>
               <th scope="col" className="px-4 py-2 font-medium">
@@ -38,9 +38,9 @@ export function PriceTable() {
                 <th scope="row" className="py-3 pr-4 font-medium text-ink">
                   {t(`landing.price.rows.${row.id}.useCase`)}
                 </th>
-                {/* Our cell is washed accent-soft; ONLY text-accent may sit on
+                {/* Our cell is washed sand; ONLY text-vermillion may sit on
                     it (design.md §7 contrast rule) */}
-                <td className="bg-accent-soft px-4 py-3 text-accent">
+                <td className="bg-sand px-4 py-3 text-vermillion">
                   <span className="block font-semibold">{formatUsd(row.ourPriceUsd)}</span>
                   <span className="block text-xs">{t(`landing.price.rows.${row.id}.ourModel`)}</span>
                 </td>

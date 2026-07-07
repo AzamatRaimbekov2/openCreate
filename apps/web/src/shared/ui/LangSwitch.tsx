@@ -17,10 +17,13 @@ export function LangSwitch() {
   const active = i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'
 
   return (
+    // Editorial toggle: a hairline pill on the cream canvas; the active locale
+    // is a solid ink mini-pill ("printed"), never a tinted wash — high contrast
+    // at this tiny size and unmistakable state
     <div
       role="group"
       aria-label={t('nav.language')}
-      className="flex items-center gap-1 rounded-xl border border-ink/15 bg-white p-1"
+      className="flex items-center gap-0.5 rounded-full border border-ink/20 p-0.5"
     >
       {LANGUAGES.map((language) => {
         const isActive = language.value === active
@@ -30,8 +33,8 @@ export function LangSwitch() {
             type="button"
             aria-pressed={isActive}
             onClick={() => setLanguage(language.value)}
-            className={`min-h-8 rounded-lg px-2 text-xs font-medium transition-opacity duration-150 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-              isActive ? 'bg-accent-soft text-accent' : 'text-ink-soft hover:text-ink'
+            className={`min-h-7 rounded-full px-2.5 text-xs font-medium tracking-[0.08em] transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none ${
+              isActive ? 'bg-ink text-cream' : 'text-ink-soft hover:text-ink'
             }`}
           >
             {language.label}

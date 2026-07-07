@@ -14,10 +14,12 @@ export type ErrorStateProps = {
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   const { t } = useTranslation()
   return (
-    // role=alert: the failure replaced expected content, announce it
+    // role=alert: the failure replaced expected content, announce it.
+    // Editorial voice: a hairline frame on the cream canvas (matches
+    // EmptyState) — failure stays calm, typeset, and never red-primary.
     <div
       role="alert"
-      className="flex flex-col items-center gap-3 rounded-2xl border border-ink/10 bg-white px-6 py-10 text-center"
+      className="flex flex-col items-center gap-4 border border-ink/15 px-6 py-10 text-center"
     >
       <p className="max-w-md text-ink">{message}</p>
       {onRetry ? (

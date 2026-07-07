@@ -28,6 +28,8 @@ flowchart LR
 - `z-[60]` deliberately outranks `Modal` (`z-50`) — losing connectivity must block even an open dialog.
 - Copy comes from `errors.offline.*` (EN+RU); tests override the read-only `navigator.onLine` getter per test via `Object.defineProperty`.
 - `getServerSnapshot` returns `true` (assume online) — required by the hook contract even though the SPA never SSRs.
+- v2 editorial restyle: cream canvas + Fraunces serif headline (`font-display text-4xl/5xl`) + one line — no action button, the overlay auto-clears on reconnect. Role/keys unchanged.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
+- (pending) restyle(web): editorial design system — tokens, fonts, ui kit

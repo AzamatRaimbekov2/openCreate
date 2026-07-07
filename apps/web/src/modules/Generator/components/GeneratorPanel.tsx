@@ -109,7 +109,7 @@ export function GeneratorPanel() {
           value={state.prompt}
           onChange={(event) => state.setPrompt(event.target.value)}
           placeholder={t('generator.prompt.placeholder')}
-          className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-ink placeholder:text-ink-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-ink placeholder:text-ink-soft focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
         />
       </div>
 
@@ -154,7 +154,7 @@ export function GeneratorPanel() {
             // the drafted prompt alive in the store if the user comes back
             <Link
               to="/pricing"
-              className="font-medium text-accent underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              className="font-medium text-vermillion underline focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
             >
               {t('generator.errors.seePricing')}
             </Link>

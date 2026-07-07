@@ -47,6 +47,10 @@ flowchart LR
 - Clicks inside the dialog call `stopPropagation()` so they never reach the overlay's
   close handler.
 - Focus restore uses the element that was active before opening (`previousFocusRef`).
+- v2 editorial restyle: the sheet is `bg-cream` with a hairline `border-ink/15`, near-flat
+  corners (`rounded-sm`) and only `shadow-lg` (no heavy glass panels — brief bans heavy
+  shadows); the title is Fraunces (`font-display text-2xl`) over a hairline rule; the close
+  button is a hairline circle that solidifies on hover. Behavior/roles unchanged.
 
 ## Commits
 

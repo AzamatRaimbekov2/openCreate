@@ -1,6 +1,8 @@
 // apps/web/src/shared/ui/Button.tsx
-// Design-system button: primary (main CTA) / ghost (quiet) / danger (destructive),
-// sizes md/lg, loading state with inline spinner. See docs/frontend/design.md §5.
+// Design-system button ("Light Editorial"): a solid-ink pill whose hover flips
+// to the vermillion accent — the editorial CTA gesture. Variants: primary
+// (solid ink), ghost (hairline outline, quiet), danger (destructive only).
+// Sizes md/lg, loading state with inline spinner. docs/frontend/design.md §5.
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 export type ButtonVariant = 'primary' | 'ghost' | 'danger'
@@ -17,16 +19,21 @@ export type ButtonProps = {
   isLoading?: boolean
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'>
 
+// Editorial variants: the primary CTA is solid ink (the "printed" button) and
+// hovers to vermillion — the accent appears as a reaction, not a default.
+// Ghost is a hairline-outline pill (quiet, secondary); danger stays a solid
+// fill so destructive actions are unmistakable, in the deeper danger red that
+// never competes with the vermillion accent.
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-white hover:bg-accent/90',
-  ghost: 'bg-transparent text-ink hover:bg-accent-soft',
-  danger: 'bg-danger text-white hover:bg-danger/90',
+  primary: 'bg-ink text-cream hover:bg-vermillion',
+  ghost: 'border border-ink/25 bg-transparent text-ink hover:border-ink hover:bg-sand',
+  danger: 'bg-danger text-cream hover:bg-danger/85',
 }
 
 // min-h keeps the 40px minimum hit area from the a11y rules
 const sizeClasses: Record<ButtonSize, string> = {
-  md: 'min-h-10 px-4 py-2 text-sm',
-  lg: 'min-h-12 px-6 py-3 text-base',
+  md: 'min-h-10 px-5 py-2 text-sm',
+  lg: 'min-h-12 px-7 py-3 text-base',
 }
 
 export function Button({
@@ -45,7 +52,10 @@ export function Button({
       // Loading is a disabled state too — double submits are never possible
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-opacity duration-150 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      // Pill shape (rounded-full) is the editorial control silhouette;
+      // transition-colors at 200ms makes the ink→vermillion hover FELT (brief:
+      // "hover states must be felt", motion window 150–250ms)
+      className={`inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       {...rest}
     >
       {isLoading ? <Spinner /> : null}

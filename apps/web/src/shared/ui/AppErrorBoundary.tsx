@@ -36,14 +36,18 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 }
 
-// Function child so the fallback can use hooks (the boundary itself cannot)
+// Function child so the fallback can use hooks (the boundary itself cannot).
+// Editorial voice (brief: "serif headline, one line, one action") — even a
+// crash is typeset like the rest of the magazine, never a panic screen.
 function CrashFallback() {
   const { t } = useTranslation()
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-paper px-6 text-center">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">{t('errors.crash.title')}</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-cream px-6 text-center">
+      <h1 className="font-display text-4xl leading-[1.02] font-semibold tracking-tight text-ink md:text-5xl">
+        {t('errors.crash.title')}
+      </h1>
       <p className="max-w-md text-ink-soft">{t('errors.crash.description')}</p>
-      <Button className="mt-2" onClick={() => window.location.reload()}>
+      <Button className="mt-3" onClick={() => window.location.reload()}>
         {t('errors.crash.reload')}
       </Button>
     </main>

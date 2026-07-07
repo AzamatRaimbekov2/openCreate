@@ -32,10 +32,12 @@ export type AppShellProps = {
   children: ReactNode
 }
 
-// Nav link styling: color lives ONLY in active/inactiveProps so the two
-// text-* utilities never fight inside one className
+// Nav links are uppercase grotesk micro-labels (the editorial magazine masthead
+// voice — brief: "nav in grotesk uppercase micro-labels"). Color lives ONLY in
+// active/inactiveProps so the two text-* utilities never fight inside one
+// className; the active state is vermillion — the sanctioned accent use.
 const navLinkClass =
-  'inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-medium transition-opacity duration-150 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none'
+  'inline-flex min-h-10 items-center rounded-full px-3 text-xs font-medium tracking-[0.18em] uppercase transition-colors duration-200 hover:text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none'
 
 export function AppShell({
   user,
@@ -47,21 +49,27 @@ export function AppShell({
   const { t } = useTranslation()
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper">
-      <header className="border-b border-ink/10">
+    <div className="flex min-h-screen flex-col bg-cream">
+      {/* Hairline top bar — the only structure line the header needs */}
+      <header className="border-b border-ink/15">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
-          {/* Wordmark doubles as the home link */}
+          {/* Serif wordmark "openCreate·" doubles as the home link. The
+              trailing middle dot is the brand's typographic period — vermillion
+              and aria-hidden so the accessible name stays "openCreate". */}
           <Link
             to="/"
-            className="rounded-xl text-lg font-semibold tracking-tight text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="rounded-sm font-display text-xl font-semibold tracking-tight text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             openCreate
+            <span aria-hidden="true" className="text-vermillion">
+              ·
+            </span>
           </Link>
           <nav className="flex items-center gap-1">
             <Link
               to="/create"
               className={navLinkClass}
-              activeProps={{ className: 'text-accent' }}
+              activeProps={{ className: 'text-vermillion' }}
               inactiveProps={{ className: 'text-ink-soft' }}
             >
               {t('nav.create')}
@@ -69,7 +77,7 @@ export function AppShell({
             <Link
               to="/library"
               className={navLinkClass}
-              activeProps={{ className: 'text-accent' }}
+              activeProps={{ className: 'text-vermillion' }}
               inactiveProps={{ className: 'text-ink-soft' }}
             >
               {t('nav.library')}
@@ -77,7 +85,7 @@ export function AppShell({
             <Link
               to="/pricing"
               className={navLinkClass}
-              activeProps={{ className: 'text-accent' }}
+              activeProps={{ className: 'text-vermillion' }}
               inactiveProps={{ className: 'text-ink-soft' }}
             >
               {t('nav.pricing')}
@@ -112,15 +120,17 @@ function AccountArea({ user, isSessionPending, onSignOut }: AccountAreaProps) {
   const { t } = useTranslation()
 
   if (isSessionPending) {
-    return <Skeleton className="h-10 w-24 rounded-xl" />
+    // Pill-shaped shimmer mirrors the sign-in pill / menu trigger silhouette
+    return <Skeleton className="h-10 w-24 rounded-full" />
   }
 
   if (!user) {
     // Link styled as the primary action — mirrors Button primary/md classes
+    // (ink pill, hover flips to vermillion: the editorial CTA gesture)
     return (
       <Link
         to="/login"
-        className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className="inline-flex min-h-10 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none"
       >
         {t('nav.signIn')}
       </Link>
@@ -162,7 +172,9 @@ function UserMenu({ user, onSignOut }: UserMenuProps) {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex min-h-10 max-w-48 items-center gap-1 truncate rounded-xl px-3 py-2 text-sm font-medium text-ink transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        // Quiet trigger: sand wash on hover (the editorial "tinted block"),
+        // never a hard fill — the account is chrome, not a call to action
+        className="inline-flex min-h-10 max-w-48 items-center gap-1 truncate rounded-full px-3 py-2 text-sm font-medium text-ink transition-colors duration-200 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
       >
         <span className="truncate">{label}</span>
         {/* Decorative chevron — the aria-expanded state carries the meaning */}
@@ -178,16 +190,18 @@ function UserMenu({ user, onSignOut }: UserMenuProps) {
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
+          {/* Menu panel = a small cream sheet with a hairline border (same
+              editorial surface language as Modal — no heavy white cards) */}
           <div
             role="menu"
             aria-label={label}
-            className="absolute top-full right-0 z-20 mt-2 w-48 rounded-2xl border border-ink/10 bg-white p-2 shadow-xl"
+            className="absolute top-full right-0 z-20 mt-2 w-48 rounded-sm border border-ink/15 bg-cream p-1.5 shadow-lg"
           >
             <button
               type="button"
               role="menuitem"
               onClick={handleSignOut}
-              className="flex min-h-10 w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-ink transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              className="flex min-h-10 w-full items-center rounded-sm px-3 py-2 text-sm font-medium text-ink transition-colors duration-200 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
             >
               {t('nav.signOut')}
             </button>

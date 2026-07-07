@@ -74,7 +74,7 @@ function PricingPage() {
           {/* Link styled as the primary lg action — mirrors Button primary/lg classes */}
           <Link
             to="/login"
-            className="mt-1 inline-flex min-h-12 items-center justify-center rounded-xl bg-accent px-6 py-3 text-base font-medium text-white transition-opacity duration-150 hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="mt-1 inline-flex min-h-12 items-center justify-center rounded-full bg-ink px-7 py-3 text-base font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {t('pricing.cta.button')}
           </Link>

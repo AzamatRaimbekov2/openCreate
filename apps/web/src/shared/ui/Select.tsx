@@ -1,6 +1,7 @@
 // apps/web/src/shared/ui/Select.tsx
-// Labelled native select with an accessible error message — same contract as
-// Input (RHF register() spreads in via ref-as-prop).
+// Labelled native select in the editorial "hairline underline" style — same
+// contract and field voice as Input (uppercase micro-label, transparent body,
+// vermillion focus rule; RHF register() spreads in via ref-as-prop).
 import { useId } from 'react'
 import type { ComponentPropsWithRef } from 'react'
 
@@ -25,15 +26,23 @@ export function Select({ label, options, error, id, className = '', ...rest }: S
   const selectId = id ?? autoId
   const errorId = `${selectId}-error`
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={selectId} className="text-sm font-medium text-ink">
+    <div className="flex flex-col gap-1.5">
+      {/* Same editorial field voice as Input: uppercase micro-label over a
+          hairline-underlined control (CSS-only transform — accessible name
+          and getByLabelText queries stay unchanged) */}
+      <label
+        htmlFor={selectId}
+        className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase"
+      >
         {label}
       </label>
       <select
         id={selectId}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`min-h-10 rounded-xl border border-ink/15 bg-white px-3 py-2 text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${className}`}
+        className={`min-h-10 border-0 border-b bg-transparent px-0.5 py-2 text-base text-ink transition-colors duration-200 focus-visible:border-vermillion focus-visible:shadow-[0_1px_0_0_var(--color-vermillion)] focus-visible:outline-none ${
+          error ? 'border-danger' : 'border-ink/30'
+        } ${className}`}
         {...rest}
       >
         {options.map((option) => (

@@ -57,6 +57,9 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
       onClick={onClose}
       role="presentation"
     >
+      {/* Editorial dialog: a cream sheet with a hairline border and near-flat
+          corners — reads as a card of the same paper, not a floating glass
+          panel. Depth comes from the dimmed page + hairline, not heavy blur. */}
       <div
         ref={dialogRef}
         role={role}
@@ -65,15 +68,16 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
         tabIndex={-1}
         // Clicks inside must not bubble to the overlay's close handler
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-sm border border-ink/15 bg-cream p-8 shadow-lg"
       >
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-ink">{title}</h2>
+        <div className="mb-5 flex items-start justify-between gap-4 border-b border-ink/15 pb-4">
+          {/* Serif display title — dialogs carry the same headline voice as pages */}
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={t('common.close')}
-            className="flex size-10 items-center justify-center rounded-xl text-ink-soft transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-ink/20 text-ink-soft transition-colors duration-200 hover:border-ink hover:text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             ✕
           </button>

@@ -21,7 +21,7 @@ export function HowItWorks() {
             {/* Visible ordinal — the ol already conveys order to screen readers */}
             <span
               aria-hidden="true"
-              className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent"
+              className="flex size-8 items-center justify-center rounded-full bg-sand text-sm font-semibold text-vermillion"
             >
               {index + 1}
             </span>

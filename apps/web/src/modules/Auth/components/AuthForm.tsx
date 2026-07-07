@@ -1,5 +1,5 @@
 // apps/web/src/modules/Auth/components/AuthForm.tsx
-// Email/password login-or-register card ("Paper & Ink" white card on paper).
+// Email/password login-or-register card ("Light Editorial" card on cream).
 // One component serves both modes: switching remounts the fields (key={mode})
 // so RHF state, zod errors and the server alert reset predictably. Server
 // failures surface as LOCALIZED copy in a role="alert" banner — never raw text.
@@ -53,7 +53,7 @@ export function AuthForm() {
       <button
         type="button"
         onClick={() => setMode(isLogin ? 'register' : 'login')}
-        className="min-h-10 self-center rounded-xl px-2 text-sm font-medium text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className="min-h-10 self-center rounded-xl px-2 text-sm font-medium text-vermillion hover:underline focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
       >
         {t(isLogin ? 'auth.switchToRegister' : 'auth.switchToLogin')}
       </button>

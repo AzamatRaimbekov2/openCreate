@@ -1,7 +1,7 @@
 // apps/web/src/modules/Credits/components/BalanceChip.tsx
 // Header credit-balance chip (⚡ 165). 4 UI states: skeleton while loading,
 // compact retry icon-button on failure, hidden entirely when signed out
-// (the shell shows "Sign in" instead), and the accent chip on data — clicking
+// (the shell shows "Sign in" instead), and the vermillion stamp chip on data — clicking
 // it opens the TransactionsList history modal.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,7 +32,7 @@ export function BalanceChip() {
         type="button"
         onClick={() => void refetch()}
         aria-label={t('credits.reload')}
-        className="flex size-10 items-center justify-center rounded-full text-ink-soft transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className="flex size-10 items-center justify-center rounded-full text-ink-soft transition-opacity duration-150 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
       >
         <span aria-hidden="true">↻</span>
       </button>
@@ -45,7 +45,7 @@ export function BalanceChip() {
         type="button"
         onClick={() => setIsHistoryOpen(true)}
         aria-label={t('credits.balance')}
-        className="inline-flex min-h-10 items-center gap-1 rounded-full bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className="inline-flex min-h-10 items-center gap-1 rounded-full bg-sand px-4 py-2 text-sm font-medium text-vermillion transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
       >
         {/* Decorative bolt — the aria-label already names the control */}
         <span aria-hidden="true">⚡</span>

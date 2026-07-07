@@ -4,7 +4,7 @@
 // anything mounts). Composition only: form left, live gallery right — a submit
 // prepends its card next door instantly, which is the module pair's success
 // feedback (no toast in the kit by design). The shell owns the page canvas
-// (bg-paper + min-height), so the screen only lays out its own content.
+// (bg-cream + min-height), so the screen only lays out its own content.
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { requireSession } from 'modules/Auth'

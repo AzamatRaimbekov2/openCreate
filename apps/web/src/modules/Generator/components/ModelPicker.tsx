@@ -41,17 +41,17 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
               type="button"
               aria-pressed={isSelected}
               onClick={() => onSelect(model.id)}
-              className={`flex flex-col items-start gap-0.5 rounded-xl border p-3 text-left transition-opacity duration-150 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+              className={`flex flex-col items-start gap-0.5 rounded-xl border p-3 text-left transition-opacity duration-150 focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none ${
                 isSelected
-                  ? 'border-accent bg-accent-soft'
-                  : 'border-ink/15 bg-white hover:bg-accent-soft'
+                  ? 'border-vermillion bg-sand'
+                  : 'border-ink/15 bg-white hover:bg-sand'
               }`}
             >
               <span className="text-sm font-semibold text-ink">{model.name}</span>
               {/* Honest provider attribution — users see what actually runs */}
               <span className="text-xs text-ink-soft">{model.providerLabel}</span>
               <span
-                className={`text-xs font-medium ${isSelected ? 'text-accent' : 'text-ink-soft'}`}
+                className={`text-xs font-medium ${isSelected ? 'text-vermillion' : 'text-ink-soft'}`}
               >
                 {priceHint(model, t)}
               </span>

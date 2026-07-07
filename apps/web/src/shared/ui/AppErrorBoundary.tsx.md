@@ -27,6 +27,8 @@ flowchart TD
 - The fallback is a terminal state by design — no reset/retry of the tree; a render crash means unknown app state, and a full reload is the only honest recovery.
 - User-safe copy only ("technical update", no blame, no codes) per design.md §8; raw error stays in the console.
 - Sits OUTSIDE `QueryClientProvider` in the root route, so the fallback must not depend on query/router context (it doesn't — only i18next's global instance).
+- v2 editorial restyle: the fallback follows the brief's error-screen formula — Fraunces serif headline (`font-display text-4xl/5xl`), one line, one Button (ink pill) — on the cream canvas. Keys/roles unchanged.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces
+- (pending) restyle(web): editorial design system — tokens, fonts, ui kit

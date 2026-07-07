@@ -42,7 +42,7 @@ export function GenerationDetail({ generation, isOpen, onClose }: GenerationDeta
           <a
             href={mediaUrl}
             download
-            className="self-start text-sm font-medium text-accent underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="self-start text-sm font-medium text-vermillion underline focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {t('gallery.download')}
           </a>

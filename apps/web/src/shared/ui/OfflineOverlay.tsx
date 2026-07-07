@@ -27,14 +27,16 @@ export function OfflineOverlay() {
   if (isOnline) return null
 
   return (
-    // z-[60] sits above the Modal layer (z-50) — connectivity outranks any dialog
+    // z-[60] sits above the Modal layer (z-50) — connectivity outranks any
+    // dialog. Editorial voice: serif headline + one line on the cream canvas;
+    // no action button because the overlay clears itself on reconnect.
     <div
       role="alertdialog"
       aria-modal="true"
       aria-label={t('errors.offline.title')}
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-paper px-6 text-center"
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-cream px-6 text-center"
     >
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">
+      <h1 className="font-display text-4xl leading-[1.02] font-semibold tracking-tight text-ink md:text-5xl">
         {t('errors.offline.title')}
       </h1>
       <p className="max-w-md text-ink-soft">{t('errors.offline.description')}</p>

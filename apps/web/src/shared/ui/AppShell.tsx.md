@@ -3,15 +3,17 @@
 > AI-facing sidecar for `AppShell.tsx`. Created 2026-07-06. Keep this in sync with the code on every change.
 
 ## Purpose
-Application chrome (header + canvas) for in-app screens: wordmark, primary nav
-(Create/Library/Pricing), credits balance slot, EN/RU LangSwitch, account area.
-Presentational by design so `shared/ui` never imports `modules/*`.
+Application chrome (header + canvas) for in-app screens, in the "Light Editorial"
+masthead voice: serif wordmark "openCreate·" (vermillion dot), hairline top bar,
+uppercase grotesk nav micro-labels (Create/Library/Pricing), credits balance slot,
+EN/RU LangSwitch, account area. Presentational by design so `shared/ui` never
+imports `modules/*`.
 
 ## What it does (for an AI reader)
-- Responsibilities: render the fixed header row and the `bg-paper` page canvas;
-  decide between three account-area states (session pending → `Skeleton`,
-  signed out → primary-styled Sign in `Link`, signed in → `UserMenu` with a
-  Sign out `menuitem`).
+- Responsibilities: render the hairline header row and the `bg-cream` page canvas;
+  decide between three account-area states (session pending → pill `Skeleton`,
+  signed out → ink-pill Sign in `Link` (hover vermillion), signed in → `UserMenu`
+  with a Sign out `menuitem` in a cream hairline panel).
 - Public API / exports / props / endpoints: `AppShell`, `AppShellProps`,
   `AppShellUser`. Props: `user: AppShellUser | null`, `isSessionPending?`,
   `onSignOut: () => void`, `balanceSlot?: ReactNode`, `children`.
@@ -51,7 +53,13 @@ flowchart LR
   typed `Link` with the same active/inactive styling as the other nav items.
 - Account name can be an empty string in better-auth — trigger label falls back
   to the email via `user.name?.trim()`.
+- v2 editorial restyle: wordmark is Fraunces (`font-display`) with an aria-hidden
+  vermillion "·" (accessible name stays "openCreate"); nav = `text-xs uppercase
+  tracking-[0.18em]`, active `text-vermillion`; hovers use the sand tint; menu
+  panel matches Modal's cream + hairline surface. Roles/labels unchanged —
+  `AppShell.test.tsx` queries by role/name only.
 
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
+- (pending) restyle(web): editorial design system — tokens, fonts, ui kit

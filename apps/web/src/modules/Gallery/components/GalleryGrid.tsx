@@ -58,7 +58,7 @@ export function GalleryGrid({ filter = 'all', hasCreateCta = true }: GalleryGrid
             // Link styled as the primary Button (same convention as NotFoundPage)
             <Link
               to="/create"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
             >
               {t('gallery.empty.cta')}
             </Link>

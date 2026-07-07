@@ -7,18 +7,25 @@ import { useTranslation } from 'react-i18next'
 export function NotFoundPage() {
   const { t } = useTranslation()
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-paper px-6 text-center">
-      <p aria-hidden="true" className="text-sm font-medium text-ink-soft">
+    // Editorial voice (brief: "serif headline, one line, one action"): a
+    // vermillion micro-label stamp, an oversized Fraunces headline, one ink
+    // pill home. The 404 numeral is decorative — the heading carries meaning.
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-cream px-6 text-center">
+      <p
+        aria-hidden="true"
+        className="text-[11px] font-medium tracking-[0.3em] text-vermillion uppercase"
+      >
         404
       </p>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">
+      <h1 className="font-display text-5xl leading-[1.02] font-semibold tracking-tight text-ink md:text-6xl">
         {t('errors.notFound.title')}
       </h1>
       <p className="max-w-md text-ink-soft">{t('errors.notFound.description')}</p>
-      {/* Link styled as the primary action — mirrors Button primary/md classes */}
+      {/* Link styled as the primary action — mirrors Button primary/md (ink
+          pill, hover flips to vermillion) */}
       <Link
         to="/"
-        className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity duration-150 hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-colors duration-200 hover:bg-vermillion focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:ring-offset-2 focus-visible:ring-offset-cream focus-visible:outline-none"
       >
         {t('common.goHome')}
       </Link>

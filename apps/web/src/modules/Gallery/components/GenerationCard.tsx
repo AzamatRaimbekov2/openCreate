@@ -69,7 +69,7 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
           <button
             type="button"
             onClick={() => setIsDetailOpen(true)}
-            className="rounded-xl focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="rounded-xl focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             <img
               src={mediaUrl}
@@ -115,7 +115,7 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
               <a
                 href={mediaUrl}
                 download
-                className="rounded-xl px-3 py-2 text-sm font-medium text-accent transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                className="rounded-xl px-3 py-2 text-sm font-medium text-vermillion transition-opacity duration-150 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
               >
                 {t('gallery.download')}
               </a>

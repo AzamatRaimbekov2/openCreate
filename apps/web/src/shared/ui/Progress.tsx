@@ -1,5 +1,7 @@
 // apps/web/src/shared/ui/Progress.tsx
-// Determinate progress bar (video generation %). Accent fill on a quiet track.
+// Determinate progress bar (video generation %). Editorial treatment: a thin
+// square-ended rule — vermillion fill (progress IS an active state, the
+// sanctioned accent use) advancing over a hairline ink track.
 import { useTranslation } from 'react-i18next'
 
 export type ProgressProps = {
@@ -19,10 +21,11 @@ export function Progress({ value, label }: ProgressProps) {
       aria-valuemax={100}
       aria-valuenow={clamped}
       aria-label={label ?? t('common.loading')}
-      className="h-2 w-full overflow-hidden rounded-full bg-ink/10"
+      // Square ends (no rounding) — the bar reads as a printed rule, not a pill
+      className="h-1.5 w-full overflow-hidden bg-ink/10"
     >
       <div
-        className="h-full rounded-full bg-accent transition-[width] duration-150"
+        className="h-full bg-vermillion transition-[width] duration-200"
         // Documented exception to the no-inline-styles rule (design.md §9):
         // a runtime-computed width cannot be a static Tailwind utility
         style={{ width: `${clamped}%` }}

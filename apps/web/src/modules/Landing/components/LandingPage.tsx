@@ -23,18 +23,18 @@ export function LandingPage({ ctaTo }: LandingPageProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-screen bg-cream">
       <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4">
         <Link
           to="/"
-          className="rounded-xl text-lg font-semibold tracking-tight text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          className="rounded-xl text-lg font-semibold tracking-tight text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
         >
           openCreate
         </Link>
         <div className="ml-auto flex items-center gap-3">
           <Link
             to="/pricing"
-            className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-medium text-ink-soft transition-opacity duration-150 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-medium text-ink-soft transition-opacity duration-150 hover:text-ink focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {t('nav.pricing')}
           </Link>
@@ -42,7 +42,7 @@ export function LandingPage({ ctaTo }: LandingPageProps) {
           {/* Session-aware top-bar action mirrors the hero CTA destination */}
           <Link
             to={ctaTo}
-            className="inline-flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-ink transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-ink transition-opacity duration-150 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {ctaTo === '/login' ? t('nav.signIn') : t('nav.create')}
           </Link>

@@ -85,7 +85,7 @@ export function ImageDrop({ value, onChange }: ImageDropProps) {
             // Allow dropping: default dragover behavior blocks the drop event
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="rounded-xl border border-dashed border-ink/15 bg-white px-4 py-6 text-sm text-ink-soft transition-opacity duration-150 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="rounded-xl border border-dashed border-ink/15 bg-white px-4 py-6 text-sm text-ink-soft transition-opacity duration-150 hover:bg-sand focus-visible:ring-2 focus-visible:ring-vermillion focus-visible:outline-none"
           >
             {t('generator.image.hint')}
           </button>
