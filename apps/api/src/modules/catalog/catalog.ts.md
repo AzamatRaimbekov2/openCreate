@@ -36,5 +36,7 @@ flowchart LR
 - `supportsSafetyParam: false` on seedance-1-5-pro (2026-07-08): live submit failed with `unsupportedParameter: safety` — ByteDance models on Runware reject the `safety` task param that our client sends by default. The flag flows catalog → generations service (`omitSafety`) → runware client (omits `safety` from the task). Moderation for these models relies on the `NSFWContent` result flag, which the service already enforces.
 - `wan-2-2` ("Forge", `provider: 'wan-runpod'`) added 2026-07-09: self-hosted Wan 2.2 on our RunPod GPU via the ComfyUI seam. `air` is a SYNTHETIC tag (`wan-runpod:wan2.2-t2v-a14b`) that only satisfies the AIR regex — it is never sent to Runware, and `verify-catalog.ts` SKIPS any `provider !== 'runware'` model. Premium tier, t2v only (`supportsImageInput: false`), 5s → 60 credits. KNOWN GAP: self-host has no provider NSFW check (poll returns `nsfw:false`).
 
+- `supportsSafetyParam: false` also on `wan-2-7` (2026-07-09): Alibaba/Wan models reject Runware's `safety` param exactly like ByteDance — verified live when a Wan 2.7 submit 400'd. Same omitSafety flow.
+
 ## Commits
 - bdc4175 feat(api): curated model catalog with credit pricing

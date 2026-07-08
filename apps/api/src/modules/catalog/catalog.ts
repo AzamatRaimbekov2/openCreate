@@ -87,6 +87,11 @@ export const CATALOG: CatalogModel[] = [
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 8],
     creditsByDuration: { '5': 55, '8': 88 },
+    // Alibaba/Wan models reject Runware's `safety` task param
+    // (unsupportedParameter, verified live 2026-07-09) — same quirk as
+    // ByteDance/Seedance. Flag off so the client omits it; moderation relies
+    // on the NSFWContent result flag.
+    supportsSafetyParam: false,
   },
   {
     id: 'kling-3-pro',
