@@ -23,7 +23,9 @@ function LibraryPage() {
   const [filter, setFilter] = useState<GalleryFilter>('all')
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 md:py-14">
+    // Full-bleed like /create — both are gallery workbenches and share the
+    // shell bar's gutter; a centered column would orphan the header alignment
+    <main className="flex w-full flex-col gap-8 px-6 py-8 xl:px-10">
       {/* Mono weight-400 30px page title over the closing white/10 hairline —
           the same terminal opener as /create and /pricing (brief QA #6) */}
       <h1 className="border-b border-white/10 pb-6 text-3xl font-normal text-white">

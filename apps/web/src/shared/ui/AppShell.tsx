@@ -57,7 +57,9 @@ export function AppShell({
           color step, so no border/shadow is needed to separate it while
           scrolling (reference: nav lives on #1d293d) */}
       <header className="sticky top-0 z-40 bg-steel">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
+        {/* Full-bleed bar: app chrome spans the viewport (tool UI, not a
+            centered reading column) — the page canvas below matches its gutter */}
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3 xl:px-10">
           {/* Mono wordmark "openCreate·" doubles as the home link. The trailing
               middle dot is the brand's cursor — portal blue and aria-hidden so
               the accessible name stays "openCreate". */}

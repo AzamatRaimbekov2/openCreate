@@ -25,6 +25,9 @@ export { NotFoundPage } from './NotFoundPage'
 export { OfflineOverlay } from './OfflineOverlay'
 export { PillGroup } from './PillGroup'
 export type { PillGroupProps, PillOption } from './PillGroup'
+// The kit's labelled native <select>; `glass` variant for the composer capsule
+export { Select } from './Select'
+export type { SelectOption, SelectProps } from './Select'
 export { Progress } from './Progress'
 export type { ProgressProps } from './Progress'
 // Specimen art + the kind list so consumers can lay out the whole grid

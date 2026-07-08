@@ -19,9 +19,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
-import { Badge, Button, ErrorState, Modal, Progress } from 'shared/ui'
+import { Badge, Button, ErrorState, Progress } from 'shared/ui'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
-import { useDeleteGeneration, useLiveGeneration } from '../model/generationsApi'
+import { useLiveGeneration } from '../model/generationsApi'
+import { DeleteGenerationAction } from './DeleteGenerationAction'
 import { GenerationDetail } from './GenerationDetail'
 
 export type GenerationCardProps = {
@@ -32,15 +33,11 @@ export type GenerationCardProps = {
 export function GenerationCard({ generation: seed }: GenerationCardProps) {
   const { t } = useTranslation()
   const [isDetailOpen, setIsDetailOpen] = useState(false)
-  // Delete is destructive AND paid — the icon opens this confirmation first;
-  // the mutation (and its optimistic cache removal) fires only on confirm
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   // Poll while processing; render list data once terminal (no extra requests).
   // The hook also reports the two ways polling can stop early (QA findings
   // 1-2): isStalled (20-min budget spent) and isPollError (the GET itself
   // failed with nothing fetched yet) — refresh() is the manual poll for both.
   const { generation, isStalled, isPollError, refresh, isRefreshing } = useLiveGeneration(seed)
-  const deleteMutation = useDeleteGeneration()
 
   const mediaUrl = generation.mediaUrls[0]
   const progress = generation.progress ?? 0
@@ -179,50 +176,12 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
                 {t('gallery.download')}
               </a>
             ) : null}
-            <DeleteButton
-              isPending={deleteMutation.isPending}
-              // The icon never deletes directly — it only asks the question
-              onDelete={() => setIsDeleteConfirmOpen(true)}
-            />
+            {/* Icon + confirmation + mutation, shared with the table row so a
+                paid generation can never die in one click in either view */}
+            <DeleteGenerationAction generationId={generation.id} />
           </div>
         </footer>
       ) : null}
-
-      {/* Blocking confirmation for the destructive action (frontend-error-ux):
-          Modal role="alertdialog" on the steel sheet; the danger specimen pill
-          confirms, the ghost pill cancels. Closing first keeps the exchange
-          snappy — the optimistic removal makes the card vanish right after. */}
-      <Modal
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => setIsDeleteConfirmOpen(false)}
-        title={t('gallery.deleteConfirm.title')}
-        role="alertdialog"
-      >
-        <div className="flex flex-col gap-6">
-          {/* Terminal voice: one quiet mist sentence states the consequence —
-              permanence is the fact the user is confirming, not a scare line */}
-          <p className="text-sm leading-relaxed text-mist">
-            {t('gallery.deleteConfirm.description')}
-          </p>
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => setIsDeleteConfirmOpen(false)}
-            >
-              {t('gallery.deleteConfirm.cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                setIsDeleteConfirmOpen(false)
-                deleteMutation.mutate(generation.id)
-              }}
-            >
-              {t('gallery.deleteConfirm.confirm')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {generation.status === 'succeeded' ? (
         <GenerationDetail
@@ -232,68 +191,5 @@ export function GenerationCard({ generation: seed }: GenerationCardProps) {
         />
       ) : null}
     </article>
-  )
-}
-
-type DeleteButtonProps = {
-  // Disables the button and swaps the icon for a spinner while deleting
-  isPending: boolean
-  // Opens the confirmation alertdialog — the mutation itself only fires there
-  onDelete: () => void
-}
-
-// Destructive action as a quiet ICON button in the glow-red icon accent
-// (stage 3 — design.md §2 files #ff2056 under "icons/status only"): a red
-// PILL on every figure shouted destructiveness across the whole grid, while
-// the icon keeps delete findable but proportionate. The aria-label preserves
-// the exact accessible name the old pill had; 40px hit area per the a11y law.
-function DeleteButton({ isPending, onDelete }: DeleteButtonProps) {
-  const { t } = useTranslation()
-  return (
-    <button
-      type="button"
-      onClick={onDelete}
-      disabled={isPending}
-      aria-busy={isPending || undefined}
-      aria-label={t('gallery.delete')}
-      className="flex size-10 items-center justify-center rounded-full text-glow-red transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {isPending ? (
-        // Same spinner anatomy as Button's — the button announces aria-busy
-        <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
-      ) : (
-        // Inline currentColor trash glyph — never an OS emoji (closed triad)
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="size-4"
-        >
-          <path d="M4 7h16" />
-          <path d="M9 7V4h6v3" />
-          <path d="M6 7l1 13h10l1-13" />
-          <path d="M10 11v6" />
-          <path d="M14 11v6" />
-        </svg>
-      )}
-    </button>
   )
 }

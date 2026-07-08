@@ -7,6 +7,7 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from 'shared/ui'
+import { readImageFile } from '../model/readImageFile'
 
 export type ImageDropProps = {
   // Current data URI from the store; null = no image chosen
@@ -15,31 +16,23 @@ export type ImageDropProps = {
   onChange: (dataUri: string | null) => void
 }
 
-// 10MB file cap — base64 inflates ~4/3, keeping us under the wire schema's 14MB
-const MAX_FILE_BYTES = 10 * 1024 * 1024
-
 export function ImageDrop({ value, onChange }: ImageDropProps) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   // Store the error as an i18n KEY so a language switch re-localizes it
   const [errorKey, setErrorKey] = useState<string | null>(null)
 
+  // Validation + data-URI read live in model/readImageFile — the composer's
+  // AttachImage shares them, so the 10MB cap can never drift between the two
   const readFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setErrorKey('generator.image.errors.type')
-      return
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      setErrorKey('generator.image.errors.size')
-      return
-    }
-    setErrorKey(null)
-    const reader = new FileReader()
-    reader.onload = () => {
-      // readAsDataURL always yields a string; guard keeps the type airtight
-      if (typeof reader.result === 'string') onChange(reader.result)
-    }
-    reader.readAsDataURL(file)
+    void readImageFile(file).then((result) => {
+      if (result.ok) {
+        setErrorKey(null)
+        onChange(result.dataUri)
+      } else {
+        setErrorKey(result.errorKey)
+      }
+    })
   }
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
