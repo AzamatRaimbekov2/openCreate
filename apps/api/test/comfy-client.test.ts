@@ -143,6 +143,25 @@ describe('comfy client — poll', () => {
     }
   })
 
+  it('resolves the live-confirmed `videos[0]` SaveVideo output shape into a /view URL', async () => {
+    // Verified live against the real pod (team-lead): native SaveVideo emits the
+    // file descriptor under outputs[nodeId].videos[0] = { filename, subfolder,
+    // type:'output' } — not `images`. The key-agnostic resolver must handle it.
+    stubFetch(200, {
+      'pid-abc': {
+        status: { status_str: 'success', completed: true },
+        outputs: {
+          '14': { videos: [{ filename: 'oc_123_ab.mp4', subfolder: '', type: 'output' }] },
+        },
+      },
+    })
+    const client = createComfyClient({ baseUrl: BASE, workflow: stubWorkflow() })
+    const r = await client.poll('pid-abc')
+    expect(r.status).toBe('success')
+    if (r.status === 'success')
+      expect(r.assetUrl).toBe(`${BASE}/view?filename=oc_123_ab.mp4&subfolder=&type=output`)
+  })
+
   it('maps a ComfyUI execution error in history to the neutral error state', async () => {
     stubFetch(200, {
       'pid-abc': {
