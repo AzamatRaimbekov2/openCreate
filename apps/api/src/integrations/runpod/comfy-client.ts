@@ -180,6 +180,13 @@ export function createComfyClient(opts: ComfyOptions = {}): VideoProvider {
   return { submit, poll }
 }
 
+// RunPod's HTTP proxy (proxy.runpod.net) sits behind Cloudflare, which returns
+// 403 (CF error 1010) to non-browser User-Agents — a bare Node fetch is blocked
+// on POST /prompt. Every request to the pod MUST carry a browser UA. Verified
+// live: with this UA, POST /prompt returns 200; without it, 403.
+export const COMFY_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+
 // Shared fetch helpers: one hard timeout spans the request, non-2xx throws a
 // SANITIZED ComfyError (status only — never the response body, which is
 // unvetted pod output). These transport failures are transient by contract:
@@ -187,7 +194,7 @@ export function createComfyClient(opts: ComfyOptions = {}): VideoProvider {
 async function postJson(url: string, body: unknown): Promise<unknown> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'User-Agent': COMFY_USER_AGENT },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   }).catch((err) => {
@@ -200,7 +207,10 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
 }
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }).catch((err) => {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': COMFY_USER_AGENT },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  }).catch((err) => {
     throw new ComfyError(`ComfyUI request failed: ${err instanceof Error ? err.name : 'network error'}`)
   })
   if (!res.ok) throw new ComfyError(`ComfyUI HTTP ${res.status}`)

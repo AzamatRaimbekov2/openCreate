@@ -108,7 +108,17 @@ export function createLocalStorage(
         // endpoints, localhost admin ports — and publish the response under
         // /media/*. Provider asset URLs are direct links; a redirect is treated
         // as hostile and fails the download outright instead of being re-vetted.
-        const res = await fetch(url, { redirect: 'manual', signal: controller.signal })
+        // Browser User-Agent: some asset hosts sit behind Cloudflare, which
+        // 403s (CF 1010) a bare Node fetch — notably our RunPod ComfyUI /view
+        // URLs. Harmless for hosts that don't care (Runware).
+        const res = await fetch(url, {
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          },
+        })
         if (res.status >= 300 && res.status < 400)
           throw new Error(`asset redirect not allowed: ${res.status}`)
         if (!res.ok || !res.body) throw new Error(`asset download failed: ${res.status}`)

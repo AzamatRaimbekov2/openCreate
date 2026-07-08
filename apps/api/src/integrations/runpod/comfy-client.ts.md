@@ -33,5 +33,8 @@ flowchart LR
 - **NSFW gap**: always returns `nsfw:false` — self-host has no moderation; the §9.4 gate never fires for wan-runpod until a worker classifier exists (ADR moderation-parity prerequisite).
 - **Workflow is embedded** (`wan22-t2v-workflow.ts`) so it ships with the esbuild bundle; injection by node title tolerates upstream node-id churn. Keep in sync with `spikes/wan-runpod/worker/workflows/wan22_t2v.json` (pod owner's canonical copy).
 
+## Key decisions (2026-07-09)
+- `COMFY_USER_AGENT`: RunPod's proxy is behind Cloudflare, which 403s (CF 1010) non-browser User-Agents. A bare Node fetch is blocked on POST /prompt. Every request to the pod (postJson/getJson) sends a browser UA; the /view video download in storage.saveFromUrl needs it too. Verified live.
+
 ## Commits
 - _no commit yet_
