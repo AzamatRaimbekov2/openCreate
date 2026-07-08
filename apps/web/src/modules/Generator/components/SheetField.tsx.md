@@ -31,7 +31,7 @@ stays under the 200-line component cap.
 flowchart LR
   GP[GeneratorPanel fields array] -->|ordinal by render order| SF[SheetField]
   SF --> ORD[aria-hidden ghost mono ordinal 01…]
-  SF --> CNT[field group: PillGroup / ModelPicker / textarea / ImageDrop]
+  SF --> CNT[field group: PillGroup / ModelSelect / textarea / ImageDrop]
 ```
 
 ## Key decisions / gotchas

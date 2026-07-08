@@ -6,7 +6,7 @@
 
 The Generator module's main surface (create page): the full generation form as the
 "commission sheet" (v3 terminal skin) — a white/10 hairline-framed sheet of NUMBERED
-field groups (type toggle, model cards, prompt, aspect/duration, optional i2v upload)
+field groups (type toggle, model SELECT, prompt, aspect/duration, optional i2v upload)
 separated by white/10 hairlines, closed by a mono cost numeral + Generate footer —
 orchestrating the store, the catalog query, and the mutation.
 
@@ -29,7 +29,7 @@ orchestrating the store, the catalog query, and the mutation.
 
 - Imports: `shared/ui` (`Button`, `EmptyState`, `ErrorState`, `PillGroup`, `Skeleton`),
   module model (`catalogApi`, `createGeneration`, `generatorStore`), sibling components
-  (`AspectPicker`, `CostLabel`, `DurationPicker`, `ImageDrop`, `ModelPicker`,
+  (`AspectPicker`, `CostLabel`, `DurationPicker`, `ImageDrop`, `ModelSelect`,
   `PromptField`, `SheetField`, `SubmitErrorBanner`), `react-i18next`. (`ApiClientError`
   moved into `SubmitErrorBanner` with the error-classification logic.)
 - Used by: `routes/create.tsx` via `modules/Generator` public API.
@@ -40,7 +40,7 @@ orchestrating the store, the catalog query, and the mutation.
 flowchart TD
   UC[useCatalog] -->|models| ST[(generatorStore)]
   ST --> FLD[ordered fields array → SheetField rows 01…]
-  FLD --> TT[PillGroup type] & MP[ModelPicker] & PR[PromptField] & AP[AspectPicker] & DP[DurationPicker video-only] & ID[ImageDrop i2v-only]
+  FLD --> TT[PillGroup type] & MP[ModelSelect] & PR[PromptField] & AP[AspectPicker] & DP[DurationPicker video-only] & ID[ImageDrop i2v-only]
   ST --> CL[CostLabel mono numeral]
   ST -->|selectCreateInput| SUB[Generate button]
   SUB --> M[useCreateGeneration]
@@ -67,6 +67,11 @@ flowchart TD
 - v4 QA round 1 (2026-07-07): header comment de-staled — it still described the v2
   "editorial / serif ordinal" skin while the rendered code had long been v3 mono
   (JetBrains Mono ghost ordinals, weight 400). Comment-only change, zero runtime diff.
+- Model select (2026-07-08): the `ModelPicker` type-filtered STEEL tiles were
+  replaced by the custom `ModelSelect` listbox (all models grouped Images/Video,
+  provider logo + tariff + description). It no longer filters by the current
+  type — picking a video model while on 'image' flips the type via the store's
+  `normalizeFor`. `ModelPicker` was deleted (zero remaining consumers).
 
 ## Commits
 

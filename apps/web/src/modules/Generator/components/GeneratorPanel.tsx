@@ -22,7 +22,7 @@ import { AspectPicker } from './AspectPicker'
 import { CostLabel } from './CostLabel'
 import { DurationPicker } from './DurationPicker'
 import { ImageDrop } from './ImageDrop'
-import { ModelPicker } from './ModelPicker'
+import { ModelSelect } from './ModelSelect'
 import { PromptField } from './PromptField'
 import { SheetField } from './SheetField'
 import { SubmitErrorBanner } from './SubmitErrorBanner'
@@ -101,11 +101,10 @@ export function GeneratorPanel() {
     {
       key: 'model',
       content: (
-        <ModelPicker
-          models={state.models.filter((candidate) => candidate.type === state.type)}
-          selectedId={state.modelId}
-          onSelect={state.setModel}
-        />
+        // The custom model select shows EVERY catalog model (grouped
+        // Images/Video) with logo, tariff and description; picking a video model
+        // while on 'image' flips the type via the store's normalization.
+        <ModelSelect selectedId={state.modelId} onSelect={state.setModel} />
       ),
     },
     {

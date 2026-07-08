@@ -1,5 +1,5 @@
 // apps/web/src/modules/Generator/components/GeneratorPanel.test.tsx
-// Behavior (plan Task 16): the panel renders prompt/model cards/aspect control
+// Behavior (plan Task 16): the panel renders prompt/model select/aspect control
 // filtered by model/duration pills (video only)/cost label from the mocked
 // catalog; the i2v upload appears only for supporting models; submit is gated
 // on prompt length and posts the exact CreateGenerationInput; an
@@ -144,22 +144,22 @@ describe('GeneratorPanel', () => {
     expect(await screen.findByLabelText(/prompt/i)).toBeInTheDocument()
   })
 
-  it('renders the prompt textarea and model cards from the catalog', async () => {
+  it('renders the prompt textarea and the model select from the catalog', async () => {
     mockApiHappyPath()
     renderPanel()
     expect(await screen.findByLabelText(/prompt/i)).toBeInTheDocument()
-    // Image type is default — only image models are offered as cards
-    const modelGroup = screen.getByRole('group', { name: /model/i })
-    const flashCard = within(modelGroup).getByRole('button', { name: /flash/i })
-    // v3 stage-3: model cards are STEEL tiles; the (auto-)selected one wears
-    // the amber selection ring — the reference files picker highlights under amber
-    expect(flashCard).toHaveAttribute('aria-pressed', 'true')
-    expect(flashCard).toHaveClass('bg-steel', 'border-glow-amber/60')
-    expect(within(modelGroup).queryByRole('button', { name: /swift/i })).not.toBeInTheDocument()
-    // Switching to video swaps the card list
-    await userEvent.click(screen.getByRole('button', { name: /^video$/i }))
-    expect(within(modelGroup).getByRole('button', { name: /swift/i })).toBeInTheDocument()
-    expect(within(modelGroup).getByRole('button', { name: /motion/i })).toBeInTheDocument()
+    // The model select trigger shows the auto-selected first image model
+    const trigger = screen.getByRole('button', { name: /flash/i })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox')
+    // Opening lists ALL catalog models grouped Images/Video (no type pre-filter)
+    await userEvent.click(trigger)
+    const listbox = screen.getByRole('listbox', { name: /model/i })
+    expect(within(listbox).getByRole('option', { name: /flash/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(within(listbox).getByRole('option', { name: /swift/i })).toBeInTheDocument()
+    expect(within(listbox).getByRole('option', { name: /motion/i })).toBeInTheDocument()
   })
 
   it('filters aspect options by the selected model', async () => {
@@ -167,10 +167,11 @@ describe('GeneratorPanel', () => {
     renderPanel()
     await screen.findByLabelText(/prompt/i)
     const aspectGroup = screen.getByRole('group', { name: /aspect ratio/i })
+    // Flash (image) offers three ratios
     expect(within(aspectGroup).getAllByRole('button')).toHaveLength(3)
-    // Motion offers only 16:9
-    await userEvent.click(screen.getByRole('button', { name: /^video$/i }))
-    await userEvent.click(screen.getByRole('button', { name: /motion/i }))
+    // Pick Motion via the model select — it offers only 16:9 (and flips to video)
+    await userEvent.click(screen.getByRole('button', { name: /flash/i }))
+    await userEvent.click(screen.getByRole('option', { name: /motion/i }))
     expect(within(aspectGroup).getAllByRole('button')).toHaveLength(1)
     expect(within(aspectGroup).getByRole('button', { name: '16:9' })).toBeInTheDocument()
   })

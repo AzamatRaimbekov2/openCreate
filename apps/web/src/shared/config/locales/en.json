@@ -26,12 +26,24 @@
       "videoMarker": "video · 5s",
       "figure": "fig. {{number}}",
       "items": {
-        "koi": { "title": "“neon koi drifting through a paper pond”" },
-        "sea": { "title": "“moonlit swells rolling in slow teal”" },
-        "ultraviolet": { "title": "“an aura photographed after dark”" },
-        "botanical": { "title": "“herbarium plate no. 7, impossible leaf”" },
-        "mono": { "title": "“print-shop geometry in three rules”" },
-        "dusk": { "title": "“the last sun over a rose-paper horizon”" }
+        "koi": {
+          "title": "“neon koi drifting through a paper pond”"
+        },
+        "sea": {
+          "title": "“moonlit swells rolling in slow teal”"
+        },
+        "ultraviolet": {
+          "title": "“an aura photographed after dark”"
+        },
+        "botanical": {
+          "title": "“herbarium plate no. 7, impossible leaf”"
+        },
+        "mono": {
+          "title": "“print-shop geometry in three rules”"
+        },
+        "dusk": {
+          "title": "“the last sun over a rose-paper horizon”"
+        }
       }
     },
     "price": {
@@ -148,7 +160,12 @@
     },
     "model": {
       "label": "Model",
-      "from": "from {{count}}"
+      "from": "from {{count}}",
+      "tariff": "{{credits}} cr · ${{dollars}}",
+      "creditsShort": "{{credits}} cr",
+      "groupImage": "Images",
+      "groupVideo": "Video",
+      "placeholder": "Select a model"
     },
     "prompt": {
       "label": "Prompt",
@@ -183,6 +200,40 @@
     "unavailable": {
       "title": "Models are unavailable",
       "description": "The model catalog did not load. Try again later."
+    },
+    "tier": {
+      "fast": "fast",
+      "quality": "quality",
+      "standard": "standard",
+      "plus": "plus",
+      "pro": "pro",
+      "premium": "premium"
+    },
+    "models": {
+      "flux-schnell": {
+        "description": "The fastest images — a usable draft in seconds for a single credit."
+      },
+      "flux-dev": {
+        "description": "Sharper, more detailed images when quality matters more than raw speed."
+      },
+      "pixverse-v6": {
+        "description": "Quick, lively clips from a prompt or a still image to animate."
+      },
+      "minimax-hailuo": {
+        "description": "Smooth, realistic motion with strong prompt following."
+      },
+      "seedance-1-5-pro": {
+        "description": "Cinematic motion with native audio baked into the clip."
+      },
+      "wan-2-7": {
+        "description": "Rich, film-like footage for more ambitious, detailed scenes."
+      },
+      "kling-3-pro": {
+        "description": "Pro-grade control and detail for demanding, high-fidelity shots."
+      },
+      "veo-3-1-fast": {
+        "description": "Premium eight-second clips with synced sound, fast."
+      }
     }
   },
   "gallery": {
@@ -191,7 +242,11 @@
       "label": "Filter",
       "all": "All",
       "images": "Images",
-      "videos": "Videos"
+      "videos": "Videos",
+      "model": "Model",
+      "anyModel": "Any model",
+      "aspect": "Aspect",
+      "anyAspect": "Any aspect"
     },
     "empty": {
       "title": "No generations yet",
@@ -219,7 +274,29 @@
       "title": "Generation details"
     },
     "cost_one": "{{count}} credit",
-    "cost_other": "{{count}} credits"
+    "cost_other": "{{count}} credits",
+    "noMatches": {
+      "title": "Nothing matches these filters",
+      "description": "Try clearing the model or aspect filter."
+    },
+    "view": {
+      "label": "View settings",
+      "mode": "View",
+      "grid": "Grid",
+      "table": "Table",
+      "slide": "Slide",
+      "size": "Card size",
+      "sizeSm": "Small",
+      "sizeMd": "Medium",
+      "sizeLg": "Large"
+    },
+    "table": {
+      "preview": "Preview",
+      "status": "Status",
+      "cost": "Cost",
+      "created": "Created",
+      "actions": "Actions"
+    }
   },
   "pricing": {
     "kicker": "The index",

@@ -10,7 +10,7 @@ export type SheetFieldProps = {
   // Two-digit order mark ("01"…) — purely decorative print furniture, so it is
   // aria-hidden and derived from render order (conditional groups renumber)
   ordinal: string
-  // The actual field group (PillGroup, ModelPicker, prompt textarea, …)
+  // The actual field group (PillGroup, ModelSelect, prompt textarea, …)
   children: ReactNode
 }
 
