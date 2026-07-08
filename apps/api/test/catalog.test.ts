@@ -19,6 +19,14 @@ describe('catalog', () => {
   it('creditsFor video with unsupported duration throws', () => {
     expect(() => creditsFor(getModel('pixverse-v6')!, 99)).toThrow()
   })
+  it('offers Seedance 1.5 Pro (AIR verified live 2026-07-07) in the standard tier with i2v', () => {
+    const m = getModel('seedance-1-5-pro')
+    expect(m).toBeDefined()
+    expect(m!.air).toBe('bytedance:seedance@1.5-pro')
+    expect(m!.supportsImageInput).toBe(true)
+    expect(creditsFor(m!, 5)).toBe(35)
+    expect(creditsFor(m!, 10)).toBe(70)
+  })
 })
 
 describe('GET /api/catalog', () => {

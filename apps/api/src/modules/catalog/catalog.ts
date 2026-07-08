@@ -74,6 +74,19 @@ export const CATALOG: CatalogModel[] = [
     creditsByDuration: { '6': 35, '10': 60 },
   },
   {
+    // AIR verified live via modelSearch 2026-07-07; wholesale ~$0.026/s 720p silent
+    id: 'seedance-1-5-pro',
+    type: 'video',
+    name: 'Pulse',
+    providerLabel: 'Seedance 1.5 Pro',
+    air: 'bytedance:seedance@1.5-pro',
+    tier: 'standard',
+    supportsImageInput: true,
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    durationOptions: [5, 10],
+    creditsByDuration: { '5': 35, '10': 70 },
+  },
+  {
     id: 'wan-2-7',
     type: 'video',
     name: 'Cinema',
