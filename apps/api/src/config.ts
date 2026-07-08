@@ -84,7 +84,11 @@ const envSchema = z.object({
   // listed, but a submit returns a clean provider_error instead of crashing. Its
   // host is auto-added to ASSET_HOST_ALLOWLIST below so /view downloads pass the
   // SSRF gate without widening the allowlist by hand.
-  COMFY_BASE_URL: z.url().optional(),
+  // Accept a valid URL, an EMPTY STRING, or absent. `.env`/.env.example ship
+  // `COMFY_BASE_URL=` empty (self-host off by default) — `z.url().optional()`
+  // rejects empty (optional = absent, not ''), which crashed boot. The `|| null`
+  // below then normalizes '' → null (not configured).
+  COMFY_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
   // Reverse-proxy header trust (review finding). Production terminates TLS in
   // a proxy that forwards everyone from loopback (PROD.md), so without this
   // req.ip is ALWAYS the proxy's address and every user shares one rate-limit

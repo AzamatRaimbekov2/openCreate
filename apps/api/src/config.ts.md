@@ -34,6 +34,9 @@ flowchart LR
 - `assetFetchTimeoutMs` / `assetMaxBytes` (download limits, review finding): hard deadline for the WHOLE asset download and max bytes counted while streaming — a stalled provider stream must not hang a settlement forever, and an oversized body must not fill the disk that also holds the SQLite db. Defaults (120s / 512MB) mirror `storage/local.ts`'s exported constants so an unset env keeps behavior identical. Consumed by `index.ts` → `createLocalStorage(..., { fetchTimeoutMs, maxBytes })`. Pinned by `test/env-loading.test.ts` + `test/storage.test.ts`.
 - `trustProxy` (rate-limit attribution, review finding): `parseTrustProxy(TRUST_PROXY)` — unset/empty/`'false'` → `false` (default-deny: direct-exposure deploys must never honor a client-forged `X-Forwarded-For`), `'true'` → `true` (trust the header from any peer — the proxy MUST then overwrite the inbound header), anything else passes through verbatim as fastify/proxy-addr address/CIDR/keyword list (e.g. `127.0.0.1`, `loopback,uniquelocal` — the safer shape: proxy-addr walks from the socket peer and stops at the first untrusted hop, so appended inbound XFF chains still resolve to the real client). Without it, PROD.md's reverse proxy makes `req.ip` always loopback → ALL users share one rate-limit bucket (auth-lockout DoS). Consumed by `app.ts` → Fastify `trustProxy`. Pinned by `test/env-loading.test.ts` + `test/rate-limit.test.ts`.
 
+## Key decisions (2026-07-09)
+- COMFY_BASE_URL accepts URL | empty-string | absent (`z.union([z.url(), z.literal("")]).optional()`): the shipped `.env`/.env.example set it empty (self-host off), and plain `z.url().optional()` rejected empty → boot crash. Empty is normalized to null (not configured) downstream.
+
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route
 - 5e8de3d feat(api): native env loading + structured logging — loadEnvFromFile + LOG_LEVEL
