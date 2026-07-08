@@ -69,6 +69,9 @@ flowchart TD
 - `duration!` non-null assertion in the video branch is safe: `creditsFor` already threw if duration was undefined for a video model.
 - **Money-path logging contract**: `credits.charge`/`credits.refund` are logged by the ledger (after commit), `generation.settle`/`generation.fail` here, gated on the guarded transition actually applying — log line exists ⇔ the state moved. `provider.error` carries the raw provider error (`err`/`detail`) because the HTTP envelope for unexpected failures is sanitized; logs are the only place with the real cause.
 
+## Key decisions (2026-07-08)
+- Video submit forwards `omitSafety: true` when the catalog model has `supportsSafetyParam === false` (ByteDance/Seedance reject Runware's `safety` param with 400 unsupportedParameter). Moderation for these models still applies via the NSFWContent flag on poll results, which this service already enforces (content_blocked + refund).
+
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
 - 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes

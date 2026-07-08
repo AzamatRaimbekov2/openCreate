@@ -341,6 +341,9 @@ export function createGenerationService({
         ...(input.inputImage
           ? { frameImages: [{ image: input.inputImage, frame: 'first' as const }] }
           : {}),
+        // ByteDance models 400 on Runware's `safety` param — the catalog flag
+        // routes around it; moderation still enforced via NSFWContent results.
+        ...(model.supportsSafetyParam === false ? { omitSafety: true } : {}),
       })
       // Publish the task uuid ONLY now that Runware has acknowledged the task.
       // Before this point get() refuses to poll (null uuid → no provider call),

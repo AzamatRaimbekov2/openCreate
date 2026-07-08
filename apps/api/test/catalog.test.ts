@@ -39,3 +39,11 @@ describe('GET /api/catalog', () => {
     for (const m of body.models) expect(catalogModelSchema.safeParse(m).success).toBe(true)
   })
 })
+
+describe('provider parameter compatibility', () => {
+  it('seedance rejects the runware safety param — catalog must flag it off', () => {
+    expect(getModel('seedance-1-5-pro')!.type === 'video' && getModel('seedance-1-5-pro')).toMatchObject({
+      supportsSafetyParam: false,
+    })
+  })
+})

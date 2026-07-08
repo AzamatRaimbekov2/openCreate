@@ -85,6 +85,10 @@ export const CATALOG: CatalogModel[] = [
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 10],
     creditsByDuration: { '5': 35, '10': 70 },
+    // ByteDance models reject Runware's `safety` param (unsupportedParameter,
+    // verified live 2026-07-08) — flag off so the client omits it. Moderation
+    // still applies via the NSFWContent flag on results.
+    supportsSafetyParam: false,
   },
   {
     id: 'wan-2-7',

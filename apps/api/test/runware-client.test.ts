@@ -125,3 +125,40 @@ describe('runware client', () => {
     ).rejects.toThrow('Runware HTTP 500')
   })
 })
+
+describe('model-specific parameter compatibility', () => {
+  it('submitVideo omits the safety param (and the flag itself) when omitSafety is set', async () => {
+    const fn = stubFetch(200, {
+      data: [{ taskType: 'videoInference', taskUUID: 't3', status: 'processing' }],
+    })
+    await client().submitVideo({
+      taskUUID: 't3',
+      positivePrompt: 'jellyfish',
+      model: 'bytedance:seedance@1.5-pro',
+      width: 720,
+      height: 1280,
+      duration: 5,
+      omitSafety: true,
+    })
+    const [, init] = fn.mock.calls[0]!
+    const sent = JSON.parse(String(init!.body)) as Array<Record<string, unknown>>
+    expect(sent[0]).not.toHaveProperty('safety')
+    expect(sent[0]).not.toHaveProperty('omitSafety')
+  })
+  it('surfaces the structured runware error message on non-2xx responses', async () => {
+    stubFetch(400, {
+      data: [],
+      errors: [{ code: 'unsupportedParameter', message: "Unsupported use of 'safety' parameter." }],
+    })
+    await expect(
+      client().submitVideo({
+        taskUUID: 't4',
+        positivePrompt: 'x',
+        model: 'bytedance:seedance@1.5-pro',
+        width: 720,
+        height: 1280,
+        duration: 5,
+      }),
+    ).rejects.toThrow(/Unsupported use of 'safety'/)
+  })
+})

@@ -300,3 +300,39 @@ describe('generations', () => {
     expect(otherGet.statusCode).toBe(404)
   })
 })
+
+describe('provider parameter compatibility wiring', () => {
+  it('video create passes omitSafety for models flagged supportsSafetyParam=false', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'seedance-1-5-pro',
+        prompt: 'glowing jellyfish in a violet void',
+        aspectRatio: '9:16',
+        duration: 5,
+      },
+    })
+    expect(res.statusCode).toBe(202)
+    expect(rw.submitVideo).toHaveBeenCalledWith(expect.objectContaining({ omitSafety: true }))
+  })
+  it('video create does NOT set omitSafety for models that accept safety', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'pixverse-v6', prompt: 'ocean waves at dusk', aspectRatio: '9:16', duration: 5 },
+    })
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.omitSafety).toBeUndefined()
+  })
+})

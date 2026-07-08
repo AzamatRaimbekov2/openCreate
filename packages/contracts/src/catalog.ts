@@ -29,6 +29,9 @@ export const catalogVideoModelSchema = catalogBase.extend({
   type: z.literal('video'),
   durationOptions: z.array(z.number().int().positive()).min(1),
   creditsByDuration: z.record(z.string(), z.number().int().positive()),
+  // Runware's `safety` task param is model-specific: ByteDance/Seedance models
+  // reject it as unsupportedParameter. Absent/true = model accepts `safety`.
+  supportsSafetyParam: z.boolean().optional(),
 })
 export const catalogModelSchema = z.discriminatedUnion('type', [
   catalogImageModelSchema,

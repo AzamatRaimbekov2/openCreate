@@ -28,5 +28,8 @@ flowchart LR
 - `creditsByDuration` keys are strings (JSON object keys); look up with `String(duration)`.
 - `air` regex loosely validates Runware AIR ids like `runware:100@1` / `klingai:kling-video@3-pro`; real existence is checked by `verify-catalog.ts` against the live API.
 
+## Key decisions (2026-07-08)
+- `supportsSafetyParam?: boolean` on video models: Runware's `safety` task parameter is model-specific — ByteDance/Seedance models reject it with `unsupportedParameter` (verified live). Optional+absent means "accepts safety" so existing entries stay untouched; only exceptions opt out. Additive change — web consumes types only.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

@@ -30,6 +30,10 @@ export type RunwareVideoRequest = {
   duration: number
   // image→video: the input frame(s); Runware nests these under `inputs`.
   frameImages?: Array<{ image: string; frame: 'first' | 'last' }> | undefined
+  // Some providers (ByteDance/Seedance) reject Runware's `safety` task param
+  // as unsupportedParameter — when true the client omits it entirely. This is
+  // client-internal routing metadata and is never sent to Runware.
+  omitSafety?: boolean | undefined
 }
 
 // Discriminated on `status` so callers must handle all three poll outcomes.

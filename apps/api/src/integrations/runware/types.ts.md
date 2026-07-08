@@ -30,5 +30,8 @@ flowchart LR
 - Field names mirror the Runware task schema exactly (`positivePrompt`, `taskUUID`, `NSFWContent`) so requests can be spread straight into the task envelope without a mapping layer.
 - Optional props are declared `?: T | undefined` (not just `?: T`): this repo compiles with `exactOptionalPropertyTypes`, and the client builds these objects from `unknown` JSON fields that legitimately produce `undefined`.
 
+## Key decisions (2026-07-08)
+- `RunwareVideoRequest.omitSafety?: boolean` — client-internal routing flag (NEVER serialized into the task): ByteDance/Seedance models reject Runware's `safety` param with `unsupportedParameter` (verified live). The client destructures it out and conditionally omits `safety`; source of truth is the catalog's `supportsSafetyParam`.
+
 ## Commits
 - 46cf18d feat(api): runware REST client (imageInference, videoInference, getResponse)

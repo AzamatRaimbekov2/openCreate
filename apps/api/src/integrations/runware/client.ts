@@ -57,9 +57,17 @@ export function createRunwareClient(opts: { apiKey: string; endpoint?: string })
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
       res = await attempt()
     }
-    // Status only — never echo the response body or auth header into errors:
-    // provider error bodies are unvetted and our key must never leak into logs.
-    if (!res.ok) throw new RunwareError(`Runware HTTP ${res.status}`)
+    // On non-2xx, surface only the STRUCTURED runware error fields (code +
+    // message) if the body parses — never the raw body text or auth header:
+    // provider bodies are unvetted and our key must never leak into logs.
+    // Runware returns 4xx with a JSON {errors:[...]} envelope (e.g.
+    // unsupportedParameter) whose message is essential for diagnosis.
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as Raw | null
+      const err = body?.errors?.[0]
+      if (err?.message) throw new RunwareError(err.message, err.code)
+      throw new RunwareError(`Runware HTTP ${res.status}`)
+    }
     return (await res.json()) as Raw
   }
 
@@ -91,15 +99,18 @@ export function createRunwareClient(opts: { apiKey: string; endpoint?: string })
 
     async submitVideo(req) {
       // frameImages must be nested under `inputs` in the task envelope; the
-      // rest of the request spreads flat.
-      const { frameImages, ...rest } = req
+      // rest of the request spreads flat. omitSafety is client-internal
+      // routing metadata (catalog.supportsSafetyParam === false — ByteDance
+      // models 400 on the `safety` param) and MUST be destructured out so it
+      // never leaks into the task payload.
+      const { frameImages, omitSafety, ...rest } = req
       const raw = await post([
         {
           taskType: 'videoInference',
           deliveryMethod: 'async',
           includeCost: true,
           outputFormat: 'MP4',
-          safety: { checkContent: true, mode: 'fast' },
+          ...(omitSafety ? {} : { safety: { checkContent: true, mode: 'fast' } }),
           ...(frameImages ? { inputs: { frameImages } } : {}),
           ...rest,
         },

@@ -37,5 +37,9 @@ flowchart LR
 - **`getResponse` returns states, not exceptions**: a failed generation is control flow for the poll caller (mark row failed + refund), not a 5xx of our own; the `errors[]` array maps to `{ status: 'error' }`.
 - `imageInference` result is a cast (`as unknown as RunwareImageResult`), trusting Runware's documented shape; tests pin the parts we rely on.
 
+## Key decisions (2026-07-08)
+- `submitVideo` honors `omitSafety` (destructured out, never serialized): ByteDance/Seedance models reject the `safety` task param with `unsupportedParameter`. Default behavior for all other models unchanged (`safety: {checkContent: true, mode: 'fast'}`).
+- Non-2xx responses now parse the JSON body and surface ONLY the structured `errors[0].code/message` fields (falling back to `Runware HTTP <status>`): 4xx bodies carry the actionable reason (e.g. unsupportedParameter), while raw-body echo stays forbidden (unvetted content / key-leak posture preserved).
+
 ## Commits
 - 46cf18d feat(api): runware REST client (imageInference, videoInference, getResponse)
