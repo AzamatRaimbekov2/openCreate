@@ -2,29 +2,15 @@
 // ids, display names, Runware AIR ids, aspect ratios and credit pricing.
 // Prices come from research 2026-07; re-verify quarterly and run
 // scripts/verify-catalog.ts against a real key before launch.
-import type { AspectRatio, CatalogModel } from '@opencreate/contracts'
+import type { CatalogModel } from '@opencreate/contracts'
 
-type Resolution = { width: number; height: number }
-
-// Keyed as a literal object (not Record<string, …>) so noUncheckedIndexedAccess
-// keeps RESOLUTIONS.hd/fhd/square1024 and table[aspect] fully defined.
-export const RESOLUTIONS = {
-  hd: {
-    '16:9': { width: 1280, height: 720 },
-    '1:1': { width: 960, height: 960 },
-    '9:16': { width: 720, height: 1280 },
-  },
-  fhd: {
-    '16:9': { width: 1920, height: 1080 },
-    '1:1': { width: 1440, height: 1440 },
-    '9:16': { width: 1080, height: 1920 },
-  },
-  square1024: {
-    '16:9': { width: 1344, height: 768 },
-    '1:1': { width: 1024, height: 1024 },
-    '9:16': { width: 768, height: 1344 },
-  },
-} satisfies Record<string, Record<AspectRatio, Resolution>>
+// RESOLUTIONS / resolutionFor moved to @opencreate/contracts (see
+// packages/contracts/src/resolution.ts): the web composer must show the user
+// the exact output size before they spend credits, and a second copy of the
+// table here would silently drift from the one the API sends to Runware.
+// Re-exported so existing importers (runware task builder, tests) keep working.
+export { RESOLUTIONS, resolutionFor } from '@opencreate/contracts'
+export type { Resolution } from '@opencreate/contracts'
 
 export const CATALOG: CatalogModel[] = [
   {
@@ -138,14 +124,4 @@ export function creditsFor(model: CatalogModel, duration: number | undefined): n
   const credits = model.creditsByDuration[String(duration)]
   if (!credits) throw new Error(`unsupported duration ${duration} for ${model.id}`)
   return credits
-}
-
-export function resolutionFor(model: CatalogModel, aspect: AspectRatio): Resolution {
-  const table =
-    model.type === 'image'
-      ? RESOLUTIONS.square1024
-      : model.tier === 'pro' || model.tier === 'premium' || model.tier === 'plus'
-        ? RESOLUTIONS.fhd
-        : RESOLUTIONS.hd
-  return table[aspect]
 }
