@@ -34,3 +34,6 @@ erDiagram
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
+
+## Key decisions (2026-07-09) — wan-runpod
+- Added `provider: text(provider).notNull().default(runware)` to `generation` (VideoProvider seam). `.default()` makes it optional in `$inferInsert` (SQLite applies the default for image/legacy rows). The neutral provider job id / cost REUSE `runwareTaskUuid` / `runwareCostUsd` (no rename — keeps money-path code byte-for-byte, instant rollback). Mirror in `ddl.ts` + `client.ts` micro-migration.

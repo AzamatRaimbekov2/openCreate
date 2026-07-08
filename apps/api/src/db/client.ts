@@ -32,6 +32,15 @@ export function createDb(path: string) {
     // added for the NSFW safety-filter handling; see modules/generations.
     sqlite.exec('ALTER TABLE generation ADD COLUMN error_code TEXT')
   }
+  if (!generationColumns.includes('provider')) {
+    // provider: which video backend ran the job (VideoProvider seam). Additive
+    // and back-compat — every pre-existing row (and every image row) predates
+    // self-host, so DEFAULT 'runware' backfills them correctly in one statement.
+    // The legacy runware_task_uuid / runware_cost_usd columns are REUSED as the
+    // neutral provider job id / cost (see schema.ts), so no further migration is
+    // needed; this is the whole additive DB change for the wan-runpod provider.
+    sqlite.exec("ALTER TABLE generation ADD COLUMN provider TEXT NOT NULL DEFAULT 'runware'")
+  }
   // DB-level refund-once backstop (review finding): UNIQUE(generation_id,
   // kind) makes a duplicate refund (or charge) ledger row physically
   // impossible even if a future code path bypasses the ledger's transactional

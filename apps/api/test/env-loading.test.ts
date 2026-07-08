@@ -147,4 +147,35 @@ describe('loadConfig production settings', () => {
     const cfg = loadConfig({ ...baseEnv, TRUST_PROXY: '127.0.0.1,10.0.0.0/8' })
     expect(cfg.trustProxy).toBe('127.0.0.1,10.0.0.0/8')
   })
+
+  // wan-runpod self-host provider (ADR: wan-selfhost-video-provider). The pod's
+  // ComfyUI base URL is optional so the app boots without it (the wan-2-2 model
+  // is listed but a submit returns a clean provider_error). When set, the pod's
+  // /view host must be auto-added to the SSRF allowlist so saveFromUrl can
+  // download the finished mp4 — env-driven so a pod change is one env edit.
+  it('defaults comfyBaseUrl to null when COMFY_BASE_URL is unset', () => {
+    const cfg = loadConfig({ ...baseEnv })
+    expect(cfg.comfyBaseUrl).toBeNull()
+    expect(cfg.assetHostAllowlist).toEqual(['runware.ai'])
+  })
+
+  it('parses COMFY_BASE_URL and adds its host to the asset allowlist', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      COMFY_BASE_URL: 'https://pod123-8188.proxy.runpod.net',
+    })
+    expect(cfg.comfyBaseUrl).toBe('https://pod123-8188.proxy.runpod.net')
+    expect(cfg.assetHostAllowlist).toContain('runware.ai')
+    expect(cfg.assetHostAllowlist).toContain('pod123-8188.proxy.runpod.net')
+  })
+
+  it('does not duplicate the comfy host if it is already on the allowlist', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      COMFY_BASE_URL: 'https://pod123-8188.proxy.runpod.net',
+      ASSET_HOST_ALLOWLIST: 'runware.ai, pod123-8188.proxy.runpod.net',
+    })
+    const occurrences = cfg.assetHostAllowlist.filter((h) => h === 'pod123-8188.proxy.runpod.net')
+    expect(occurrences).toHaveLength(1)
+  })
 })

@@ -9,6 +9,9 @@ import fastifyStatic from '@fastify/static'
 import type { AppConfig } from './config'
 import type { Db } from './db/client'
 import type { RunwareClient } from './integrations/runware/client'
+import { createRunwareVideoAdapter } from './integrations/runware/video-adapter'
+import { createComfyClient } from './integrations/runpod/comfy-client'
+import type { VideoProvider, VideoProviderId } from './integrations/video-provider'
 import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
@@ -24,8 +27,16 @@ export type AppDeps = {
   // Media storage: assets downloaded from Runware are served from here.
   storage: StorageProvider
   // Runware provider client — injected so tests script it (fakeRunware) and
-  // prod boot (index.ts) passes the real REST client. AppDeps is complete now.
+  // prod boot (index.ts) passes the real REST client. Still used directly for
+  // the synchronous IMAGE path (never routed through the video registry).
   runware: RunwareClient
+  // VIDEO provider registry (VideoProvider seam). Optional: when absent it is
+  // DERIVED here from `runware` (adapter) + `config.comfyBaseUrl` (wan-runpod
+  // ComfyUI client), so index.ts stays minimal and existing tests that inject
+  // only `runware` keep routing video through the Runware adapter unchanged.
+  // Routing-focused tests inject an explicit registry to assert which backend
+  // ran; the image path never touches this.
+  videoProviders?: Record<VideoProviderId, VideoProvider>
   // Optional pino destination override. Tests inject a capture stream to
   // assert on structured log lines; production leaves it unset (stdout).
   logStream?: { write: (msg: string) => void }
@@ -134,11 +145,21 @@ export async function buildApp(deps: AppDeps) {
   // storage trio; routes stay thin and session-gated via requireUser. The
   // base logger is the fallback for money-path events — routes pass req.log
   // per call so those lines carry the request's reqId.
+  // Video provider registry: use the injected one, else derive the production
+  // default — Runware wrapped as a VideoProvider, plus the wan-runpod ComfyUI
+  // client. The comfy client is ALWAYS registered even when COMFY_BASE_URL is
+  // unset (it then returns a clean provider_error on submit), so the wan-2-2
+  // catalog entry can be listed without the pod configured and boot never fails.
+  const videoProviders: Record<VideoProviderId, VideoProvider> = deps.videoProviders ?? {
+    runware: createRunwareVideoAdapter(deps.runware),
+    'wan-runpod': createComfyClient({ baseUrl: deps.config.comfyBaseUrl }),
+  }
   registerGenerationRoutes(
     app,
     createGenerationService({
       db: deps.db,
       runware: deps.runware,
+      videoProviders,
       storage: deps.storage,
       log: app.log,
       // undefined → the service's own 3s default; only tests override this.

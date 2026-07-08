@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS generation (
   model_id TEXT NOT NULL,
   params_json TEXT NOT NULL,
   cost_credits INTEGER NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'runware',
   runware_task_uuid TEXT,
   runware_cost_usd TEXT,
   media_json TEXT NOT NULL DEFAULT '[]',

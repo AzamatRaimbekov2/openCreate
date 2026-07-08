@@ -78,6 +78,13 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(512 * 1024 * 1024),
+  // Self-hosted Wan 2.2 provider (ADR: wan-selfhost-video-provider). Base URL of
+  // the pod's ComfyUI HTTP API (e.g. https://<podid>-8188.proxy.runpod.net).
+  // OPTIONAL: unset keeps boot healthy — the wan-2-2 catalog model is still
+  // listed, but a submit returns a clean provider_error instead of crashing. Its
+  // host is auto-added to ASSET_HOST_ALLOWLIST below so /view downloads pass the
+  // SSRF gate without widening the allowlist by hand.
+  COMFY_BASE_URL: z.url().optional(),
   // Reverse-proxy header trust (review finding). Production terminates TLS in
   // a proxy that forwards everyone from loopback (PROD.md), so without this
   // req.ip is ALWAYS the proxy's address and every user shares one rate-limit
@@ -110,7 +117,10 @@ export type AppConfig = {
   // Origins allowed to make cookie-carrying state changes (better-auth CSRF).
   trustedOrigins: string[]
   // Host suffixes storage.saveFromUrl may fetch assets from (SSRF allowlist).
+  // Includes the COMFY_BASE_URL host when the wan-runpod provider is configured.
   assetHostAllowlist: string[]
+  // Pod ComfyUI base URL for the wan-runpod video provider; null when unset.
+  comfyBaseUrl: string | null
   // Asset download limits handed to storage.saveFromUrl: hard deadline for
   // the whole download (ms) and max accepted bytes, counted while streaming.
   assetFetchTimeoutMs: number
@@ -144,6 +154,9 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     env = process.env
   }
   const e = envSchema.parse(env)
+  // `|| null` (not `?? null`): an empty COMFY_BASE_URL means "not configured",
+  // same treatment as the Google OAuth creds below.
+  const comfyBaseUrl = e.COMFY_BASE_URL || null
   return {
     runwareApiKey: e.RUNWARE_API_KEY,
     betterAuthSecret: e.BETTER_AUTH_SECRET,
@@ -172,12 +185,35 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
       : [e.WEB_ORIGIN],
     // Comma list → trimmed host-suffix allowlist for asset downloads. The
     // schema default ('runware.ai') means a fresh deploy is locked to the
-    // provider's own domain unless the operator explicitly widens it.
-    assetHostAllowlist: e.ASSET_HOST_ALLOWLIST.split(',')
-      .map((h) => h.trim())
-      .filter(Boolean),
+    // provider's own domain unless the operator explicitly widens it. The
+    // wan-runpod pod's /view host is folded in below so its finished mp4s pass
+    // the SSRF gate — driven entirely by COMFY_BASE_URL, so pointing at a new
+    // pod is one env edit with no allowlist bookkeeping.
+    assetHostAllowlist: withComfyHost(
+      e.ASSET_HOST_ALLOWLIST.split(',')
+        .map((h) => h.trim())
+        .filter(Boolean),
+      comfyBaseUrl,
+    ),
     assetFetchTimeoutMs: e.ASSET_FETCH_TIMEOUT_MS,
     assetMaxBytes: e.ASSET_MAX_BYTES,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
+    comfyBaseUrl,
   }
+}
+
+// Fold the configured ComfyUI host into the SSRF allowlist (de-duplicated). The
+// pod's /view URL is where the finished mp4 is downloaded from, so its exact
+// host must be fetchable — but ONLY when a pod is configured, keeping the SSRF
+// surface closed by default. An unparseable base URL is ignored (config already
+// validated it as a URL, so this is belt-and-braces).
+function withComfyHost(allowlist: string[], comfyBaseUrl: string | null): string[] {
+  if (!comfyBaseUrl) return allowlist
+  let host: string
+  try {
+    host = new URL(comfyBaseUrl).hostname
+  } catch {
+    return allowlist
+  }
+  return allowlist.includes(host) ? allowlist : [...allowlist, host]
 }

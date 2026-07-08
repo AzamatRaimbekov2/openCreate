@@ -41,6 +41,14 @@ async function airExists(air: string): Promise<boolean> {
 
 let missing = 0
 for (const model of CATALOG) {
+  // Self-hosted providers (wan-runpod) do not have a Runware AIR id — their
+  // `air` is a synthetic tag that would always report NOT-FOUND on modelSearch.
+  // Skip anything not routed through Runware; this check only gates the Runware
+  // fast tier. (Image models have no `provider` field → always Runware.)
+  if (model.type === 'video' && model.provider && model.provider !== 'runware') {
+    console.log(`${'SKIP (self-host)'.padEnd(24)} ${model.id.padEnd(16)} ${model.air}`)
+    continue
+  }
   let status: string
   try {
     status = (await airExists(model.air)) ? 'FOUND' : 'NOT-FOUND'

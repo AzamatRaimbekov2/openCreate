@@ -9,6 +9,8 @@ import { and, desc, eq, lt, or } from 'drizzle-orm'
 import type { CreateGenerationInput, Generation } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
+import { createRunwareVideoAdapter } from '../../integrations/runware/video-adapter'
+import type { VideoProvider, VideoProviderId } from '../../integrations/video-provider'
 import type { StorageProvider } from '../../storage/local'
 import { generation } from '../../db/schema'
 import { chargeCredits, logCharge, logRefund, refundCredits, type MoneyLog } from '../credits/ledger'
@@ -51,7 +53,16 @@ export class ContentBlockedError extends Error {
 // disable (0) or exercise it without real clocks.
 type Deps = {
   db: Db
+  // Still used DIRECTLY for the synchronous IMAGE path (imageInference), which
+  // is deliberately never routed through the provider registry — image stays
+  // Runware-only and unchanged.
   runware: RunwareClient
+  // VIDEO provider registry (VideoProvider seam). Optional: when absent the
+  // service derives a single-entry { runware } registry from `runware`, so the
+  // existing direct-service unit tests (poll-throttle/stale/atomicity) keep
+  // working with just { db, runware, storage }. buildApp injects the full
+  // registry (runware adapter + wan-runpod ComfyUI client).
+  videoProviders?: Record<VideoProviderId, VideoProvider>
   storage: StorageProvider
   log?: MoneyLog
   pollMinIntervalMs?: number
@@ -176,10 +187,33 @@ export type GenerationService = ReturnType<typeof createGenerationService>
 export function createGenerationService({
   db,
   runware,
+  videoProviders,
   storage,
   log: baseLog,
   pollMinIntervalMs = DEFAULT_POLL_MIN_INTERVAL_MS,
 }: Deps) {
+  // Resolve the VIDEO provider registry. Fallback keeps direct-service callers
+  // (unit tests passing only { db, runware, storage }) working: they get the
+  // runware adapter wrapping their scripted RunwareClient, so submitVideo/
+  // getResponse are still exercised exactly as before. Production/buildApp
+  // injects the full registry including the wan-runpod ComfyUI client.
+  const providers: Partial<Record<VideoProviderId, VideoProvider>> = videoProviders ?? {
+    runware: createRunwareVideoAdapter(runware),
+  }
+  // A video job always polls the backend it was SUBMITTED to (durable state on
+  // the row), so an unknown/legacy provider string safely resolves to runware.
+  const resolveProvider = (id: string): VideoProvider => {
+    const provider = providers[id as VideoProviderId] ?? providers.runware
+    if (!provider) {
+      // Registry misconfigured (no runware entry) — surface as a provider error
+      // so the guarded fail+refund settles the row instead of a raw 500.
+      throw Object.assign(new Error(`no video provider registered for '${id}'`), {
+        statusCode: 502,
+        apiCode: 'provider_error',
+      })
+    }
+    return provider
+  }
   // Per-generation timestamp of the last REAL Runware poll. In-memory on
   // purpose (MVP is a single process): losing it on restart merely allows one
   // extra provider call per generation, which is harmless. Entries are
@@ -217,6 +251,11 @@ export function createGenerationService({
     const taskUUID = randomUUID()
     const now = new Date()
     const mode = input.inputImage ? 'image' : 'text'
+    // Which backend runs this job. Image is always Runware (never routed);
+    // video reads the catalog `provider` (default 'runware'). Persisted on the
+    // row so the poll path resolves the SAME provider it submitted to.
+    const providerId: VideoProviderId =
+      model.type === 'video' ? (model.provider ?? 'runware') : 'runware'
 
     // Charge + row insert in ONE transaction (review finding): as two separate
     // transactions, a crash between them charged the user for a generation row
@@ -242,6 +281,7 @@ export function createGenerationService({
           status: 'processing',
           prompt: input.prompt,
           modelId: model.id,
+          provider: providerId,
           paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, duration: input.duration }),
           costCredits: cost,
           createdAt: now,
@@ -330,29 +370,34 @@ export function createGenerationService({
     }
 
     // Video is async: submit and return 202; progress arrives via get() polls.
+    // Only the provider CALL is swapped behind the seam — the submit-window race
+    // guard, the status-guarded uuid publish, and the failure settlement are all
+    // byte-for-byte unchanged. The provider is resolved from the catalog entry
+    // (default Runware); the wan-runpod adapter maps this same shape onto ComfyUI.
     try {
-      await runware.submitVideo({
-        taskUUID,
-        positivePrompt: input.prompt,
+      const videoProvider = resolveProvider(providerId)
+      const { providerJobId } = await videoProvider.submit({
+        prompt: input.prompt,
         model: model.air,
         width,
         height,
-        duration: input.duration!,
-        ...(input.inputImage
-          ? { frameImages: [{ image: input.inputImage, frame: 'first' as const }] }
-          : {}),
+        durationSeconds: input.duration!,
+        ...(input.inputImage ? { inputImage: input.inputImage } : {}),
         // ByteDance models 400 on Runware's `safety` param — the catalog flag
-        // routes around it; moderation still enforced via NSFWContent results.
-        ...(model.supportsSafetyParam === false ? { omitSafety: true } : {}),
+        // routes around it (Runware adapter omits it; other providers ignore it).
+        ...(model.type === 'video' && model.supportsSafetyParam === false
+          ? { omitSafety: true }
+          : {}),
       })
-      // Publish the task uuid ONLY now that Runware has acknowledged the task.
-      // Before this point get() refuses to poll (null uuid → no provider call),
-      // which closes the submit-window race: a concurrent poll can no longer
-      // ask Runware about a not-yet-registered task, read the resulting error
-      // as a failure, and refund a job the operator still pays Runware for.
-      // Status-guarded so a row settled elsewhere is never resurrected.
+      // Publish the provider job id ONLY now that the provider has acknowledged
+      // the job. Before this point get() refuses to poll (null id → no provider
+      // call), which closes the submit-window race: a concurrent poll can no
+      // longer ask the provider about a not-yet-registered job, read the
+      // resulting error as a failure, and refund a job still being paid for.
+      // Reuses the runwareTaskUuid column (neutral job-handle store). Status-
+      // guarded so a row settled elsewhere is never resurrected.
       db.update(generation)
-        .set({ runwareTaskUuid: taskUUID })
+        .set({ runwareTaskUuid: providerJobId })
         .where(and(eq(generation.id, id), eq(generation.status, 'processing')))
         .run()
     } catch (err) {
@@ -404,10 +449,11 @@ export function createGenerationService({
       return toDto(settled!)
     }
     // A null runwareTaskUuid on a processing row means create() has not yet
-    // finished the provider submit — the task does not exist on Runware's side
-    // yet, so polling it would misread "unknown task" as a terminal failure
+    // finished the provider submit — the job does not exist on the provider's
+    // side yet, so polling it would misread "unknown job" as a terminal failure
     // (and refund a job that is about to succeed). Return the row as-is; the
-    // SPA's next poll will find the uuid once the submit completes.
+    // SPA's next poll will find the id once the submit completes. (The column
+    // now holds a neutral provider job id — Runware taskUUID or ComfyUI prompt_id.)
     if (!row.runwareTaskUuid) return toDto(row)
 
     // Poll throttle: a getResponse call for this generation happened inside
@@ -422,7 +468,12 @@ export function createGenerationService({
     if (lastPoll !== undefined && nowMs - lastPoll < pollMinIntervalMs) return toDto(row)
     lastPolledAt.set(id, nowMs)
 
-    const poll = await runware.getResponse(row.runwareTaskUuid)
+    // Poll the SAME provider the job was submitted to (durable state on the
+    // row). The neutral VideoPollResult union is identical across providers, so
+    // every settlement branch below is byte-for-byte the pre-seam logic — only
+    // the field names are the neutral ones (assetUrl/costUsd/nsfw).
+    const videoProvider = resolveProvider(row.provider)
+    const poll = await videoProvider.poll(row.runwareTaskUuid)
     if (poll.status === 'processing') {
       db.update(generation).set({ progress: poll.progress }).where(eq(generation.id, id)).run()
       return toDto({ ...row, progress: poll.progress })
@@ -431,8 +482,10 @@ export function createGenerationService({
       // Safety gate BEFORE the download (spec §2/§9.4): NSFW-flagged output
       // is never stored or served — settle as failed with the machine-readable
       // 'content_blocked' code (the SPA shows a localized safety message) and
-      // give the credits back.
-      if (poll.NSFWContent) {
+      // give the credits back. Self-hosted wan-runpod has no provider-side
+      // moderation and always reports nsfw:false (documented ADR gap) — the
+      // gate simply never fires for it until a worker classifier is added.
+      if (poll.nsfw) {
         failGeneration(
           db,
           userId,
@@ -445,10 +498,10 @@ export function createGenerationService({
         const settled = db.select().from(generation).where(eq(generation.id, id)).get()
         return toDto(settled!)
       }
-      const src = poll.videoURL ?? poll.imageURL
+      const src = poll.assetUrl
       if (!src) {
         // 'success' with no asset URL is unrecoverable: every future poll of
-        // this task would return the same payload, so "leave it processing
+        // this job would return the same payload, so "leave it processing
         // and retry" loops forever while the user's credits stay held. Treat
         // it as a provider failure and give the money back.
         log?.error(
@@ -473,7 +526,9 @@ export function createGenerationService({
           .set({
             status: 'succeeded',
             mediaJson: JSON.stringify([mediaUrl]),
-            runwareCostUsd: poll.cost?.toString(),
+            // Neutral cost store (reused column): Runware's invoice figure, or
+            // the wan-runpod operator estimate — margin dashboards only.
+            runwareCostUsd: poll.costUsd?.toString(),
             progress: 100,
             completedAt: new Date(),
           })
@@ -490,7 +545,7 @@ export function createGenerationService({
             userId,
             generationId: id,
             costCredits: row.costCredits,
-            runwareCostUsd: poll.cost ?? null,
+            runwareCostUsd: poll.costUsd ?? null,
           },
           'generation settled',
         )

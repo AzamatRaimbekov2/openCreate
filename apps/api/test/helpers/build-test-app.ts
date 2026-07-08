@@ -8,6 +8,7 @@ import { vi } from 'vitest'
 import { buildApp } from '../../src/app'
 import { createDb } from '../../src/db/client'
 import type { RunwareClient } from '../../src/integrations/runware/client'
+import type { VideoProvider, VideoProviderId } from '../../src/integrations/video-provider'
 import { createLocalStorage } from '../../src/storage/local'
 
 // Fully-mocked RunwareClient (plan Task 10): each test scripts the provider's
@@ -18,12 +19,22 @@ export const fakeRunware = () => ({
   getResponse: vi.fn(),
 })
 
+// Fully-mocked VideoProvider (wan-runpod seam): each test scripts submit/poll
+// and asserts which provider the service routed to.
+export const fakeVideoProvider = () => ({
+  submit: vi.fn(),
+  poll: vi.fn(),
+})
+
 export type TestAppOverrides = {
   // Task 9: point /media serving at a caller-owned temp dir so tests can put
   // files in it / assert on it. Default: a fresh mkdtemp per app.
   storageDir?: string
   // Task 10: scripted provider + a lowered signup bonus for 402 tests.
   runware?: RunwareClient
+  // wan-runpod seam: override the video provider registry to assert routing.
+  // Absent → buildApp derives { runware: adapter(runware), 'wan-runpod': comfy }.
+  videoProviders?: Record<VideoProviderId, VideoProvider>
   signupBonusCredits?: number
   // Ops hardening: logger is SILENT by default so suites stay quiet; logging
   // tests raise the level and capture pino's NDJSON via a write stub.
@@ -37,6 +48,10 @@ export type TestAppOverrides = {
   // Reverse-proxy header trust (TRUST_PROXY): rate-limit tests flip this to
   // pin per-forwarded-client buckets vs the default deny (header ignored).
   trustProxy?: boolean | string
+  // SSRF allowlist for storage.saveFromUrl AND config. Default ['runware.ai'];
+  // wan-runpod routing tests widen it to the pod /view host (mirrors the
+  // production config, which auto-adds the COMFY_BASE_URL host).
+  assetHostAllowlist?: string[]
   // Poll throttle seam. Tests default to 0 (disabled) because many suites
   // deliberately script back-to-back polls of one generation (processing →
   // succeeded etc.) and must see Runware answer each step; the throttle's own
@@ -50,8 +65,9 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
   return buildApp({
     // Fresh in-memory db per app: tests are fully isolated from each other.
     db: createDb(':memory:').db,
-    storage: createLocalStorage(storageDir),
+    storage: createLocalStorage(storageDir, overrides.assetHostAllowlist ?? ['runware.ai']),
     runware: overrides.runware ?? (fakeRunware() as unknown as RunwareClient),
+    ...(overrides.videoProviders ? { videoProviders: overrides.videoProviders } : {}),
     ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
     // 0 disables the poll throttle by default (see TestAppOverrides note).
     pollMinIntervalMs: overrides.pollMinIntervalMs ?? 0,
@@ -67,13 +83,17 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       googleClientId: null,
       googleClientSecret: null,
       logLevel: overrides.logLevel ?? 'silent',
-      // Matches the storage default; tests that probe the SSRF allowlist
-      // construct their own createLocalStorage with a custom list instead.
-      assetHostAllowlist: ['runware.ai'],
+      // Matches the storage default; wan-runpod routing tests widen it to the
+      // pod /view host (see the assetHostAllowlist override above).
+      assetHostAllowlist: overrides.assetHostAllowlist ?? ['runware.ai'],
       // Production defaults (120s / 512MB); tests that probe the download
       // limits construct their own createLocalStorage with tight limits.
       assetFetchTimeoutMs: 120_000,
       assetMaxBytes: 512 * 1024 * 1024,
+      // wan-runpod pod URL: unset by default (tests inject a fake videoProviders
+      // registry rather than a live pod). Kept null so buildApp's derived comfy
+      // client is present-but-unconfigured (a wan-runpod submit would 502).
+      comfyBaseUrl: null,
       // Default-deny like production: proxy headers are only trusted when a
       // test opts in — mirrors the TRUST_PROXY env knob (unset → false).
       trustProxy: overrides.trustProxy ?? false,

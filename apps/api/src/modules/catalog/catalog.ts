@@ -112,6 +112,26 @@ export const CATALOG: CatalogModel[] = [
     durationOptions: [8],
     creditsByDuration: { '8': 140 },
   },
+  {
+    // Self-hosted Wan 2.2 on our own RunPod GPU (ADR: wan-selfhost-video-
+    // provider). `provider: 'wan-runpod'` routes submit/poll to the ComfyUI
+    // adapter instead of Runware; the `air` is a synthetic tag (never sent to
+    // Runware, skipped by verify-catalog) that only satisfies the AIR regex.
+    // t2v only for now (supportsImageInput: false). Premium async "Forge" tier.
+    // KNOWN GAP: self-host has no provider-side NSFW check (ComfyUI returns
+    // nsfw:false) — see the ADR's moderation-parity note before public launch.
+    id: 'wan-2-2',
+    type: 'video',
+    name: 'Forge',
+    providerLabel: 'Wan 2.2 · our GPU',
+    air: 'wan-runpod:wan2.2-t2v-a14b',
+    tier: 'premium',
+    supportsImageInput: false,
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    durationOptions: [5],
+    creditsByDuration: { '5': 60 },
+    provider: 'wan-runpod',
+  },
 ]
 
 export function getModel(id: string): CatalogModel | undefined {

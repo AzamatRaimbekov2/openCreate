@@ -31,3 +31,6 @@ flowchart LR
 
 ## Commits
 - bdc4175 feat(api): curated model catalog with credit pricing
+
+## Key decisions (2026-07-09) — wan-runpod
+- Skips any video model with `provider !== 'runware'` (prints `SKIP (self-host)`): self-hosted models have a synthetic `air` with no Runware AIR, so modelSearch would always report NOT-FOUND. The check gates only the Runware fast tier.

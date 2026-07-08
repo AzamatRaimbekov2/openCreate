@@ -72,6 +72,12 @@ flowchart TD
 ## Key decisions (2026-07-08)
 - Video submit forwards `omitSafety: true` when the catalog model has `supportsSafetyParam === false` (ByteDance/Seedance reject Runware's `safety` param with 400 unsupportedParameter). Moderation for these models still applies via the NSFWContent flag on poll results, which this service already enforces (content_blocked + refund).
 
+## Key decisions (2026-07-09) — VideoProvider seam / wan-runpod routing
+- The VIDEO path now calls a `VideoProvider` from a `videoProviders` registry instead of `runware.*` directly. Provider is resolved from the catalog model's `provider` at submit (`providerId`, default `runware`) and from the row's persisted `provider` at poll (durable — a job always polls the backend it submitted to). The IMAGE path still calls `runware.imageInference` directly and is UNCHANGED.
+- `videoProviders` is optional: when absent the service derives `{ runware: createRunwareVideoAdapter(runware) }`, so the existing direct-service unit tests (`{ db, runware, storage }`) keep exercising `submitVideo`/`getResponse` through the adapter unchanged. `buildApp` injects the full registry (runware + wan-runpod).
+- Neutral field rename only — `poll.assetUrl` / `poll.costUsd` / `poll.nsfw` replace `videoURL/imageURL` / `cost` / `NSFWContent`. Provider job id + cost REUSE the `runwareTaskUuid` / `runwareCostUsd` columns. Every money-path guard (charge+insert atomic, submit-window null-id guard, guarded fail+refund, stale reaper, poll throttle) is byte-for-byte unchanged.
+- wan-runpod reports `nsfw:false` (no self-host moderation) → the §9.4 gate never fires for it; documented gap.
+
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
 - 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes

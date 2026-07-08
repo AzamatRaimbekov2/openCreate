@@ -70,6 +70,15 @@ export const generation = sqliteTable('generation', {
   modelId: text('model_id').notNull(),
   paramsJson: text('params_json').notNull(),
   costCredits: integer('cost_credits').notNull(),
+  // Which video backend ran this job (VideoProvider seam). Additive + back-compat:
+  // NOT NULL DEFAULT 'runware' so every legacy row and image row reads 'runware'.
+  // The poll path resolves the provider from THIS column (durable state), not the
+  // live catalog, so a job always polls the backend it was submitted to.
+  provider: text('provider').notNull().default('runware'),
+  // Provider job handle + operator cost. Kept under the legacy `runware_*` names
+  // (reused, not renamed — see the ADR's additive/reversible DB decision) but now
+  // hold the NEUTRAL job id/cost for whichever provider ran: Runware's taskUUID or
+  // the ComfyUI prompt_id. Reusing them keeps the money-path guards byte-for-byte.
   runwareTaskUuid: text('runware_task_uuid'),
   runwareCostUsd: text('runware_cost_usd'),
   mediaJson: text('media_json').notNull().default('[]'),

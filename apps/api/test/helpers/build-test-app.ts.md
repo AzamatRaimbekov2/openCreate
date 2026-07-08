@@ -51,3 +51,6 @@ flowchart LR
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs override (default 0), assetHostAllowlist in test config
 - eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — trustProxy override (default false)
 - de61e59 feat(api): db-level refund-once index + asset download limits — assetFetchTimeoutMs/assetMaxBytes in the test config (production defaults)
+
+## Key decisions (2026-07-09) — wan-runpod
+- `fakeVideoProvider()` (scripted `submit`/`poll`) + `TestAppOverrides.videoProviders` let routing tests assert which backend ran. `assetHostAllowlist` override flows into BOTH the test storage and config (mirrors prod auto-adding the pod host) so wan `/view` URLs pass the SSRF gate. `config.comfyBaseUrl: null` by default (tests inject a fake registry, not a live pod).

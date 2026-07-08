@@ -41,3 +41,6 @@ flowchart LR
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — ASSET_HOST_ALLOWLIST → assetHostAllowlist
 - eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — TRUST_PROXY → trustProxy (parseTrustProxy tri-state)
 - de61e59 feat(api): db-level refund-once index + asset download limits — ASSET_FETCH_TIMEOUT_MS/ASSET_MAX_BYTES → assetFetchTimeoutMs/assetMaxBytes
+
+## Key decisions (2026-07-09) — wan-runpod
+- `COMFY_BASE_URL` (optional `z.url()`) → `config.comfyBaseUrl` (`string | null`, `|| null` so empty = unconfigured). `withComfyHost()` folds its hostname into `assetHostAllowlist` (de-duplicated) so `saveFromUrl` can pull the finished mp4 from the pod `/view` — env-driven, so pointing at a new pod is one edit and the SSRF surface stays closed by default.
