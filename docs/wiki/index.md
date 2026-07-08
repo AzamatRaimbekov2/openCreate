@@ -24,6 +24,7 @@ tags:
 - [[modular-frontend-architecture]] - Imported modular/FSD-like frontend architecture guidance from Notion and FigJam.
 - [[opencreate-mvp-architecture]] - **Accepted ADR**: openCreate MVP — Runware-backed image/video generation platform (pnpm monorepo, Vite SPA + Fastify API, credit ledger, own asset storage). Spec: `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`.
 - [[opencreate-implementation]] - ADR → implementation map for the shipped openCreate MVP (decision-by-decision code locations, recorded deltas, verification results).
+- [[wan-selfhost-video-provider]] - **Proposed ADR** (pending user approval + spike): self-hosted Wan 2.2 A14B as a second video provider on RunPod serverless, behind a `VideoProvider { submit; poll }` seam and the unchanged async lifecycle; Runware kept as the fast tier; presigned-PUT delivery into our own bucket; ~$0.01–0.04/clip vs the $0.13 Seedance baseline. Feasibility gated by [[wan-runpod-feasibility-spike]].
 
 ## Workflows
 
