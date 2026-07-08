@@ -58,3 +58,9 @@ data/
 *.tsbuildinfo
 playwright-report/
 test-results/
+
+# --- Spike runtime outputs (feasibility spikes; never commit generated media) -
+spikes/**/.env
+spikes/**/out/
+spikes/**/*.mp4
+spikes/**/.venv/

@@ -1,0 +1,4 @@
+# Measurement client deps — intentionally tiny so the user needs no build step.
+#   pip install -r requirements.txt
+requests>=2.32.0
+boto3>=1.34.0

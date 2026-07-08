@@ -1,0 +1,13 @@
+# Handler-side deps (installed into the worker image on top of ComfyUI's own reqs).
+# Torch/torchvision are installed separately in the Dockerfile (CUDA-matched wheels).
+runpod>=1.7.0
+requests>=2.32.0
+
+# NSFW classifier on output frames (ADR §6 moderation parity — HARD requirement).
+transformers>=4.44.0
+Pillow>=10.4.0
+
+# Frame extraction from the generated mp4 for the NSFW pass.
+imageio>=2.35.0
+imageio-ffmpeg>=0.5.1
+av>=12.0.0
