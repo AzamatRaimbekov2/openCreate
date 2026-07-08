@@ -25,6 +25,9 @@ export const catalogImageModelSchema = catalogBase.extend({
   type: z.literal('image'),
   credits: z.number().int().positive(),
 })
+export const videoProviderSchema = z.enum(['runware', 'wan-runpod'])
+export type VideoProviderId = z.infer<typeof videoProviderSchema>
+
 export const catalogVideoModelSchema = catalogBase.extend({
   type: z.literal('video'),
   durationOptions: z.array(z.number().int().positive()).min(1),
@@ -32,6 +35,12 @@ export const catalogVideoModelSchema = catalogBase.extend({
   // Runware's `safety` task param is model-specific: ByteDance/Seedance models
   // reject it as unsupportedParameter. Absent/true = model accepts `safety`.
   supportsSafetyParam: z.boolean().optional(),
+  // Which backend runs this video model. Additive and optional: absent means
+  // the default fast tier (Runware). 'wan-runpod' routes submit/poll to our
+  // self-hosted ComfyUI worker instead (see the VideoProvider seam in the API
+  // and the wan-selfhost-video-provider ADR). Image models are always Runware,
+  // so this lives on the video schema only.
+  provider: videoProviderSchema.optional(),
 })
 export const catalogModelSchema = z.discriminatedUnion('type', [
   catalogImageModelSchema,

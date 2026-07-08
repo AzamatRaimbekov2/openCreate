@@ -31,5 +31,8 @@ flowchart LR
 ## Key decisions (2026-07-08)
 - `supportsSafetyParam?: boolean` on video models: Runware's `safety` task parameter is model-specific — ByteDance/Seedance models reject it with `unsupportedParameter` (verified live). Optional+absent means "accepts safety" so existing entries stay untouched; only exceptions opt out. Additive change — web consumes types only.
 
+## Key decisions (2026-07-09)
+- `provider?: 'runware' | 'wan-runpod'` on `catalogVideoModelSchema` (+ exported `videoProviderSchema` / `VideoProviderId`): routes a video model to the API's VideoProvider seam. Optional + absent = Runware, so every existing entry stays valid. Image models have no `provider` (always Runware). Additive — web consumes types only.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
