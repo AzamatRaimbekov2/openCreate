@@ -79,6 +79,9 @@ flowchart LR
   (auth-entry files under red), `variant="primary"` (green) for sign-up
   (account creation is a create action). Accessible names are unchanged.
 
+## Key decisions (2026-07-08)
+- `AuthClientError.code/status` widened to `?: T | undefined` so better-auth's `error.code` (string | undefined) can be passed under exactOptionalPropertyTypes — was a build-blocking TS2379 from 21e7370.
+
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)

@@ -46,10 +46,12 @@ type ServerError = {
 
 // The better-auth client returns { error } with a code/status we branch on.
 type AuthClientError = {
-  // UpperSnakeCase error code (may be absent on some failures)
-  code?: string
+  // UpperSnakeCase error code (may be absent on some failures). Explicit
+  // `| undefined` so a possibly-undefined value can be passed under
+  // exactOptionalPropertyTypes (better-auth's error.code is string | undefined).
+  code?: string | undefined
   // HTTP status — our fallback when the code is missing/unrecognised
-  status?: number
+  status?: number | undefined
 }
 
 // Map a better-auth client error to safe localized copy. better-auth 1.6.x
