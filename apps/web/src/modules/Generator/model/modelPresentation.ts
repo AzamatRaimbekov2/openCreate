@@ -35,6 +35,9 @@ const PROVIDER_BY_MODEL: Record<string, ProviderId> = {
   'minimax-hailuo': 'minimax',
   'seedance-1-5-pro': 'seedance',
   'wan-2-7': 'wan',
+  // Self-hosted Wan 2.2 ("Forge") — same Wan brand mark as wan-2-7. Its
+  // description string is generator.models.wan-2-2.description in the locales.
+  'wan-2-2': 'wan',
   'kling-3-pro': 'kling',
   'veo-3-1-fast': 'veo',
 }

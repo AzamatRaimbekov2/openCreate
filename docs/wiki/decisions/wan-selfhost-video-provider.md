@@ -19,6 +19,15 @@ tags:
 
 **Proposed — pending user approval + spike.** No implementation, scaffolding, dependencies, or catalog exposure happens until (1) the user approves this ADR and (2) the feasibility spike ([[wan-runpod-feasibility-spike]]) passes its go/no-go gates. This is a design-only record.
 
+## Implementation note (2026-07-09 — ComfyUI-HTTP spike variant)
+
+The `VideoProvider` seam and the `wan-runpod` provider are **implemented and merged** (apps/api + packages/contracts). As-built deviations from the design above, all deliberate for this first integration:
+
+- **Transport = the pod's ComfyUI HTTP API, not a serverless `/run` handler.** `submit()` POSTs a templated Wan 2.2 t2v workflow to `${COMFY_BASE_URL}/prompt` and returns the `prompt_id`; `poll()` reads `${COMFY_BASE_URL}/history/<id>` and resolves the SaveVideo output into a `${COMFY_BASE_URL}/view?...` URL. The serverless `/run`·`/status` shape in diagram (b) remains the later production topology.
+- **Delivery = `saveFromUrl` from `/view`, not a presigned PUT (yet).** The finished mp4 is downloaded from the pod's `/view` host exactly like a Runware URL; that host is added to `ASSET_HOST_ALLOWLIST` (env-driven from `COMFY_BASE_URL`). Presigned-PUT-into-our-bucket is deferred with the serverless migration. This DOES widen the SSRF allowlist to the configured pod host (one exact host, env-controlled) — a conscious spike trade-off vs. the design's "no RunPod host allowlisted".
+- **DB = reuse the legacy job columns.** Only `provider TEXT NOT NULL DEFAULT 'runware'` was added; the neutral provider job id / cost reuse `runware_task_uuid` / `runware_cost_usd` (no `provider_job_id` / `provider_cost_usd` split), keeping the money-path guards byte-for-byte.
+- **Moderation parity is NOT yet met** — self-hosted ComfyUI returns no NSFW signal, so the provider reports `nsfw:false` and the §9.4 gate never fires for `wan-2-2`. The model ships in the catalog for the spike per the build owner's decision; a worker-side classifier remains the hard prerequisite before public launch.
+
 ## Context
 
 The MVP ([[opencreate-mvp-architecture]]) generates video through a **single closed provider — Runware** — inside a well-tested async lifecycle: submit → `202 processing` → SPA polls our API every 4s → API polls the provider → settle (charge-at-submit, refund-on-failure), with a transactional credit ledger, own media storage (`StorageProvider.saveFromUrl` behind an SSRF host allowlist), a 1h stale-processing reaper, and a §9.4 NSFW gate.

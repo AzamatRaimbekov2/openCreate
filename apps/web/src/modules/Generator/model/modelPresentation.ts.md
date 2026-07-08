@@ -36,3 +36,6 @@ flowchart LR
 
 ## Commits
 - _no commit yet_
+
+## Key decisions (2026-07-09) — wan-runpod
+- Added `'wan-2-2': 'wan'` to `PROVIDER_BY_MODEL` so the self-hosted "Forge" model draws the Wan brand mark. Description is `generator.models.wan-2-2.description` (EN/RU locales). Presentation only — the model itself comes from the server catalog and auto-renders in the video group.
