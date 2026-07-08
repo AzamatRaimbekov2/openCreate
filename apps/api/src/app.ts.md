@@ -35,6 +35,8 @@ flowchart LR
 - **Production single-origin serving**: when `nodeEnv === 'production'` AND `webDistPath/index.html` exists, a second `@fastify/static` serves the built SPA at `/` (`decorateReply: false` — the /media registration already added `sendFile`), and a `setNotFoundHandler` answers `index.html` for non-`/api`, non-`/media` GETs (SPA deep links) while API/media misses return the JSON `not_found` envelope. Gated on the file existing so an api-only prod deploy boots clean. Pinned by `test/static-web.test.ts`.
 - Logging: session cookies ARE the credential — `redact` covers `req.headers.cookie`/`authorization` and `res.headers["set-cookie"]` (plus bare `headers.*` for hand-rolled objects) so no serializer can leak them. `app.log` is handed to the auth factory (signup bonus) and the generation service as the non-request fallback; routes pass `req.log` per call for reqId correlation. Tests keep `logLevel: 'silent'` via `build-test-app.ts`.
 
+- 2026-07-09: registerCatalogRoutes now receives `comfyBaseUrl !== null` so the route can hide self-host models when self-host is off.
+
 ## Commits
 - eb91028 feat(api): fastify skeleton with typed config and health route
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL — `db` added to `AppDeps`

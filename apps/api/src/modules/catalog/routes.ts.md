@@ -27,5 +27,7 @@ flowchart LR
 - **Public, no `requireUser`** on purpose: the landing/pricing page renders prices before sign-in, and the payload contains nothing user-specific or secret (AIR ids are public Runware identifiers).
 - Response is static per process — if the catalog ever becomes DB-backed, add cache headers here.
 
+- 2026-07-09: /api/catalog hides `provider:"wan-runpod"` video models when COMFY_BASE_URL is unset (self-host off) — a listed model whose backend cannot run is only a broken option. Models stay in CATALOG (routing/tests intact).
+
 ## Commits
 - bdc4175 feat(api): curated model catalog with credit pricing

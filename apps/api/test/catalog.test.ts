@@ -30,13 +30,27 @@ describe('catalog', () => {
 })
 
 describe('GET /api/catalog', () => {
-  it('is public and returns all catalog models', async () => {
+  it('is public and returns the runnable catalog models', async () => {
+    // buildTestApp defaults comfyBaseUrl to null (self-host off), so the route
+    // hides wan-runpod models — a listed model whose backend cannot run is only
+    // a selectable option that always errors.
     const app = await buildTestApp()
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     expect(res.statusCode).toBe(200)
-    const body = res.json() as { models: unknown[] }
-    expect(body.models).toHaveLength(CATALOG.length)
+    const body = res.json() as { models: Array<{ provider?: string }> }
+    const expected = CATALOG.filter((m) => m.type !== 'video' || m.provider !== 'wan-runpod')
+    expect(body.models).toHaveLength(expected.length)
+    // No self-host model leaks into the listing while self-host is off.
+    expect(body.models.some((m) => m.provider === 'wan-runpod')).toBe(false)
     for (const m of body.models) expect(catalogModelSchema.safeParse(m).success).toBe(true)
+  })
+
+  it('lists wan-runpod models when self-host IS configured', async () => {
+    const app = await buildTestApp({ comfyBaseUrl: 'https://pod-8188.proxy.runpod.net' })
+    const res = await app.inject({ method: 'GET', url: '/api/catalog' })
+    const body = res.json() as { models: Array<{ provider?: string }> }
+    expect(body.models).toHaveLength(CATALOG.length)
+    expect(body.models.some((m) => m.provider === 'wan-runpod')).toBe(true)
   })
 })
 

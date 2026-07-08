@@ -17,6 +17,8 @@ import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
+import { registerEntityRoutes } from './modules/entities/routes'
+import { createEntityService } from './modules/entities/service'
 import { createGenerationService, settleStaleGenerations } from './modules/generations/service'
 import { registerGenerationRoutes } from './modules/generations/routes'
 import { registerUserRoutes } from './modules/users/routes'
@@ -140,7 +142,7 @@ export async function buildApp(deps: AppDeps) {
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)
   // Catalog is public (no requireUser): pricing must render before sign-in.
-  registerCatalogRoutes(app)
+  registerCatalogRoutes(app, deps.config.comfyBaseUrl !== null)
   // The core (Task 10): generation lifecycle service gets the db + provider +
   // storage trio; routes stay thin and session-gated via requireUser. The
   // base logger is the fallback for money-path events — routes pass req.log
@@ -168,6 +170,9 @@ export async function buildApp(deps: AppDeps) {
         : {}),
     }),
   )
+  // Entity library (characters/objects/places) — independent of generations for
+  // now; the mention wiring into POST /generations lands with the capability flag.
+  registerEntityRoutes(app, createEntityService({ db: deps.db, storage: deps.storage }))
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.

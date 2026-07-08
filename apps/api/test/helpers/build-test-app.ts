@@ -58,6 +58,10 @@ export type TestAppOverrides = {
   // tests opt in with a real interval. Production keeps the service's 3s
   // default (pinned by a service-level test in generations-poll-throttle).
   pollMinIntervalMs?: number
+  // Self-host on/off: default null (off). Set to a URL so the catalog route
+  // lists the wan-runpod (self-host) models — a listed model whose backend is
+  // unconfigured is only a broken option, so /api/catalog hides them when off.
+  comfyBaseUrl?: string | null
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -93,7 +97,7 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // wan-runpod pod URL: unset by default (tests inject a fake videoProviders
       // registry rather than a live pod). Kept null so buildApp's derived comfy
       // client is present-but-unconfigured (a wan-runpod submit would 502).
-      comfyBaseUrl: null,
+      comfyBaseUrl: overrides.comfyBaseUrl ?? null,
       // Default-deny like production: proxy headers are only trusted when a
       // test opts in — mirrors the TRUST_PROXY env knob (unset → false).
       trustProxy: overrides.trustProxy ?? false,
