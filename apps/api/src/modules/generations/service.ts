@@ -6,14 +6,20 @@
 // it fully testable with the scripted fake in test/helpers/build-test-app.ts.
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, lt, or } from 'drizzle-orm'
-import type { CreateGenerationInput, Generation } from '@opencreate/contracts'
+import { applyPromptPreset } from '@opencreate/contracts'
+import type { CreateGenerationInput, Generation, PromptPreset } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import { createRunwareVideoAdapter } from '../../integrations/runware/video-adapter'
+import { createRunwareAudioAdapter } from '../../integrations/runware/audio-adapter'
 import type { VideoProvider, VideoProviderId } from '../../integrations/video-provider'
+import type { AudioProvider } from '../../integrations/audio-provider'
 import type { StorageProvider } from '../../storage/local'
-import { generation } from '../../db/schema'
+import { generation, generationEntity } from '../../db/schema'
 import { chargeCredits, logCharge, logRefund, refundCredits, type MoneyLog } from '../credits/ledger'
+import { composePrompt } from '../entities/mentions'
+import type { MentionEntities } from '../entities/mentions'
+import type { EntityService } from '../entities/service'
 import { creditsFor, getModel, resolutionFor } from '../catalog/catalog'
 
 // Domain errors carry statusCode + apiCode so the central error handler in
@@ -63,7 +69,17 @@ type Deps = {
   // working with just { db, runware, storage }. buildApp injects the full
   // registry (runware adapter + wan-runpod ComfyUI client).
   videoProviders?: Record<VideoProviderId, VideoProvider>
+  // AUDIO provider (CinemaStudio music/voiceover). Optional: when absent it is
+  // derived from `runware` (createRunwareAudioAdapter), mirroring the video
+  // registry fallback so existing { db, runware, storage } callers keep working.
+  // Audio submits through this; it POLLS through the video registry (an audio
+  // row is provider:'runware', and the runware video adapter now maps audioURL).
+  audioProvider?: AudioProvider
   storage: StorageProvider
+  // Entity library. Optional so the many direct-service unit tests that predate
+  // tagging keep constructing the service with { db, runware, storage }: without
+  // it, a request carrying entityRefs is rejected rather than silently untagged.
+  entities?: EntityService
   log?: MoneyLog
   pollMinIntervalMs?: number
 }
@@ -159,6 +175,16 @@ export function settleStaleGenerations(db: Db, now = Date.now(), log?: MoneyLog)
   return rows.length
 }
 
+// The on-disk extension for a finished asset of each media type. Video → mp4,
+// audio → mp3 (CinemaStudio), everything else (image) → webp. One place owns the
+// mapping so the download (get), the discard-on-race cleanup (image path), and
+// remove() can never disagree about a generation's file name.
+function assetExt(type: 'image' | 'video' | 'audio'): 'mp4' | 'mp3' | 'webp' {
+  if (type === 'video') return 'mp4'
+  if (type === 'audio') return 'mp3'
+  return 'webp'
+}
+
 // DB row → wire DTO (contracts generationSchema). JSON columns are parsed here
 // and dates leave as ISO strings — the wire contract is JSON, not Date objects.
 function toDto(row: typeof generation.$inferSelect): Generation {
@@ -168,6 +194,13 @@ function toDto(row: typeof generation.$inferSelect): Generation {
     mode: row.mode,
     status: row.status,
     prompt: row.prompt,
+    // CinemaStudio (ADR §3): the model-facing composed prompt (null on preset-
+    // less/legacy rows → the client falls back to `prompt`) and the structured
+    // preset echoed back so the composer can pre-fill pickers on Regenerate.
+    composedPrompt: row.composedPrompt,
+    promptPreset: row.promptPresetJson
+      ? (JSON.parse(row.promptPresetJson) as Generation['promptPreset'])
+      : null,
     modelId: row.modelId,
     params: JSON.parse(row.paramsJson) as Generation['params'],
     costCredits: row.costCredits,
@@ -188,10 +221,16 @@ export function createGenerationService({
   db,
   runware,
   videoProviders,
+  audioProvider,
   storage,
+  entities,
   log: baseLog,
   pollMinIntervalMs = DEFAULT_POLL_MIN_INTERVAL_MS,
 }: Deps) {
+  // Audio provider fallback (mirrors the video registry fallback below): a
+  // caller that injects only { db, runware, storage } still gets a working
+  // audio submit path via the runware audioInference adapter.
+  const audio: AudioProvider = audioProvider ?? createRunwareAudioAdapter(runware)
   // Resolve the VIDEO provider registry. Fallback keeps direct-service callers
   // (unit tests passing only { db, runware, storage }) working: they get the
   // runware adapter wrapping their scripted RunwareClient, so submitVideo/
@@ -234,10 +273,73 @@ export function createGenerationService({
     // shape, but only the catalog knows which combinations are real.
     const model = getModel(input.modelId)
     if (!model) throw new ValidationError(`unknown model ${input.modelId}`)
-    if (!model.aspectRatios.includes(input.aspectRatio))
-      throw new ValidationError(`aspect ${input.aspectRatio} unsupported for ${model.id}`)
+    // Aspect ratio is required for image/video and enforced against the model's
+    // list; audio has none (CinemaStudio) — the audio branch skips resolution.
+    if (model.type !== 'audio') {
+      if (!input.aspectRatio) throw new ValidationError(`aspectRatio required for ${model.id}`)
+      if (!model.aspectRatios.includes(input.aspectRatio))
+        throw new ValidationError(`aspect ${input.aspectRatio} unsupported for ${model.id}`)
+    }
     if (input.inputImage && !model.supportsImageInput)
       throw new ValidationError(`${model.id} does not support image input`)
+
+    // ── Tagged entities ──────────────────────────────────────────────────────
+    // Everything here runs BEFORE the charge. A tag the model cannot honour, or
+    // an entity with no photo, must cost the user nothing: the provider would
+    // happily return a plausible image of a stranger for full price.
+    const refs = input.entityRefs ?? []
+    let referenceImages: string[] | undefined
+    let mentionEntities: MentionEntities = {}
+
+    if (refs.length > 0) {
+      if (!entities) throw new ValidationError('entity tagging is unavailable')
+      // The client filters the model list on `referenceMode`; the API decides.
+      // A capability the client can lie about is not a capability.
+      if (!model.referenceMode)
+        throw new ValidationError(`${model.id} cannot use reference images`)
+      if (refs.length > (model.maxReferenceImages ?? 1))
+        throw new ValidationError(
+          `${model.id} accepts at most ${model.maxReferenceImages ?? 1} reference image(s)`,
+        )
+      // Scoped to this user and to alive rows: a foreign or deleted id simply does
+      // not come back, and composePrompt below turns the miss into a 400 without
+      // ever revealing whether that id exists for someone else.
+      mentionEntities = await entities.loadForMentions(
+        userId,
+        refs.map((ref) => ref.entityId),
+      )
+    }
+
+    // ALWAYS compose, even with zero refs, and BEFORE fetching any photo.
+    // · Skipping the pass when refs are empty let a prompt carrying a stray
+    //   `[[e1]]` sail through to the text encoder, which reads it as words —
+    //   the exact silent poisoning this protocol exists to prevent.
+    // · Composing before the photo lookup means an unauthorized entityId fails
+    //   as "unknown entity" here, rather than leaking through a not-found on a
+    //   subsequent get() that names someone else's row.
+    let composedPrompt: string
+    try {
+      composedPrompt = composePrompt(input.prompt, refs, mentionEntities)
+    } catch (err) {
+      throw new ValidationError(err instanceof Error ? err.message : 'invalid entity refs')
+    }
+
+    if (refs.length > 0 && entities) {
+      // The photo is the whole point of the tag: with none, the generation is
+      // indistinguishable from an untagged one — and just as expensive.
+      const urls: string[] = []
+      for (const ref of refs) {
+        const dto = await entities.get(userId, ref.entityId)
+        const url = entities.referenceImageUrl(dto)
+        if (!url) throw new ValidationError(`entity ${dto.name} has no photo to use as a reference`)
+        // Runware conditions on data URIs. Our /media paths are not publicly
+        // reachable in dev (or behind a private asset host), so handing over a
+        // URL would fail exactly where we test it. (ADR: reference delivery.)
+        urls.push(await storage.readAsDataUri(url))
+      }
+      referenceImages = urls
+    }
+
     let cost: number
     try {
       cost = creditsFor(model, input.duration)
@@ -246,7 +348,25 @@ export function createGenerationService({
       // are caller mistakes, so surface as 400, not 500.
       throw new ValidationError(err instanceof Error ? err.message : 'invalid duration')
     }
-    const { width, height } = resolutionFor(model, input.aspectRatio)
+    // Resolution is derived for image/video only; audio has no aspect ratio.
+    // (0,0 placeholders for audio are never sent — the audio branch ignores them.)
+    const { width, height } =
+      model.type === 'audio' ? { width: 0, height: 0 } : resolutionFor(model, input.aspectRatio!)
+
+    // CinemaStudio preset composition (ADR §3). The entity substitution above
+    // produced `composedPrompt` (the model-facing text with [[e1]] resolved);
+    // applyPromptPreset wraps the structured style/camera/motion/quality
+    // fragments around it. With NO preset this returns composedPrompt unchanged
+    // and an empty negative, so every existing (preset-less) request is byte-for-
+    // byte identical. `modelPrompt` is what the provider actually receives.
+    const preset: PromptPreset | undefined = input.promptPreset
+    const { positivePrompt: modelPrompt, negativePrompt } = applyPromptPreset(composedPrompt, preset)
+    // Stored only when a preset was supplied: composed_prompt is the debugging/
+    // provenance record of the fully-composed text; a preset-less row leaves it
+    // NULL and the DTO falls back to `prompt`.
+    const composedPromptCol = preset ? modelPrompt : null
+    const promptPresetJson = preset ? JSON.stringify(preset) : null
+
     const id = randomUUID()
     const taskUUID = randomUUID()
     const now = new Date()
@@ -279,7 +399,15 @@ export function createGenerationService({
           type: model.type,
           mode,
           status: 'processing',
-          prompt: input.prompt,
+          // The COMPOSED prompt: what the model actually saw. Storing the raw
+          // "[[e1]] у окна" would make every gallery card show a placeholder.
+          // Provenance (which entity, which placeholder) lives in generation_entity.
+          prompt: composedPrompt,
+          // CinemaStudio (ADR §3): composed_prompt = the fully-composed model-
+          // facing text (entity + preset), stored only when a preset was used;
+          // prompt_preset_json echoes the structured preset for Regenerate.
+          composedPrompt: composedPromptCol,
+          promptPresetJson,
           modelId: model.id,
           provider: providerId,
           paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, duration: input.duration }),
@@ -287,6 +415,13 @@ export function createGenerationService({
           createdAt: now,
         })
         .run()
+      // Provenance in the SAME transaction as the row: a citation without its
+      // generation (or the reverse) is a record that can never be reconciled.
+      for (const ref of refs) {
+        tx.insert(generationEntity)
+          .values({ generationId: id, entityId: ref.entityId, placeholder: ref.placeholder })
+          .run()
+      }
     })
     logCharge(log, userId, id, cost)
 
@@ -296,8 +431,16 @@ export function createGenerationService({
       try {
         const res = await runware.imageInference({
           taskUUID,
-          positivePrompt: input.prompt,
+          // The preset-composed prompt (== composedPrompt when no preset).
+          positivePrompt: modelPrompt,
+          // Style preset negative (empty string when no style) — steers the
+          // model away from the wrong medium (a Disney render must push off
+          // "photorealistic, live action").
+          ...(negativePrompt ? { negativePrompt } : {}),
           model: model.air,
+          // Omitted entirely when untagged — exactOptionalPropertyTypes keeps a
+          // stray `referenceImages: undefined` out of the task envelope
+          ...(referenceImages ? { referenceImages } : {}),
           width,
           height,
         })
@@ -369,26 +512,45 @@ export function createGenerationService({
       return { dto: toDto(row!), created: true }
     }
 
-    // Video is async: submit and return 202; progress arrives via get() polls.
-    // Only the provider CALL is swapped behind the seam — the submit-window race
-    // guard, the status-guarded uuid publish, and the failure settlement are all
-    // byte-for-byte unchanged. The provider is resolved from the catalog entry
-    // (default Runware); the wan-runpod adapter maps this same shape onto ComfyUI.
+    // Video AND audio are async: submit and return 202; progress arrives via
+    // get() polls. Only the provider CALL differs by media type — audio submits
+    // through the AudioProvider (audioInference), video through the VideoProvider
+    // registry (Runware or the wan-runpod ComfyUI adapter). Everything after the
+    // submit — the submit-window race guard, the status-guarded uuid publish, the
+    // shared poll path, and the guarded failure settlement — is byte-for-byte the
+    // same for both, which is exactly why audio is not a new subsystem (ADR §1).
     try {
-      const videoProvider = resolveProvider(providerId)
-      const { providerJobId } = await videoProvider.submit({
-        prompt: input.prompt,
-        model: model.air,
-        width,
-        height,
-        durationSeconds: input.duration!,
-        ...(input.inputImage ? { inputImage: input.inputImage } : {}),
-        // ByteDance models 400 on Runware's `safety` param — the catalog flag
-        // routes around it (Runware adapter omits it; other providers ignore it).
-        ...(model.type === 'video' && model.supportsSafetyParam === false
-          ? { omitSafety: true }
-          : {}),
-      })
+      let providerJobId: string
+      if (model.type === 'audio') {
+        // Audio has no width/height/duration; the composer's prompt is the music
+        // positive prompt or the TTS spoken text (chosen by the model's audioKind).
+        const r = await audio.submit({
+          prompt: modelPrompt,
+          model: model.air,
+          audioKind: model.audioKind,
+          ...(input.voice ? { voice: input.voice } : {}),
+        })
+        providerJobId = r.providerJobId
+      } else {
+        const videoProvider = resolveProvider(providerId)
+        const r = await videoProvider.submit({
+          // The preset-composed prompt (== input.prompt when no preset/entities).
+          prompt: modelPrompt,
+          // Style preset negative (empty → omitted).
+          ...(negativePrompt ? { negativePrompt } : {}),
+          model: model.air,
+          width,
+          height,
+          durationSeconds: input.duration!,
+          ...(input.inputImage ? { inputImage: input.inputImage } : {}),
+          // ByteDance models 400 on Runware's `safety` param — the catalog flag
+          // routes around it (Runware adapter omits it; other providers ignore it).
+          ...(model.type === 'video' && model.supportsSafetyParam === false
+            ? { omitSafety: true }
+            : {}),
+        })
+        providerJobId = r.providerJobId
+      }
       // Publish the provider job id ONLY now that the provider has acknowledged
       // the job. Before this point get() refuses to poll (null id → no provider
       // call), which closes the submit-window race: a concurrent poll can no
@@ -515,7 +677,7 @@ export function createGenerationService({
       }
       // Download BEFORE the status flip: if the download throws, the row stays
       // processing and the next poll retries — never a succeeded row without media.
-      const mediaUrl = await storage.saveFromUrl(src, id, row.type === 'video' ? 'mp4' : 'webp')
+      const mediaUrl = await storage.saveFromUrl(src, id, assetExt(row.type))
       // Guard: only transition if still processing (two browser tabs can poll
       // the same generation concurrently).
       let settled = false
@@ -624,7 +786,7 @@ export function createGenerationService({
       throw new ConflictError('generation is still processing — wait for it to finish')
     // Remove the media file first (idempotent), then the row — a re-run after
     // a crash between the two steps is harmless.
-    await storage.remove(id, row.type === 'video' ? 'mp4' : 'webp')
+    await storage.remove(id, assetExt(row.type))
     db.delete(generation).where(eq(generation.id, id)).run()
   }
 

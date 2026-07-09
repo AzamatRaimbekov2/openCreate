@@ -88,3 +88,10 @@ flowchart TD
 - 2859858 fix(api): forbid deleting processing generations — ConflictError 409 in remove()
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — compound (createdAt,id) cursor, per-generation lastPolledAt throttle (DEFAULT_POLL_MIN_INTERVAL_MS)
 - ecb7c7f fix(api): guard refund against succeeded race + atomic video submit failure — failGeneration check-and-set covers the refund too; video submit catch reuses it
+
+## Key decisions (2026-07-09) — CinemaStudio (audio + presets)
+- `Deps.audioProvider?: AudioProvider` added (fallback derived from `runware` via `createRunwareAudioAdapter`, mirroring the video registry fallback). Audio SUBMITS through it; it POLLS through the video registry (audio row is `provider: 'runware'`; the runware video adapter maps `audioURL` → `assetUrl`), so every money-path invariant is reused unchanged.
+- `create()` now: (1) validates aspectRatio only for image/video (audio has none; audio skips `resolutionFor`); (2) composes the model-facing prompt via `applyPromptPreset(entityComposedPrompt, input.promptPreset)` — with no preset this returns the entity-composed prompt unchanged, so preset-less requests are byte-for-byte identical; (3) stores `composed_prompt` (only when a preset was used) + `prompt_preset_json`; (4) has a unified async branch: `model.type === 'audio'` submits via the audio provider, else the video registry — the publish/catch/settlement after submit is shared.
+- Video submit now sends `modelPrompt` (was `input.prompt`) + the style preset `negativePrompt` (both omitted-when-empty). Image sends `modelPrompt` + `negativePrompt`. `negativePrompt` is wired through `VideoSubmitInput` → video-adapter → `RunwareVideoRequest`/`RunwareImageRequest`.
+- `assetExt(type)` helper: video→mp4, audio→mp3, image→webp. Used by the download (get), and remove(); the image discard-on-race stays literal 'webp'.
+- `toDto` now returns `composedPrompt` (null → client reads `prompt`) and `promptPreset` (parsed from `promptPresetJson`).

@@ -1,8 +1,8 @@
 // apps/web/src/modules/Gallery/components/GenerationCard.test.tsx
 // Behavior (plan Task 17, v3 stage-3 tiles): processing → Progress % + pulsing
 // SQUARE media tile, no <video>; succeeded video → <video controls src> +
-// green "ready" chip + download + delete; failed → danger border +
-// errorMessage + "credits refunded" badge + delete; a processing card that
+// an overflow menu holding download + delete; failed → danger border +
+// errorMessage + "credits refunded" badge + the same menu; a processing card that
 // polls into a terminal state invalidates the list and the balance; a
 // succeeded image opens the detail modal; delete asks for confirmation in an
 // alertdialog — cancel deletes nothing, confirm fires the DELETE mutation and
@@ -77,13 +77,16 @@ const succeededImage: Generation = {
   completedAt: '2026-07-06T10:01:00.000Z',
 }
 
-function renderCard(generation: Generation) {
+function renderCard(
+  generation: Generation,
+  options?: { onRegenerate?: (generation: Generation) => void },
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return {
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <GenerationCard generation={generation} />
+        <GenerationCard generation={generation} {...options} />
       </QueryClientProvider>,
     ),
   }
@@ -92,6 +95,13 @@ function renderCard(generation: Generation) {
 beforeEach(() => {
   apiMock.mockReset()
 })
+
+// Actions moved behind the card's overflow menu (three dots) — every action
+// assertion must open it first. That indirection IS the feature: the card's
+// footer used to shout "1 credit / Download" over every result.
+async function openMenu() {
+  await userEvent.click(screen.getByRole('button', { name: /actions/i }))
+}
 
 describe('GenerationCard', () => {
   it('processing: shows progress percent and a pulsing square tile, no video', async () => {
@@ -108,30 +118,46 @@ describe('GenerationCard', () => {
     expect(container.querySelector('video')).not.toBeInTheDocument()
   })
 
-  it('succeeded video: renders a playable video with a ready chip, download and delete', () => {
+  it('succeeded video: renders a playable video, with download and delete in the menu', async () => {
     const { container } = renderCard(succeededVideo)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('controls')
     expect(video).toHaveAttribute('src', '/media/gen1.mp4')
-    // The green status chip says it plainly — never color alone
-    expect(screen.getByText(/^ready$/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /download/i })).toHaveAttribute(
-      'href',
-      '/media/gen1.mp4',
-    )
-    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()
+    // The old footer is gone: no cost line, no inline Download link on the card
+    expect(screen.queryByText(/1 credit/i)).toBeNull()
+    expect(screen.queryByRole('link', { name: /download/i })).toBeNull()
+
+    // Both actions live in the overflow menu now
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: /download/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
+    // Regenerate is absent without an onRegenerate prop (no composer on screen)
+    expect(screen.queryByRole('menuitem', { name: /regenerate/i })).toBeNull()
     // Terminal item from the list — no polling request
     expect(apiMock).not.toHaveBeenCalled()
   })
 
-  it('failed: shows danger border, error text, refunded badge and delete', () => {
+  it('offers Regenerate only when the screen can accept a draft', async () => {
+    const onRegenerate = vi.fn()
+    renderCard(succeededVideo, { onRegenerate })
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: /regenerate/i }))
+    expect(onRegenerate).toHaveBeenCalledWith(expect.objectContaining({ id: succeededVideo.id }))
+  })
+
+  it('failed: shows danger border, error text, refunded badge and a delete action', async () => {
     const { container } = renderCard(failedVideo)
     // v3 triad: failed status = glow-red border on the well
     expect(container.querySelector('.border-glow-red')).toBeInTheDocument()
     expect(screen.getByText('timeoutProvider')).toBeInTheDocument()
     expect(screen.getByText(/credits refunded/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()
     expect(container.querySelector('video')).not.toBeInTheDocument()
+    // A FAILED generation must still be deletable — the overflow menu rides on
+    // the red tile too, not only on succeeded media
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
+    // ...but there is nothing to download
+    expect(screen.queryByRole('menuitem', { name: /download/i })).toBeNull()
   })
 
   it('failed without a code: localized generic primary, raw text only as the secondary line', () => {
@@ -254,7 +280,8 @@ describe('GenerationCard delete confirmation', () => {
 
   it('opens a confirmation alertdialog without deleting anything', async () => {
     const { queryClient } = renderSeededCard()
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: /delete/i }))
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveAccessibleName(/delete this generation/i)
     expect(dialog).toHaveTextContent(/cannot be undone/i)
@@ -265,7 +292,8 @@ describe('GenerationCard delete confirmation', () => {
 
   it('cancel closes the dialog and deletes nothing', async () => {
     const { queryClient } = renderSeededCard()
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: /delete/i }))
     const dialog = await screen.findByRole('alertdialog')
     await userEvent.click(within(dialog).getByRole('button', { name: /cancel/i }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
@@ -276,7 +304,8 @@ describe('GenerationCard delete confirmation', () => {
   it('confirm fires the DELETE mutation and removes the card optimistically', async () => {
     apiMock.mockResolvedValue(undefined)
     const { queryClient } = renderSeededCard()
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: /delete/i }))
     const dialog = await screen.findByRole('alertdialog')
     await userEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
@@ -284,5 +313,48 @@ describe('GenerationCard delete confirmation', () => {
       expect(apiMock).toHaveBeenCalledWith('/api/generations/gen1', { method: 'DELETE' })
     })
     expect(cachedItems(queryClient)).toHaveLength(0)
+  })
+})
+
+// A denied clipboard write must NOT become an unhandled promise rejection — that
+// surfaces as a page-level error and, in the browser, took the whole app down.
+// The action fails silently: no "Copied" flash, no crash.
+describe('GenerationCard prompt copy', () => {
+  // HOW THIS TEST DETECTS THE BUG: an unhandled rejection makes VITEST ITSELF
+  // fail the run ("Unhandled Errors", exit 1) even though the assertions below
+  // pass. Verified by mutation: deleting the .catch in useGenerationActions
+  // turns this file red. A window 'unhandledrejection' listener does NOT fire in
+  // jsdom for promises rejected inside React handlers, so asserting on one would
+  // be false confidence — hence the wait, which gives a missing .catch the tick
+  // it needs to surface.
+  it('survives a rejected clipboard write', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('Write permission denied'))
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+
+    renderCard(succeededVideo)
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: /copy prompt/i }))
+
+    expect(writeText).toHaveBeenCalledWith(succeededVideo.prompt)
+    // Let the rejection settle — an unhandled one would abort the run here
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Nothing was copied, so the confirmation must not lie
+    expect(screen.queryByText(/^copied$/i)).toBeNull()
+
+    vi.unstubAllGlobals()
+  })
+
+  it('flashes "Copied" when the clipboard write succeeds', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+
+    renderCard(succeededVideo)
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: /copy prompt/i }))
+
+    await openMenu()
+    expect(await screen.findByRole('menuitem', { name: /^copied$/i })).toBeInTheDocument()
+
+    vi.unstubAllGlobals()
   })
 })

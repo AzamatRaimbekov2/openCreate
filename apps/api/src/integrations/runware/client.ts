@@ -2,6 +2,7 @@
 // an array of task objects in, { data, errors } out. Injected into the app via
 // AppDeps so tests can swap in a fake (see plan Task 10's fakeRunware).
 import type {
+  RunwareAudioRequest,
   RunwareImageRequest,
   RunwareImageResult,
   RunwarePollResult,
@@ -35,6 +36,11 @@ export class RunwareError extends Error {
 export type RunwareClient = {
   imageInference(req: RunwareImageRequest): Promise<RunwareImageResult>
   submitVideo(req: RunwareVideoRequest): Promise<void>
+  // CinemaStudio audio: same async submit-then-poll contract as submitVideo —
+  // audioInference is acked immediately and settled via getResponse (which now
+  // also surfaces audioURL). See the CinemaStudio ADR §1 (audio rides the video
+  // lifecycle).
+  submitAudio(req: RunwareAudioRequest): Promise<void>
   getResponse(taskUUID: string): Promise<RunwarePollResult>
 }
 
@@ -118,6 +124,39 @@ export function createRunwareClient(opts: { apiKey: string; endpoint?: string })
       firstOrThrow(raw) // async ack — or an immediate submit error
     },
 
+    async submitAudio(req) {
+      // audioInference, async: differentiate TTS vs music by which fields we
+      // send (Runware keys the workflow off the model + payload, not a separate
+      // task type). TTS → `speech.{text,voice}`; music → `positivePrompt` plus
+      // `settings.instrumental` for a clean background bed. Same async ack as
+      // submitVideo — the row is settled later via getResponse.
+      const task =
+        req.audioKind === 'tts'
+          ? {
+              taskType: 'audioInference' as const,
+              deliveryMethod: 'async' as const,
+              includeCost: true,
+              outputType: 'URL' as const,
+              outputFormat: 'MP3' as const,
+              taskUUID: req.taskUUID,
+              model: req.model,
+              speech: { text: req.text ?? '', voice: req.voice ?? '' },
+            }
+          : {
+              taskType: 'audioInference' as const,
+              deliveryMethod: 'async' as const,
+              includeCost: true,
+              outputType: 'URL' as const,
+              outputFormat: 'MP3' as const,
+              taskUUID: req.taskUUID,
+              model: req.model,
+              positivePrompt: req.positivePrompt ?? '',
+              settings: { instrumental: true },
+            }
+      const raw = await post([task])
+      firstOrThrow(raw) // async ack — or an immediate submit error
+    },
+
     async getResponse(taskUUID) {
       const raw = await post([{ taskType: 'getResponse', taskUUID }])
       // Polling maps provider errors to a *state*, not an exception: the poll
@@ -132,11 +171,13 @@ export function createRunwareClient(opts: { apiKey: string; endpoint?: string })
           status: 'processing',
           progress: typeof item.progress === 'number' ? item.progress : null,
         }
-      if (item.status === 'success' || item.videoURL || item.imageURL)
+      if (item.status === 'success' || item.videoURL || item.imageURL || item.audioURL)
         return {
           status: 'success',
           videoURL: item.videoURL as string | undefined,
           imageURL: item.imageURL as string | undefined,
+          // CinemaStudio audio: audioInference returns audioURL on success.
+          audioURL: item.audioURL as string | undefined,
           cost: item.cost as number | undefined,
           NSFWContent: item.NSFWContent as boolean | undefined,
         }

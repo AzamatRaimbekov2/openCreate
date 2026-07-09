@@ -1,6 +1,6 @@
-# DeleteGenerationAction.tsx — AI component doc
+# mentions.ts — AI component doc
 
-> AI-facing sidecar for `DeleteGenerationAction.tsx`. Created 2026-07-08. Keep this in sync with the code on every change.
+> AI-facing sidecar for `mentions.ts`. Created 2026-07-08. Keep this in sync with the code on every change.
 
 ## Purpose
 _What this file/component is and why it exists (one or two sentences)._
@@ -18,7 +18,7 @@ _What this file/component is and why it exists (one or two sentences)._
 ## Diagram
 ```mermaid
 flowchart LR
-  IN[input] --> DeleteGenerationAction[DeleteGenerationAction.tsx] --> OUT[output]
+  IN[input] --> mentions[mentions.ts] --> OUT[output]
 ```
 
 ## Key decisions / gotchas

@@ -147,12 +147,18 @@ beforeEach(() => {
 })
 
 describe('ModelSelect', () => {
-  it('renders the trigger with the selected model, its provider and credit price', async () => {
+  it('renders the trigger with the selected model and its credit price', async () => {
     renderSelect({ selectedId: 'flux-schnell' })
     const trigger = await screen.findByRole('button', { name: /flash/i })
     expect(trigger).toHaveTextContent('Flash')
-    expect(trigger).toHaveTextContent('FLUX schnell')
     expect(trigger).toHaveTextContent('1 cr')
+    // The provider label ('FLUX schnell') is NOT on the trigger: since the kit's
+    // Select unified every dropdown, the trigger is a single-line 32px chip.
+    // Provider attribution lives on the option row, one click away (asserted in
+    // the "lists all models" test below).
+    expect(trigger).not.toHaveTextContent('FLUX schnell')
+    // The field name still precedes the value for AT: "Model, Flash"
+    expect(trigger).toHaveAccessibleName(/model/i)
     // The provider logo is an inline decorative svg inside the trigger
     expect(trigger.querySelector('svg')).toBeInTheDocument()
     expect(trigger).toHaveAttribute('aria-haspopup', 'listbox')

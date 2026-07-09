@@ -90,6 +90,22 @@ export function AppShell({
               {t('nav.library')}
             </Link>
             <Link
+              to="/cinema"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.cinema')}
+            </Link>
+            <Link
+              to="/entities"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.entities')}
+            </Link>
+            <Link
               to="/pricing"
               className={navLinkClass}
               activeProps={{ className: 'text-white' }}

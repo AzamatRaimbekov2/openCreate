@@ -34,5 +34,8 @@ flowchart LR
 ## Key decisions (2026-07-09)
 - `provider?: 'runware' | 'wan-runpod'` on `catalogVideoModelSchema` (+ exported `videoProviderSchema` / `VideoProviderId`): routes a video model to the API's VideoProvider seam. Optional + absent = Runware, so every existing entry stays valid. Image models have no `provider` (always Runware). Additive — web consumes types only.
 
+## Key decisions (2026-07-09) — CinemaStudio audio
+- Added `catalogAudioModelSchema` (`type: 'audio'`) as a third discriminated-union member: flat `credits` (per song/utterance, like image — NOT per-duration like video), `audioKind: 'music' | 'tts'`, optional `voices` (TTS only). Exports `audioKindCatalogSchema`, `AudioKindCatalog`, `CatalogAudioModel`. Audio has no aspect ratio but `catalogBase.aspectRatios` requires ≥1, so audio entries carry a throwaway ratio the service never reads (audio path skips resolution). `resolutionFor` is never called for audio.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors

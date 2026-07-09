@@ -30,3 +30,6 @@ flowchart LR
 
 ## Commits
 - _no commit yet_
+
+## Key decisions (2026-07-09) — CinemaStudio audio
+- poll() now maps `audioURL` into `assetUrl` as well (`videoURL ?? imageURL ?? audioURL`). Audio generations are `provider: 'runware'`, so they poll through this same adapter — one poll path settles image/video/audio alike. Submit for audio lives in a dedicated `audio-provider` (audioInference), but polling is shared here.

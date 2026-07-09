@@ -64,3 +64,6 @@ spikes/**/.env
 spikes/**/out/
 spikes/**/*.mp4
 spikes/**/.venv/
+
+# --- TanStack Router generated cache (build artifact, not source) -----------
+apps/web/.tanstack/

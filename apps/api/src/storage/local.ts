@@ -5,18 +5,37 @@
 // an S3/R2 provider can replace it post-MVP without touching callers.
 import { createWriteStream, mkdirSync } from 'node:fs'
 import { unlink } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, extname, join, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { pipeline } from 'node:stream/promises'
+import { readFile, writeFile } from 'node:fs/promises'
+import { parseImageDataUri } from './dataUri'
 
 export type StorageProvider = {
   // Downloads `url` and stores it as <dir>/<key>.<ext>; returns the public
   // "/media/<key>.<ext>" path that goes into generation.mediaJson.
   saveFromUrl(url: string, key: string, ext: string): Promise<string>
+  // Stores the bytes of a user-supplied image data URI (entity photos). No
+  // network, so no SSRF gate — but parseImageDataUri still guards the DISK:
+  // raster mimes only (no svg → stored XSS), cap measured on decoded bytes.
+  saveDataUri(dataUri: string, key: string): Promise<string>
+  // Reads a stored object BACK as a data URI. Needed because Runware conditions
+  // on reference images given as data URIs, and our /media/* paths are not
+  // publicly reachable in development (or behind a private asset host), so
+  // handing over a URL would fail precisely where we test it.
+  readAsDataUri(publicPath: string): Promise<string>
   // Absolute directory @fastify/static serves as /media/* (see app.ts).
   dir: string
   remove(key: string, ext: string): Promise<void>
+  // Absolute on-disk path of a stored asset — the local file the CinemaStudio
+  // ffmpeg render reads (shot media) and writes (the finished mp4). No I/O, no
+  // await: it just joins <dir>/<key>.<ext>. Because every finished generation
+  // asset is already downloaded into STORAGE_DIR (Runware URLs expire in 7 days),
+  // the render's inputs are always local files — ffmpeg needs no network and the
+  // SSRF gate is not in the picture. An S3 provider would implement this by
+  // staging to a temp dir first; noted in the ADR, not built.
+  localPath(key: string, ext: string): string
 }
 
 // Download hardening defaults (review finding). Without a deadline, a single
@@ -28,6 +47,16 @@ export type StorageProvider = {
 // still bounding the damage. Both are env-tunable (ASSET_FETCH_TIMEOUT_MS /
 // ASSET_MAX_BYTES → config.ts) and defaulted HERE too so the constructor
 // stays safe-by-default for any caller that forgets to pass config values.
+// Reverse of dataUri.ts's MIME_TO_EXT — the extension we stored decides the mime
+// we hand back. Same closed raster set: nothing here can reintroduce svg.
+const MIME_BY_EXT: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  avif: 'image/avif',
+}
+
 export const DEFAULT_ASSET_FETCH_TIMEOUT_MS = 120_000
 export const DEFAULT_ASSET_MAX_BYTES = 512 * 1024 * 1024
 
@@ -84,6 +113,24 @@ export function createLocalStorage(
   const maxBytes = limits.maxBytes ?? DEFAULT_ASSET_MAX_BYTES
   return {
     dir: root,
+    async saveDataUri(dataUri, key) {
+      // Entity photos are ours forever (Runware URLs expire after 7 days), so
+      // they land in the same STORAGE_DIR the generations use. Reuses the asset
+      // byte cap: one number governs "how big may a stored image be".
+      const { bytes, ext } = parseImageDataUri(dataUri, maxBytes)
+      await writeFile(join(root, `${key}.${ext}`), bytes)
+      return `/media/${key}.${ext}`
+    },
+    async readAsDataUri(publicPath) {
+      // publicPath is "/media/<key>.<ext>" — a path WE minted, never client input.
+      // basename() still guards it: a future caller passing "/media/../../etc/passwd"
+      // must not escape the storage root.
+      const fileName = basename(publicPath)
+      const mime = MIME_BY_EXT[extname(fileName).slice(1).toLowerCase()]
+      if (!mime) throw new Error(`unsupported stored asset: ${fileName}`)
+      const bytes = await readFile(join(root, fileName))
+      return `data:${mime};base64,${bytes.toString('base64')}`
+    },
     async saveFromUrl(url, key, ext) {
       // Gate BEFORE the fetch — a forbidden host must never see the request.
       assertAllowedAssetUrl(url, allowedHosts)
@@ -167,6 +214,13 @@ export function createLocalStorage(
       // Idempotent delete: a missing file is fine (already cleaned up or the
       // generation failed before download) — callers must not have to care.
       await unlink(join(root, `${key}.${ext}`)).catch(() => undefined)
+    },
+    localPath(key, ext) {
+      // Pure path join against the resolved absolute root. Callers (the render
+      // pipeline) pass their own keys/exts; this never touches the network or
+      // the filesystem, so it is safe to call for a path that does not exist yet
+      // (the render OUTPUT path is computed before ffmpeg writes it).
+      return join(root, `${key}.${ext}`)
     },
   }
 }

@@ -19,6 +19,11 @@ export type { VideoProviderId }
 // these (Runware takes seconds directly; ComfyUI derives frame count).
 export type VideoSubmitInput = {
   prompt: string
+  // CinemaStudio style-preset negative prompt (empty/absent → not sent). Steers
+  // the model away from the wrong medium (a Disney render must push off
+  // "photorealistic, live action"). Runware forwards it; the wan-runpod ComfyUI
+  // adapter ignores it (its workflow has no negative slot wired yet).
+  negativePrompt?: string | undefined
   width: number
   height: number
   durationSeconds: number

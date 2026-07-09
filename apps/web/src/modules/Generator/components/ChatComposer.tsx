@@ -24,7 +24,6 @@
 import { useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AspectRatio, CatalogModel } from '@opencreate/contracts'
 import { formatResolution, resolutionFor } from '@opencreate/contracts'
 import { Button, EmptyState, ErrorState, Select, Skeleton } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
@@ -36,16 +35,12 @@ import {
   useGeneratorStore,
 } from '../model/generatorStore'
 import { AttachImage } from './AttachImage'
+import { MentionControl } from './MentionControl'
+import type { TaggableEntity } from './MentionControl'
 import { CostLabel } from './CostLabel'
 import { ModelSelect } from './ModelSelect'
+import { deriveEntityRefs } from '../model/mentions'
 import { SubmitErrorBanner } from './SubmitErrorBanner'
-
-// Aspect option text carries the DERIVED output size — "16:9 · 1920×1080".
-// The user never picks pixels (the model's tier decides them), so the size is
-// stated inside the choice that determines it rather than as a separate readout.
-function aspectOptionLabel(ratio: AspectRatio, model: CatalogModel) {
-  return `${ratio} · ${formatResolution(resolutionFor(model, ratio))}`
-}
 
 // The capsule: a floating pill of frosted glass the media scrolls beneath.
 //
@@ -88,7 +83,13 @@ const CAPSULE_CLASS = [
   'supports-[backdrop-filter]:ring-1 supports-[backdrop-filter]:ring-white/5 supports-[backdrop-filter]:ring-inset',
 ].join(' ')
 
-export function ChatComposer() {
+export type ChatComposerProps = {
+  // Entities the user can tag, injected by the route (Generator must not import
+  // modules/Entities). Absent/empty → the mention control shows a quiet hint.
+  taggableEntities?: TaggableEntity[]
+}
+
+export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
   const { t } = useTranslation()
   const catalog = useCatalog()
   const state = useGeneratorStore()
@@ -136,6 +137,25 @@ export function ChatComposer() {
   const model = selectModel(state)
   const cost = selectCostCredits(state)
   const input = selectCreateInput(state)
+  // A tag is LIVE when its token is still in the text. While one is, the model
+  // list narrows to reference-capable models — a model that ignores the tag
+  // would silently bill the user for a stranger (enforced again by the API).
+  const hasMention = deriveEntityRefs(state.prompt, state.mentions).length > 0
+
+  // Insert a tag: register the mention, append its token to the prompt. Appended
+  // (not inserted at caret) to stay dependency-free — the token is opaque, so its
+  // position is cosmetic, and the API composes the final sentence anyway.
+  const handleAddMention = (entityId: string) => {
+    const token = state.addMention(entityId)
+    const separator = state.prompt.length > 0 && !state.prompt.endsWith(' ') ? ' ' : ''
+    state.setPrompt(`${state.prompt}${separator}${token}`)
+  }
+
+  // Remove a tag: drop the mapping AND strip its token, so the two never drift
+  const handleRemoveMention = (placeholder: string) => {
+    state.removeMention(placeholder)
+    state.setPrompt(state.prompt.replace(`[[${placeholder}]]`, '').replace(/\s{2,}/g, ' ').trim())
+  }
 
   const handleSubmit = () => {
     // input is null while the draft is not submittable (button disabled too)
@@ -210,20 +230,36 @@ export function ChatComposer() {
           onChange={state.setType}
         />
         <div className="min-w-0 sm:max-w-56 sm:flex-1">
-          <ModelSelect variant="glass" selectedId={state.modelId} onSelect={state.setModel} />
+          <ModelSelect
+            variant="glass"
+            selectedId={state.modelId}
+            onSelect={state.setModel}
+            referenceCapableOnly={hasMention}
+          />
         </div>
         {model ? (
           <Select
             label={t('generator.aspect.label')}
             variant="glass"
+            // Ratio is the label, the DERIVED pixel size is the meta column —
+            // the kit right-aligns it, so the sizes line up down the popup
+            // instead of trailing each ratio at a ragged offset
             options={model.aspectRatios.map((ratio) => ({
               value: ratio,
-              label: aspectOptionLabel(ratio, model),
+              label: ratio,
+              meta: formatResolution(resolutionFor(model, ratio)),
             }))}
             value={state.aspectRatio}
             onChange={state.setAspectRatio}
           />
         ) : null}
+        <MentionControl
+          entities={taggableEntities}
+          prompt={state.prompt}
+          mentions={state.mentions}
+          onAdd={handleAddMention}
+          onRemove={handleRemoveMention}
+        />
         {/* Duration is a video-only dimension */}
         {model?.type === 'video' ? (
           <Select

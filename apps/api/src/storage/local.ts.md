@@ -13,6 +13,7 @@ Owns finished generation assets on local disk. Runware URLs expire after 7 days,
   - `createLocalStorage(dir, allowedHosts = ['runware.ai'], limits = {})` →
     - `saveFromUrl(url, key, ext)` → SSRF gate first (see below), then fetches `url` with `redirect: 'manual'`, streams to `<root>/<key>.<ext>` under the byte cap and abort deadline, returns `"/media/<key>.<ext>"` (goes into `generation.mediaJson`); throws `asset url/host not allowed…` before any fetch for a forbidden host or non-https scheme, `asset redirect not allowed: <status>` on any 30x answer, `asset download failed: <status>` on non-2xx or missing body, `asset too large: exceeded <n> bytes` when the streamed byte count passes `maxBytes`, `asset download timed out after <n>ms` when the deadline fires (headers OR body phase). On any mid-stream failure the partial file is unlinked — a truncated asset is never left behind under `/media/*`.
     - `remove(key, ext)` → idempotent unlink (missing file is fine — already cleaned up or never downloaded).
+    - `localPath(key, ext)` → absolute on-disk path `<root>/<key>.<ext>`, no I/O (CinemaStudio render reads shot media and writes the finished mp4 through this). Safe to call for a not-yet-existing path (the render output path is computed before ffmpeg writes it).
     - `dir` → absolute root that app.ts serves at `/media/*` via `@fastify/static`.
 - Inputs → Outputs: provider URL + key/ext → file on disk + public path.
 - Side effects: `mkdir -p` of the root at creation; network fetch (allowlisted hosts only); file writes/deletes.

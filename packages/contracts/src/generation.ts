@@ -5,23 +5,50 @@
 // strings because SQLite stores ms timestamps and JSON has no Date type.
 import { z } from 'zod'
 import { aspectRatioSchema } from './catalog'
+import { entityRefSchema } from './entity'
+import { promptPresetSchema } from './presets'
 import { apiErrorCodeSchema } from './errors'
 
-export const generationTypeSchema = z.enum(['image', 'video'])
+// 'audio' joins image|video for CinemaStudio (music beds + voiceover). It rides
+// the SAME async lifecycle as video (charge-at-submit, poll, refund) — see the
+// CinemaStudio ADR §1: audio is not a new subsystem, it is a third generation
+// type behind an AudioProvider seam shaped exactly like the VideoProvider seam.
+export const generationTypeSchema = z.enum(['image', 'video', 'audio'])
 export const generationModeSchema = z.enum(['text', 'image'])
 export const generationStatusSchema = z.enum(['processing', 'succeeded', 'failed'])
 
 export const createGenerationInputSchema = z.object({
   modelId: z.string().min(1),
+  // The prompt the CLIENT sends may contain opaque `[[e1]]` placeholders. The
+  // prompt the MODEL sees is composed server-side by substituting each one with
+  // its entity's name + description (see entity.ts for why tags cannot be prose),
+  // then wrapping the preset fragments around it (see presets.ts). For audio:
+  // music uses `prompt` as the positive prompt; TTS uses it as the spoken text.
   prompt: z.string().min(2).max(2000),
-  aspectRatio: aspectRatioSchema,
+  // Optional for audio models (they have no aspect ratio); required for
+  // image/video, which the SERVICE enforces against the model's aspectRatios.
+  aspectRatio: aspectRatioSchema.optional(),
   duration: z.number().int().min(1).max(15).optional(),
   inputImage: z.string().startsWith('data:image/').max(14_000_000).optional(),
+  // Tagged entities. Capped at 1 because Runware accepts a single reference
+  // image; the array shape is what lets that cap rise without a wire break.
+  // The API re-validates model capability — a capability the client can lie
+  // about is not a capability.
+  entityRefs: z.array(entityRefSchema).max(1).optional(),
+  // Structured CinemaStudio preset (style/camera/motion/quality). Optional and
+  // additive: absent → the composed prompt is exactly the user's text, so the
+  // existing ChatComposer is unaffected. The SERVER composes; the client never
+  // concatenates fragments into `prompt` (ADR §3 — a preset is structure).
+  promptPreset: promptPresetSchema.optional(),
+  // TTS voice id (audio models only). Ignored by image/video/music paths.
+  voice: z.string().max(80).optional(),
 })
 export type CreateGenerationInput = z.infer<typeof createGenerationInputSchema>
 
 export const generationParamsSchema = z.object({
-  aspectRatio: aspectRatioSchema,
+  // Optional now that audio rows exist — they have no aspect ratio. Every
+  // image/video row still carries one, so existing consumers are unaffected.
+  aspectRatio: aspectRatioSchema.optional(),
   duration: z.number().int().optional(),
   seed: z.number().optional(),
 })
@@ -31,7 +58,15 @@ export const generationSchema = z.object({
   type: generationTypeSchema,
   mode: generationModeSchema,
   status: generationStatusSchema,
+  // The user's own words (with `[[e1]]` already substituted). Kept verbatim so
+  // "Regenerate"/"Edit prompt" read back what the user wrote.
   prompt: z.string(),
+  // What the MODEL actually saw: prompt + preset fragments (presets.ts). Null on
+  // legacy rows and any generation made without a preset — read `prompt` then.
+  composedPrompt: z.string().nullable().optional(),
+  // The structured preset this generation used, echoed back so the composer can
+  // pre-fill the pickers on "Regenerate". Null when none was supplied.
+  promptPreset: promptPresetSchema.nullable().optional(),
   modelId: z.string(),
   params: generationParamsSchema,
   costCredits: z.number().int(),

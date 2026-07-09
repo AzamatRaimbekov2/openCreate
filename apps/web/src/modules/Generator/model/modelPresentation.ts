@@ -70,9 +70,10 @@ export type ModelTariff = {
 // (first) duration price — durationOptions[0] — so the tariff is one honest
 // number the user can compare across models at a glance.
 export function tariffFor(model: CatalogModel): ModelTariff {
+  // Video quotes its BASE duration; image and audio are flat-priced (credits)
   const credits =
-    model.type === 'image'
-      ? model.credits
-      : (model.creditsByDuration[String(model.durationOptions[0])] ?? 0)
+    model.type === 'video'
+      ? (model.creditsByDuration[String(model.durationOptions[0])] ?? 0)
+      : model.credits
   return { credits, dollars: (credits * USD_PER_CREDIT).toFixed(2) }
 }

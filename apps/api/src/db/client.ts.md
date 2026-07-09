@@ -33,3 +33,7 @@ flowchart LR
 
 ## Key decisions (2026-07-09) — wan-runpod
 - Added a guarded micro-migration: `if (!generationColumns.includes('provider')) ALTER TABLE generation ADD COLUMN provider TEXT NOT NULL DEFAULT 'runware'`. Legacy/image rows backfill to `runware` in one statement — the whole additive DB change for the video-provider seam.
+
+## Key decisions (2026-07-09) — CinemaStudio
+- Now execs `FILM_DDL` alongside `DDL`/`ENTITY_DDL` (film/shot/film_audio/film_render tables).
+- Two more guarded micro-migrations on `generation`: `composed_prompt TEXT` and `prompt_preset_json TEXT` (nullable, additive — legacy rows read NULL → fall back to `prompt`).

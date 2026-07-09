@@ -44,6 +44,23 @@ react-hook-form + zod, i18next.
   cancels; only then optimistic with rollback), succeeded cards show a green "ready" chip, failed
   cards show the reason + "credits refunded" chip; status triad
   processing=amber / succeeded=green / failed=red.
+- **CinemaStudio (`/cinema`, `/cinema/$filmId`, guarded)** — compose films on top
+  of the generation lifecycle. The library lists film cards (canvas-shaped abyss
+  plates, `Link` into the editor) with a green "New film" modal (title + aspect
+  `PillGroup` + default-style `Select`). The editor is a header (rename/delete-
+  confirm) + a horizontal `Timeline` of `ShotThumb`s (live clip status from the
+  shared `['generation', id]` cache, reorder by chevron buttons, add shot / title
+  card / storyboard) beside a `ShotInspector` (prompt + style/framing/motion/
+  quality `Select`s built FROM the contract preset tables + a video-model picker +
+  duration/transition/title; Generate composes a **structured** `promptPreset`,
+  POSTs `/api/generations`, links it to the shot, then polls). A `PreviewPlayer`
+  plays the shots back-to-back in the DOM (an honest "approximation" — the server
+  render is authoritative); `RenderBar` POSTs an ffmpeg render, polls to a green
+  Download `/media/<id>.mp4` (calm retry on failure, never the raw ffmpeg text);
+  `AudioTracks` generates+links music/voiceover; `StoryboardModal` turns a script
+  into draft shots (key-gated — an unset LLM key surfaces as a calm inline notice).
+  The module has NO cross-module imports: the catalog is read at the route (the
+  seam) and decoupling from Gallery/Generator is through the shared query cache.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
   full per-model credit table from the catalog query, a "200 free credits" amber
   chip by the title, and the visitor signup CTA as a steel card with a green pill.
@@ -66,12 +83,15 @@ src/
 ├── routes/                     # composition-only file routes
 │   ├── __root.tsx              # providers, crash boundary, offline overlay, 404
 │   ├── index.tsx  login.tsx    # standalone (no shell)
-│   └── _shell.tsx + _shell.{create,library,pricing}.tsx   # pathless layout
+│   └── _shell.tsx + _shell.{create,library,cinema.index,cinema.$filmId,entities,pricing}.tsx
 ├── modules/
 │   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, requireSession
 │   ├── Generator/              # generatorStore (draft), catalog query, create mutation,
 │   │                           # commission-sheet panel (SheetField/PromptField/SubmitErrorBanner)
 │   ├── Gallery/                # generations list/poll/delete hooks, cards, grid, detail
+│   ├── Cinema/                 # films/shots/audio/renders/storyboard hooks, timeline,
+│   │                           # shot inspector (preset pickers), preview player, render bar
+│   │                           # (public: CinemaLibrary, FilmEditor; catalog fed from route)
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, showcase spread, section heading, price tables
 │                               # (+ TableScrollRegion overflow wrapper), how-it-works,

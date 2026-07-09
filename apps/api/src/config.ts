@@ -89,6 +89,12 @@ const envSchema = z.object({
   // rejects empty (optional = absent, not ''), which crashed boot. The `|| null`
   // below then normalizes '' → null (not configured).
   COMFY_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
+  // Anthropic API key for the CinemaStudio script→storyboard feature. OPTIONAL,
+  // same treatment as COMFY_BASE_URL / Google OAuth: unset keeps boot healthy —
+  // the /storyboard endpoint then returns a clean provider_error instead of
+  // crashing. Any other CinemaStudio feature (timeline, render, generate) works
+  // without it. `|| null` normalizes '' → null below.
+  ANTHROPIC_API_KEY: z.string().optional(),
   // Reverse-proxy header trust (review finding). Production terminates TLS in
   // a proxy that forwards everyone from loopback (PROD.md), so without this
   // req.ip is ALWAYS the proxy's address and every user shares one rate-limit
@@ -125,6 +131,9 @@ export type AppConfig = {
   assetHostAllowlist: string[]
   // Pod ComfyUI base URL for the wan-runpod video provider; null when unset.
   comfyBaseUrl: string | null
+  // Anthropic key for the storyboard feature; null when unset (feature disabled,
+  // boot stays healthy).
+  anthropicApiKey: string | null
   // Asset download limits handed to storage.saveFromUrl: hard deadline for
   // the whole download (ms) and max accepted bytes, counted while streaming.
   assetFetchTimeoutMs: number
@@ -203,6 +212,9 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     assetMaxBytes: e.ASSET_MAX_BYTES,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
     comfyBaseUrl,
+    // `|| null` (not `?? null`): an empty string means "not configured", so the
+    // storyboard feature stays disabled rather than initializing with a blank key.
+    anthropicApiKey: e.ANTHROPIC_API_KEY || null,
   }
 }
 

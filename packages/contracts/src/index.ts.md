@@ -6,13 +6,13 @@
 Public API barrel of `@opencreate/contracts` — the only import path (`package.json` `exports` maps `.` → this file) for both apps.
 
 ## What it does (for an AI reader)
-- Responsibilities: re-export everything from `errors`, `catalog`, `generation`, `credits`, `user`.
-- Public API / exports: the union of all five modules' exports (schemas + inferred types).
+- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `credits`, `user`.
+- Public API / exports: the union of all modules' exports (schemas + inferred types).
 - Inputs → Outputs: none at runtime beyond module re-export.
 - Side effects: none.
 
 ## Dependencies
-- Imports / depends on: `./errors`, `./catalog`, `./generation`, `./credits`, `./user`.
+- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./credits`, `./user`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
 - Used by: `apps/api` and `apps/web` via `import { ... } from '@opencreate/contracts'`.
 
 ## Diagram
@@ -20,7 +20,11 @@ Public API barrel of `@opencreate/contracts` — the only import path (`package.
 flowchart LR
   E[errors.ts] --> IDX[index.ts]
   C[catalog.ts] --> IDX
+  R[resolution.ts] --> IDX
+  EN[entity.ts] --> IDX
+  P[presets.ts] --> IDX
   G[generation.ts] --> IDX
+  F[film.ts] --> IDX
   CR[credits.ts] --> IDX
   U[user.ts] --> IDX
   IDX --> API[apps/api]

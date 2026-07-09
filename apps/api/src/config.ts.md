@@ -47,3 +47,6 @@ flowchart LR
 
 ## Key decisions (2026-07-09) — wan-runpod
 - `COMFY_BASE_URL` (optional `z.url()`) → `config.comfyBaseUrl` (`string | null`, `|| null` so empty = unconfigured). `withComfyHost()` folds its hostname into `assetHostAllowlist` (de-duplicated) so `saveFromUrl` can pull the finished mp4 from the pod `/view` — env-driven, so pointing at a new pod is one edit and the SSRF surface stays closed by default.
+
+## Key decisions (2026-07-09) — CinemaStudio
+- `ANTHROPIC_API_KEY` (optional string) → `config.anthropicApiKey` (`string | null`, `|| null` so empty = unconfigured). Powers ONLY the CinemaStudio script→storyboard feature; unset keeps boot healthy and that endpoint returns a clean `provider_error`. Same optional-secret pattern as `COMFY_BASE_URL` and Google OAuth. Every other CinemaStudio feature (timeline, render, generate) works without it.

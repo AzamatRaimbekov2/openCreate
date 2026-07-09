@@ -15,6 +15,9 @@ import { buildTestApp, fakeRunware, registerAndGetCookie } from './helpers/build
 const stubStorage = (): StorageProvider => ({
   dir: '/tmp/unused',
   saveFromUrl: async () => '/media/unused.webp',
+  saveDataUri: async () => '/media/entity.png',
+  readAsDataUri: async () => 'data:image/png;base64,AAA',
+  localPath: (key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 })
 

@@ -1,28 +1,32 @@
-// apps/web/src/modules/Generator/hooks/useModelListbox.ts
-// Headless keyboard/focus/placement brain of the custom ModelSelect listbox.
-// It owns the open state, the active (highlighted) option index, and the popup
-// placement, and returns the handlers + ARIA ids the view binds. Kept separate
-// from the render so the listbox behaviour is testable and ModelSelect stays a
-// thin presentation layer under the 200-line cap.
+// apps/web/src/shared/ui/useListbox.ts
+// Headless keyboard/focus/placement brain of the kit's Select listbox. It owns
+// open state, the active (highlighted) index and the popup placement, and hands
+// back the handlers + ARIA ids the view binds.
 //
-// WHY a custom listbox instead of a native <select>: a native <option> renders
-// TEXT ONLY — it cannot carry a provider logo, a tier chip, a tariff and a
-// description line. That capability is the whole point of this control, so we
-// re-implement the WAI-ARIA listbox keyboard contract here.
+// WHY THIS EXISTS AT ALL — i.e. why not a native <select>:
+// a native <option> renders TEXT ONLY. It cannot carry a provider logo, a tier
+// chip, a price and a description line. Once ONE control in the app needs that,
+// every other dropdown either matches it or reads as a different species. So we
+// re-implement the WAI-ARIA listbox keyboard contract, once, here.
+//
+// Generalized from the Generator's useModelListbox: the brain never knew what a
+// "model" was — only a flat list of values and their typeahead labels. Passing
+// those two arrays instead of CatalogModel[] is the entire generalization.
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import type { CatalogModel } from '@opencreate/contracts'
 
-// Whether the panel drops below the trigger or flips above it (composer sits at
-// the bottom of the viewport, so it must open upward).
+// Whether the panel drops below the trigger or flips above it (the composer sits
+// at the bottom of the viewport, so its selects must open upward).
 export type ListboxPlacement = 'down' | 'up'
 
-type UseModelListboxArgs = {
-  // Models in RENDER order (images first, then videos) — the active index maps
-  // straight into this flat list, so it must match what the view paints.
-  models: CatalogModel[]
-  selectedId: string | null
-  onSelect: (modelId: string) => void
+type UseListboxArgs = {
+  // Option values in RENDER order — the active index maps straight into this
+  // flat list, so it MUST match the order the view paints (groups flattened).
+  values: string[]
+  // Parallel array of typeahead labels; labels[i] describes values[i]
+  labels: string[]
+  value: string
+  onChange: (value: string) => void
 }
 
 // Rough panel height used to decide up/down flip before the panel has rendered
@@ -39,7 +43,7 @@ function computePlacement(el: HTMLButtonElement | null): ListboxPlacement {
   return 'down'
 }
 
-export function useModelListbox({ models, selectedId, onSelect }: UseModelListboxArgs) {
+export function useListbox({ values, labels, value, onChange }: UseListboxArgs) {
   const baseId = useId()
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const listboxRef = useRef<HTMLDivElement | null>(null)
@@ -52,12 +56,11 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
   const typeaheadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const listboxId = `${baseId}-listbox`
-  const optionId = (modelId: string) => `${baseId}-opt-${modelId}`
+  // Values can contain characters that are illegal in a DOM id fragment used by
+  // getElementById-free lookups; index keeps the id opaque and always valid.
+  const optionId = (index: number) => `${baseId}-opt-${index}`
   // Never let a stale/missing selection produce a negative index
-  const selectedIndex = Math.max(
-    0,
-    models.findIndex((model) => model.id === selectedId),
-  )
+  const selectedIndex = Math.max(0, values.indexOf(value))
 
   const open = () => {
     setPlacement(computePlacement(triggerRef.current))
@@ -72,9 +75,9 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
   const toggle = () => (isOpen ? close() : open())
 
   const selectAt = (index: number) => {
-    const model = models[index]
-    if (!model) return
-    onSelect(model.id)
+    const next = values[index]
+    if (next === undefined) return
+    onChange(next)
     // Choosing returns focus to the trigger so the user lands back where they
     // opened the menu (keyboard-friendly, matches the APG listbox pattern)
     close(true)
@@ -84,7 +87,7 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
     if (typeaheadTimer.current) clearTimeout(typeaheadTimer.current)
     typeaheadBuffer.current += char.toLowerCase()
     const buffer = typeaheadBuffer.current
-    const match = models.findIndex((model) => model.name.toLowerCase().startsWith(buffer))
+    const match = labels.findIndex((label) => label.toLowerCase().startsWith(buffer))
     if (match >= 0) setActiveIndex(match)
     typeaheadTimer.current = setTimeout(() => {
       typeaheadBuffer.current = ''
@@ -95,7 +98,7 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault()
-        setActiveIndex((index) => Math.min(index + 1, models.length - 1))
+        setActiveIndex((index) => Math.min(index + 1, values.length - 1))
         return
       case 'ArrowUp':
         event.preventDefault()
@@ -107,7 +110,7 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
         return
       case 'End':
         event.preventDefault()
-        setActiveIndex(models.length - 1)
+        setActiveIndex(values.length - 1)
         return
       case 'Enter':
       case ' ':
@@ -130,6 +133,17 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
     }
   }
 
+  // The trigger must also answer the keyboard: ArrowDown/Up/Enter/Space open the
+  // panel. Without this a keyboard user can focus the trigger and press Down to
+  // nothing — the single most common custom-select bug.
+  const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (isOpen) return
+    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+      event.preventDefault()
+      open()
+    }
+  }
+
   // Move focus into the listbox when it opens so arrow keys work immediately
   useEffect(() => {
     if (isOpen) listboxRef.current?.focus()
@@ -137,11 +151,10 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
 
   // Keep the active option visible. scrollIntoView is optional-chained: jsdom
   // (tests) does not implement it, and we must not throw there.
-  const activeModelId = models[activeIndex]?.id
   useEffect(() => {
-    if (!isOpen || !activeModelId) return
-    document.getElementById(`${baseId}-opt-${activeModelId}`)?.scrollIntoView?.({ block: 'nearest' })
-  }, [isOpen, activeModelId, baseId])
+    if (!isOpen) return
+    document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [isOpen, activeIndex, baseId])
 
   // Pointer down outside the trigger/panel closes (no focus restore — the user
   // is already interacting elsewhere)
@@ -164,7 +177,7 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
     [],
   )
 
-  const activeDescendant = isOpen ? optionId(models[activeIndex]?.id ?? '') : undefined
+  const activeDescendant = isOpen ? optionId(activeIndex) : undefined
 
   return {
     isOpen,
@@ -182,5 +195,6 @@ export function useModelListbox({ models, selectedId, onSelect }: UseModelListbo
     // Hover highlights the same active row keyboard nav uses
     activate: setActiveIndex,
     handleListboxKeyDown,
+    handleTriggerKeyDown,
   } as const
 }

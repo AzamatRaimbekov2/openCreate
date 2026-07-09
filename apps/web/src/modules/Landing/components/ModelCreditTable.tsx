@@ -15,7 +15,8 @@ export type ModelCreditTableProps = {
 
 // "1 · per image" for flat-priced images, "5s — 35 · 8s — 56" for videos
 function creditsLabel(model: CatalogModel, t: TFunction): string {
-  if (model.type === 'image') {
+  // Non-video (image | audio) is flat-priced; only video reads the duration table
+  if (model.type !== 'video') {
     return `${model.credits} · ${t('pricing.models.perImage')}`
   }
   return model.durationOptions
@@ -32,7 +33,8 @@ function creditsLabel(model: CatalogModel, t: TFunction): string {
 
 // Flat USD for images; the cheapest duration as a "from" price for videos
 function usdLabel(model: CatalogModel, t: TFunction): string {
-  if (model.type === 'image') {
+  // Non-video (image | audio) is flat-priced; only video quotes a "from" price
+  if (model.type !== 'video') {
     return formatUsd(model.credits * CREDIT_USD)
   }
   const cheapest = Math.min(...Object.values(model.creditsByDuration))

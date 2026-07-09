@@ -24,6 +24,9 @@ afterEach(() => vi.unstubAllGlobals())
 const stubStorage = (): StorageProvider => ({
   dir: '/tmp/unused',
   saveFromUrl: async () => '/media/unused.mp4',
+  saveDataUri: async () => '/media/entity.png',
+  readAsDataUri: async () => 'data:image/png;base64,AAA',
+  localPath: (key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 })
 

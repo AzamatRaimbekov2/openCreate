@@ -16,6 +16,9 @@ import { createLocalStorage } from '../../src/storage/local'
 export const fakeRunware = () => ({
   imageInference: vi.fn(),
   submitVideo: vi.fn(),
+  // CinemaStudio audio submit (audioInference). Present on the fake so the
+  // RunwareClient type is satisfied; audio tests script it per case.
+  submitAudio: vi.fn(),
   getResponse: vi.fn(),
 })
 
@@ -79,6 +82,8 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       databasePath: ':memory:',
       storageDir,
       runwareApiKey: 'test-key',
+      // CinemaStudio config (parallel feature): null → no LLM-backed features in tests
+      anthropicApiKey: null,
       betterAuthSecret: 'test-secret-test-secret-test-secret',
       betterAuthUrl: 'http://localhost:8787',
       webOrigin: 'http://localhost:5173',

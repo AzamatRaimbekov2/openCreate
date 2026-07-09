@@ -63,9 +63,49 @@ export type ModalProps = {
   children: ReactNode
   // 'alertdialog' for blocking failures that need acknowledgement; 'dialog' otherwise
   role?: 'dialog' | 'alertdialog'
+  // Sheet width. 'lg' is for media: a portrait image in a max-w-lg sheet is a
+  // stamp, and the user opened the detail view precisely to stop squinting.
+  size?: 'md' | 'lg'
+  // Frosted-glass sheet instead of the opaque steel one. Only for surfaces whose
+  // CONTENT is the hero (the media detail view) — never for text dialogs, where
+  // a busy backdrop bleeding through the copy is just harder to read.
+  surface?: 'steel' | 'glass'
+  // Hide the heading row (the media detail draws its own chrome over the image)
+  hideHeader?: boolean
 }
 
-export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: ModalProps) {
+const SIZE_CLASS = {
+  md: 'max-w-lg',
+  lg: 'max-w-5xl',
+} as const
+
+// Same rule as the composer capsule: the opaque fill is the BASELINE and glass
+// is layered on only where backdrop-filter actually exists. Without that guard a
+// translucent sheet over unblurred content is unreadable, not stylish.
+const SURFACE_CLASS = {
+  steel: 'border-white/10 bg-steel',
+  glass: [
+    'border-white/15 bg-steel',
+    'supports-[backdrop-filter]:bg-white/[0.06]',
+    'supports-[backdrop-filter]:backdrop-blur-2xl',
+    'supports-[backdrop-filter]:backdrop-saturate-150',
+    'supports-[backdrop-filter]:backdrop-brightness-75',
+    'supports-[backdrop-filter]:border-white/10',
+    'supports-[backdrop-filter]:border-t-white/25',
+    'supports-[backdrop-filter]:ring-1 supports-[backdrop-filter]:ring-white/5 supports-[backdrop-filter]:ring-inset',
+  ].join(' '),
+} as const
+
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  role = 'dialog',
+  size = 'md',
+  surface = 'steel',
+  hideHeader = false,
+}: ModalProps) {
   const { t } = useTranslation()
   // Where focus returns when the dialog closes
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -127,20 +167,36 @@ export function Modal({ isOpen, onClose, title, children, role = 'dialog' }: Mod
         tabIndex={-1}
         // Clicks inside must not bubble to the overlay's close handler
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-lg rounded-lg border border-white/10 bg-steel p-8"
+        // max-h + flex lets a tall child (a portrait image) scroll or shrink
+        // INSIDE the sheet instead of running off the bottom of the viewport
+        // `relative` anchors the floating close button of the headerless variant
+        className={`relative flex max-h-[92dvh] w-full flex-col rounded-2xl border ${SIZE_CLASS[size]} ${SURFACE_CLASS[surface]} ${hideHeader ? 'p-3' : 'p-8'}`}
       >
-        <div className="mb-5 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
-          {/* Mono weight-400 title — headings are never bold in v3 */}
-          <h2 className="text-2xl font-normal text-white">{title}</h2>
+        {hideHeader ? (
+          // No heading row, but the dialog still needs a close control and an
+          // accessible name (aria-label on the shell carries the latter)
           <button
             type="button"
             onClick={onClose}
             aria-label={t('common.close')}
-            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            className="absolute top-6 right-6 z-10 flex size-10 items-center justify-center rounded-full border border-white/10 bg-void/60 text-mist-dim backdrop-blur transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
             ✕
           </button>
-        </div>
+        ) : (
+          <div className="mb-5 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+            {/* Mono weight-400 title — headings are never bold in v3 */}
+            <h2 className="text-2xl font-normal text-white">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('common.close')}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {children}
       </div>
     </div>,

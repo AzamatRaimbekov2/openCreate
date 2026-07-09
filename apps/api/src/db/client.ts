@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as schema from './schema'
-import { DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
+import { DDL, ENTITY_DDL, FILM_DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
 
 export type Db = ReturnType<typeof createDb>['db']
 
@@ -20,6 +20,11 @@ export function createDb(path: string) {
   sqlite.pragma('foreign_keys = ON')
   // Idempotent bootstrap — CREATE IF NOT EXISTS, safe to run on every boot.
   sqlite.exec(DDL)
+  // Entity library tables — separate constant, same idempotent contract
+  sqlite.exec(ENTITY_DDL)
+  // CinemaStudio tables (film/shot/film_audio/film_render) — separate constant,
+  // same idempotent CREATE IF NOT EXISTS contract.
+  sqlite.exec(FILM_DDL)
   // Micro-migrations: CREATE TABLE IF NOT EXISTS never alters tables that
   // already exist, so columns added after a db file was first created must be
   // back-filled here (SQLite has no ADD COLUMN IF NOT EXISTS). Guarded by
@@ -40,6 +45,15 @@ export function createDb(path: string) {
     // neutral provider job id / cost (see schema.ts), so no further migration is
     // needed; this is the whole additive DB change for the wan-runpod provider.
     sqlite.exec("ALTER TABLE generation ADD COLUMN provider TEXT NOT NULL DEFAULT 'runware'")
+  }
+  // CinemaStudio (ADR cinema-studio §3): composed_prompt = what the model saw,
+  // prompt_preset_json = the structured preset echoed back. Both nullable and
+  // additive — legacy rows read NULL and fall back to `prompt`.
+  if (!generationColumns.includes('composed_prompt')) {
+    sqlite.exec('ALTER TABLE generation ADD COLUMN composed_prompt TEXT')
+  }
+  if (!generationColumns.includes('prompt_preset_json')) {
+    sqlite.exec('ALTER TABLE generation ADD COLUMN prompt_preset_json TEXT')
   }
   // DB-level refund-once backstop (review finding): UNIQUE(generation_id,
   // kind) makes a duplicate refund (or charge) ledger row physically

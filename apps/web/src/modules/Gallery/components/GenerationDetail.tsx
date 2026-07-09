@@ -1,9 +1,21 @@
 // apps/web/src/modules/Gallery/components/GenerationDetail.tsx
-// Detail modal for a succeeded generation: full media, complete prompt and
-// meta (cost, date), plus a download action. Opened from the card's media.
+// Detail view for a succeeded generation: the media at full size on a glass
+// sheet, the prompt and meta beneath it, and the action set as an icon rail.
+//
+// THE BUG THIS FIXES: the old sheet was `max-w-lg` with a plain `<img className=
+// "w-full">`. A 9:16 portrait therefore rendered ~512px wide and ~910px tall —
+// taller than most viewports, with no scroll, so its bottom was simply gone.
+// Now the media box is height-capped (max-h-[70dvh]) and the image is
+// object-contain inside it: the whole frame always fits, letterboxed on the
+// abyss well, whatever its aspect ratio.
+//
+// Actions come from useGenerationActions — the same list the card's overflow
+// menu renders, painted here as icons. Neither view owns the rules.
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
 import { Modal } from 'shared/ui'
+import type { MenuItem } from 'shared/ui'
+import { useGenerationActions } from './useGenerationActions'
 
 export type GenerationDetailProps = {
   // The generation to present — callers only open it for succeeded items
@@ -12,10 +24,24 @@ export type GenerationDetailProps = {
   isOpen: boolean
   // Called on Escape, overlay click, and the close button
   onClose: () => void
+  // Refill the composer from this generation (see useGenerationActions)
+  onRegenerate?: (generation: Generation) => void
 }
 
-export function GenerationDetail({ generation, isOpen, onClose }: GenerationDetailProps) {
+export function GenerationDetail({
+  generation,
+  isOpen,
+  onClose,
+  onRegenerate,
+}: GenerationDetailProps) {
   const { t, i18n } = useTranslation()
+  // exactOptionalPropertyTypes: passing `onRegenerate: undefined` is not the
+  // same as omitting the key, so spread it conditionally
+  const { actions, confirmDialog } = useGenerationActions({
+    generation,
+    ...(onRegenerate ? { onRegenerate } : {}),
+  })
+
   const mediaUrl = generation.mediaUrls[0]
   // Locale-aware timestamp — follows the active language, not the browser
   const createdAt = new Intl.DateTimeFormat(i18n.language, {
@@ -23,34 +49,81 @@ export function GenerationDetail({ generation, isOpen, onClose }: GenerationDeta
     timeStyle: 'short',
   }).format(new Date(generation.createdAt))
 
+  const handleAction = (item: MenuItem) => {
+    item.onSelect()
+    // Regenerating fills the composer behind this dialog — staying open would
+    // hide the very input the user now wants. Delete only OPENS a confirmation,
+    // so it must NOT close here; download leaves the user looking at their work.
+    if (item.id === 'regenerate') onClose()
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('gallery.detail.title')}>
-      <div className="flex flex-col gap-4">
-        {mediaUrl ? (
-          // Media sits on the abyss well — one surface step BELOW the modal's
-          // steel sheet, so the user's work reads as recessed film (v3 §2)
-          generation.type === 'video' ? (
-            <video controls src={mediaUrl} className="w-full rounded-lg bg-abyss" />
-          ) : (
-            <img src={mediaUrl} alt={generation.prompt} className="w-full rounded-lg bg-abyss" />
-          )
-        ) : null}
-        {/* Figure caption voice — the same quiet mono prompt as the card */}
-        <p className="text-base leading-snug text-mist">{generation.prompt}</p>
-        <p className="text-xs text-mist-dim">
-          {t('gallery.cost', { count: generation.costCredits })} · {createdAt}
-        </p>
-        {mediaUrl ? (
-          // Portal blue — the sanctioned prose-link color (v3 §2)
-          <a
-            href={mediaUrl}
-            download
-            className="self-start text-sm font-medium text-portal underline decoration-portal/40 underline-offset-4 transition-colors duration-200 hover:decoration-portal focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
-          >
-            {t('gallery.download')}
-          </a>
-        ) : null}
-      </div>
-    </Modal>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={t('gallery.detail.title')}
+        size="lg"
+        surface="glass"
+        hideHeader
+      >
+        <div className="flex min-h-0 flex-col gap-3">
+          {mediaUrl ? (
+            // The media well: a height-capped box on the recessed abyss step.
+            // object-contain (never object-cover) — this view exists to show the
+            // honest full frame the square card had to crop.
+            <div className="flex max-h-[70dvh] min-h-0 items-center justify-center overflow-hidden rounded-xl bg-abyss">
+              {generation.type === 'video' ? (
+                <video controls src={mediaUrl} className="max-h-[70dvh] w-auto max-w-full" />
+              ) : (
+                <img
+                  src={mediaUrl}
+                  alt={generation.prompt}
+                  className="max-h-[70dvh] w-auto max-w-full object-contain"
+                />
+              )}
+            </div>
+          ) : null}
+
+          {/* Prompt + meta on the left, the icon rail on the right — the caption
+              row is where a user reads what they made and then acts on it */}
+          <div className="flex items-start justify-between gap-4 px-1">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm leading-snug text-mist">{generation.prompt}</p>
+              <p className="mt-1 text-xs text-mist-dim">
+                {t('gallery.cost', { count: generation.costCredits })} · {createdAt}
+              </p>
+            </div>
+
+            {/* Icon rail. Each button carries its label as the accessible name
+                AND a native tooltip — an icon-only control with no name is
+                unusable by screen reader and unguessable by everyone else. */}
+            <div className="flex shrink-0 items-center gap-1">
+              {actions
+                .filter((action) => action.isAvailable !== false)
+                .map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => handleAction(action)}
+                    aria-label={action.label}
+                    title={action.label}
+                    className={`flex size-10 items-center justify-center rounded-full border border-white/10 transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
+                      action.variant === 'danger'
+                        ? 'text-glow-red'
+                        : 'text-mist-dim hover:text-white'
+                    }`}
+                  >
+                    {action.icon}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+      {/* Rendered OUTSIDE the Modal above: two nested dialogs would have their
+          focus traps fighting over Tab. Both portal to <body> anyway. */}
+      {confirmDialog}
+    </>
   )
 }

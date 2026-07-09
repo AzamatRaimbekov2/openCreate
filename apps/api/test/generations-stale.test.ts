@@ -25,12 +25,16 @@ type Db = ReturnType<typeof createDb>['db']
 const storage: StorageProvider = {
   dir: '/tmp/unused',
   saveFromUrl: async () => '/media/unused.mp4',
+  saveDataUri: async () => '/media/entity.png',
+  readAsDataUri: async () => 'data:image/png;base64,AAA',
+  localPath: (key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 }
 
 const fakeRunware = () => ({
   imageInference: vi.fn(),
   submitVideo: vi.fn(),
+  submitAudio: vi.fn(),
   getResponse: vi.fn(),
 })
 

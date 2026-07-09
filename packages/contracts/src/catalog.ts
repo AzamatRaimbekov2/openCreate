@@ -19,6 +19,20 @@ const catalogBase = z.object({
   tier: modelTierSchema,
   supportsImageInput: z.boolean(),
   aspectRatios: z.array(aspectRatioSchema).min(1),
+  // Can this model accept a tagged entity as a reference image, and in which
+  // sense? 'portrait' = faces (ACE++ Portrait), 'subject' = objects/places
+  // (ACE++ Subject), 'both' = either. Absent/null = tagging is impossible on
+  // this model, and the composer must not offer it.
+  //
+  // This is a CAPABILITY, not a preference: the API re-validates it on every
+  // request, because a capability the client can lie about is not a capability.
+  referenceMode: z.enum(['portrait', 'subject', 'both']).nullish(),
+  // Max reference images the provider accepts (FLUX.1 Kontext: 2). Only
+  // meaningful when referenceMode is set.
+  maxReferenceImages: z.number().int().positive().optional(),
+  // Which resolution table this model reads (see resolution.ts). Absent → the
+  // tier ladder. Present when the provider only accepts its own dimension list.
+  resolutionProfile: z.enum(['hd', 'fhd', 'square1024', 'kontext']).optional(),
 })
 
 export const catalogImageModelSchema = catalogBase.extend({
@@ -42,12 +56,30 @@ export const catalogVideoModelSchema = catalogBase.extend({
   // so this lives on the video schema only.
   provider: videoProviderSchema.optional(),
 })
+// CinemaStudio audio models (music beds + voiceover). Flat-priced per generation
+// (a song / an utterance), so `credits` mirrors the image shape rather than the
+// video per-duration table. `audioKind` splits the two workflows: 'music' reads
+// the prompt as a positive prompt; 'tts' reads it as the spoken text and offers
+// a `voices` list. Audio has no aspect ratio, but catalogBase requires ≥1, so an
+// audio model carries a single throwaway ratio the service never reads — the
+// audio path skips resolution entirely.
+export const audioKindCatalogSchema = z.enum(['music', 'tts'])
+export type AudioKindCatalog = z.infer<typeof audioKindCatalogSchema>
+export const catalogAudioModelSchema = catalogBase.extend({
+  type: z.literal('audio'),
+  credits: z.number().int().positive(),
+  audioKind: audioKindCatalogSchema,
+  // TTS voices offered in the composer; absent for music models.
+  voices: z.array(z.string()).optional(),
+})
 export const catalogModelSchema = z.discriminatedUnion('type', [
   catalogImageModelSchema,
   catalogVideoModelSchema,
+  catalogAudioModelSchema,
 ])
 export type CatalogModel = z.infer<typeof catalogModelSchema>
 export type CatalogImageModel = z.infer<typeof catalogImageModelSchema>
 export type CatalogVideoModel = z.infer<typeof catalogVideoModelSchema>
+export type CatalogAudioModel = z.infer<typeof catalogAudioModelSchema>
 
 export const catalogResponseSchema = z.object({ models: z.array(catalogModelSchema) })

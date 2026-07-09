@@ -8,10 +8,19 @@
 export type RunwareImageRequest = {
   taskUUID: string
   positivePrompt: string
+  // CinemaStudio style-preset negative prompt; spreads flat into the image task
+  // (Runware accepts `negativePrompt` on imageInference). Optional/absent → not sent.
+  negativePrompt?: string | undefined
   model: string
   width: number
   height: number
   seed?: number | undefined
+  // Tagged-entity conditioning (entity library). Runware accepts a UUID, a URL,
+  // a bare base64 string, or a data URI. We send DATA URIs: our /media paths are
+  // not publicly reachable in dev or behind a private asset host, so a URL would
+  // fail exactly where we test it. Only models whose catalog entry declares a
+  // `referenceMode` may carry this — the generation service enforces that.
+  referenceImages?: string[] | undefined
 }
 
 export type RunwareImageResult = {
@@ -24,6 +33,9 @@ export type RunwareImageResult = {
 export type RunwareVideoRequest = {
   taskUUID: string
   positivePrompt: string
+  // CinemaStudio style-preset negative prompt; spreads flat into the video task
+  // (Runware accepts `negativePrompt` on videoInference). Optional/absent → not sent.
+  negativePrompt?: string | undefined
   model: string
   width: number
   height: number
@@ -36,6 +48,22 @@ export type RunwareVideoRequest = {
   omitSafety?: boolean | undefined
 }
 
+// CinemaStudio audio (Runware audioInference — same envelope as videoInference,
+// same taskUUID, same getResponse polling). The client builds the task-specific
+// shape from `audioKind`: TTS sends `speech.{text,voice}`, music sends
+// `positivePrompt` + `settings.instrumental`. Kept neutral here so the client
+// owns the Runware nouns and the adapter owns the mapping.
+export type RunwareAudioRequest = {
+  taskUUID: string
+  model: string
+  audioKind: 'music' | 'tts'
+  // TTS: the spoken text + voice id. Ignored for music.
+  text?: string | undefined
+  voice?: string | undefined
+  // Music: the positive music prompt. Ignored for TTS.
+  positivePrompt?: string | undefined
+}
+
 // Discriminated on `status` so callers must handle all three poll outcomes.
 export type RunwarePollResult =
   | { status: 'processing'; progress: number | null }
@@ -43,6 +71,10 @@ export type RunwarePollResult =
       status: 'success'
       videoURL?: string | undefined
       imageURL?: string | undefined
+      // audioInference returns audioURL; the video adapter maps it into the
+      // neutral assetUrl exactly like videoURL/imageURL, so the settlement path
+      // in the generation service is shared across all three media types.
+      audioURL?: string | undefined
       cost?: number | undefined
       NSFWContent?: boolean | undefined
     }

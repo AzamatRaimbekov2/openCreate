@@ -54,3 +54,6 @@ flowchart LR
 
 ## Key decisions (2026-07-09) — video provider registry
 - `AppDeps.videoProviders?: Record<'runware'|'wan-runpod', VideoProvider>` (optional). When absent, buildApp DERIVES it: `{ runware: createRunwareVideoAdapter(deps.runware), 'wan-runpod': createComfyClient({ baseUrl: config.comfyBaseUrl }) }`. The comfy client is ALWAYS registered even when `COMFY_BASE_URL` is unset (submit then returns a clean provider_error), so `wan-2-2` is listable without a pod and boot never fails. The registry is passed to `createGenerationService`; `index.ts` is unchanged (relies on the derived default).
+
+## Update 2026-07-09 — CinemaStudio
+- Wires `createFilmService({ db, storage })` + `registerFilmRoutes(app, filmService, storyboardService)` (films/shots/audio + renders + storyboard). `createStoryboardService({ anthropicApiKey: config.anthropicApiKey, films })` gates on the optional key. Adds `settleStaleRenders(db, now, log)` to the boot sweep (render reaper; no refund).

@@ -10,3 +10,8 @@ export { ChatComposer } from './components/ChatComposer'
 // share the SAME ['catalog'] cache entry, so exposing the hook beats
 // duplicating it — the draft store and mutation remain private.
 export { useCatalog } from './model/catalogApi'
+// "Regenerate": load a past generation back into the composer draft. Published
+// so the ROUTE can wire Gallery's card action to the Generator's store without
+// Gallery ever importing it (cross-module import law).
+export { usePrefillDraft } from './model/prefillDraft'
+export type { PrefillSource } from './model/prefillDraft'

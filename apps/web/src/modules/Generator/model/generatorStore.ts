@@ -5,7 +5,8 @@
 // never duplicated here — the selectors read it from the catalog models that
 // setCatalog stored (single source: the API catalog).
 import { create } from 'zustand'
-import type { AspectRatio, CatalogModel, CreateGenerationInput } from '@opencreate/contracts'
+import type { AspectRatio, CatalogModel, CreateGenerationInput, EntityRef } from '@opencreate/contracts'
+import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from './mentions'
 
 export type GeneratorState = {
   // Catalog models as fetched from /api/catalog (set once by the panel)
@@ -22,6 +23,10 @@ export type GeneratorState = {
   duration: number | undefined
   // i2v reference image as a data URI; null when absent or unsupported
   inputImage: string | null
+  // Tagged entities: placeholder → entityId. The prompt text holds the [[eN]]
+  // tokens; this maps them. entityRefs are DERIVED from the text at submit
+  // (deriveEntityRefs), so removing a token drops the tag — one source of truth.
+  mentions: EntityRef[]
   // Actions
   setCatalog: (models: CatalogModel[]) => void
   setType: (type: CatalogModel['type']) => void
@@ -30,6 +35,10 @@ export type GeneratorState = {
   setAspectRatio: (aspectRatio: AspectRatio) => void
   setDuration: (duration: number) => void
   setInputImage: (inputImage: string | null) => void
+  // Register a tagged entity and return the token to insert into the prompt
+  addMention: (entityId: string) => string
+  // Drop a mention (used when its chip is dismissed)
+  removeMention: (placeholder: string) => void
 }
 
 // The slice of state a model switch has to re-validate
@@ -61,6 +70,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   aspectRatio: '1:1',
   duration: undefined,
   inputImage: null,
+  mentions: [],
 
   setCatalog: (models) => {
     const state = get()
@@ -89,6 +99,13 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   setAspectRatio: (aspectRatio) => set({ aspectRatio }),
   setDuration: (duration) => set({ duration }),
   setInputImage: (inputImage) => set({ inputImage }),
+  addMention: (entityId) => {
+    const placeholder = nextPlaceholder(get().mentions)
+    set((state) => ({ mentions: [...state.mentions, { placeholder, entityId }] }))
+    return entityPlaceholderToken(placeholder)
+  },
+  removeMention: (placeholder) =>
+    set((state) => ({ mentions: state.mentions.filter((m) => m.placeholder !== placeholder) })),
 }))
 
 // The currently selected catalog model, if any
@@ -96,12 +113,13 @@ export function selectModel(state: GeneratorState): CatalogModel | undefined {
   return state.models.find((model) => model.id === state.modelId)
 }
 
-// Credit price of the current draft: image → flat credits, video → the
-// per-duration table. null while the price cannot be determined yet.
+// Credit price of the current draft: video → the per-duration table; image and
+// audio → flat credits. null while the price cannot be determined yet.
 export function selectCostCredits(state: GeneratorState): number | null {
   const model = selectModel(state)
   if (!model) return null
-  if (model.type === 'image') return model.credits
+  // Non-video (image | audio) is flat-priced; only video reads the duration table
+  if (model.type !== 'video') return model.credits
   if (state.duration === undefined) return null
   return model.creditsByDuration[String(state.duration)] ?? null
 }
@@ -120,5 +138,10 @@ export function selectCreateInput(state: GeneratorState): CreateGenerationInput 
     // must match createGenerationInputSchema exactly
     ...(model.type === 'video' && state.duration !== undefined ? { duration: state.duration } : {}),
     ...(state.inputImage ? { inputImage: state.inputImage } : {}),
+    // Only refs whose token survives in the text — deleting [[e1]] drops it
+    ...(() => {
+      const refs = deriveEntityRefs(prompt, state.mentions)
+      return refs.length > 0 ? { entityRefs: refs } : {}
+    })(),
   }
 }

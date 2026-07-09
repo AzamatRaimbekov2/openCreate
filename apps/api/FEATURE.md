@@ -75,6 +75,19 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 - **Production single-origin** — with `NODE_ENV=production` and a built SPA at
   `WEB_DIST_PATH` (default `../web/dist`), the API serves it at `/` with an index.html
   fallback for non-`/api`, non-`/media` GETs (one origin, first-party cookies, no CORS).
+- **CinemaStudio** (ADR `docs/wiki/decisions/cinema-studio.md`) — a composition layer OVER
+  the generation lifecycle. **Prompt presets** (style/camera/motion/quality) are structured
+  ids composed server-side into the model prompt (never client-concatenated; `promptPreset`
+  in / `composedPrompt` out). **Audio** is `generation.type='audio'` behind an `AudioProvider`
+  seam that reuses the ENTIRE video money path (charge/poll/refund/stale-sweep) — Runware
+  `audioInference` for TTS (`voiceover`) + music (`music`), zero new client, polled through the
+  same registry (audioURL→assetUrl). **Films** own ordered shots + audio tracks + ffmpeg
+  **renders**: a render is NOT a generation — its own `film_render` table, status-guarded
+  settle, boot reaper, and NO ledger (it spends CPU, not a provider invoice). The render is a
+  PURE ffmpeg-argv builder (`films/render.ts`, unit-tested) + a spawn runner (ffmpeg-static),
+  bounded by a semaphore. **Storyboard**: `POST /api/films/:id/storyboard` sends a script to
+  Claude (`claude-opus-4-8`, optional `ANTHROPIC_API_KEY`) → draft shots (nothing charged until
+  the user generates each). Charge/refund/stale-sweep and the VideoProvider seam are UNCHANGED.
 
 ## HTTP surface
 
@@ -89,7 +102,14 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | GET | `/api/generations` | ✓ | `?limit` (≤50, default 24) `&cursor` (zod-validated, 400 on garbage); `{ items, nextCursor }` |
 | GET | `/api/generations/:id` | ✓ | doubles as the Runware poll while processing (throttled to 1 provider call / 3s / generation) |
 | DELETE | `/api/generations/:id` | ✓ | 204; removes media file + row; 409 `conflict` while processing |
-| GET | `/media/:file` | – | stored generation assets |
+| GET/POST | `/api/films` | ✓ | CinemaStudio: list / create film |
+| GET/PATCH/DELETE | `/api/films/:id` | ✓ | film detail (film+shots+audio) / update / delete |
+| POST/PATCH/DELETE | `/api/films/:id/shots[...]` | ✓ | add / update / delete a shot; `POST …/shots/reorder` |
+| POST/DELETE | `/api/films/:id/audio[...]` | ✓ | add / remove an audio track (cites an audio generation) |
+| POST | `/api/films/:id/renders` | ✓ | 202; ffmpeg export job (rate-limited 10/min) |
+| GET | `/api/films/:id/renders/:renderId` | ✓ | render poll (progress → succeeded/failed) |
+| POST | `/api/films/:id/storyboard` | ✓ | Claude script→draft shots; 502 `provider_error` if `ANTHROPIC_API_KEY` unset |
+| GET | `/media/:file` | – | stored generation assets AND rendered films |
 | GET | `/*` | – | production only: built SPA + index.html fallback |
 
 ## Module map
@@ -104,13 +124,16 @@ src/
 │   ├── auth/                   # better-auth instance + Fastify bridge + requireUser
 │   ├── users/                  # GET /api/me
 │   ├── credits/                # ledger (grant/charge/refund) + transactions route
-│   ├── catalog/                # CATALOG + creditsFor/resolutionFor + route
-│   └── generations/            # lifecycle service + thin routes (the core)
+│   ├── catalog/                # CATALOG (+audio models) + creditsFor/resolutionFor + route
+│   ├── generations/            # lifecycle service + thin routes (the core; audio + preset composition)
+│   ├── entities/               # reusable character/object/place library + reference tagging
+│   └── films/                  # CinemaStudio: service (CRUD+render) + routes + render.ts (ffmpeg) + storyboard.ts (Claude)
 ├── integrations/
 │   ├── video-provider.ts       # VideoProvider seam: neutral submit/poll types
-│   ├── runware/                # REST client (unchanged) + video-adapter.ts → VideoProvider
+│   ├── audio-provider.ts       # AudioProvider seam (submit only; polls via the video registry)
+│   ├── runware/                # REST client + video-adapter + audio-adapter (audioInference)
 │   └── runpod/                 # comfy-client.ts (wan-runpod) + embedded wan22-t2v-workflow.ts
-├── storage/local.ts            # StorageProvider: save-from-url → /media/<key>.<ext>
+├── storage/local.ts            # StorageProvider: save-from-url + localPath (render I/O) → /media/<key>.<ext>
 └── scripts/verify-catalog.ts   # AIR id verification against Runware modelSearch
 scripts/build.mjs               # esbuild bundle → runnable dist/index.js (contracts inlined)
 ```

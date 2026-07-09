@@ -32,7 +32,8 @@ import { useTranslation } from 'react-i18next'
 import { requireSession } from 'modules/Auth'
 import { GalleryFilterBar, GalleryGrid, ViewSettingsMenu } from 'modules/Gallery'
 import type { GalleryFilters } from 'modules/Gallery'
-import { ChatComposer, useCatalog } from 'modules/Generator'
+import { ChatComposer, useCatalog, usePrefillDraft } from 'modules/Generator'
+import { useEntities } from 'modules/Entities'
 
 export const Route = createFileRoute('/_shell/create')({
   beforeLoad: () => requireSession(),
@@ -48,6 +49,13 @@ function CreatePage() {
   // it here costs nothing (same ['catalog'] cache entry) and lets Gallery stay
   // ignorant of the Generator module. Names only — the filter sees no prices.
   const catalog = useCatalog()
+  // Wires Gallery's "Regenerate" card action to the Generator's draft store.
+  // The route is the ONLY place allowed to know both modules exist.
+  const prefillDraft = usePrefillDraft()
+  // The composer's mention picker taggable list. Read HERE so Generator never
+  // imports modules/Entities — the route is the seam (as with onRegenerate).
+  const entitiesQuery = useEntities()
+  const taggableEntities = (entitiesQuery.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
   const modelOptions = (catalog.data?.models ?? []).map((model) => ({
     id: model.id,
     name: model.name,
@@ -81,6 +89,7 @@ function CreatePage() {
           modelId={filters.modelId}
           aspectRatio={filters.aspectRatio}
           hasCreateCta={false}
+          onRegenerate={prefillDraft}
         />
       </section>
 
@@ -88,7 +97,7 @@ function CreatePage() {
           (pointer-events-none) so the feed stays scrollable to its very edges;
           the capsule itself re-enables pointer events. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pb-5">
-        <ChatComposer />
+        <ChatComposer taggableEntities={taggableEntities} />
       </div>
     </main>
   )

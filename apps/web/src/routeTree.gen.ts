@@ -14,7 +14,10 @@ import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellPricingRouteImport } from './routes/_shell.pricing'
 import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
+import { Route as ShellEntitiesRouteImport } from './routes/_shell.entities'
 import { Route as ShellCreateRouteImport } from './routes/_shell.create'
+import { Route as ShellCinemaIndexRouteImport } from './routes/_shell.cinema.index'
+import { Route as ShellCinemaFilmIdRouteImport } from './routes/_shell.cinema.$filmId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -40,9 +43,24 @@ const ShellLibraryRoute = ShellLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellEntitiesRoute = ShellEntitiesRouteImport.update({
+  id: '/entities',
+  path: '/entities',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellCreateRoute = ShellCreateRouteImport.update({
   id: '/create',
   path: '/create',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellCinemaIndexRoute = ShellCinemaIndexRouteImport.update({
+  id: '/cinema/',
+  path: '/cinema/',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellCinemaFilmIdRoute = ShellCinemaFilmIdRouteImport.update({
+  id: '/cinema/$filmId',
+  path: '/cinema/$filmId',
   getParentRoute: () => ShellRoute,
 } as any)
 
@@ -50,15 +68,21 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/create': typeof ShellCreateRoute
+  '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
+  '/cinema/$filmId': typeof ShellCinemaFilmIdRoute
+  '/cinema/': typeof ShellCinemaIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/create': typeof ShellCreateRoute
+  '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
+  '/cinema/$filmId': typeof ShellCinemaFilmIdRoute
+  '/cinema': typeof ShellCinemaIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -66,22 +90,44 @@ export interface FileRoutesById {
   '/_shell': typeof ShellRouteWithChildren
   '/login': typeof LoginRoute
   '/_shell/create': typeof ShellCreateRoute
+  '/_shell/entities': typeof ShellEntitiesRoute
   '/_shell/library': typeof ShellLibraryRoute
   '/_shell/pricing': typeof ShellPricingRoute
+  '/_shell/cinema/$filmId': typeof ShellCinemaFilmIdRoute
+  '/_shell/cinema/': typeof ShellCinemaIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/create' | '/library' | '/pricing'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/create'
+    | '/entities'
+    | '/library'
+    | '/pricing'
+    | '/cinema/$filmId'
+    | '/cinema/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/create' | '/library' | '/pricing'
+  to:
+    | '/'
+    | '/login'
+    | '/create'
+    | '/entities'
+    | '/library'
+    | '/pricing'
+    | '/cinema/$filmId'
+    | '/cinema'
   id:
     | '__root__'
     | '/'
     | '/_shell'
     | '/login'
     | '/_shell/create'
+    | '/_shell/entities'
     | '/_shell/library'
     | '/_shell/pricing'
+    | '/_shell/cinema/$filmId'
+    | '/_shell/cinema/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -127,6 +173,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellLibraryRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/entities': {
+      id: '/_shell/entities'
+      path: '/entities'
+      fullPath: '/entities'
+      preLoaderRoute: typeof ShellEntitiesRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/create': {
       id: '/_shell/create'
       path: '/create'
@@ -134,19 +187,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellCreateRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/cinema/': {
+      id: '/_shell/cinema/'
+      path: '/cinema'
+      fullPath: '/cinema/'
+      preLoaderRoute: typeof ShellCinemaIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/cinema/$filmId': {
+      id: '/_shell/cinema/$filmId'
+      path: '/cinema/$filmId'
+      fullPath: '/cinema/$filmId'
+      preLoaderRoute: typeof ShellCinemaFilmIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
   }
 }
 
 interface ShellRouteChildren {
   ShellCreateRoute: typeof ShellCreateRoute
+  ShellEntitiesRoute: typeof ShellEntitiesRoute
   ShellLibraryRoute: typeof ShellLibraryRoute
   ShellPricingRoute: typeof ShellPricingRoute
+  ShellCinemaFilmIdRoute: typeof ShellCinemaFilmIdRoute
+  ShellCinemaIndexRoute: typeof ShellCinemaIndexRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellCreateRoute: ShellCreateRoute,
+  ShellEntitiesRoute: ShellEntitiesRoute,
   ShellLibraryRoute: ShellLibraryRoute,
   ShellPricingRoute: ShellPricingRoute,
+  ShellCinemaFilmIdRoute: ShellCinemaFilmIdRoute,
+  ShellCinemaIndexRoute: ShellCinemaIndexRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)

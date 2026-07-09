@@ -21,6 +21,9 @@ import { registerEntityRoutes } from './modules/entities/routes'
 import { createEntityService } from './modules/entities/service'
 import { createGenerationService, settleStaleGenerations } from './modules/generations/service'
 import { registerGenerationRoutes } from './modules/generations/routes'
+import { createFilmService, settleStaleRenders } from './modules/films/service'
+import { registerFilmRoutes } from './modules/films/routes'
+import { createStoryboardService } from './modules/films/storyboard'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -156,6 +159,9 @@ export async function buildApp(deps: AppDeps) {
     runware: createRunwareVideoAdapter(deps.runware),
     'wan-runpod': createComfyClient({ baseUrl: deps.config.comfyBaseUrl }),
   }
+  // One entity service instance, shared: the generation service needs it to
+  // resolve tagged mentions, and the entity routes expose the same rules.
+  const entityService = createEntityService({ db: deps.db, storage: deps.storage })
   registerGenerationRoutes(
     app,
     createGenerationService({
@@ -163,6 +169,7 @@ export async function buildApp(deps: AppDeps) {
       runware: deps.runware,
       videoProviders,
       storage: deps.storage,
+      entities: entityService,
       log: app.log,
       // undefined → the service's own 3s default; only tests override this.
       ...(deps.pollMinIntervalMs !== undefined
@@ -172,11 +179,25 @@ export async function buildApp(deps: AppDeps) {
   )
   // Entity library (characters/objects/places) — independent of generations for
   // now; the mention wiring into POST /generations lands with the capability flag.
-  registerEntityRoutes(app, createEntityService({ db: deps.db, storage: deps.storage }))
+  registerEntityRoutes(app, entityService)
+  // CinemaStudio (ADR cinema-studio): films/shots/audio + ffmpeg renders, plus
+  // the optional script→storyboard endpoint. The film service owns the render
+  // pipeline (ffmpeg spawn, semaphore-bounded); the storyboard service gates on
+  // the optional ANTHROPIC_API_KEY (unset → the endpoint answers provider_error,
+  // boot stays healthy). Both scope every query by the caller's id.
+  const filmService = createFilmService({ db: deps.db, storage: deps.storage })
+  const storyboardService = createStoryboardService({
+    anthropicApiKey: deps.config.anthropicApiKey,
+    films: filmService,
+  })
+  registerFilmRoutes(app, filmService, storyboardService)
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.
   settleStaleGenerations(deps.db, Date.now(), app.log)
+  // Render reaper (no refund — a render has no charge): a render whose ffmpeg
+  // process died would hold 'processing' forever with no poller to settle it.
+  settleStaleRenders(deps.db, Date.now(), app.log)
 
   // Serve downloaded generation assets at /media/* straight off the storage
   // dir. Public by design for the MVP: keys are unguessable UUIDs minted by

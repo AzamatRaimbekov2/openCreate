@@ -36,6 +36,37 @@ export const CATALOG: CatalogModel[] = [
     credits: 2,
   },
   {
+    // The ONLY model in this catalog that can render a TAGGED ENTITY. Neither
+    // flux-schnell nor flux-dev accepts `referenceImages` (verified against
+    // Runware's per-model docs, 2026-07-09) — reference conditioning lives in the
+    // Kontext family and in FLUX Fill (ACE++). Without this entry the entity
+    // library would have nothing to generate with.
+    //
+    // `resolutionProfile: 'kontext'` is load-bearing: Kontext accepts only its own
+    // dimension list, so the default square1024 table's 1344x768 would earn a
+    // provider 400 on every 16:9 request.
+    //
+    // PRICE IS PROVISIONAL. Runware lists $0.04/image at 1024x1024 — 4 credits of
+    // raw cost at 1 credit = $0.01. 8 keeps roughly the margin flux-dev carries.
+    // Re-verify with scripts/verify-catalog.ts against a real key before this
+    // reaches paying users: a wrong number here loses money silently.
+    id: 'flux-kontext-pro',
+    type: 'image',
+    name: 'Cast',
+    providerLabel: 'FLUX.1 Kontext pro',
+    air: 'bfl:3@1',
+    tier: 'plus',
+    supportsImageInput: false,
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    credits: 8,
+    // Faces AND objects/places: Kontext conditions on any reference subject
+    referenceMode: 'both',
+    // Runware documents a max of 2 reference images here. Our wire contract caps
+    // entityRefs at 1 today; raising it needs no change to this entry.
+    maxReferenceImages: 2,
+    resolutionProfile: 'kontext',
+  },
+  {
     id: 'pixverse-v6',
     type: 'video',
     name: 'Swift',
@@ -137,6 +168,38 @@ export const CATALOG: CatalogModel[] = [
     creditsByDuration: { '5': 60 },
     provider: 'wan-runpod',
   },
+  {
+    // CinemaStudio audio — voiceover (TTS). Runware audioInference, verified to
+    // expose Russian voices. Priced flat per utterance (~$0.035/1k chars whole-
+    // sale). aspectRatios carries a throwaway '16:9' only to satisfy catalogBase's
+    // min(1) — the audio path never reads it.
+    id: 'voiceover',
+    type: 'audio',
+    name: 'Голос',
+    providerLabel: 'Inworld TTS 2',
+    air: 'inworld:tts@2',
+    tier: 'standard',
+    supportsImageInput: false,
+    aspectRatios: ['16:9'],
+    credits: 8,
+    audioKind: 'tts',
+    voices: ['Svetlana', 'Elena', 'Dmitry', 'Nikolai', 'Ashley', 'Alex'],
+  },
+  {
+    // CinemaStudio audio — music bed. Runware audioInference, MiniMax Music 2.6
+    // (~$0.15 per ~3-min track). The prompt is the positive music prompt; the
+    // audio adapter sends settings.instrumental for a clean background bed.
+    id: 'music',
+    type: 'audio',
+    name: 'Музыка',
+    providerLabel: 'MiniMax Music 2.6',
+    air: 'minimax:music@2.6',
+    tier: 'plus',
+    supportsImageInput: false,
+    aspectRatios: ['16:9'],
+    credits: 20,
+    audioKind: 'music',
+  },
 ]
 
 export function getModel(id: string): CatalogModel | undefined {
@@ -144,7 +207,9 @@ export function getModel(id: string): CatalogModel | undefined {
 }
 
 export function creditsFor(model: CatalogModel, duration: number | undefined): number {
-  if (model.type === 'image') return model.credits
+  // Image and audio are flat-priced per generation (a picture, a song, an
+  // utterance); only video prices by duration.
+  if (model.type === 'image' || model.type === 'audio') return model.credits
   if (duration === undefined) throw new Error('duration required for video')
   const credits = model.creditsByDuration[String(duration)]
   if (!credits) throw new Error(`unsupported duration ${duration} for ${model.id}`)

@@ -11,7 +11,7 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Generation, GenerationList } from '@opencreate/contracts'
 import { ApiClientError, api } from 'shared/libs/apiClient'
@@ -142,7 +142,11 @@ describe('GalleryGrid', () => {
     })
     renderGrid()
     expect(await screen.findByText(/red fox/i)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+    // Actions now live behind the card's overflow menu, and delete asks first
+    await userEvent.click(screen.getByRole('button', { name: /actions/i }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /delete/i }))
+    const dialog = await screen.findByRole('alertdialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }))
     // Rollback after the rejection — the card returns
     expect(await screen.findByText(/red fox/i)).toBeInTheDocument()
   })

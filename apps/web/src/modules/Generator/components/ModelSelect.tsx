@@ -1,22 +1,24 @@
 // apps/web/src/modules/Generator/components/ModelSelect.tsx
-// The custom, on-brand model select: a fully self-contained listbox (NOT a
-// native <select>) that shows EVERY catalog model with a provider logo, its
+// The model picker: every catalog model with its provider logo, tier chip,
 // tariff (credits + the $0.01/credit equivalent) and a localized description,
-// grouped into Images / Video. It owns the catalog query and renders the four
-// UI states; selection is delegated up via selectedId/onSelect so it drops into
-// both the GeneratorPanel sheet and the ChatComposer glass capsule.
+// grouped into Images / Video.
 //
-// WHY a bespoke listbox: a native <option> is text-only — it cannot carry the
-// logo, tier chip and description the owner asked for. The panel is an OPAQUE
-// steel surface (never translucent) so it stays readable over ANY backdrop,
-// including the composer's frosted glass. No gradients anywhere (owner rule).
+// It is now a THIN WRAPPER over shared/ui Select. Everything that used to live
+// here — the listbox keyboard contract, placement flip, typeahead, the option
+// row — moved into the kit, because the owner's rule is that EVERY select looks
+// and behaves like this one. What stays here is the only part genuinely about
+// models: owning the catalog query, its four UI states, and translating a
+// CatalogModel into a SelectOption.
+//
+// (The deleted useModelListbox + ModelSelectOption were exactly this code with
+// `CatalogModel` hard-coded into it.)
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CatalogModel } from '@opencreate/contracts'
-import { Skeleton } from 'shared/ui'
+import { Select, Skeleton } from 'shared/ui'
+import type { SelectOption } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
-import { useModelListbox } from '../hooks/useModelListbox'
 import { presentationFor, tariffFor } from '../model/modelPresentation'
-import { ModelSelectOption } from './ModelSelectOption'
 import { ProviderMark } from './ProviderMark'
 
 export type ModelSelectProps = {
@@ -29,83 +31,46 @@ export type ModelSelectProps = {
   // translucent field for the composer's frosted capsule. The PANEL is opaque
   // in both — only the resting trigger fill changes.
   variant?: 'sheet' | 'glass'
+  // When true, list ONLY models that can condition on a tagged entity
+  // (catalog.referenceMode). Set by the composer while a mention is live — a
+  // model that ignores the reference would bill the user for a stranger.
+  referenceCapableOnly?: boolean
 }
 
-// Chevron affordance (decorative — rotates when open)
-function Chevron({ isOpen }: { isOpen: boolean }) {
+// The label wrapper the loading/error/empty states share, so the control's
+// height and caption never jump between states
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={`h-4 w-4 shrink-0 text-mist-dim transition-transform duration-200 ${
-        isOpen ? 'rotate-180' : ''
-      }`}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
+    <div className="flex min-w-0 flex-col gap-1">
+      <span aria-hidden="true" className="truncate text-[11px] leading-none text-mist-dim">
+        {label}
+      </span>
+      {children}
+    </div>
   )
 }
 
-const TRIGGER_SURFACE = {
-  sheet: 'bg-steel hover:bg-ridge',
-  glass: 'bg-white/5 hover:bg-white/10',
-} as const
-
-export function ModelSelect({ selectedId, onSelect, variant = 'sheet' }: ModelSelectProps) {
+export function ModelSelect({ selectedId, onSelect, variant = 'sheet', referenceCapableOnly = false }: ModelSelectProps) {
   const { t } = useTranslation()
   const catalog = useCatalog()
   const label = t('generator.model.label')
 
-  // Split into the two rendered groups; `flat` is the nav order (images first)
-  const models = catalog.data?.models ?? []
-  const imageModels = models.filter((model) => model.type === 'image')
-  const videoModels = models.filter((model) => model.type === 'video')
-  const flat: CatalogModel[] = [...imageModels, ...videoModels]
-
-  // The listbox brain (open/active/keyboard/placement). Destructured so each
-  // value is a plain local — the refs are used ONLY as ref props below.
-  const {
-    isOpen,
-    activeIndex,
-    placement,
-    triggerRef,
-    listboxRef,
-    listboxId,
-    optionId,
-    activeDescendant,
-    toggle,
-    selectAt,
-    activate,
-    handleListboxKeyDown,
-  } = useModelListbox({ models: flat, selectedId, onSelect })
-
   // 1 — Loading: a trigger-shaped skeleton so data lands without a jump
   if (catalog.isPending) {
     return (
-      <div className="flex flex-col gap-2">
-        <span aria-hidden="true" className="text-xs text-mist-dim">
-          {label}
-        </span>
-        <Skeleton className="h-14 w-full rounded-lg" />
-      </div>
+      <Field label={label}>
+        <Skeleton className="h-8 w-full rounded-full" />
+      </Field>
     )
   }
 
   // 2 — Error: a calm inline retry (never raw server text, never red-primary)
   if (catalog.isError) {
     return (
-      <div className="flex flex-col gap-2">
-        <span aria-hidden="true" className="text-xs text-mist-dim">
-          {label}
-        </span>
+      <Field label={label}>
         <div
           role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-steel px-3 py-2.5"
+          className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-steel px-3 py-2"
         >
           <span className="text-xs text-mist-dim">{t('errors.loadFailed')}</span>
           <button
@@ -116,126 +81,64 @@ export function ModelSelect({ selectedId, onSelect, variant = 'sheet' }: ModelSe
             {t('common.retry')}
           </button>
         </div>
-      </div>
+      </Field>
     )
   }
+
+  // Filtering here (not in the parent) keeps ModelSelect the single owner of the
+  // catalog: the composer only flips a boolean, it never handles the model list.
+  const models = referenceCapableOnly
+    ? catalog.data.models.filter((model) => model.referenceMode)
+    : catalog.data.models
 
   // 3 — Empty: a disabled placeholder (rare — a catalog with no models)
   if (models.length === 0) {
     return (
-      <div className="flex flex-col gap-2">
-        <span aria-hidden="true" className="text-xs text-mist-dim">
-          {label}
-        </span>
+      <Field label={label}>
         <button
           type="button"
           disabled
-          className="flex w-full items-center gap-2.5 rounded-lg border border-white/10 bg-steel px-3 py-2.5 text-left opacity-50"
+          className="flex min-h-8 w-full items-center rounded-full border border-white/10 bg-steel px-2.5 text-left text-xs text-mist-dim opacity-50"
         >
-          <span className="text-sm text-mist-dim">{t('generator.model.placeholder')}</span>
+          {t('generator.model.placeholder')}
         </button>
-      </div>
+      </Field>
     )
   }
 
-  // 4 — Data
-  const selected = models.find((model) => model.id === selectedId)
-  const groups = [
-    { type: 'image' as const, labelKey: 'generator.model.groupImage', models: imageModels },
-    { type: 'video' as const, labelKey: 'generator.model.groupVideo', models: videoModels },
-  ].filter((group) => group.models.length > 0)
+  // 4 — Data. A CatalogModel becomes a rich SelectOption; the kit draws it.
+  const toOption = (model: CatalogModel): SelectOption<string> => {
+    const { provider, descriptionKey } = presentationFor(model.id)
+    const tariff = tariffFor(model)
+    return {
+      value: model.id,
+      label: model.name,
+      // Honest provider attribution — users see what actually runs (no rebadging)
+      caption: model.providerLabel,
+      description: t(descriptionKey),
+      badge: t(`generator.tier.${model.tier}`),
+      meta: t('generator.model.tariff', { credits: tariff.credits, dollars: tariff.dollars }),
+      icon: <ProviderMark provider={provider} className="size-5" />,
+    }
+  }
 
-  // Enter transition is pure CSS via @starting-style (Tailwind `starting:`): the
-  // panel fades/slides in on mount with no state or effect (which would trip the
-  // "setState in effect" rule and add render churn). Slide direction follows the
-  // open placement.
-  const panelMotion =
-    placement === 'up'
-      ? 'starting:translate-y-1 starting:opacity-0'
-      : 'starting:-translate-y-1 starting:opacity-0'
+  const idsOf = (type: CatalogModel['type']) =>
+    models.filter((model) => model.type === type).map((model) => model.id)
 
   return (
-    <div className="flex flex-col gap-2">
-      <span aria-hidden="true" className="text-xs text-mist-dim">
-        {label}
-      </span>
-
-      {/* `relative` anchors the absolutely-positioned panel */}
-      <div className="relative">
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          aria-controls={listboxId}
-          onClick={toggle}
-          className={`flex w-full items-center gap-2.5 rounded-lg border border-white/10 px-3 py-2 text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${TRIGGER_SURFACE[variant]}`}
-        >
-          {selected ? (
-            <>
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-steel text-mist">
-                <ProviderMark provider={presentationFor(selected.id).provider} className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-white">
-                  {selected.name}
-                </span>
-                <span className="block truncate text-xs text-mist-dim">
-                  {selected.providerLabel}
-                </span>
-              </span>
-              <span className="shrink-0 text-xs font-medium text-mist">
-                {t('generator.model.creditsShort', { credits: tariffFor(selected).credits })}
-              </span>
-            </>
-          ) : (
-            <span className="min-w-0 flex-1 truncate text-sm text-mist-dim">
-              {t('generator.model.placeholder')}
-            </span>
-          )}
-          <Chevron isOpen={isOpen} />
-        </button>
-
-        {isOpen ? (
-          <div
-            ref={listboxRef}
-            id={listboxId}
-            role="listbox"
-            aria-label={label}
-            aria-activedescendant={activeDescendant}
-            tabIndex={-1}
-            onKeyDown={handleListboxKeyDown}
-            className={`absolute left-0 z-40 max-h-[22rem] translate-y-0 overflow-y-auto rounded-lg border border-white/10 bg-steel p-1.5 opacity-100 transition duration-150 focus:outline-none motion-reduce:transition-none ${
-              variant === 'glass' ? 'w-[22rem] max-w-[calc(100vw-2rem)]' : 'w-full'
-            } ${placement === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${panelMotion}`}
-          >
-            {groups.map((group) => (
-              <div key={group.type} role="group" aria-label={t(group.labelKey)}>
-                <span
-                  aria-hidden="true"
-                  className="block px-2.5 pt-2 pb-1 text-xs lowercase text-mist-dim"
-                >
-                  {t(group.labelKey)}
-                </span>
-                {group.models.map((model) => {
-                  const index = flat.findIndex((candidate) => candidate.id === model.id)
-                  return (
-                    <ModelSelectOption
-                      key={model.id}
-                      model={model}
-                      optionId={optionId(model.id)}
-                      isSelected={model.id === selectedId}
-                      isActive={index === activeIndex}
-                      onChoose={() => selectAt(index)}
-                      onActivate={() => activate(index)}
-                    />
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <Select
+      label={label}
+      variant={variant === 'sheet' ? 'solid' : 'glass'}
+      // Rich rows need room even when the trigger is a narrow rail chip
+      panelWidth="wide"
+      placeholder={t('generator.model.placeholder')}
+      options={models.map(toOption)}
+      groups={[
+        { label: t('generator.model.groupImage'), values: idsOf('image') },
+        { label: t('generator.model.groupVideo'), values: idsOf('video') },
+      ]}
+      value={selectedId ?? ''}
+      onChange={onSelect}
+    />
   )
 }

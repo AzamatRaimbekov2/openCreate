@@ -4,3 +4,7 @@ packages:
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+  # CinemaStudio server-side render: ffmpeg-static's postinstall downloads the
+  # ffmpeg binary. Allowed so the render worker has a real ffmpeg on disk; the
+  # render module resolves the binary path lazily and fails cleanly if absent.
+  ffmpeg-static: true

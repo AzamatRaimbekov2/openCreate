@@ -18,6 +18,8 @@ export function createRunwareVideoAdapter(client: RunwareClient): VideoProvider 
       await client.submitVideo({
         taskUUID: providerJobId,
         positivePrompt: input.prompt,
+        // CinemaStudio style-preset negative (omitted when empty/absent).
+        ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
         model: input.model,
         width: input.width,
         height: input.height,
@@ -38,12 +40,14 @@ export function createRunwareVideoAdapter(client: RunwareClient): VideoProvider 
       const r = await client.getResponse(providerJobId)
       if (r.status === 'processing') return { status: 'processing', progress: r.progress }
       if (r.status === 'success')
-        // Noun rename onto the neutral union — videoURL/imageURL→assetUrl,
+        // Noun rename onto the neutral union — videoURL/imageURL/audioURL→assetUrl,
         // cost→costUsd, NSFWContent→nsfw — so the service settles identically
-        // regardless of provider.
+        // regardless of provider OR media type. CinemaStudio audio rows are
+        // `provider: 'runware'`, so they poll through THIS adapter; the audioURL
+        // fallback is what lets one poll path serve image/video/audio alike.
         return {
           status: 'success',
-          assetUrl: r.videoURL ?? r.imageURL,
+          assetUrl: r.videoURL ?? r.imageURL ?? r.audioURL,
           costUsd: r.cost,
           nsfw: r.NSFWContent,
         }

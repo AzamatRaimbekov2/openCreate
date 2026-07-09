@@ -35,3 +35,7 @@ flowchart LR
 
 ## Commits
 - 46cf18d feat(api): runware REST client (imageInference, videoInference, getResponse)
+
+## Key decisions (2026-07-09) — CinemaStudio audio
+- `RunwareAudioRequest` added (audioInference: same envelope/taskUUID/getResponse polling as video). Neutral shape `{ taskUUID, model, audioKind, text?, voice?, positivePrompt? }` — the client builds the TTS (`speech.{text,voice}`) vs music (`positivePrompt` + `settings.instrumental`) task shape from `audioKind`.
+- `RunwarePollResult` success variant gains `audioURL?` — the video adapter maps it into the neutral `assetUrl` exactly like `videoURL`/`imageURL`, so the generation service's settlement path is shared across image/video/audio.

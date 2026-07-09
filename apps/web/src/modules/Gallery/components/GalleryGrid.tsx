@@ -25,6 +25,9 @@ export type GalleryGridProps = {
   // The create page embeds the grid next to the form — a CTA to /create there
   // would point at itself, so the page can turn it off
   hasCreateCta?: boolean
+  // Refill the composer from a generation. Passed straight down to every card /
+  // row; absent on /library, where the Regenerate action then does not appear.
+  onRegenerate?: (generation: Generation) => void
 }
 
 // Static keys for the fixed skeleton row — index keys are banned even here
@@ -39,12 +42,13 @@ type GalleryItemsProps = {
   items: Generation[]
   view: GalleryView
   gridSize: GridSize
+  onRegenerate?: ((generation: Generation) => void) | undefined
 }
 
 // The three shapes of the same feed. Split out of GalleryGrid so the 4-states
 // logic above (loading/error/empty/data) stays readable and does not grow a
 // three-way branch inside its own return.
-function GalleryItems({ items, view, gridSize }: GalleryItemsProps) {
+function GalleryItems({ items, view, gridSize, onRegenerate }: GalleryItemsProps) {
   const { t } = useTranslation()
 
   if (view === 'table') {
@@ -89,7 +93,11 @@ function GalleryItems({ items, view, gridSize }: GalleryItemsProps) {
           </thead>
           <tbody>
             {items.map((generation) => (
-              <GenerationRow key={generation.id} generation={generation} />
+              <GenerationRow
+                key={generation.id}
+                generation={generation}
+                {...(onRegenerate ? { onRegenerate } : {})}
+              />
             ))}
           </tbody>
         </table>
@@ -105,7 +113,10 @@ function GalleryItems({ items, view, gridSize }: GalleryItemsProps) {
       <ul className="-mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto px-2 pb-2">
         {items.map((generation) => (
           <li key={generation.id} className="w-[min(85vw,32rem)] shrink-0 snap-center">
-            <GenerationCard generation={generation} />
+            <GenerationCard
+              generation={generation}
+              {...(onRegenerate ? { onRegenerate } : {})}
+            />
           </li>
         ))}
       </ul>
@@ -116,7 +127,7 @@ function GalleryItems({ items, view, gridSize }: GalleryItemsProps) {
     <ul className={`grid gap-4 ${GRID_SIZE_CLASSES[gridSize]}`}>
       {items.map((generation) => (
         <li key={generation.id}>
-          <GenerationCard generation={generation} />
+          <GenerationCard generation={generation} {...(onRegenerate ? { onRegenerate } : {})} />
         </li>
       ))}
     </ul>
@@ -128,6 +139,7 @@ export function GalleryGrid({
   modelId = null,
   aspectRatio = null,
   hasCreateCta = true,
+  onRegenerate,
 }: GalleryGridProps) {
   const { t } = useTranslation()
   // Display preference, not filter state — it outlives the visit (persisted)
@@ -197,7 +209,7 @@ export function GalleryGrid({
 
   return (
     <div className="flex flex-col gap-6">
-      <GalleryItems items={items} view={view} gridSize={gridSize} />
+      <GalleryItems items={items} view={view} gridSize={gridSize} onRegenerate={onRegenerate} />
       {hasNextPage ? (
         <Button
           variant="ghost"

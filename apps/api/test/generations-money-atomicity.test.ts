@@ -30,6 +30,11 @@ const stubStorage = (): StorageProvider => ({
   saveFromUrl: async () => {
     throw new Error('storage must not be touched by these paths')
   },
+  saveDataUri: async () => {
+    throw new Error('storage must not be touched by these paths')
+  },
+  readAsDataUri: async () => 'data:image/png;base64,AAA',
+  localPath: (key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 })
 

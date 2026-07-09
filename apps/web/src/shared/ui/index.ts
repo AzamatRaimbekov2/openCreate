@@ -20,14 +20,22 @@ export { Input } from './Input'
 export type { InputProps } from './Input'
 export { Modal } from './Modal'
 export type { ModalProps } from './Modal'
+// Action menu (fires and forgets) — the counterpart to Select (chooses and keeps)
+export { Menu } from './Menu'
+export type { MenuItem, MenuProps } from './Menu'
 export { LangSwitch } from './LangSwitch'
 export { NotFoundPage } from './NotFoundPage'
 export { OfflineOverlay } from './OfflineOverlay'
 export { PillGroup } from './PillGroup'
 export type { PillGroupProps, PillOption } from './PillGroup'
-// The kit's labelled native <select>; `glass` variant for the composer capsule
+// The kit's ONE dropdown: a WAI-ARIA listbox with rich rows (icon / badge /
+// caption / description / meta). `glass` variant for the composer capsule.
 export { Select } from './Select'
 export type { SelectOption, SelectProps } from './Select'
+// Its headless brain — exported for any bespoke popup that must match the
+// keyboard contract without reusing the row rendering
+export { useListbox } from './useListbox'
+export type { ListboxPlacement } from './useListbox'
 export { Progress } from './Progress'
 export type { ProgressProps } from './Progress'
 // Specimen art + the kind list so consumers can lay out the whole grid

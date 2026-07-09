@@ -5,7 +5,9 @@
     "pricing": "Pricing",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "language": "Language"
+    "language": "Language",
+    "entities": "Entities",
+    "cinema": "Cinema"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -228,12 +230,21 @@
       "wan-2-7": {
         "description": "Rich, film-like footage for more ambitious, detailed scenes."
       },
+      "wan-2-2": {
+        "description": "Runs on our own GPU — open-weights Wan 2.2, ~4–5 min render."
+      },
       "kling-3-pro": {
         "description": "Pro-grade control and detail for demanding, high-fidelity shots."
       },
       "veo-3-1-fast": {
         "description": "Premium eight-second clips with synced sound, fast."
       }
+    },
+    "mention": {
+      "label": "Tag",
+      "add": "Tag entity",
+      "remove": "Remove {{name}}",
+      "empty": "No entities yet — create one in Library"
     }
   },
   "gallery": {
@@ -296,6 +307,12 @@
       "cost": "Cost",
       "created": "Created",
       "actions": "Actions"
+    },
+    "actions": {
+      "label": "Actions",
+      "regenerate": "Regenerate",
+      "prompt": "Copy prompt",
+      "promptCopied": "Copied"
     }
   },
   "pricing": {
@@ -324,7 +341,10 @@
     "close": "Close",
     "loading": "Loading",
     "goHome": "Go to home page",
-    "scrollHint": "scroll →"
+    "scrollHint": "scroll →",
+    "edit": "Edit",
+    "done": "Done",
+    "cancel": "Cancel"
   },
   "errors": {
     "notFound": {
@@ -353,6 +373,184 @@
       "conflict": "This generation is still processing — wait for it to finish.",
       "internalError": "Something went wrong on our side. Please try again.",
       "unknown": "Something went wrong. Please try again."
+    }
+  },
+  "entities": {
+    "title": "Entities",
+    "noPhoto": "No photo",
+    "create": {
+      "cta": "New entity",
+      "title": "New entity",
+      "submit": "Create"
+    },
+    "edit": {
+      "title": "Edit entity"
+    },
+    "empty": {
+      "title": "No entities yet",
+      "description": "Create a character, object or place to tag in your prompts."
+    },
+    "field": {
+      "name": "Name",
+      "kind": "Type",
+      "description": "Description",
+      "photos": "Photos"
+    },
+    "kind": {
+      "character": "Character",
+      "object": "Object",
+      "place": "Place",
+      "other": "Other"
+    },
+    "primary": {
+      "set": "Use as reference",
+      "hint": "The highlighted photo is sent as the reference."
+    },
+    "errors": {
+      "name": "A name is required."
+    },
+    "presets": {
+      "character": {
+        "cinematic": "cinematic lighting",
+        "portrait": "close-up portrait",
+        "photoreal": "photorealistic",
+        "studioLight": "studio lighting"
+      },
+      "object": {
+        "productShot": "product shot",
+        "isolated": "isolated on plain background",
+        "detailed": "highly detailed"
+      },
+      "place": {
+        "wide": "wide establishing shot",
+        "goldenHour": "golden hour",
+        "atmospheric": "atmospheric"
+      },
+      "other": {
+        "detailed": "highly detailed",
+        "photoreal": "photorealistic"
+      }
+    }
+  },
+  "cinema": {
+    "title": "Films",
+    "new": "New film",
+    "empty": {
+      "title": "No films yet",
+      "description": "Start a film — generate shots, arrange them on a timeline, add sound, and export an mp4."
+    },
+    "card": {
+      "updated": "updated {{date}}"
+    },
+    "settings": {
+      "createTitle": "New film",
+      "editTitle": "Film settings",
+      "title": "Title",
+      "titlePlaceholder": "My film",
+      "aspect": "Aspect ratio",
+      "style": "Default style",
+      "styleNone": "No style",
+      "create": "Create film"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "empty": "No shots yet. Add a shot or generate a storyboard from a script.",
+      "addShot": "Add shot",
+      "addTitle": "Title card"
+    },
+    "storyboard": {
+      "cta": "Storyboard",
+      "title": "Storyboard from a script",
+      "script": "Script",
+      "scriptPlaceholder": "Paste your script. We'll break it into draft shots you can review and generate.",
+      "shotCount": "Shots",
+      "shotCountAuto": "Auto",
+      "submit": "Create shots",
+      "unavailable": "Storyboarding isn't configured yet. Add shots manually for now."
+    },
+    "shot": {
+      "select": "Select shot {{index}}",
+      "seconds": "{{count}}s",
+      "moveLeft": "Move earlier",
+      "moveRight": "Move later",
+      "delete": "Delete shot",
+      "failed": "Generation failed",
+      "generating": "Generating",
+      "ready": "Ready",
+      "titleDefault": "Title"
+    },
+    "transition": {
+      "none": "None",
+      "crossfade": "Crossfade"
+    },
+    "position": {
+      "top": "Top",
+      "center": "Center",
+      "bottom": "Bottom"
+    },
+    "inspector": {
+      "title": "Shot",
+      "prompt": "Prompt",
+      "promptPlaceholder": "Describe this shot",
+      "style": "Style",
+      "camera": "Framing",
+      "motion": "Camera motion",
+      "quality": "Quality",
+      "model": "Model",
+      "noModel": "No model",
+      "duration": "Duration",
+      "transition": "Transition in",
+      "transitionMs": "Transition length",
+      "titleToggle": "Title overlay",
+      "titlePlaceholder": "Overlay text",
+      "titlePosition": "Position",
+      "willSee": "The model will see:",
+      "save": "Save",
+      "generate": "Generate",
+      "selectHint": "Select a shot to edit it, or add one from the timeline."
+    },
+    "preview": {
+      "title": "Preview",
+      "play": "Play",
+      "pause": "Pause",
+      "position": "{{current}} / {{total}}",
+      "placeholder": "Shot not generated yet",
+      "empty": "Add shots to preview your film",
+      "approx": "Preview is an approximation. The exported render is authoritative."
+    },
+    "render": {
+      "title": "Export",
+      "cta": "Render mp4",
+      "processing": "Rendering",
+      "download": "Download mp4",
+      "failed": "The render didn't finish. Please try again."
+    },
+    "audio": {
+      "title": "Audio",
+      "empty": "No audio tracks yet.",
+      "addMusic": "Add music",
+      "addVoice": "Add voiceover",
+      "unavailable": "Audio models aren't available.",
+      "remove": "Remove track",
+      "voice": "Voice",
+      "generate": "Generate",
+      "musicPlaceholder": "Describe the music — mood, genre, tempo",
+      "voicePlaceholder": "Text to speak",
+      "kind": {
+        "music": "Music",
+        "voiceover": "Voiceover"
+      }
+    },
+    "editor": {
+      "back": "All films",
+      "filmMenu": "Film actions",
+      "rename": "Film settings",
+      "deleteFilm": "Delete film",
+      "deleteConfirm": {
+        "title": "Delete this film?",
+        "body": "\"{{title}}\" and its shots will be removed permanently. This cannot be undone.",
+        "confirm": "Delete"
+      }
     }
   }
 }

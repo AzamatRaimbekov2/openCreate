@@ -43,3 +43,7 @@ flowchart LR
 
 ## Commits
 - 46cf18d feat(api): runware REST client (imageInference, videoInference, getResponse)
+
+## Key decisions (2026-07-09) — CinemaStudio audio
+- `submitAudio(req: RunwareAudioRequest)` added to the `RunwareClient` type + impl: audioInference, `deliveryMethod: 'async'`, same ack-then-`getResponse` contract as `submitVideo`. Builds the TTS shape (`speech.{text,voice}`) vs music shape (`positivePrompt` + `settings.instrumental`) from `req.audioKind` — Runware keys the workflow off model+payload, not a separate task type.
+- `getResponse` now also surfaces `audioURL` (success branch triggers on `videoURL || imageURL || audioURL`). The video adapter maps it into the neutral `assetUrl`, so audio settles through the exact same generation-service path as video.

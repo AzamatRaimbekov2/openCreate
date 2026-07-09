@@ -40,3 +40,7 @@ flowchart LR
 
 ## Commits
 - bdc4175 feat(api): curated model catalog with credit pricing
+
+## Key decisions (2026-07-09) — CinemaStudio audio
+- Two `type: 'audio'` models added: `voiceover` (Inworld TTS 2, `air: inworld:tts@2`, 8 cr, `audioKind: 'tts'`, Russian voices) and `music` (MiniMax Music 2.6, `air: minimax:music@2.6`, 20 cr, `audioKind: 'music'`). Both flat-priced per generation.
+- `creditsFor` now returns the flat `credits` for BOTH image and audio (only video prices by duration). `resolutionFor` is never called for audio (the generation service's audio branch skips resolution — audio has no aspect ratio; the throwaway `aspectRatios: ['16:9']` only satisfies catalogBase's `min(1)`).

@@ -10,6 +10,7 @@ import { createRunwareVideoAdapter } from '../src/integrations/runware/video-ada
 const fakeRunware = () => ({
   imageInference: vi.fn(),
   submitVideo: vi.fn(),
+  submitAudio: vi.fn(),
   getResponse: vi.fn(),
 })
 

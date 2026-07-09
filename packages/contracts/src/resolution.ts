@@ -33,11 +33,25 @@ export const RESOLUTIONS = {
     '1:1': { width: 1024, height: 1024 },
     '9:16': { width: 768, height: 1344 },
   },
+  // FLUX.1 Kontext accepts only its OWN dimension list. Handing it the
+  // square1024 table's 1344x768 earns a provider 400 the user never asked for,
+  // so a model may name its table explicitly (catalog.resolutionProfile).
+  kontext: {
+    '16:9': { width: 1392, height: 752 },
+    '1:1': { width: 1024, height: 1024 },
+    '9:16': { width: 752, height: 1392 },
+  },
 } satisfies Record<string, Record<AspectRatio, Resolution>>
+
+// Which table a model reads. Absent → the legacy tier ladder below.
+export type ResolutionProfile = keyof typeof RESOLUTIONS
 
 // Image models all render off the square1024 table; video resolution is a
 // function of the model's commercial tier (plus/pro/premium buy you 1080p).
 export function resolutionFor(model: CatalogModel, aspect: AspectRatio): Resolution {
+  // An explicit profile always wins: it exists precisely because the provider
+  // rejects everything outside its own list.
+  if (model.resolutionProfile) return RESOLUTIONS[model.resolutionProfile][aspect]
   const table =
     model.type === 'image'
       ? RESOLUTIONS.square1024
