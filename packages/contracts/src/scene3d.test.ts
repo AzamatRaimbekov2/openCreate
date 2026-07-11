@@ -12,7 +12,7 @@ describe('scene presets', () => {
     expect(getScenePreset('nope')).toBeUndefined()
   })
 
-  it('stores exposure in EV stops, not as a linear multiplier', () => {
+  it('keeps exposureEv within the documented EV range', () => {
     const studio = getScenePreset('studio')!
     expect(studio.tonemap.exposureEv).toBeGreaterThanOrEqual(-4)
     expect(studio.tonemap.exposureEv).toBeLessThanOrEqual(4)

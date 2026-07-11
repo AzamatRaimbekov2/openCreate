@@ -30,7 +30,11 @@ export const scenePresetSchema = z.object({
     // those fetch from a GitHub CDN and drei's own docs say they are not for
     // production.
     hdriId: z.string().min(1),
-    rotationY: z.number(),
+    // RADIANS — matches three's `environmentRotation` directly. Maps conceptually
+    // to Blender's world Mapping node `rotation.z`, but sign/zero-offset differ
+    // between the two, so that conversion is a calibration constant that belongs
+    // in the Blender exporter, not baked into this preset.
+    rotationYRad: z.number(),
     intensity: z.number().positive(),
   }),
   background: z.object({
@@ -44,6 +48,10 @@ export const scenePresetSchema = z.object({
     // because the exact same math has to run in whatever renders the final video.
     marginPct: z.number().min(0).max(100),
     orbit: z.object({
+      // Deliberately unbounded and cyclic, NOT clamped to [0, 360): the
+      // `dramatic` preset spans -30 -> 330 to center its sweep on the front of
+      // the model. Clamping these to a 0-360 range would silently change which
+      // arc the camera travels.
       azimuthStartDeg: z.number(),
       azimuthEndDeg: z.number(),
       elevationDeg: z.number().min(-89).max(89),
@@ -83,7 +91,7 @@ export const SCENE_PRESETS: ScenePreset[] = [
     ...base,
     id: 'studio',
     name: 'Studio',
-    environment: { hdriId: 'studio-soft', rotationY: 0.35, intensity: 1.0 },
+    environment: { hdriId: 'studio-soft', rotationYRad: 0.35, intensity: 1.0 },
     background: { mode: 'color', color: '#0b0b0d' },
     camera: {
       fovVertical: 35,
@@ -96,7 +104,7 @@ export const SCENE_PRESETS: ScenePreset[] = [
     ...base,
     id: 'product',
     name: 'Product',
-    environment: { hdriId: 'studio-soft', rotationY: 0, intensity: 1.3 },
+    environment: { hdriId: 'studio-soft', rotationYRad: 0, intensity: 1.3 },
     background: { mode: 'color', color: '#f5f5f7' },
     camera: {
       fovVertical: 28,
@@ -109,7 +117,7 @@ export const SCENE_PRESETS: ScenePreset[] = [
     ...base,
     id: 'dramatic',
     name: 'Dramatic',
-    environment: { hdriId: 'rim-hard', rotationY: 2.1, intensity: 0.8 },
+    environment: { hdriId: 'rim-hard', rotationYRad: 2.1, intensity: 0.8 },
     background: { mode: 'color', color: '#050507' },
     camera: {
       fovVertical: 42,
@@ -123,7 +131,7 @@ export const SCENE_PRESETS: ScenePreset[] = [
     ...base,
     id: 'neon',
     name: 'Neon',
-    environment: { hdriId: 'neon-city', rotationY: 1.2, intensity: 1.6 },
+    environment: { hdriId: 'neon-city', rotationYRad: 1.2, intensity: 1.6 },
     background: { mode: 'hdri', color: '#12021f' },
     camera: {
       fovVertical: 38,
