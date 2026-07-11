@@ -24,3 +24,6 @@ export * from './user'
 // The portable Studio3D scene preset (lighting/camera/tonemap) — one JSON read
 // by both the three.js viewer and any future server-side renderer.
 export * from './scene3d'
+// Studio3D render (video-from-model, no credit ledger — a render is not a
+// generation) + the public revocable model share.
+export * from './model-render'

@@ -6,13 +6,13 @@
 Public API barrel of `@opencreate/contracts` — the only import path (`package.json` `exports` maps `.` → this file) for both apps.
 
 ## What it does (for an AI reader)
-- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `scene3d`.
+- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `scene3d`, `model-render`.
 - Public API / exports: the union of all modules' exports (schemas + inferred types).
 - Inputs → Outputs: none at runtime beyond module re-export.
 - Side effects: none.
 
 ## Dependencies
-- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./templates`, `./credits`, `./user`, `./scene3d`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
+- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./templates`, `./credits`, `./user`, `./scene3d`, `./model-render`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
 - Used by: `apps/api` and `apps/web` via `import { ... } from '@opencreate/contracts'`.
 
 ## Diagram
@@ -29,6 +29,7 @@ flowchart LR
   U[user.ts] --> IDX
   T[templates.ts] --> IDX
   S3[scene3d.ts] --> IDX
+  MR[model-render.ts] --> IDX
   IDX --> API[apps/api]
   IDX --> WEB[apps/web]
 ```
@@ -41,6 +42,17 @@ flowchart LR
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 789adb5 feat: template catalog — Brainrot Studio (fruit/cat drama, talking food)
 - 863a9c0 feat(contracts): portable scene preset (one JSON, N renderers)
+
+## Update 2026-07-11 — model render + share (Task 3)
+- Now also re-exports `./model-render`: `modelRenderStatusSchema`, `createModelRenderInputSchema`/
+  `CreateModelRenderInput`, `modelRenderSchema`/`ModelRender`, `modelRenderListSchema`,
+  `modelShareSchema`/`ModelShare`.
+- Exported last (after `scene3d`) — no dependency-ordering constraint; nothing else in the barrel
+  imports from it yet.
+- Why this file exists: ADR D3 draws a hard line between a **generation** (charges credits, calls a
+  paid provider) and a **render** (spends only our own compute — browser WebCodecs today, a future
+  server-side renderer later). `model-render.ts` is the wire shape for that render plus its public,
+  revocable share link; it deliberately carries no `costCredits`/charge/refund field anywhere.
 
 ## Update 2026-07-11 — template catalog
 - Now also re-exports `./templates` (the `/templates` gallery DTO + the from-template request:
