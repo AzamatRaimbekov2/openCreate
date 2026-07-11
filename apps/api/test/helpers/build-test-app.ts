@@ -19,6 +19,9 @@ export const fakeRunware = () => ({
   // CinemaStudio audio submit (audioInference). Present on the fake so the
   // RunwareClient type is satisfied; audio tests script it per case.
   submitAudio: vi.fn(),
+  // Studio3D image→3D submit (3dInference). Same reason as submitAudio: the fake
+  // must satisfy the full RunwareClient type; the 3D tests script it per case.
+  submit3d: vi.fn(),
   getResponse: vi.fn(),
 })
 

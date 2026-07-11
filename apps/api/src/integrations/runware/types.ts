@@ -64,6 +64,22 @@ export type RunwareAudioRequest = {
   positivePrompt?: string | undefined
 }
 
+// Studio3D image→3D (Runware `3dInference`: TRELLIS.2 / Hunyuan3D / Tripo /
+// Meshy). Async submit-then-poll, same taskUUID + getResponse contract as video.
+export type Runware3dRequest = {
+  taskUUID: string
+  model: string
+  // A data URI. Runware accepts a UUID, a URL, a bare base64 string or a data
+  // URI; we send a data URI for the same reason the image path does — the API
+  // never hands a provider a user-supplied URL to fetch.
+  inputImage: string
+  // Quality knobs. Runware's returned `cost` SCALES WITH THESE, which is why the
+  // settled row bills from the poll response's cost field and never from the
+  // catalog list price.
+  pbr?: boolean | undefined
+  faceLimit?: number | undefined
+}
+
 // Discriminated on `status` so callers must handle all three poll outcomes.
 export type RunwarePollResult =
   | { status: 'processing'; progress: number | null }
@@ -75,6 +91,10 @@ export type RunwarePollResult =
       // neutral assetUrl exactly like videoURL/imageURL, so the settlement path
       // in the generation service is shared across all three media types.
       audioURL?: string | undefined
+      // 3dInference does NOT use the flat *URL shape — the finished GLB arrives
+      // under `outputs.files[0].url`. The client normalizes it to this field so
+      // callers keep one settlement path across all four media types.
+      meshURL?: string | undefined
       cost?: number | undefined
       NSFWContent?: boolean | undefined
     }

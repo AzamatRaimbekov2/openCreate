@@ -2,6 +2,7 @@
 // an array of task objects in, { data, errors } out. Injected into the app via
 // AppDeps so tests can swap in a fake (see plan Task 10's fakeRunware).
 import type {
+  Runware3dRequest,
   RunwareAudioRequest,
   RunwareImageRequest,
   RunwareImageResult,
@@ -41,6 +42,9 @@ export type RunwareClient = {
   // also surfaces audioURL). See the CinemaStudio ADR §1 (audio rides the video
   // lifecycle).
   submitAudio(req: RunwareAudioRequest): Promise<void>
+  // Studio3D: 3dInference, async — same submit-then-poll contract as submitVideo.
+  // The finished GLB arrives via getResponse under outputs.files[0].url.
+  submit3d(req: Runware3dRequest): Promise<void>
   getResponse(taskUUID: string): Promise<RunwarePollResult>
 }
 
@@ -157,6 +161,41 @@ export function createRunwareClient(opts: { apiKey: string; endpoint?: string })
       firstOrThrow(raw) // async ack — or an immediate submit error
     },
 
+    async submit3d(req) {
+      // Studio3D image→3D. inputImage / pbr / faceLimit are destructured out
+      // because they do NOT belong flat on the task envelope: the image nests
+      // under `inputs.images` (a flat `inputImage` is silently ignored by
+      // Runware — you get a task that never produces a mesh), and the quality
+      // knobs nest under `settings`. Everything else (taskUUID, model) spreads.
+      const { inputImage, pbr, faceLimit, ...rest } = req
+      const raw = await post([
+        {
+          taskType: '3dInference',
+          deliveryMethod: 'async',
+          includeCost: true,
+          outputFormat: 'GLB',
+          // NO `safety` param. 3dInference documents no safety filter, and Runware
+          // returns 400 unsupportedParameter on params a model does not know —
+          // exactly how ByteDance and Wan 2.7 broke. Do not add one speculatively.
+          inputs: { images: [inputImage] },
+          settings: {
+            // Let the provider segment the subject: every image→3D model produces a
+            // materially better mesh from a clean cutout, and Tripo/Hunyuan ship
+            // their own matting. Cheaper and better than us doing it badly.
+            imageAutoFix: true,
+            texture: true,
+            // Spread-if-present, never `pbr: undefined`: an explicit undefined key
+            // still serializes as a param on some paths, and an unknown param is a
+            // 400. Absent means absent.
+            ...(pbr !== undefined ? { pbr } : {}),
+            ...(faceLimit !== undefined ? { faceLimit } : {}),
+          },
+          ...rest,
+        },
+      ])
+      firstOrThrow(raw) // async ack — or an immediate submit error
+    },
+
     async getResponse(taskUUID) {
       const raw = await post([{ taskType: 'getResponse', taskUUID }])
       // Polling maps provider errors to a *state*, not an exception: the poll
@@ -171,13 +210,22 @@ export function createRunwareClient(opts: { apiKey: string; endpoint?: string })
           status: 'processing',
           progress: typeof item.progress === 'number' ? item.progress : null,
         }
-      if (item.status === 'success' || item.videoURL || item.imageURL || item.audioURL)
+      // Studio3D: 3dInference does NOT use the flat imageURL/videoURL/audioURL
+      // shape — it returns outputs.files[0].url. Reading it HERE (rather than in
+      // an adapter) keeps ONE place that knows Runware's response envelope. If
+      // this were missed, every 3D poll would read as "success with no asset" and
+      // the generation service would fail the row and REFUND a job that actually
+      // succeeded, while we still paid Runware for the mesh.
+      const files = (item.outputs as { files?: Array<{ url?: unknown }> } | undefined)?.files
+      const meshURL = typeof files?.[0]?.url === 'string' ? files[0].url : undefined
+      if (item.status === 'success' || item.videoURL || item.imageURL || item.audioURL || meshURL)
         return {
           status: 'success',
           videoURL: item.videoURL as string | undefined,
           imageURL: item.imageURL as string | undefined,
           // CinemaStudio audio: audioInference returns audioURL on success.
           audioURL: item.audioURL as string | undefined,
+          meshURL,
           cost: item.cost as number | undefined,
           NSFWContent: item.NSFWContent as boolean | undefined,
         }

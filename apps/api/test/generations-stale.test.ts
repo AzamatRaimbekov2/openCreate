@@ -35,6 +35,8 @@ const fakeRunware = () => ({
   imageInference: vi.fn(),
   submitVideo: vi.fn(),
   submitAudio: vi.fn(),
+  // Studio3D 3dInference submit — present so the fake satisfies RunwareClient.
+  submit3d: vi.fn(),
   getResponse: vi.fn(),
 })
 
