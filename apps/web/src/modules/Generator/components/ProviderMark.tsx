@@ -56,6 +56,11 @@ const GLYPH: Record<ProviderId, ReactNode> = {
       <path d="M10 8 l6 4 l-6 4 z" />
     </>
   ),
+  // Nano Banana (Google/Gemini image) — a crescent. The literal read of the name
+  // is the point: this is the mark users are already looking for in every other
+  // tool, and an abstract "Gemini spark" would hide it behind a brand they do not
+  // say out loud. Two arcs, closed — monoline like the rest, no fill.
+  nanobanana: <path d="M7 4 a11 11 0 0 0 13 13 A9 9 0 0 1 7 4 z" />,
   // Fallback — a neutral faceted node
   generic: <path d="M12 3 l8 4.5 v9 L12 21 l-8 -4.5 v-9 z" />,
 }

@@ -25,7 +25,7 @@ import { useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatResolution, resolutionFor } from '@opencreate/contracts'
-import { Button, EmptyState, ErrorState, Select, Skeleton } from 'shared/ui'
+import { Button, EmptyState, ErrorState, GLASS_FLOATING, Select, Skeleton } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
 import { useCreateGeneration } from '../model/createGeneration'
 import {
@@ -44,43 +44,23 @@ import { SubmitErrorBanner } from './SubmitErrorBanner'
 
 // The capsule: a floating pill of frosted glass the media scrolls beneath.
 //
-// bg-ridge is the OPAQUE default and supports-[backdrop-filter] upgrades it to
-// translucent. Order matters — without backdrop-filter a translucent fill is
-// just a transparent panel, and the prompt text would land unreadable on top of
-// whatever media happens to be behind it. Glass is the enhancement, never the
-// baseline. (Firefox ships backdrop-filter enabled since 103, but the flag can
-// still be off, and print/forced-colors modes drop it entirely.)
+// The material (opaque baseline + the supports-[backdrop-filter] upgrade, the
+// saturate/brightness pair, the specular top border, the inner ring) is NOT
+// written here: it is `GLASS_FLOATING` in shared/ui/surfaces.ts, the one place
+// that owns the recipe. This file used to carry a hand-copy of it, which had
+// already drifted (bg-ridge baseline, a fainter fill, a bespoke shadow) — the
+// exact failure a single source exists to prevent.
 //
-// WHAT MAKES IT READ AS iOS 18 GLASS, and not as "a dark box at 55% opacity":
-//  · the fill is barely there (white/[0.04]) — the blurred backdrop IS the
-//    surface, so you can see media move through it rather than behind a scrim
-//  · backdrop-saturate-150 — Apple's materials boost chroma of what they blur;
-//    without it a blur washes colour out and the panel goes grey and dead
-//  · backdrop-brightness-75 — buys text contrast from the BACKDROP instead of
-//    from an opaque fill, which is the whole trick: dim what's behind, don't
-//    cover it
-//  · a bright top border + faint bottom (border-t-white/25) fakes the specular
-//    edge of a real lens; a uniform hairline reads as a flat outline
-//  · an inset ring adds the inner glass wall under that edge
+// FLOATING, not the resting card elevation: the capsule hovers over a scrolling
+// feed and needs the longer shadow throw to separate from it.
 //
-// The pointer-events-auto re-enables clicks the route's click-through wrapper
-// disabled so the feed could stay scrollable under the capsule's margins.
+// Only the capsule's own geometry stays local — the pill radius (larger than a
+// card's), the padding, and pointer-events-auto, which re-enables the clicks the
+// route's click-through wrapper disabled so the feed stays scrollable under the
+// capsule's margins.
 const CAPSULE_CLASS = [
-  'pointer-events-auto w-full max-w-3xl rounded-[1.75rem] px-4 py-3',
-  // Opaque baseline — everything below only applies where glass is real
-  'border border-white/15 bg-ridge',
-  // Depth: a long soft shadow lifts the capsule off the feed
-  'shadow-2xl shadow-black/50',
-  // The glass itself
-  'supports-[backdrop-filter]:bg-white/[0.04]',
-  'supports-[backdrop-filter]:backdrop-blur-2xl',
-  'supports-[backdrop-filter]:backdrop-saturate-150',
-  'supports-[backdrop-filter]:backdrop-brightness-75',
-  // Specular edge: lit from above, dimmer below
-  'supports-[backdrop-filter]:border-white/10',
-  'supports-[backdrop-filter]:border-t-white/25',
-  // Inner glass wall
-  'supports-[backdrop-filter]:ring-1 supports-[backdrop-filter]:ring-white/5 supports-[backdrop-filter]:ring-inset',
+  'pointer-events-auto w-full max-w-3xl rounded-[1.75rem] border px-4 py-3',
+  GLASS_FLOATING,
 ].join(' ')
 
 export type ChatComposerProps = {

@@ -168,4 +168,41 @@ describe('generation with entity refs', () => {
     expect(task.positivePrompt).toBe('закат')
     expect(task.referenceImages).toBeUndefined()
   })
+
+  // The face policy, enforced at the boundary. Seedance 2.0 refuses real human
+  // faces on input, and it is NOT reference-capable — so a tagged character must
+  // be rejected by US, cheaply and before any money moves, rather than shipped to
+  // ByteDance to be refused by their moderation. (The client already filters the
+  // picker; this is the API keeping its own counsel, per the entity-library ADR:
+  // "a capability the client can lie about is not a capability".)
+  it('refuses to route a tagged character to seedance-2-0 (never reaches ByteDance)', async () => {
+    const { generations, entities } = await setup()
+    const character = await seedCharacter(entities)
+    await expect(
+      generations.create('u1', {
+        modelId: 'seedance-2-0',
+        prompt: '[[e1]] идёт по улице',
+        aspectRatio: '16:9',
+        duration: 5,
+        entityRefs: [{ placeholder: 'e1', entityId: character.id }],
+      }),
+    ).rejects.toThrow(/reference/i)
+  })
+
+  it('routes a tagged character to nano-banana-pro, the reference model', async () => {
+    const { generations, entities, runware } = await setup()
+    const character = await seedCharacter(entities)
+    await generations.create('u1', {
+      modelId: 'nano-banana-pro',
+      prompt: '[[e1]] стоит у окна',
+      aspectRatio: '16:9',
+      entityRefs: [{ placeholder: 'e1', entityId: character.id }],
+    })
+    const task = runware.imageInference.mock.calls[0]?.[0]
+    expect(task.positivePrompt).toBe('Аня (тёмные волосы) стоит у окна')
+    expect(task.referenceImages).toHaveLength(1)
+    // Its own dimension table, not the default square1024 one.
+    expect(task.width).toBe(1376)
+    expect(task.height).toBe(768)
+  })
 })

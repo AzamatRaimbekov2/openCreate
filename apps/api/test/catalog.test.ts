@@ -3,7 +3,7 @@
 // contract schema, and creditsFor must be exact about duration pricing.
 import { describe, expect, it } from 'vitest'
 import { catalogModelSchema } from '@opencreate/contracts'
-import { CATALOG, creditsFor, getModel } from '../src/modules/catalog/catalog'
+import { CATALOG, creditsFor, getModel, resolutionFor } from '../src/modules/catalog/catalog'
 import { buildTestApp } from './helpers/build-test-app'
 
 describe('catalog', () => {
@@ -30,27 +30,139 @@ describe('catalog', () => {
 })
 
 describe('GET /api/catalog', () => {
-  it('is public and returns the runnable catalog models', async () => {
-    // buildTestApp defaults comfyBaseUrl to null (self-host off), so the route
-    // hides wan-runpod models — a listed model whose backend cannot run is only
-    // a selectable option that always errors.
+  // The rule the route implements: a video model is listed only when the backend
+  // that runs it is configured. Runware is always on; wan-runpod needs
+  // COMFY_BASE_URL and bytedance needs ARK_API_KEY. Listing a model whose backend
+  // cannot run is worse than omitting it — it is a selectable option that walks
+  // the user all the way to submit and only then fails.
+  const optionalProviders = ['wan-runpod', 'bytedance']
+
+  it('is public and lists only Runware models when both optional backends are off', async () => {
+    // buildTestApp defaults comfyBaseUrl AND arkApiKey to null.
     const app = await buildTestApp()
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     expect(res.statusCode).toBe(200)
     const body = res.json() as { models: Array<{ provider?: string }> }
-    const expected = CATALOG.filter((m) => m.type !== 'video' || m.provider !== 'wan-runpod')
+    const expected = CATALOG.filter(
+      (m) => m.type !== 'video' || !optionalProviders.includes(m.provider ?? 'runware'),
+    )
     expect(body.models).toHaveLength(expected.length)
-    // No self-host model leaks into the listing while self-host is off.
-    expect(body.models.some((m) => m.provider === 'wan-runpod')).toBe(false)
+    for (const p of optionalProviders)
+      expect(body.models.some((m) => m.provider === p)).toBe(false)
     for (const m of body.models) expect(catalogModelSchema.safeParse(m).success).toBe(true)
   })
 
-  it('lists wan-runpod models when self-host IS configured', async () => {
+  it('lists wan-runpod models when self-host IS configured (and still hides bytedance)', async () => {
     const app = await buildTestApp({ comfyBaseUrl: 'https://pod-8188.proxy.runpod.net' })
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     const body = res.json() as { models: Array<{ provider?: string }> }
-    expect(body.models).toHaveLength(CATALOG.length)
     expect(body.models.some((m) => m.provider === 'wan-runpod')).toBe(true)
+    // Each backend is gated by its OWN env: turning the pod on must not smuggle
+    // in a ByteDance model whose key is still absent.
+    expect(body.models.some((m) => m.provider === 'bytedance')).toBe(false)
+  })
+
+  it('lists bytedance models only when ARK_API_KEY IS configured', async () => {
+    const off = await buildTestApp()
+    const offBody = (await off.inject({ method: 'GET', url: '/api/catalog' })).json() as {
+      models: Array<{ id: string }>
+    }
+    expect(offBody.models.some((m) => m.id === 'seedance-2-0')).toBe(false)
+
+    const on = await buildTestApp({ arkApiKey: 'ark-key' })
+    const onBody = (await on.inject({ method: 'GET', url: '/api/catalog' })).json() as {
+      models: Array<{ id: string; provider?: string }>
+    }
+    expect(onBody.models.some((m) => m.id === 'seedance-2-0')).toBe(true)
+    expect(onBody.models.some((m) => m.provider === 'wan-runpod')).toBe(false)
+  })
+
+  it('lists every model when both optional backends are configured', async () => {
+    const app = await buildTestApp({
+      comfyBaseUrl: 'https://pod-8188.proxy.runpod.net',
+      arkApiKey: 'ark-key',
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/catalog' })
+    const body = res.json() as { models: Array<{ provider?: string }> }
+    expect(body.models).toHaveLength(CATALOG.length)
+  })
+})
+
+describe('nano-banana-pro — the reference/character model', () => {
+  const m = getModel('nano-banana-pro')
+
+  it('is a Runware image model that conditions on references (faces AND subjects)', () => {
+    expect(m).toBeDefined()
+    expect(m!.type).toBe('image')
+    expect(m!.air).toBe('google:4@2')
+    expect(m!.referenceMode).toBe('both')
+    expect(m!.maxReferenceImages).toBe(14)
+  })
+
+  it('reads its OWN dimension table — the default one would earn a provider 400', () => {
+    // Nano Banana rejects sizes outside its published list, exactly like Kontext.
+    // square1024's 1344×768 is NOT on that list.
+    expect(m!.resolutionProfile).toBe('nanobanana')
+    expect(resolutionFor(m!, '16:9')).toEqual({ width: 1376, height: 768 })
+    expect(resolutionFor(m!, '1:1')).toEqual({ width: 1024, height: 1024 })
+    expect(resolutionFor(m!, '9:16')).toEqual({ width: 768, height: 1376 })
+  })
+
+  it('is priced above wholesale ($0.138/image at 1K)', () => {
+    expect(m!.type === 'image' && m!.credits).toBeGreaterThan(14)
+  })
+})
+
+// THE load-bearing architectural invariant of the ByteDance integration.
+// Seedance 2.0 refuses real human faces on input, and Nano Banana is a Google
+// model — ByteDance trusts ONLY ModelArk's own outputs, so switching the image
+// model from Flux to Nano Banana does NOT unlock faces on Seedance 2.0.
+// The protection is the capability flag: a model with no `referenceMode` is
+// filtered out of the picker the moment an entity is tagged, and the API
+// re-validates. If someone ever "helpfully" adds referenceMode to seedance-2-0,
+// this test is what stops a class of silently-refused, credit-burning generations.
+describe('face policy — Seedance 2.0 must never be reference-capable', () => {
+  it('seedance-2-0 declares NO referenceMode, so a tagged entity can never route to it', () => {
+    const m = getModel('seedance-2-0')!
+    expect(m.referenceMode).toBeFalsy()
+  })
+
+  it('the reference-capable models are exactly those that accept real faces', () => {
+    // Every model offered once a character is tagged must be one whose provider
+    // has no real-face policy. ByteDance-backed models must not appear here.
+    const referenceCapable = CATALOG.filter((m) => m.referenceMode)
+    expect(referenceCapable.length).toBeGreaterThan(0)
+    for (const m of referenceCapable)
+      expect(m.type === 'video' && m.provider === 'bytedance').toBe(false)
+  })
+})
+
+describe('seedance 2.0 — direct ByteDance channel', () => {
+  const m = getModel('seedance-2-0')
+
+  it('routes to the bytedance provider, not the Runware aggregator', () => {
+    expect(m).toBeDefined()
+    expect(m!.type === 'video' && m!.provider).toBe('bytedance')
+  })
+
+  it('carries the dreamina- prefixed ModelArk id behind the synthetic AIR prefix', () => {
+    // ByteDance 404s InvalidEndpointOrModel.NotFound without the `dreamina-`
+    // prefix (2.0 has it; 1.x does not). The `bytedance:` half is ours — it only
+    // exists to satisfy the shared AIR regex and is stripped by the adapter.
+    expect(m!.air).toBe('bytedance:dreamina-seedance-2-0-260128')
+  })
+
+  it('is pinned to the 720p (hd) table so a premium tier cannot silently buy 1080p', () => {
+    // Wholesale is $0.756/5s at 720p but $1.87/5s at 1080p. Without this pin the
+    // 'premium' tier would read the fhd table and multiply our cost by ~2.5×.
+    expect(m!.resolutionProfile).toBe('hd')
+  })
+
+  it('is priced above wholesale — the 35-credit standard tier would sell at a loss', () => {
+    // 5s 720p costs $0.756 (108k tokens × $0.0070/1k, the no-video-input rate).
+    // 1 credit = $0.01, so anything at or below 76 credits loses money per clip.
+    expect(creditsFor(m!, 5)).toBeGreaterThan(76)
+    expect(creditsFor(m!, 10)).toBe(creditsFor(m!, 5) * 2)
   })
 })
 

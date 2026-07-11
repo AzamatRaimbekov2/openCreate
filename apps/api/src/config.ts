@@ -89,6 +89,13 @@ const envSchema = z.object({
   // rejects empty (optional = absent, not ''), which crashed boot. The `|| null`
   // below then normalizes '' → null (not configured).
   COMFY_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
+  // ByteDance ModelArk API key (ADR: seedance-direct-bytedance) — the DIRECT
+  // Seedance channel, bypassing the Runware aggregator. OPTIONAL, same
+  // treatment as COMFY_BASE_URL: unset keeps boot healthy and simply hides the
+  // bytedance-backed models from /api/catalog, so nobody can select a model
+  // whose backend cannot run. A plain bearer token (ModelArk does no request
+  // signing). `|| null` normalizes '' → null (not configured) below.
+  ARK_API_KEY: z.string().optional(),
   // Anthropic API key for the CinemaStudio script→storyboard feature. OPTIONAL,
   // same treatment as COMFY_BASE_URL / Google OAuth: unset keeps boot healthy —
   // the /storyboard endpoint then returns a clean provider_error instead of
@@ -131,6 +138,9 @@ export type AppConfig = {
   assetHostAllowlist: string[]
   // Pod ComfyUI base URL for the wan-runpod video provider; null when unset.
   comfyBaseUrl: string | null
+  // ByteDance ModelArk bearer token for the direct Seedance provider; null when
+  // unset (provider disabled, its catalog models hidden, boot stays healthy).
+  arkApiKey: string | null
   // Anthropic key for the storyboard feature; null when unset (feature disabled,
   // boot stays healthy).
   anthropicApiKey: string | null
@@ -170,6 +180,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
   // `|| null` (not `?? null`): an empty COMFY_BASE_URL means "not configured",
   // same treatment as the Google OAuth creds below.
   const comfyBaseUrl = e.COMFY_BASE_URL || null
+  const arkApiKey = e.ARK_API_KEY || null
   return {
     runwareApiKey: e.RUNWARE_API_KEY,
     betterAuthSecret: e.BETTER_AUTH_SECRET,
@@ -202,16 +213,20 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     // wan-runpod pod's /view host is folded in below so its finished mp4s pass
     // the SSRF gate — driven entirely by COMFY_BASE_URL, so pointing at a new
     // pod is one env edit with no allowlist bookkeeping.
-    assetHostAllowlist: withComfyHost(
-      e.ASSET_HOST_ALLOWLIST.split(',')
-        .map((h) => h.trim())
-        .filter(Boolean),
-      comfyBaseUrl,
+    assetHostAllowlist: withArkHost(
+      withComfyHost(
+        e.ASSET_HOST_ALLOWLIST.split(',')
+          .map((h) => h.trim())
+          .filter(Boolean),
+        comfyBaseUrl,
+      ),
+      arkApiKey,
     ),
     assetFetchTimeoutMs: e.ASSET_FETCH_TIMEOUT_MS,
     assetMaxBytes: e.ASSET_MAX_BYTES,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
     comfyBaseUrl,
+    arkApiKey,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.
     anthropicApiKey: e.ANTHROPIC_API_KEY || null,
@@ -232,4 +247,26 @@ function withComfyHost(allowlist: string[], comfyBaseUrl: string | null): string
     return allowlist
   }
   return allowlist.includes(host) ? allowlist : [...allowlist, host]
+}
+
+// Where ModelArk publishes a finished Seedance video. NOT the API's own domain:
+// the API lives on *.bytepluses.com but the asset lands on ByteDance's TOS
+// object storage under *.volces.com — allowlisting the API domain would pass the
+// SSRF gate for zero real downloads and fail every one of them. Verified against
+// the ModelArk API docs' example response body (content.video_url =
+// https://ark-content-generation-ap-southeast-1.tos-ap-southeast-1.volces.com/…).
+//
+// The REGION suffix (not the full bucket host) is the allowlist entry: the gate
+// matches on an exact-or-dot-boundary basis, so this admits ByteDance's ark
+// buckets in ap-southeast-1 and nothing else, while surviving a bucket rename.
+// Seedance is served ONLY from ap-southeast-1 (eu-west-1 carries other models),
+// so there is no second region to fold in.
+export const ARK_ASSET_HOST = 'tos-ap-southeast-1.volces.com'
+
+// Fold the ModelArk asset host into the SSRF allowlist, but ONLY when the direct
+// ByteDance provider is actually configured — an unset ARK_API_KEY keeps the
+// download surface closed, exactly like the wan-runpod pod host above.
+function withArkHost(allowlist: string[], arkApiKey: string | null): string[] {
+  if (!arkApiKey) return allowlist
+  return allowlist.includes(ARK_ASSET_HOST) ? allowlist : [...allowlist, ARK_ASSET_HOST]
 }

@@ -1,9 +1,12 @@
-# openCreate — Design System v3 ("Bioluminescent Terminal")
+# openCreate — Design System v4 ("Bioluminescent Terminal, frosted")
 
 > Canonical design source of truth for `apps/web`. Every screen, component, and token
 > decision starts here. v3 created 2026-07-07 from the owner-chosen Midjourney-style
 > reference (`docs/frontend/style-reference-v3.md` — its §Adaptations are binding),
-> superseding v2 "Light Editorial". Keep in sync with
+> superseding v2 "Light Editorial". **v4 (2026-07-09)** keeps all of v3 except the
+> depth model: cards and sheets became iOS-18-style frosted glass (§3.5) at the
+> owner's request. The no-gradient law, the surface ladder, the mono typography and
+> the specimen-pill triad are unchanged. Keep in sync with
 > `apps/web/src/shared/config/theme.css` and `apps/web/src/shared/ui/`.
 
 ## 1. Intent & identity
@@ -23,9 +26,12 @@ translucent specimen pills — never a dashboard template, never a light theme.
   subscription) keep their exact meaning everywhere.
 - **NO GRADIENTS — hard owner rule.** No background gradients, no gradient shimmer,
   no gradient fills in art or chrome. Flat colors only, everywhere. Grep every diff
-  for `gradient` before committing.
-- Depth: **surface color steps, not shadows.** The ONLY allowed shadow is the soft
-  double `shadow-pill` on specimen pills.
+  for `gradient` before committing. **This rule survives v4 untouched.**
+- Depth (**v4, 2026-07-09**): **frosted glass.** Cards and sheets are translucent,
+  backdrop-blurred and lifted with `shadow-glass`. This SUPERSEDES the v3 rule
+  ("depth = surface color steps, the only shadow is `shadow-pill`"), which the owner
+  retired when asking for iOS-18-style glass cards. Surface color steps still order
+  the ladder (§2); glass is how a card sits ON it. See §3.5.
 
 ## 2. Color tokens
 
@@ -115,18 +121,62 @@ Two self-hosted static families (imported in `main.tsx` via @fontsource, declare
 - `font-medium` (500) is reserved for interactive labels (buttons, links, nav
   wordmark, model names).
 
+## 3.5 Glass surfaces (v4 — the depth model)
+
+Authored ONCE in `apps/web/src/shared/ui/surfaces.ts` and normally consumed through
+the `Card` primitive (`Modal`'s sheet reads the same constants). **Never hand-write a
+frosted class string.** Before v4 the recipe had been copy-pasted into three
+components and the third copy (the composer capsule) had already drifted — a fainter
+fill, a `bg-ridge` baseline, a bespoke shadow. That drift is the whole argument for a
+single source.
+
+| Surface | Constant | Use when | Never |
+|---|---|---|---|
+| **glass** | `GLASS_SURFACE` | The default card, at rest. Panels and modal sheets. | Popup/menu panels; anything that must stay legible over moving media |
+| **glass, floating** | `GLASS_FLOATING` | The same material with a longer shadow throw: chrome hovering OVER scrolling content (the composer capsule) | A resting panel — the lift would read as a bug |
+| **steel** | `STEEL_SURFACE` | Opaque working surface: text dialogs, dropdown panels, inputs | As a generic card (that is glass now) |
+| **well** | `WELL_SURFACE` | Recessed plate the content sits INSIDE: media wells, the shot rail | Anything that should look raised |
+
+There are exactly **two elevations**, not a shadow per call site: Tailwind resolves
+competing shadow utilities by stylesheet order, not by class order, so "`GLASS_SURFACE`
+plus my own shadow" is not something a consumer can express. Need a new elevation? Add
+a named one here. `Select`'s trigger keeps its own translucent fill — a trigger is a
+control, not a surface, and its popup PANEL is deliberately opaque.
+
+Three properties of the glass recipe are load-bearing, and each exists for a reason:
+
+1. **`bg-steel` is the baseline, not a fallback afterthought.** Every frosted utility
+   is layered behind `supports-[backdrop-filter]:`. A browser without
+   `backdrop-filter` therefore renders an opaque steel card — a translucent card over
+   unblurred content is unreadable, not stylish.
+2. **`backdrop-blur` only does visible work where there is TEXTURE behind the card.**
+   Blurring a uniform fill returns the same fill, so over the flat `--color-void` the
+   blur is a mathematical no-op. Glass reads over media (previews, thumbnails, the
+   gallery grid) and over the dimmed page under a modal; elsewhere the translucent
+   wash, the hairline and `shadow-glass` carry the look. Do not "fix" this with a
+   background gradient — see the no-gradient rule.
+3. **The specular edge is a brighter TOP BORDER** (`border-t-white/25`), never a
+   gradient sheen. This is how the iOS-glass highlight is reproduced under the
+   no-gradient law.
+
+Media is still the hero (owner's standing feedback): a frosted card wrapping a
+photograph adds chrome and buries it. Media plates take `surface="well"` +
+`padding="none"` and let the image be the brightest thing on screen.
+
 ## 4. Structure, spacing, radius, motion
 
 - **Surface elevation table (§2) is the layout law**: prose on the void, cards and
   inputs on steel, hovers/menus on ridge, media on abyss. The sticky steel nav needs
   no border — the color step separates it.
-- **Radii: two only.** Pills = `rounded-full` (buttons, chips, toggles, LangSwitch);
-  cards/inputs/modals/media = `rounded-lg` (8px). No intermediate radii; square ends
-  for rules/progress meters.
+- **Radii: three.** Pills = `rounded-full` (buttons, chips, toggles, LangSwitch);
+  **cards/modals = `rounded-2xl` (16px, v4 — the glass silhouette)**; inputs/media
+  = `rounded-lg` (8px). Square ends for rules/progress meters.
 - **Spacing**: 4px scale. `gap-1` inside controls, `gap-4` between fields, `p-6`–`p-8`
   framed blocks; landing sections keep ≥96px vertical rhythm on desktop (`md:gap-28`).
   Landing/prose column stays narrow; app screens (create/library) use the wider grid.
-- **Shadows**: `shadow-pill` on specimen pills ONLY. Modals, menus, cards: none.
+- **Shadows (v4)**: `shadow-pill` on specimen pills; `shadow-glass` on glass cards and
+  sheets (it ships inside `GLASS_SURFACE`). Popup/menu panels: still none — they are
+  opaque steel by design. Never author a bespoke shadow.
 - **Motion**: opacity/translate/color only, 150–250ms (`duration-200` default).
   Hover = one surface step up (`hover:bg-ridge`) or one tint step (`/20 → /35`).
   `animate-skeleton` (stepped background-color walk abyss→steel→ridge→steel,
@@ -163,7 +213,8 @@ anything new; new shared components must be added to this table in the same task
 | `Button` | `variant: primary \| ghost \| danger`, `size: md \| lg`, `isLoading` | Specimen pills: primary = green tint, ghost = amber tint, danger = red tint — always `bg-specimen-*/20 border-white/10` + bright text + `shadow-pill`, hover `/35`. Focus = portal ring; disabled 50%; loading spinner + `aria-busy` |
 | `Input` | `label`, `error`; native props incl. `ref` (RHF-ready) | Steel filled field: `bg-steel rounded-lg border-white/10`, mono caption label (`text-xs text-mist-dim`); focus = `border-portal`; error = `border-glow-red` + `role="alert"` glow-red message |
 | `Skeleton` | `className` for shape | `animate-skeleton bg-steel rounded-lg` — stepped solid pulse through the surface ladder (no gradient shimmer) |
-| `Modal` | `isOpen`, `onClose`, `title`, `role: dialog \| alertdialog` | Steel sheet: `bg-steel rounded-lg border-white/10` over `bg-void/70`, mono 400 title, white/10 hairline close circle (hover → ridge); portal, Escape + overlay close, scroll lock, dependency-free focus TRAP (Tab/Shift+Tab wrap inside), focus restore to the trigger; NO shadow |
+| `Card` **(v4)** | `surface: glass \| steel \| well`, `title?`, `action?`, `padding: none \| md \| lg`, `className` (layout only) | THE panel primitive — replaces every hand-rolled `rounded-lg border border-white/10 p-4`. `rounded-2xl`, surface from `surfaces.ts`. With `title` it renders the heading and becomes a `<section>` landmark named by it (`aria-labelledby`), so an editor screen is navigable by region. `padding="none"` for edge-to-edge media. `className` is for grid spans / sticky positioning — NEVER for surface styling |
+| `Modal` | `isOpen`, `onClose`, `title`, `role: dialog \| alertdialog`, `size: md \| lg`, `surface: steel \| glass`, `hideHeader` | `rounded-2xl` sheet over `bg-void/70`; `steel` = opaque (text dialogs), `glass` = frosted (media detail, where the content is the hero). Both surfaces come from `surfaces.ts`. Mono 400 title, white/10 hairline close circle (hover → ridge); portal, Escape + overlay close, scroll lock, dependency-free focus TRAP (Tab/Shift+Tab wrap inside), focus restore to the trigger |
 | `EmptyState` | `icon?`, `title`, `description?`, `action?` | White/10 hairline `rounded-lg` frame on the void, mono 400 30px white title |
 | `ErrorState` | `message`, `onRetry?` | Calm hairline frame + amber ghost retry, `role="alert"` — never red-primary |
 | `Badge` | `variant: neutral \| accent \| success \| danger` | Mono caption CHIP: `rounded-full border-white/10 bg-white/5 text-xs`, lowercase; text color = mist-dim / glow-amber / glow-green / glow-red |
@@ -269,17 +320,20 @@ Module-owned components (inside `modules/*`, composed from §6 primitives).
 | Auth | `AuthForm` (`/login`) | Inside the route's centered STEEL card: mono 30px h1 over a white/10 hairline, steel `Input` fields (border-defined on the card); submit pill tinted by mode — log-in = RED specimen pill (auth-entry), sign-up = GREEN (creating an account is a create action); login↔register switch as a portal link; zod errors per field (`role="alert"`); server banner = ABYSS block + glow-red left rule (steel would vanish on the steel card); Google button = amber ghost, behind `VITE_GOOGLE_AUTH=1`. |
 | Credits | `BalanceChip` (header) | The AMBER SPECIMEN PILL at 40px: `rounded-full border-white/10 bg-specimen-amber/20 text-lumen-amber shadow-pill` (hover `/35` — Button-ghost anatomy: the balance is a real control, not passive meta), glow-AMBER bolt icon accent + `font-medium` numeral (the 500 ceiling); the bolt is a decorative `currentColor` SVG — NEVER an OS emoji; loading = pill `Skeleton`; failure = ↻ icon-button; signed-out hidden. Opens history modal. |
 | Credits | `TransactionsList` (modal) | `Modal` (steel sheet) + 4 states; ledger rows on `divide-white/10`, mono 400 amounts — `+n` glow-green / `-n` glow-red (sign carries meaning, color reinforces). |
-| Generator | `GeneratorPanel` (`/create`) | The "commission sheet": unfilled `rounded-lg border-white/10` frame on the void (steel surfaces inside keep the elevation ladder readable), mono caption head, ordered `SheetField` rows (`divide-white/10`), glow-GREEN mono `CostLabel` + green Generate against the closing hairline (price and action share the create tint). Catalog 4 states. Submit failures inline via `SubmitErrorBanner` (portal `/pricing` link on insufficient credits). |
+| Generator | `GeneratorPanel` (sheet posture) | The "commission sheet": a TITLED GLASS `Card` (`padding='lg'`, `title=generator.sheet`). v4 retired the unfilled `rounded-lg border-white/10` frame — the card now has depth of its own, so the steel inputs inside no longer carry the elevation ladder alone — and retired the `<header>` + `aria-label` pair with it: the visible mono caption IS the landmark's accessible name (which therefore changed from `generator.title` to `generator.sheet`). Ordered `SheetField` rows (`divide-white/10`), glow-GREEN mono `CostLabel` + green Generate against the closing hairline (price and action share the create tint). Catalog 4 states. Submit failures inline via `SubmitErrorBanner` (portal `/pricing` link on insufficient credits). Sibling of `ChatComposer` over the same store — `/create` renders the composer. |
 | Generator | `SheetField` | One sheet row: ghost mono ordinal (`text-white/20`, 400, aria-hidden, derived from render order) + field group; separators owned by the parent `divide-y`. |
 | Generator | `PromptField` | Mono caption + steel filled textarea (`bg-steel rounded-lg`, focus → portal border) — the `Input` treatment's textarea twin. |
 | Generator | `SubmitErrorBanner` | `role="alert"` steel block + glow-red left rule; EVERY envelope code renders localized primary copy — `insufficient_credits` (+ portal `/pricing` link) and `content_blocked` (refund promise) keep dedicated wording, all other/unknown codes map via `shared/libs/errorCopy` → `errors.codes.*`; the raw envelope message may trail only as a secondary `text-mist-dim` line (suppressed for the two dedicated codes and for non-envelope exceptions). |
 | Generator | `ModelSelect` (+ `ModelSelectOption`, `ProviderMark`, `useModelListbox`) | Custom accessible LISTBOX (not a native `<select>` — options need a logo, tier chip and description). Trigger = steel (`variant='sheet'`) or glass (`variant='glass'`, composer) field showing the selected model's `ProviderMark` + name + provider label + `N cr`. Opens an OPAQUE `bg-steel` panel (readable over the composer's frosted glass — the reason a native select was rejected here), placement-aware (flips UP for the bottom-docked composer), listing ALL models in `role="group"` sections (Images / Video). Each `role="option"` row: `ProviderMark` tile, name + provider, tier `Badge` (amber), tariff `N cr · $N.NN` ($ = credits × $0.01, video quotes its base duration) and a localized description (`generator.models.<id>.description`). SELECTED = amber ring (`ring-glow-amber/60`) + `aria-selected`; ACTIVE (keyboard/hover) = one step to `bg-ridge`. Full keyboard: Arrow/Home/End move, Enter/Space select, Esc closes + restores focus, typeahead by name; click-outside closes; enter transition is CSS `@starting-style` (no gradient). Owns `useCatalog` + the 4 states (skeleton / inline retry / disabled placeholder / data). Picking a video model while on 'image' flips the type via the store's `normalizeFor`. Replaced the old `ModelPicker` tiles (deleted 2026-07-08). |
 | Generator | `ProviderMark` | Inline SVG provider LOGO marks (one crisp monoline glyph per brand: flux/pixverse/minimax/seedance/wan/kling/veo + generic) — self-contained (no external URLs, CSP-safe), `currentColor`, flat strokes, no gradients; `aria-hidden` (the brand name is text). |
 | Generator | `ImageDrop` | Dashed white/15 dropzone on the void (hover brightens + ridge wash) + sr-only file input; preview thumb on `bg-abyss`; image/* ≤10MB; glow-red inline errors. |
-| Gallery | `GalleryGrid` | 4 states: 8 plate-shaped skeletons (`animate-skeleton`) / `ErrorState` / `EmptyState` + green pill `/create` CTA / 1-2-3-col grid + amber ghost Load more. |
-| Gallery | `GenerationCard` | A FIGURE (no card): SQUARE `rounded-lg bg-abyss` tile — the landing specimen grid's tile language (images `object-cover`, videos letterboxed; the full frame lives in the detail modal); mono mist prompt caption; white/10 meta row (cost · portal download · glow-red ICON delete — `#ff2056` is "icons/status only", a red pill per figure shouted). Processing = `animate-skeleton` tile + `Progress` + glow-amber %; polling is BOUNDED — 20 min past `createdAt` the interval stops and a `role="status"` glow-AMBER "taking longer than usual" note (`gallery.stalled`) + amber ghost Refresh pill (`gallery.refresh`, one manual poll) appear under the progress row (amber, not red: nothing failed yet); a status poll that fails before any data replaces the tile with `ErrorState` (`gallery.pollFailed`) + retry — the card never freezes at "Generating N%". Succeeded = green "ready" chip (`gallery.ready` — status said in text, never color-only); failed = glow-red hairline tile + a localized primary reason (`errorCodeMessageKey(errorCode)` → `errors.codes.*`, unknown → generic) + the raw provider text only as the secondary mist-dim caption (suppressed for `content_blocked`) + "Credits refunded" green chip. Plates lift on hover (`motion-safe`). Delete opens the destructive-confirm alertdialog (§9, `gallery.deleteConfirm.*`) — the optimistic removal fires only on the danger-pill confirm. |
-| Gallery | `GenerationDetail` (modal) | `rounded-lg bg-abyss` plate, mono caption, portal download. |
+| Gallery | `GalleryGrid` | 4 states: 8 plate-shaped skeletons (`animate-skeleton`, `rounded-2xl` = the well's radius, so the grid never re-corners itself when data lands) / `ErrorState` / `EmptyState` + green pill `/create` CTA / 1-2-3-col grid + amber ghost Load more. |
+| Gallery | `GenerationCard` | A FIGURE: a SQUARE `Card surface='well' padding='none'` plate — **never `glass`**. A thumbnail in a grid IS the content; frosting a card around a photo lays a lit edge, a blur and a shadow over what the eye is reading as an image. Glass is for chrome that floats OVER media. Images `object-cover`, videos letterboxed; the full frame lives in the detail modal. The `<button>` sits INSIDE the well (a `<button>` takes phrasing content, `Card` renders a `<div>`), so the plate owns the `motion-safe` hover lift and the button a `focus-visible:ring-inset` ring — an outset ring would be clipped by `overflow-hidden`. Mono mist prompt caption; the action set rides the plate's corner in a `Menu` (glow-red ICON delete — `#ff2056` is "icons/status only", a red pill per figure shouted). Two plates stay hand-rolled at the well's radius: PROCESSING (`animate-skeleton` walks background-color; a well would pin the fill and kill the pulse) and FAILED (its `border-glow-red` is STATUS, and Card owns its hairline as surface — pushing a border color through the layout-only `className` would let Tailwind's stylesheet order decide the winner). Processing = `animate-skeleton` tile + `Progress` + glow-amber %; polling is BOUNDED — 20 min past `createdAt` the interval stops and a `role="status"` glow-AMBER "taking longer than usual" note (`gallery.stalled`) + amber ghost Refresh pill (`gallery.refresh`, one manual poll) appear under the progress row (amber, not red: nothing failed yet); a status poll that fails before any data replaces the tile with `ErrorState` (`gallery.pollFailed`) + retry — the card never freezes at "Generating N%". Succeeded = green "ready" chip (`gallery.ready` — status said in text, never color-only); failed = glow-red hairline tile + a localized primary reason (`errorCodeMessageKey(errorCode)` → `errors.codes.*`, unknown → generic) + the raw provider text only as the secondary mist-dim caption (suppressed for `content_blocked`) + "Credits refunded" green chip. Plates lift on hover (`motion-safe`). Delete opens the destructive-confirm alertdialog (§9, `gallery.deleteConfirm.*`) — the optimistic removal fires only on the danger-pill confirm. |
+| Gallery | `GenerationDetail` (modal) | A `Card surface='well' padding='none'` media plate inside a `Modal surface='glass'` sheet — the frosted dialog floats, the user's work is sunk one step into it. Height-capped (`max-h-[70dvh]`) with `object-contain`, so a 9:16 portrait shows its whole frame instead of running off the viewport. Mono caption + meta, then the action set as a named icon rail. Only layout classes (sizing, centering, `overflow-hidden`) go through the Card's `className`; the surface is Card's. |
 | Gallery | `GalleryFilterChips` | `PillGroup` All/Images/Videos (amber selection). |
+| Gallery | `ViewSettingsMenu` | Gear disclosure holding the display preferences (grid/table/slide + density). Its panel stays an OPAQUE `bg-ridge` step, **not** glass: a translucent popup over moving media is unreadable. Same asymmetry `Select` documents. |
+| Entities | `EntityLibrary` (`/entities`) | 4 states over `useEntities`: 6 square `rounded-2xl` skeletons / `ErrorState` / `EmptyState` + green create pill / grid of cover tiles. A tile is a `Card surface='well' padding='none'` (an uploaded face is content, not chrome — same reasoning as `GenerationCard`) holding a media button, with the name, localized kind and an overflow `Menu` beneath. |
+| Entities | `EntityEditor` (modal) | `Modal` create/edit (null=create): steel `Input` name, kind `Select` (create only — kind is immutable), steel textarea + preset snippet chips, and in edit mode the photo set with amber-bordered primary election. Inline glow-red `role="alert"` errors. |
 | Landing | `LandingPage`, `Hero`, `ShowcaseSpread`, `SectionHeading`, `PriceTable`, `HowItWorks`, `FaqClaims`, `ModelCreditTable`, `TableScrollRegion` | Stage 2 terminal skin (§11): full-viewport `AsciiSphere` hero with two pill CTAs; `ShowcaseSpread` = ONE figure wrapping the 4×2 `SpecimenTile` grid + ONE honest figcaption (sampleLabel chip + `landing.showcase.caption` naming the real models) + one video-marked tile; `SectionHeading` (amber spark icon, decorative — heading names are behavior) and `PriceTable` (no props since Stage 2) are also consumed by the /pricing route via the module index. Claims and honesty markers ("verified July 2026" caption as the table's accessible name, one named competitor per row, the sample-style labeling) are unchangeable. `TableScrollRegion` (v4 QA r2 + 390px affordance) wraps both index tables: a keyboard-focusable `role="region"` overflow area + a dynamic aria-hidden mono `common.scrollHint` ("scroll →" / «прокрутите →») + a translucent SOLID `bg-void/60` right-edge overlay strip (aria-hidden, pointer-events-none) that retires at the far right — the NO-GRADIENT answer to an edge fade, both shown only while columns really overflow. |
 
 | Cinema | `CinemaLibrary` (`/cinema`) | 4 states over `useFilms`: 4 canvas-shaped `Skeleton` plates / `ErrorState` / `EmptyState` + green "New film" pill / grid of `FilmCard`. Header green "New film" opens `FilmSettingsModal` (create). |

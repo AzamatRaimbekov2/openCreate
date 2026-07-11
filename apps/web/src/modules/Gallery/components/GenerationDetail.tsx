@@ -13,7 +13,7 @@
 // menu renders, painted here as icons. Neither view owns the rules.
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
-import { Modal } from 'shared/ui'
+import { Card, Modal } from 'shared/ui'
 import type { MenuItem } from 'shared/ui'
 import { useGenerationActions } from './useGenerationActions'
 
@@ -69,10 +69,18 @@ export function GenerationDetail({
       >
         <div className="flex min-h-0 flex-col gap-3">
           {mediaUrl ? (
-            // The media well: a height-capped box on the recessed abyss step.
-            // object-contain (never object-cover) — this view exists to show the
-            // honest full frame the square card had to crop.
-            <div className="flex max-h-[70dvh] min-h-0 items-center justify-center overflow-hidden rounded-xl bg-abyss">
+            // The media well: a height-capped box on the recessed abyss step,
+            // one surface step BELOW the glass sheet holding it — the frosted
+            // sheet floats, the user's work is sunk into it. object-contain
+            // (never object-cover): this view exists to show the honest full
+            // frame the square card had to crop. Everything passed through
+            // className here is layout (sizing, centering, clipping); the
+            // surface itself is Card's to own.
+            <Card
+              surface="well"
+              padding="none"
+              className="flex max-h-[70dvh] min-h-0 items-center justify-center overflow-hidden"
+            >
               {generation.type === 'video' ? (
                 <video controls src={mediaUrl} className="max-h-[70dvh] w-auto max-w-full" />
               ) : (
@@ -82,7 +90,7 @@ export function GenerationDetail({
                   className="max-h-[70dvh] w-auto max-w-full object-contain"
                 />
               )}
-            </div>
+            </Card>
           ) : null}
 
           {/* Prompt + meta on the left, the icon rail on the right — the caption

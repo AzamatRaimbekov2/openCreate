@@ -2,10 +2,15 @@
 // The /entities page body: the 4-states list (loading skeletons → error+retry →
 // empty+CTA → grid) plus the create/edit modal. The route owns the page canvas;
 // this owns the library itself.
+//
+// v4 SURFACE: an entity's cover photo is content, not chrome — the tile is a
+// recessed `well` Card, exactly like a Gallery generation plate, so a face the
+// user uploaded reads as a face and not as something sitting behind frosted
+// glass. Frosted `glass` is reserved for chrome that floats OVER media.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Entity } from '@opencreate/contracts'
-import { Button, EmptyState, ErrorState, Menu, Skeleton } from 'shared/ui'
+import { Button, Card, EmptyState, ErrorState, Menu, Skeleton } from 'shared/ui'
 import { useDeleteEntity, useEntities } from '../model/entitiesApi'
 import { EntityEditor } from './EntityEditor'
 
@@ -32,8 +37,10 @@ export function EntityLibrary() {
   if (isPending) {
     return (
       <div className={GRID}>
+        {/* rounded-2xl = the well's radius, so the grid keeps its silhouette
+            when the real tiles land */}
         {SKELETON_KEYS.map((key) => (
-          <Skeleton key={key} className="aspect-square w-full rounded-xl" />
+          <Skeleton key={key} className="aspect-square w-full rounded-2xl" />
         ))}
       </div>
     )
@@ -62,20 +69,30 @@ export function EntityLibrary() {
             const cover = entity.images.find((image) => image.id === entity.primaryImageId)
             return (
               <li key={entity.id} className="group relative flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEdit(entity)}
-                  className="aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-abyss transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
+                {/* The button lives INSIDE the well, not around it: a <button>
+                    takes phrasing content, and Card renders a <div>. So the
+                    plate owns the hover lift and the button owns the focus ring
+                    — inset, because the well clips anything drawn outside it. */}
+                <Card
+                  surface="well"
+                  padding="none"
+                  className="overflow-hidden transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
                 >
-                  {cover ? (
-                    <img src={cover.url} alt={entity.name} className="size-full object-cover" />
-                  ) : (
-                    // No photo yet — a quiet placeholder that still opens the editor
-                    <span className="flex size-full items-center justify-center text-xs text-mist-dim">
-                      {t('entities.noPhoto')}
-                    </span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(entity)}
+                    className="block aspect-square w-full focus-visible:ring-2 focus-visible:ring-portal focus-visible:ring-inset focus-visible:outline-none"
+                  >
+                    {cover ? (
+                      <img src={cover.url} alt={entity.name} className="size-full object-cover" />
+                    ) : (
+                      // No photo yet — a quiet placeholder that still opens the editor
+                      <span className="flex size-full items-center justify-center text-xs text-mist-dim">
+                        {t('entities.noPhoto')}
+                      </span>
+                    )}
+                  </button>
+                </Card>
                 <div className="flex items-start justify-between gap-1">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-white">{entity.name}</p>

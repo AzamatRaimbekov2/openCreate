@@ -576,12 +576,19 @@ export function createGenerationService({
       // stood between that and a double credit), and the flip itself carried
       // no status check. One transaction now: flip + refund commit or roll
       // back together, and a row that somehow already settled is untouched.
+      // A provider can refuse the CONTENT at submit rather than at poll —
+      // ByteDance moderates the input image up-front and 400s a real human face
+      // before any render starts. Persist that as 'content_blocked' so the failed
+      // row explains itself in the gallery, exactly like a poll-time block; every
+      // other failure keeps the neutral null code. (The refund is unchanged and
+      // unconditional either way — this only decides which message the SPA shows.)
+      const apiCode = (err as { apiCode?: unknown } | null)?.apiCode
       failGeneration(
         db,
         userId,
         id,
         err instanceof Error ? err.message : 'submit failed',
-        null,
+        apiCode === 'content_blocked' ? 'content_blocked' : null,
         log,
       )
       throw err
@@ -718,7 +725,13 @@ export function createGenerationService({
         { event: 'provider.error', userId, generationId: id, detail: poll.message },
         'provider reported failure',
       )
-      failGeneration(db, userId, id, poll.message, null, log)
+      // `blocked` = the provider refused the CONTENT, not the infrastructure
+      // (ByteDance declines any input image carrying a real human face, and kills
+      // its own output on a moderation hit). The refund is identical either way —
+      // what changes is the code the SPA localizes off, and "your image was
+      // refused, here is why" is the difference between a user fixing their input
+      // and a user filing a bug against us.
+      failGeneration(db, userId, id, poll.message, poll.blocked ? 'content_blocked' : null, log)
     }
     const updated = db.select().from(generation).where(eq(generation.id, id)).get()
     // Terminal transition observed (settle above or failGeneration) → drop the

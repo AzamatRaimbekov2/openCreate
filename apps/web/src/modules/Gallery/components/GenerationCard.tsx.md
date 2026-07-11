@@ -31,10 +31,10 @@ paid generation is only removed after an explicit confirm.
     - poll failure (`isPollError`) → replaces the tile with
       `ErrorState message=gallery.pollFailed onRetry=refresh` — the card never
       freezes at "Generating N%".
-  - succeeded video → `<video controls src>` letterboxed on the square abyss
-    tile; image → media button (lift hover, motion-safe, `object-cover` crop)
-    opening `GenerationDetail`; green "ready" `Badge`; hairline footer: cost +
-    portal download link + glow-red icon delete.
+  - succeeded video → `<video controls src>` letterboxed in a square
+    `Card surface="well" padding="none"`; image → the same well holding a media
+    button (lift hover, motion-safe, `object-cover` crop) that opens
+    `GenerationDetail`; the action set rides the plate's corner in a `Menu`.
   - failed → glow-red-HAIRLINE square abyss tile (`border-glow-red`), stored
     failure reason, success-variant "Credits refunded" chip, delete.
 - Side effects: polling + invalidations via `useLiveGeneration`; DELETE via
@@ -44,9 +44,10 @@ paid generation is only removed after an explicit confirm.
 ## Dependencies
 
 - Imports: `react` (`useState`), `react-i18next`, `@opencreate/contracts`,
-  `shared/ui` (`Badge`, `Button`, `ErrorState`, `Modal`, `Progress`),
+  `shared/ui` (`Badge`, `Button`, `Card`, `ErrorState`, `Menu`, `Progress`),
   `shared/libs/errorCopy` (`errorCodeMessageKey`), module model
-  (`generationsApi`), sibling `GenerationDetail`.
+  (`generationsApi`), siblings `GenerationDetail`, `icons`,
+  `useGenerationActions`.
 - Used by: `components/GalleryGrid.tsx`.
 
 ## Diagram
@@ -70,12 +71,32 @@ flowchart TD
 
 ## Key decisions / gotchas
 
-- Stage-3: media wells are SQUARE tiles (`aspect-square`, 8px radius) — the
-  same tile language as the landing's specimen grid, so the library reads as
-  one product with the landing; images crop with `object-cover`, videos
-  letterbox on the abyss plate, and the full frame lives in `GenerationDetail`.
-  The fixed square keeps CLS at zero across all states (the earlier
-  real-aspect `aspectClasses` map is gone with the uniform tile).
+- Media wells are SQUARE tiles (`aspect-square`) — the same tile language as
+  the landing's specimen grid, so the library reads as one product with the
+  landing; images crop with `object-cover`, videos letterbox on the plate, and
+  the full frame lives in `GenerationDetail`. The fixed square keeps CLS at
+  zero across all states (the earlier real-aspect `aspectClasses` map is gone
+  with the uniform tile).
+- v4 surface migration (2026-07-09): the succeeded video/image plates are now
+  `Card surface="well" padding="none"`, NOT the default frosted `glass`. A
+  thumbnail in a grid IS the content — frosting a card around a photo adds a
+  lit edge, a blur and a drop shadow to something the eye is reading as an
+  image. Glass is for chrome that floats OVER media (composer, modal).
+  Consequences worth knowing before editing:
+  - the `<button>` sits INSIDE the Card, never around it: a `<button>` takes
+    phrasing content and `Card` renders a `<div>`;
+  - therefore the plate owns `motion-safe:hover:-translate-y-0.5` and the
+    button owns a `focus-visible:ring-inset` ring — an outset ring would be
+    clipped by the Card's `overflow-hidden`.
+- Two plates are deliberately NOT Cards:
+  - the PROCESSING tile — `animate-skeleton` walks background-color, and a
+    well would pin that fill to abyss and kill the pulse;
+  - the FAILED tile — its `border-glow-red` is STATUS, and `Card` owns its
+    hairline as part of the surface. Pushing a border color through Card's
+    layout-only `className` would leave `border-white/10` vs `border-glow-red`
+    to be decided by Tailwind's stylesheet order.
+  Both borrow the well's `rounded-2xl` radius so the grid never re-corners
+  itself between states.
 - Failed cards (QA finding 3): the PRIMARY reason line is always OUR copy —
   `t(errorCodeMessageKey(errorCode))` from `shared/libs/errorCopy`
   (`errors.codes.*`; unknown/missing code → generic). The stored raw

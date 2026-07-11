@@ -59,7 +59,20 @@ export type VideoPollResult =
       // provider with no moderation of its own returns false (documented gap).
       nsfw?: boolean | undefined
     }
-  | { status: 'error'; message: string }
+  | {
+      status: 'error'
+      message: string
+      // The provider refused this job on CONTENT grounds, not infrastructure
+      // ones. Distinct from `nsfw` above: that flags a finished-but-unsafe
+      // OUTPUT, whereas this covers a provider that never produced anything
+      // because it rejected the INPUT (ByteDance's Seedance 2.0 declines any
+      // image carrying a real human face) or killed its own output mid-flight.
+      // The service maps it to the SAME user-facing 'content_blocked' code and
+      // the SAME refund — the money path is identical, only the explanation the
+      // user reads differs, and "your portrait was refused" beats "provider
+      // error" every time. Absent/false = an ordinary provider failure.
+      blocked?: boolean | undefined
+    }
 
 // The whole seam: submit returns an opaque provider job id the service persists
 // and later polls with. Two operations, mirroring the two the lifecycle runs.

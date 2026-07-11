@@ -1,10 +1,15 @@
 // apps/web/src/modules/Gallery/components/GenerationCard.tsx
-// One generation as a FIGURE (v3 terminal, stage 3): a SQUARE abyss tile is
-// the plate (8px radius, the recessed surface step reserved for user media —
-// the same square-tile language as the landing's specimen grid, so library
-// and landing read as one product), the prompt is a quiet mono caption below
-// it, and the meta/actions row closes it over a white/10 hairline — no card
-// wrapper (the user's work is the hero, not a box).
+// One generation as a FIGURE: a SQUARE plate carries the media, the prompt is
+// a quiet mono caption below it, and the actions ride the plate's corner.
+//
+// v4 SURFACE CHOICE — why the plate is a `well` and NOT the default frosted
+// glass: a thumbnail in a grid IS the content. Frosting a card around a photo
+// adds a lit edge, a blur and a drop shadow to something the eye is trying to
+// read as an image — chrome competing with the hero. `surface="well"` is the
+// recessed step media sits INSIDE (the same fog-bordered tile language as the
+// landing's specimen grid), and `padding="none"` lets the frame reach the edge.
+// Glass belongs to chrome that floats OVER media (the composer, a modal), not
+// to the media itself.
 // Live states (the list's Empty state is the grid's): processing →
 // stepped-pulse tile + Progress + mono percent, with two honest sub-states —
 // stalled (20-min polling budget spent: amber note + manual refresh) and
@@ -19,7 +24,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Generation } from '@opencreate/contracts'
-import { Badge, Button, ErrorState, Menu, Progress } from 'shared/ui'
+import { Badge, Button, Card, ErrorState, Menu, Progress } from 'shared/ui'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { useLiveGeneration } from '../model/generationsApi'
 import { GenerationDetail } from './GenerationDetail'
@@ -66,10 +71,13 @@ export function GenerationCard({ generation: seed, onRegenerate }: GenerationCar
           <>
             {/* Stepped-pulse media tile — the same surface-ladder loading pulse
                 as Skeleton (animate-skeleton, never a gradient shimmer); square
-                like every gallery plate, so the grid never jumps between states */}
+                like every gallery plate, so the grid never jumps between states.
+                NOT a Card: `animate-skeleton` walks background-color, and a well
+                would pin that fill to abyss and kill the pulse. It only borrows
+                the well's radius so the silhouette survives the state change. */}
             <div
               aria-hidden="true"
-              className="aspect-square w-full animate-skeleton rounded-lg bg-abyss"
+              className="aspect-square w-full animate-skeleton rounded-2xl bg-abyss"
             />
             <div className="flex items-center gap-3">
               <Progress value={progress} label={t('gallery.processing')} />
@@ -106,33 +114,47 @@ export function GenerationCard({ generation: seed, onRegenerate }: GenerationCar
         // hover-only affordance is invisible to anyone who never hovers.
         <div className="group relative">
           {generation.type === 'video' ? (
-            // The square tile letterboxes non-square footage on the abyss plate
-            // (the recessed step) — the full frame lives in the detail modal
-            <video
-              controls
-              src={mediaUrl}
-              preload="metadata"
-              aria-label={generation.prompt}
-              className="aspect-square w-full rounded-xl bg-abyss"
-            />
-          ) : (
-            // Images enlarge in the detail modal — the media itself is the
-            // button. The lift hover (motion-safe only) makes the plate FELT as
-            // interactive without any shadow (elevation stays color-only).
-            <button
-              type="button"
-              onClick={() => setIsDetailOpen(true)}
-              className="block w-full rounded-xl transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
-            >
-              {/* object-cover crops to the square tile — honest full frame is
-                  one click away in the detail modal */}
-              <img
+            // The square well letterboxes non-square footage on the recessed
+            // step — the full frame lives in the detail modal. overflow-hidden
+            // is what makes the video's own corners take the well's radius.
+            <Card surface="well" padding="none" className="overflow-hidden">
+              <video
+                controls
                 src={mediaUrl}
-                alt={generation.prompt}
-                loading="lazy"
-                className="aspect-square w-full rounded-xl bg-abyss object-cover"
+                preload="metadata"
+                aria-label={generation.prompt}
+                className="aspect-square w-full"
               />
-            </button>
+            </Card>
+          ) : (
+            // Images enlarge in the detail modal. The BUTTON lives inside the
+            // well rather than around it: a <button> may only contain phrasing
+            // content, so wrapping the Card's <div> in it would be invalid HTML.
+            // Consequences of that ordering, both deliberate:
+            //  · the lift hover rides the plate (motion-safe only) — it makes
+            //    the tile FELT as interactive without a shadow
+            //  · the focus ring is INSET, because overflow-hidden would clip a
+            //    ring drawn outside the button's border box
+            <Card
+              surface="well"
+              padding="none"
+              className="overflow-hidden transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
+            >
+              <button
+                type="button"
+                onClick={() => setIsDetailOpen(true)}
+                className="block w-full focus-visible:ring-2 focus-visible:ring-portal focus-visible:ring-inset focus-visible:outline-none"
+              >
+                {/* object-cover crops to the square tile — honest full frame is
+                    one click away in the detail modal */}
+                <img
+                  src={mediaUrl}
+                  alt={generation.prompt}
+                  loading="lazy"
+                  className="aspect-square w-full object-cover"
+                />
+              </button>
+            </Card>
           )}
 
           {/* Overflow menu, floating over the media's top-right corner. Always
@@ -157,8 +179,15 @@ export function GenerationCard({ generation: seed, onRegenerate }: GenerationCar
               border + text carry the FAILED status together (never color alone).
               It carries the SAME overflow menu as a succeeded plate: a failed
               generation must still be deletable, and its prompt is exactly what
-              the user wants to copy or re-run after a safety block. */}
-          <div className="group relative flex aspect-square w-full items-center justify-center rounded-xl border border-glow-red bg-abyss">
+              the user wants to copy or re-run after a safety block.
+
+              DELIBERATELY NOT a Card: the border color here is STATUS, and Card
+              owns its hairline as part of the surface. Passing `border-glow-red`
+              through Card's className would be surface styling through a
+              layout-only escape hatch, and the winner of `border-white/10` vs
+              `border-glow-red` would be decided by Tailwind's stylesheet order
+              rather than by us. It borrows the well's radius and fill instead. */}
+          <div className="group relative flex aspect-square w-full items-center justify-center rounded-2xl border border-glow-red bg-abyss">
             <span className="text-sm font-medium text-glow-red">{t('gallery.failed')}</span>
             <div className="absolute top-2 right-2 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
               <Menu

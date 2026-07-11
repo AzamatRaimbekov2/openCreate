@@ -4,9 +4,16 @@
 // slate advances on a durationMs timer (cleaned up on every step). This is an
 // APPROXIMATION of the timeline; the server ffmpeg render is authoritative, and
 // the UI says so. No wasm, no crossfade compositing — deliberately (ADR).
+//
+// v4 layout: the player is the STAGE — the one thing you look at. It is a single
+// `Card surface="well"` with `padding="none"` so the media runs edge to edge and
+// the transport controls hang off it as a hairline footer. It carries no visible
+// heading on purpose: a hero that announces itself is a panel, not a stage (the
+// region still has an accessible name for screen readers).
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AspectRatio, Shot, ShotTitle } from '@opencreate/contracts'
+import { Card } from 'shared/ui'
 import { useShotGenerations } from '../model/shotGeneration'
 import { PauseIcon, PlayIcon } from './icons'
 
@@ -98,66 +105,74 @@ export function PreviewPlayer({ shots, filmAspect }: PreviewPlayerProps) {
   }
 
   return (
-    <section aria-label={t('cinema.preview.title')} className="flex flex-col gap-3">
-      <h2 className="text-sm text-mist-dim">{t('cinema.preview.title')}</h2>
+    // The well IS the stage: `overflow-hidden` lets the media reach the card's
+    // rounded corners, so nothing frames the picture but the card itself.
+    <Card surface="well" padding="none" className="overflow-hidden">
+      <section aria-label={t('cinema.preview.title')}>
+        {/* The canvas — sized to the film's real output shape */}
+        <div className={`relative w-full ${ASPECT_CLASS[filmAspect]}`}>
+          {clip ? (
+            <>
+              {clip.kind === 'video' && clip.src ? (
+                <video
+                  key={clip.key}
+                  ref={videoRef}
+                  src={clip.src}
+                  muted
+                  playsInline
+                  onEnded={goNext}
+                  className="size-full object-contain"
+                />
+              ) : clip.kind === 'image' && clip.src ? (
+                <img key={clip.key} src={clip.src} alt="" className="size-full object-contain" />
+              ) : (
+                // Slate: a title card, or a clip that has not rendered yet
+                <div className="grid size-full place-items-center px-6 text-center">
+                  <p className="text-mist">{clip.title?.text ?? t('cinema.preview.placeholder')}</p>
+                </div>
+              )}
+              {/* Title overlay on media clips (the slate already shows its text) */}
+              {clip.title && clip.kind !== 'slate' ? (
+                <div
+                  className={`pointer-events-none absolute inset-0 flex justify-center p-4 ${TITLE_POSITION[clip.title.position]}`}
+                >
+                  <span className="rounded bg-void/70 px-3 py-1 text-sm text-white">
+                    {clip.title.text}
+                  </span>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="grid size-full place-items-center text-sm text-mist-dim">
+              {t('cinema.preview.empty')}
+            </div>
+          )}
+        </div>
 
-      {/* The stage — canvas-shaped abyss well */}
-      <div className={`relative w-full overflow-hidden rounded-lg border border-white/10 bg-abyss ${ASPECT_CLASS[filmAspect]}`}>
-        {clip ? (
-          <>
-            {clip.kind === 'video' && clip.src ? (
-              <video
-                key={clip.key}
-                ref={videoRef}
-                src={clip.src}
-                muted
-                playsInline
-                onEnded={goNext}
-                className="size-full object-contain"
-              />
-            ) : clip.kind === 'image' && clip.src ? (
-              <img key={clip.key} src={clip.src} alt="" className="size-full object-contain" />
-            ) : (
-              // Slate: a title card, or a clip that has not rendered yet
-              <div className="grid size-full place-items-center px-6 text-center">
-                <p className="text-mist">{clip.title?.text ?? t('cinema.preview.placeholder')}</p>
-              </div>
-            )}
-            {/* Title overlay on media clips (the slate already shows its text) */}
-            {clip.title && clip.kind !== 'slate' ? (
-              <div className={`pointer-events-none absolute inset-0 flex justify-center p-4 ${TITLE_POSITION[clip.title.position]}`}>
-                <span className="rounded bg-void/70 px-3 py-1 text-sm text-white">
-                  {clip.title.text}
-                </span>
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <div className="grid size-full place-items-center text-sm text-mist-dim">
-            {t('cinema.preview.empty')}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={togglePlay}
-          disabled={playlist.length === 0}
-          aria-label={isPlaying ? t('cinema.preview.pause') : t('cinema.preview.play')}
-          className="grid size-10 place-items-center rounded-full border border-white/10 bg-specimen-amber/20 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:opacity-50"
-        >
-          {isPlaying ? <PauseIcon /> : <PlayIcon />}
-        </button>
-        {playlist.length > 0 ? (
-          <span className="text-xs text-mist-dim">
-            {t('cinema.preview.position', { current: Math.min(index + 1, playlist.length), total: playlist.length })}
-          </span>
-        ) : null}
-      </div>
-
-      {/* Honest caveat — the render is authoritative */}
-      <p className="text-xs text-mist-dim/70">{t('cinema.preview.approx')}</p>
-    </section>
+        {/* Transport strip: chrome hanging off the picture, separated by a
+            hairline rather than a gap — one object, not a card plus a toolbar. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 px-4 py-3">
+          <button
+            type="button"
+            onClick={togglePlay}
+            disabled={playlist.length === 0}
+            aria-label={isPlaying ? t('cinema.preview.pause') : t('cinema.preview.play')}
+            className="grid size-10 shrink-0 place-items-center rounded-full border border-white/10 bg-specimen-amber/20 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:opacity-50"
+          >
+            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          {playlist.length > 0 ? (
+            <span className="text-xs text-mist-dim">
+              {t('cinema.preview.position', {
+                current: Math.min(index + 1, playlist.length),
+                total: playlist.length,
+              })}
+            </span>
+          ) : null}
+          {/* Honest caveat — the render is authoritative */}
+          <p className="ml-auto text-xs text-mist-dim/70">{t('cinema.preview.approx')}</p>
+        </div>
+      </section>
+    </Card>
   )
 }

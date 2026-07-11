@@ -4,11 +4,12 @@
 
 ## Purpose
 
-The Generator module's main surface (create page): the full generation form as the
-"commission sheet" (v3 terminal skin) — a white/10 hairline-framed sheet of NUMBERED
-field groups (type toggle, model SELECT, prompt, aspect/duration, optional i2v upload)
-separated by white/10 hairlines, closed by a mono cost numeral + Generate footer —
-orchestrating the store, the catalog query, and the mutation.
+The Generator module's sheet-posture surface: the full generation form as the
+"commission sheet" — a titled frosted-glass `Card` of NUMBERED field groups (type
+toggle, model SELECT, prompt, aspect/duration, optional i2v upload) separated by
+white/10 hairlines, closed by a mono cost numeral + Generate footer — orchestrating
+the store, the catalog query, and the mutation. Its sibling over the same model
+layer is `ChatComposer` (the docked, bar-posture surface `/create` actually renders).
 
 ## What it does (for an AI reader)
 
@@ -27,7 +28,7 @@ orchestrating the store, the catalog query, and the mutation.
 
 ## Dependencies
 
-- Imports: `shared/ui` (`Button`, `EmptyState`, `ErrorState`, `PillGroup`, `Skeleton`),
+- Imports: `shared/ui` (`Button`, `Card`, `EmptyState`, `ErrorState`, `PillGroup`, `Skeleton`),
   module model (`catalogApi`, `createGeneration`, `generatorStore`), sibling components
   (`AspectPicker`, `CostLabel`, `DurationPicker`, `ImageDrop`, `ModelSelect`,
   `PromptField`, `SheetField`, `SubmitErrorBanner`), `react-i18next`. (`ApiClientError`
@@ -67,6 +68,16 @@ flowchart TD
 - v4 QA round 1 (2026-07-07): header comment de-staled — it still described the v2
   "editorial / serif ordinal" skin while the rendered code had long been v3 mono
   (JetBrains Mono ghost ordinals, weight 400). Comment-only change, zero runtime diff.
+- v4 surface migration (2026-07-09): the hand-rolled
+  `rounded-lg border border-white/10 p-6` sheet (unfilled on purpose, so the steel
+  inputs inside carried the elevation ladder) is now the default frosted `glass`
+  `Card` with `padding="lg"`. The card has depth of its own, so the inputs no
+  longer have to supply it. `title={t('generator.sheet')}` renders the visible
+  mono caption AND labels the landmark, which retired both the `<header>` markup
+  and the `aria-label={t('generator.title')}`: **the section's accessible name
+  changed from "Create" to "Commission sheet"**, and there is now one string
+  instead of a visible caption and an invisible label free to drift apart. The
+  head's `border-b` hairline is gone with it — Card owns heading spacing.
 - Model select (2026-07-08): the `ModelPicker` type-filtered STEEL tiles were
   replaced by the custom `ModelSelect` listbox (all models grouped Images/Video,
   provider logo + tariff + description). It no longer filters by the current

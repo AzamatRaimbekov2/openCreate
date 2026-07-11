@@ -67,6 +67,47 @@ export const CATALOG: CatalogModel[] = [
     resolutionProfile: 'kontext',
   },
   {
+    // Nano Banana Pro (Gemini 3 Pro Image) — the REFERENCE model: the one we
+    // generate a character's portrait with and then re-cite in every later shot.
+    // Chosen over the cheaper Nano Banana 2 (google:4@3, ~$0.069) because a
+    // character reference is generated ONCE and reused for the life of the
+    // entity — identity fidelity across subjects is the whole product, and the
+    // per-image delta is noise against that.
+    //
+    // `resolutionProfile: 'nanobanana'` is load-bearing, exactly as it is for
+    // Kontext: the model publishes its own dimension list per tier and rejects
+    // anything outside it, so the default square1024 table's 1344×768 would earn
+    // a provider 400 on every 16:9 request. We buy the 1K tier.
+    //
+    // IT DOES NOT UNLOCK SEEDANCE 2.0 FOR FACES. Nano Banana is a Google model,
+    // and ByteDance trusts ONLY ModelArk's own outputs ("outputs from other
+    // platforms are not supported") — so a Nano Banana portrait carrying a real-
+    // looking face is refused by Seedance 2.0's input moderation just as a Flux
+    // one is. That is not a gap to patch here: `seedance-2-0` carries no
+    // `referenceMode`, so the composer filters it out the moment an entity is
+    // tagged (and the API re-validates). Character shots route to Kling / Veo /
+    // PixVerse / MiniMax / Wan, which have no such policy.
+    //
+    // PRICE: $0.138/image at 1K wholesale → 28 credits ($0.28) keeps roughly the
+    // 2× margin flux-kontext-pro carries.
+    id: 'nano-banana-pro',
+    type: 'image',
+    name: 'Muse',
+    providerLabel: 'Nano Banana Pro',
+    air: 'google:4@2',
+    tier: 'pro',
+    supportsImageInput: false,
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    credits: 28,
+    // Faces AND objects/places — it conditions on any reference subject, and
+    // holds identity across several of them at once.
+    referenceMode: 'both',
+    // Runware documents up to 14 referenceImages here. Our wire contract still
+    // caps entityRefs at 1; raising that needs no change to this entry.
+    maxReferenceImages: 14,
+    resolutionProfile: 'nanobanana',
+  },
+  {
     id: 'pixverse-v6',
     type: 'video',
     name: 'Swift',
@@ -167,6 +208,50 @@ export const CATALOG: CatalogModel[] = [
     durationOptions: [5],
     creditsByDuration: { '5': 60 },
     provider: 'wan-runpod',
+  },
+  {
+    // Seedance 2.0 straight from ByteDance ModelArk — no Runware in the path
+    // (ADR: seedance-direct-bytedance). `provider: 'bytedance'` routes submit/poll
+    // to the ark-client; the `air` wraps the REAL ModelArk id behind a synthetic
+    // `bytedance:` prefix purely to satisfy the shared AIR regex (the adapter
+    // strips it, and verify-catalog skips it — it is not a Runware id).
+    //
+    // The `dreamina-` in the model id is MANDATORY and is not a typo: ByteDance
+    // prefixes the 2.0 generation with it while 1.x carries no prefix. Drop it and
+    // every call 404s.
+    //
+    // PINNED TO 720p via resolutionProfile, deliberately. Left to the tier ladder
+    // a 'premium' model would read the fhd table and render 1080p — which on this
+    // provider costs $1.87/5s wholesale instead of $0.76, i.e. the tier label would
+    // silently multiply our cost by 2.5×. At 720p Seedance 2.0's own dimension
+    // table IS our hd table (1280×720 / 960×960 / 720×1280), so what the composer
+    // promises is exactly what renders.
+    //
+    // PRICE: wholesale is $0.756 per 5s 720p clip (108k tokens × $0.0070/1k — the
+    // NO-video-input rate; the widely-quoted $0.0043 applies only when a VIDEO is
+    // supplied as input, which we never do). At 1 credit = $0.01, 130 credits =
+    // $1.30 leaves ~42% margin. Do NOT drop this to the 35-credit standard tier:
+    // that tier does not cover Seedance 2.0 at ANY provider and every clip would
+    // be sold below cost.
+    //
+    // KNOWN CONSTRAINT (product, not bug): the 2.0 series REFUSES any input image
+    // containing a real human face — only ByteDance's own recent outputs, their
+    // preset digital characters, or identity-verified assets are trusted. i2v is
+    // still offered because it works for everything else (landscape, product,
+    // animal, illustration); a refused portrait comes back as a refundable
+    // 'content_blocked' with a message naming the real reason.
+    id: 'seedance-2-0',
+    type: 'video',
+    name: 'Auteur',
+    providerLabel: 'Seedance 2.0 · ByteDance',
+    air: 'bytedance:dreamina-seedance-2-0-260128',
+    tier: 'premium',
+    supportsImageInput: true,
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    durationOptions: [5, 10],
+    creditsByDuration: { '5': 130, '10': 260 },
+    resolutionProfile: 'hd',
+    provider: 'bytedance',
   },
   {
     // CinemaStudio audio — voiceover (TTS). Runware audioInference, verified to

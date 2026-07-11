@@ -50,9 +50,11 @@ flowchart TD
 - The CTA `Link` is styled with the primary Button classes (NotFoundPage
   convention) — semantically navigation, visually the main action. v3: the
   GREEN specimen pill, because creating is THE green action in the triad.
-- v3 terminal restyle: skeletons are the shared Skeleton's stepped surface
-  pulse (`animate-skeleton bg-steel rounded-lg`) — exactly 8 nodes (the test
-  counts `.animate-skeleton`).
+- Skeletons are the shared Skeleton's stepped surface pulse
+  (`animate-skeleton bg-steel`) — exactly 8 nodes (the test counts
+  `.animate-skeleton`). v4: they carry `rounded-2xl`, the radius of the `well`
+  Card the media lands in, so the whole grid does not re-corner itself the
+  moment data arrives.
 
 ## Commits
 

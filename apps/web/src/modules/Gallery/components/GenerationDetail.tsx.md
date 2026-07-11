@@ -17,8 +17,10 @@ cost + locale-formatted date, and a download action.
 
 ## Dependencies
 
-- Imports: `react-i18next`, `@opencreate/contracts` (`Generation`), `shared/ui` (`Modal`).
-- Used by: `components/GenerationCard.tsx` (opened from the image media button).
+- Imports: `react-i18next`, `@opencreate/contracts` (`Generation`), `shared/ui`
+  (`Card`, `Modal`, `MenuItem`), sibling `useGenerationActions`.
+- Used by: `components/GenerationCard.tsx` (opened from the image media button)
+  and `components/GenerationRow.tsx` (the table view's thumbnail).
 
 ## Diagram
 
@@ -38,11 +40,15 @@ flowchart LR
   the browser's (same convention as Credits' TransactionsList).
 - Uses the shared `Modal` (`role="dialog"`): Escape/overlay close, scroll lock,
   focus restore come for free.
-- v3 terminal restyle: media plate `rounded-lg bg-abyss` — one surface step
-  BELOW the modal's steel sheet so the user's work reads as recessed film; the
-  prompt is the quiet mono mist caption (same voice as GenerationCard);
-  download is a portal-blue link (the sanctioned prose-link color, v3 §2).
-  Behavior and i18n untouched.
+- v4 surface migration (2026-07-09): the media plate is
+  `Card surface="well" padding="none"` inside a `Modal surface="glass"` sheet —
+  one surface step BELOW the sheet, so the frosted dialog floats and the user's
+  work is sunk into it. Everything passed through the Card's `className` there
+  is layout (`flex`, `max-h-[70dvh]`, centering, `overflow-hidden`); the
+  surface itself is Card's to own. Behavior, a11y and i18n untouched.
+- The media box is height-capped and the image is `object-contain`: a 9:16
+  portrait used to render taller than the viewport with no scroll, cutting its
+  own bottom off. This view exists to show the full frame the card crops.
 
 ## Commits
 

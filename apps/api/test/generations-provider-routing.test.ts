@@ -123,6 +123,132 @@ describe('video provider routing', () => {
     expect(me.json().creditsBalance).toBe(200)
   })
 
+  it('routes a bytedance model to the ByteDance provider (never Runware) and settles', async () => {
+    const runware = fakeVideoProvider()
+    const bytedance = fakeVideoProvider()
+    bytedance.submit.mockResolvedValue({ providerJobId: 'cgt-1' })
+    bytedance.poll.mockResolvedValueOnce({ status: 'processing', progress: null }).mockResolvedValueOnce({
+      status: 'success',
+      assetUrl: 'https://ark-content-generation-ap-southeast-1.tos-ap-southeast-1.volces.com/x.mp4',
+      costUsd: 0.756,
+      nsfw: false,
+    })
+    const app = await buildTestApp({
+      videoProviders: { runware, bytedance },
+      assetHostAllowlist: ['runware.ai', 'tos-ap-southeast-1.volces.com'],
+    })
+    const cookie = await registerAndGetCookie(app)
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'seedance-2-0', prompt: 'a lighthouse in a storm', aspectRatio: '16:9', duration: 5 },
+    })
+    expect(created.statusCode).toBe(202)
+    const id = created.json().id
+
+    expect(runware.submit).not.toHaveBeenCalled()
+    expect(bytedance.submit).toHaveBeenCalledTimes(1)
+    // The adapter receives the AIR id verbatim and strips the prefix itself — the
+    // service must not pre-mangle it.
+    expect(bytedance.submit.mock.calls[0]![0]).toMatchObject({
+      prompt: 'a lighthouse in a storm',
+      durationSeconds: 5,
+      model: 'bytedance:dreamina-seedance-2-0-260128',
+      // resolutionProfile 'hd' → the 720p row of ByteDance's own table.
+      width: 1280,
+      height: 720,
+    })
+
+    await app.inject({ method: 'GET', url: `/api/generations/${id}`, headers: { cookie } })
+    const p2 = await app.inject({ method: 'GET', url: `/api/generations/${id}`, headers: { cookie } })
+    expect(p2.json().status).toBe('succeeded')
+    expect(p2.json().mediaUrls[0]).toMatch(/\.mp4$/)
+    expect(bytedance.poll).toHaveBeenCalledWith('cgt-1')
+    expect(runware.poll).not.toHaveBeenCalled()
+  })
+
+  it('a ByteDance real-face rejection at submit fails as content_blocked AND refunds', async () => {
+    // The defining Seedance 2.0 constraint: the 2.0 series refuses any input image
+    // containing a real human face. The user must get their credits back and a
+    // message that names the actual reason — not an opaque provider error they
+    // would "fix" by retrying the same portrait.
+    const bytedance = fakeVideoProvider()
+    bytedance.submit.mockRejectedValue(
+      Object.assign(
+        new Error('ByteDance refused this input. Seedance 2.0 does not accept images or video containing real human faces.'),
+        { statusCode: 400, apiCode: 'content_blocked' },
+      ),
+    )
+    const app = await buildTestApp({ videoProviders: { bytedance } })
+    const cookie = await registerAndGetCookie(app)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'seedance-2-0',
+        prompt: 'she turns to the camera',
+        aspectRatio: '16:9',
+        duration: 5,
+        inputImage: 'data:image/png;base64,AAAA',
+      },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error.code).toBe('content_blocked')
+    // Charged 130, refunded 130 → back to the signup bonus. The money invariant
+    // holds for a content refusal exactly as it does for an outage.
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(me.json().creditsBalance).toBe(200)
+  })
+
+  it('a ByteDance output-moderation kill at poll fails as content_blocked AND refunds', async () => {
+    const bytedance = fakeVideoProvider()
+    bytedance.submit.mockResolvedValue({ providerJobId: 'cgt-blocked' })
+    bytedance.poll.mockResolvedValue({
+      status: 'error',
+      message: 'The generated video may contain sensitive information.',
+      blocked: true,
+    })
+    const app = await buildTestApp({ videoProviders: { bytedance } })
+    const cookie = await registerAndGetCookie(app)
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'seedance-2-0', prompt: 'a crowd', aspectRatio: '16:9', duration: 5 },
+    })
+    const id = created.json().id
+    const p = await app.inject({ method: 'GET', url: `/api/generations/${id}`, headers: { cookie } })
+    expect(p.json().status).toBe('failed')
+    // The row explains itself: 'content_blocked', not a generic provider failure.
+    expect(p.json().errorCode).toBe('content_blocked')
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(me.json().creditsBalance).toBe(200)
+  })
+
+  it('an ordinary ByteDance poll failure stays a plain provider failure (not content_blocked)', async () => {
+    const bytedance = fakeVideoProvider()
+    bytedance.submit.mockResolvedValue({ providerJobId: 'cgt-err' })
+    bytedance.poll.mockResolvedValue({ status: 'error', message: 'model worker crashed' })
+    const app = await buildTestApp({ videoProviders: { bytedance } })
+    const cookie = await registerAndGetCookie(app)
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: { modelId: 'seedance-2-0', prompt: 'a river', aspectRatio: '16:9', duration: 5 },
+    })
+    const id = created.json().id
+    const p = await app.inject({ method: 'GET', url: `/api/generations/${id}`, headers: { cookie } })
+    expect(p.json().status).toBe('failed')
+    expect(p.json().errorCode).toBeNull()
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(me.json().creditsBalance).toBe(200)
+  })
+
   it('routes a wan-runpod poll error to fail + refund', async () => {
     const runware = fakeVideoProvider()
     const wan = fakeVideoProvider()

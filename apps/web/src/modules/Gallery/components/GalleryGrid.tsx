@@ -149,12 +149,14 @@ export function GalleryGrid({
     useGenerations()
 
   // Loading: 8 figure-shaped skeletons mirror the eventual media plates
-  // (the shared Skeleton's stepped surface pulse — never a gradient shimmer)
+  // (the shared Skeleton's stepped surface pulse — never a gradient shimmer).
+  // rounded-2xl is the well's radius: the skeleton must be the same silhouette
+  // the media lands in, or the whole grid re-corners itself when data arrives.
   if (isPending) {
     return (
       <div className={SKELETON_GRID}>
         {SKELETON_KEYS.map((key) => (
-          <Skeleton key={key} className="aspect-square w-full" />
+          <Skeleton key={key} className="aspect-square w-full rounded-2xl" />
         ))}
       </div>
     )

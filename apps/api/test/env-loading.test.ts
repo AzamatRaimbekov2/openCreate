@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { loadConfig, loadEnvFromFile } from '../src/config'
+import { ARK_ASSET_HOST, loadConfig, loadEnvFromFile } from '../src/config'
 
 const cleanupKeys = ['OC_TEST_FROM_FILE', 'OC_TEST_PRESET', 'ENV_FILE']
 
@@ -177,5 +177,47 @@ describe('loadConfig production settings', () => {
     })
     const occurrences = cfg.assetHostAllowlist.filter((h) => h === 'pod123-8188.proxy.runpod.net')
     expect(occurrences).toHaveLength(1)
+  })
+})
+
+// Direct ByteDance channel (ADR: seedance-direct-bytedance). Same optional-provider
+// contract as COMFY_BASE_URL: unset keeps boot healthy and hides the model, set
+// lights it up AND opens exactly the one download host it needs.
+describe('ARK_API_KEY (direct ByteDance provider)', () => {
+  it('defaults arkApiKey to null and keeps the ByteDance asset host OFF the allowlist', () => {
+    const cfg = loadConfig({ ...baseEnv })
+    expect(cfg.arkApiKey).toBeNull()
+    // Default-deny: an unconfigured provider must not widen the SSRF surface.
+    expect(cfg.assetHostAllowlist).not.toContain(ARK_ASSET_HOST)
+  })
+
+  it('treats an EMPTY ARK_API_KEY as not configured (mirrors COMFY_BASE_URL)', () => {
+    // `.env` ships the key commented/blank; '' must mean "off", not "a blank key"
+    // — otherwise boot would register a provider that 401s on every call.
+    const cfg = loadConfig({ ...baseEnv, ARK_API_KEY: '' })
+    expect(cfg.arkApiKey).toBeNull()
+    expect(cfg.assetHostAllowlist).not.toContain(ARK_ASSET_HOST)
+  })
+
+  it('adds ByteDance’s TOS asset host — NOT its API host — when the key is set', () => {
+    const cfg = loadConfig({ ...baseEnv, ARK_API_KEY: 'ark-key' })
+    expect(cfg.arkApiKey).toBe('ark-key')
+    // The API answers on *.bytepluses.com but publishes finished videos to
+    // ByteDance's TOS object storage on *.volces.com. Allowlisting the API domain
+    // would pass the gate for zero real downloads and fail every actual one.
+    expect(cfg.assetHostAllowlist).toContain(ARK_ASSET_HOST)
+    expect(cfg.assetHostAllowlist.some((h) => h.endsWith('bytepluses.com'))).toBe(false)
+    expect(cfg.assetHostAllowlist).toContain('runware.ai')
+  })
+
+  it('composes with the comfy host rather than replacing it', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      ARK_API_KEY: 'ark-key',
+      COMFY_BASE_URL: 'https://pod123-8188.proxy.runpod.net',
+    })
+    expect(cfg.assetHostAllowlist).toEqual(
+      expect.arrayContaining(['runware.ai', 'pod123-8188.proxy.runpod.net', ARK_ASSET_HOST]),
+    )
   })
 })

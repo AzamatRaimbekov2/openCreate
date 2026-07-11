@@ -35,9 +35,11 @@ export type TestAppOverrides = {
   storageDir?: string
   // Task 10: scripted provider + a lowered signup bonus for 402 tests.
   runware?: RunwareClient
-  // wan-runpod seam: override the video provider registry to assert routing.
-  // Absent → buildApp derives { runware: adapter(runware), 'wan-runpod': comfy }.
-  videoProviders?: Record<VideoProviderId, VideoProvider>
+  // VideoProvider seam: override entries of the video provider registry to assert
+  // routing. PARTIAL — buildApp derives the full registry (runware adapter +
+  // wan-runpod comfy + bytedance ark) and merges these on top, so a routing test
+  // stubs only the backends it actually asserts on.
+  videoProviders?: Partial<Record<VideoProviderId, VideoProvider>>
   signupBonusCredits?: number
   // Ops hardening: logger is SILENT by default so suites stay quiet; logging
   // tests raise the level and capture pino's NDJSON via a write stub.
@@ -65,6 +67,9 @@ export type TestAppOverrides = {
   // lists the wan-runpod (self-host) models — a listed model whose backend is
   // unconfigured is only a broken option, so /api/catalog hides them when off.
   comfyBaseUrl?: string | null
+  // Direct ByteDance on/off: default null (off), same contract as comfyBaseUrl —
+  // set a key so /api/catalog lists the bytedance-backed Seedance models.
+  arkApiKey?: string | null
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -103,6 +108,10 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // registry rather than a live pod). Kept null so buildApp's derived comfy
       // client is present-but-unconfigured (a wan-runpod submit would 502).
       comfyBaseUrl: overrides.comfyBaseUrl ?? null,
+      // Direct ByteDance key: unset by default, same rationale as comfyBaseUrl —
+      // buildApp's derived ark client is present-but-unconfigured (a bytedance
+      // submit would 502), and routing tests inject a fake provider instead.
+      arkApiKey: overrides.arkApiKey ?? null,
       // Default-deny like production: proxy headers are only trusted when a
       // test opts in — mirrors the TRUST_PROXY env knob (unset → false).
       trustProxy: overrides.trustProxy ?? false,

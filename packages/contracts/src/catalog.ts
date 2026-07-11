@@ -32,14 +32,14 @@ const catalogBase = z.object({
   maxReferenceImages: z.number().int().positive().optional(),
   // Which resolution table this model reads (see resolution.ts). Absent → the
   // tier ladder. Present when the provider only accepts its own dimension list.
-  resolutionProfile: z.enum(['hd', 'fhd', 'square1024', 'kontext']).optional(),
+  resolutionProfile: z.enum(['hd', 'fhd', 'square1024', 'kontext', 'nanobanana']).optional(),
 })
 
 export const catalogImageModelSchema = catalogBase.extend({
   type: z.literal('image'),
   credits: z.number().int().positive(),
 })
-export const videoProviderSchema = z.enum(['runware', 'wan-runpod'])
+export const videoProviderSchema = z.enum(['runware', 'wan-runpod', 'bytedance'])
 export type VideoProviderId = z.infer<typeof videoProviderSchema>
 
 export const catalogVideoModelSchema = catalogBase.extend({
@@ -52,8 +52,10 @@ export const catalogVideoModelSchema = catalogBase.extend({
   // Which backend runs this video model. Additive and optional: absent means
   // the default fast tier (Runware). 'wan-runpod' routes submit/poll to our
   // self-hosted ComfyUI worker instead (see the VideoProvider seam in the API
-  // and the wan-selfhost-video-provider ADR). Image models are always Runware,
-  // so this lives on the video schema only.
+  // and the wan-selfhost-video-provider ADR); 'bytedance' routes to ByteDance's
+  // ModelArk API directly, bypassing the Runware aggregator (see the
+  // seedance-direct-bytedance ADR). Image models are always Runware, so this
+  // lives on the video schema only.
   provider: videoProviderSchema.optional(),
 })
 // CinemaStudio audio models (music beds + voiceover). Flat-priced per generation

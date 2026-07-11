@@ -12,6 +12,14 @@ export { Badge } from './Badge'
 export type { BadgeProps, BadgeVariant } from './Badge'
 export { Button } from './Button'
 export type { ButtonProps, ButtonSize, ButtonVariant } from './Button'
+// The v4 surface primitive: every panel in the app is a Card with a declared
+// surface (glass / steel / well) instead of a hand-rolled border+padding string
+export { Card } from './Card'
+export type { CardPadding, CardProps, CardSurface } from './Card'
+// The raw frosted recipes, for the rare surface that is NOT a Card — the composer
+// capsule needs its own radius. Reach for `Card` first; these exist so nobody
+// hand-copies the recipe a fifth time. Consumers add their own `border` + radius.
+export { GLASS_FLOATING, GLASS_SURFACE, STEEL_SURFACE, WELL_SURFACE } from './surfaces'
 export { EmptyState } from './EmptyState'
 export type { EmptyStateProps } from './EmptyState'
 export { ErrorState } from './ErrorState'

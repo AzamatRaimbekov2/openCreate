@@ -10,6 +10,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { GLASS_SURFACE, STEEL_SURFACE } from './surfaces'
 
 // Everything keyboard-reachable inside the dialog. Enumerated at KEYDOWN time
 // (not once on open) so content that swaps while open — skeleton → data rows,
@@ -79,21 +80,11 @@ const SIZE_CLASS = {
   lg: 'max-w-5xl',
 } as const
 
-// Same rule as the composer capsule: the opaque fill is the BASELINE and glass
-// is layered on only where backdrop-filter actually exists. Without that guard a
-// translucent sheet over unblurred content is unreadable, not stylish.
+// The frosted recipe and its opaque baseline now live in ONE place (surfaces.ts)
+// so a sheet, a card and the composer capsule cannot drift apart.
 const SURFACE_CLASS = {
-  steel: 'border-white/10 bg-steel',
-  glass: [
-    'border-white/15 bg-steel',
-    'supports-[backdrop-filter]:bg-white/[0.06]',
-    'supports-[backdrop-filter]:backdrop-blur-2xl',
-    'supports-[backdrop-filter]:backdrop-saturate-150',
-    'supports-[backdrop-filter]:backdrop-brightness-75',
-    'supports-[backdrop-filter]:border-white/10',
-    'supports-[backdrop-filter]:border-t-white/25',
-    'supports-[backdrop-filter]:ring-1 supports-[backdrop-filter]:ring-white/5 supports-[backdrop-filter]:ring-inset',
-  ].join(' '),
+  steel: STEEL_SURFACE,
+  glass: GLASS_SURFACE,
 } as const
 
 export function Modal({

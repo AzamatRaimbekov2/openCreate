@@ -8,6 +8,8 @@ A simple, robust sequential DOM player (NOT an encoder): plays the shots' media
 back-to-back on one canvas — video advances on `ended`, an image/title slate on a
 `durationMs` timer. An APPROXIMATION; the server render is authoritative.
 
+It is also the editor's STAGE — the hero surface of `/cinema/$filmId`.
+
 ## What it does (for an AI reader)
 
 - Responsibilities: build a playlist from shots + their generations; play it.
@@ -19,8 +21,8 @@ back-to-back on one canvas — video advances on `ended`, an image/title slate o
 ## Dependencies
 
 - Imports: `react` (`useEffect/useMemo/useRef/useState`), `react-i18next`,
-  `useShotGenerations`, `PlayIcon`/`PauseIcon`.
-- Used by: `FilmEditor`.
+  `Card` from `shared/ui`, `useShotGenerations`, `PlayIcon`/`PauseIcon`.
+- Used by: `FilmEditor` (the stage column).
 
 ## Diagram
 
@@ -35,6 +37,11 @@ flowchart TD
 
 ## Key decisions / gotchas
 
+- v4 surface: ONE `Card surface="well" padding="none" className="overflow-hidden"`.
+  Media runs edge to edge to the card's rounded corners; the transport controls
+  hang off it as a hairline footer, so the player reads as a single object.
+- It carries NO visible heading, only `aria-label` on its `<section>`: a hero that
+  announces itself is a panel, not a stage. Screen readers still get the name.
 - No polling here — the mounted `ShotThumb`s own the `['generation', id]` poll;
   this only reads the fresher answer from cache.
 - No crossfade compositing / wasm — deliberately (ADR). The caveat line says the

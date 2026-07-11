@@ -41,6 +41,16 @@ export const RESOLUTIONS = {
     '1:1': { width: 1024, height: 1024 },
     '9:16': { width: 752, height: 1392 },
   },
+  // Nano Banana (Gemini image) publishes its OWN dimension list per resolution
+  // tier and rejects sizes outside it — same class of constraint as Kontext, so
+  // it gets its own table rather than being forced through the tier ladder.
+  // These are its 1K-tier options (1024×1024 / 1376×768 / 768×1376) — the tier we
+  // buy, since a reference portrait is generated once and never needs 4K.
+  nanobanana: {
+    '16:9': { width: 1376, height: 768 },
+    '1:1': { width: 1024, height: 1024 },
+    '9:16': { width: 768, height: 1376 },
+  },
 } satisfies Record<string, Record<AspectRatio, Resolution>>
 
 // Which table a model reads. Absent → the legacy tier ladder below.

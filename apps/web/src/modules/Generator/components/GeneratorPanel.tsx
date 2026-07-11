@@ -1,15 +1,22 @@
 // apps/web/src/modules/Generator/components/GeneratorPanel.tsx
-// The create-page form as the v3 terminal "commission sheet": a white/10
-// hairline-framed sheet whose field groups — type → model cards → prompt →
-// aspect/duration → optional i2v upload — are rows numbered by ghost mono
-// ordinals and separated by hairlines, closed by a footer with the mono cost
-// numeral + the Generate pill.
+// The create-page form as the "commission sheet": a sheet whose field groups —
+// type → model → prompt → aspect/duration → optional i2v upload — are rows
+// numbered by ghost mono ordinals and separated by hairlines, closed by a
+// footer with the mono cost numeral + the Generate pill.
 // Catalog state (loading/error/empty/data) follows the 4-states rule; submit
 // failures surface inline via SubmitErrorBanner (never a blocking modal).
+//
+// v4 SURFACE: the sheet was a hand-rolled `rounded-lg border border-white/10`
+// frame that stayed UNFILLED so the steel inputs inside kept an elevation step.
+// It is now the default `glass` Card — the frost + specular edge + shadow-glass
+// give it depth of its own, so the inputs no longer have to carry the
+// elevation ladder alone. `title` makes it a labelled landmark: the visible
+// "commission sheet" caption IS the section's accessible name now, replacing
+// the invisible aria-label the hand-rolled <section> carried.
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, EmptyState, ErrorState, PillGroup, Skeleton } from 'shared/ui'
+import { Button, Card, EmptyState, ErrorState, PillGroup, Skeleton } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
 import { useCreateGeneration } from '../model/createGeneration'
 import {
@@ -41,18 +48,17 @@ export function GeneratorPanel() {
   }, [catalog.data, setCatalog])
 
   // Loading: mirror the sheet silhouette (toggle, cards, textarea, footer)
-  // inside the same hairline frame so data lands without a layout jump
+  // inside the same titled glass card so data lands without a layout jump
   if (catalog.isPending) {
     return (
-      <section
-        aria-label={t('generator.title')}
-        className="flex flex-col gap-4 rounded-lg border border-white/10 p-6 md:p-7"
-      >
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </section>
+      <Card title={t('generator.sheet')} padding="lg">
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </Card>
     )
   }
 
@@ -155,18 +161,11 @@ export function GeneratorPanel() {
   }
 
   return (
-    <section
-      aria-label={t('generator.title')}
-      // The commission sheet (v3): a white/10 hairline frame directly on the
-      // void — inputs INSIDE it are the steel surface steps, so the frame
-      // itself stays unfilled to keep the elevation ladder readable
-      className="flex flex-col rounded-lg border border-white/10 p-6 md:p-7"
-    >
-      {/* Sheet head: quiet mono caption over the sheet's opening hairline */}
-      <header className="mb-6 border-b border-white/10 pb-4">
-        <span className="text-xs text-mist-dim">{t('generator.sheet')}</span>
-      </header>
-
+    // The commission sheet: `title` renders the quiet mono caption AND labels
+    // the landmark, so the old <header> + aria-label pair is gone — one string,
+    // one heading, one accessible name instead of a visible caption and an
+    // invisible label that could drift apart.
+    <Card title={t('generator.sheet')} padding="lg">
       <div className="flex flex-col divide-y divide-white/10">
         {fields.map((field, index) => (
           <SheetField key={field.key} ordinal={String(index + 1).padStart(2, '0')}>
@@ -190,6 +189,6 @@ export function GeneratorPanel() {
           {t('generator.submit')}
         </Button>
       </footer>
-    </section>
+    </Card>
   )
 }

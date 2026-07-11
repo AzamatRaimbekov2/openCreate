@@ -11,6 +11,7 @@ import type { CatalogModel } from '@opencreate/contracts'
 // or unknown model id still renders a mark instead of crashing (see ProviderMark).
 export type ProviderId =
   | 'flux'
+  | 'nanobanana'
   | 'pixverse'
   | 'minimax'
   | 'seedance'
@@ -31,9 +32,15 @@ export type ModelPresentation = {
 const PROVIDER_BY_MODEL: Record<string, ProviderId> = {
   'flux-schnell': 'flux',
   'flux-dev': 'flux',
+  // Nano Banana Pro — the reference/character model (Gemini image, via Runware)
+  'nano-banana-pro': 'nanobanana',
   'pixverse-v6': 'pixverse',
   'minimax-hailuo': 'minimax',
   'seedance-1-5-pro': 'seedance',
+  // Seedance 2.0 straight from ByteDance (no Runware in the path) — same Seedance
+  // brand mark as 1.5 Pro. The mark names the MODEL's brand, not the channel it
+  // is billed through, so a provider swap must never change the glyph.
+  'seedance-2-0': 'seedance',
   'wan-2-7': 'wan',
   // Self-hosted Wan 2.2 ("Forge") — same Wan brand mark as wan-2-7. Its
   // description string is generator.models.wan-2-2.description in the locales.

@@ -46,8 +46,15 @@
      RU prose falls back to the system sans by design) */
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  /* The one allowed shadow: the soft double shadow on specimen pills */
+  /* Specimen-pill shadow (v3) */
   --shadow-pill: 0 2px 5px -1px rgb(0 0 0 / 0.3), 0 1px 3px -1px rgb(0 0 0 / 0.35);
+  /* Glass-card shadow (v4): cards now LIFT off the void instead of stepping up
+     through surface colors. Still no gradient anywhere — the specular edge is a
+     brighter top border, not a sheen. See shared/ui/surfaces.ts. */
+  --shadow-glass: 0 8px 24px -8px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  /* The floating step of the same material: chrome that hovers OVER scrolling
+     content (the composer capsule) and needs a longer throw to separate from it */
+  --shadow-glass-lg: 0 16px 48px -12px rgb(0 0 0 / 0.65), 0 4px 12px -4px rgb(0 0 0 / 0.5);
 
   /* Skeleton loading: a STEPPED solid pulse through the surface ladder
      (abyss → steel → ridge → steel) — never a gradient shimmer */
