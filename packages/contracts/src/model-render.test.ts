@@ -23,4 +23,22 @@ describe('createModelRenderInput', () => {
     })
     expect(r.success).toBe(false)
   })
+
+  it('rejects an svg poster (script-execution surface, not a raster image)', () => {
+    const r = createModelRenderInputSchema.safeParse({
+      presetId: 'studio',
+      video: VIDEO,
+      poster: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+    })
+    expect(r.success).toBe(false)
+  })
+
+  it('rejects a video mime that merely starts with the allowed prefix', () => {
+    const r = createModelRenderInputSchema.safeParse({
+      presetId: 'studio',
+      video: `data:video/mp4evil,${'A'.repeat(64)}`,
+      poster: POSTER,
+    })
+    expect(r.success).toBe(false)
+  })
 })
