@@ -285,16 +285,64 @@ export const CATALOG: CatalogModel[] = [
     credits: 20,
     audioKind: 'music',
   },
+  // ── Studio3D (ADR: photo-to-3d-studio) ──────────────────────────────────────
+  // Runware's 3dInference task type. Prices verified 2026-07-11; the response's
+  // `cost` field is what we actually bill against (it SCALES with the quality
+  // settings), so these list prices seed the credit table, not the ledger.
+  //
+  // 3D has no aspect ratio. catalogBase requires >=1, so each entry carries a
+  // single throwaway '1:1' the service never reads — the model3d path skips
+  // resolution entirely, exactly as the audio path does.
+  {
+    id: 'trellis-2',
+    type: 'model3d',
+    name: 'Sketch',
+    providerLabel: 'TRELLIS.2',
+    air: 'microsoft:trellis-2@4b',
+    tier: 'fast',
+    supportsImageInput: true,
+    aspectRatios: ['1:1'],
+    // $0.0256 raw. MIT-licensed and an order of magnitude cheaper than the rest —
+    // this is the tier that makes 3D feel free enough to play with.
+    credits: 6,
+    pbr: true,
+  },
+  {
+    id: 'hunyuan-3d-rapid',
+    type: 'model3d',
+    name: 'Solid',
+    providerLabel: 'Hunyuan 3D 3.1 Rapid',
+    air: 'tencent:hunyuan-3d@3.1-rapid',
+    tier: 'standard',
+    supportsImageInput: true,
+    aspectRatios: ['1:1'],
+    credits: 45, // $0.225 raw
+    pbr: true,
+  },
+  {
+    id: 'tripo-3d',
+    type: 'model3d',
+    name: 'Sculpt',
+    providerLabel: 'Tripo 3D v3.1',
+    air: 'tripo:v3.1@0',
+    tier: 'quality',
+    supportsImageInput: true,
+    aspectRatios: ['1:1'],
+    credits: 80, // $0.40 raw
+    pbr: true,
+  },
 ]
 
 export function getModel(id: string): CatalogModel | undefined {
   return CATALOG.find((m) => m.id === id)
 }
 
-export function creditsFor(model: CatalogModel, duration: number | undefined): number {
-  // Image and audio are flat-priced per generation (a picture, a song, an
-  // utterance); only video prices by duration.
-  if (model.type === 'image' || model.type === 'audio') return model.credits
+export function creditsFor(model: CatalogModel, duration?: number): number {
+  // Image, audio and model3d are flat-priced per generation (a picture, a song,
+  // an utterance, a mesh); only video prices by duration. `duration` is optional
+  // so callers pricing a flat model (e.g. the 3D tiers) don't have to pass
+  // `undefined` explicitly.
+  if (model.type === 'image' || model.type === 'audio' || model.type === 'model3d') return model.credits
   if (duration === undefined) throw new Error('duration required for video')
   const credits = model.creditsByDuration[String(duration)]
   if (!credits) throw new Error(`unsupported duration ${duration} for ${model.id}`)

@@ -6,12 +6,12 @@
 The one place where openCreate's sellable models live: product ids, display names, Runware AIR ids, tiers, supported aspect ratios, duration options and **credit prices**. Routes, the generation service and SPA pricing all derive from this array — pricing is never duplicated elsewhere.
 
 ## What it does (for an AI reader)
-- Responsibilities: hold the 2 image + 6 video model definitions and the pure pricing/resolution helpers.
+- Responsibilities: hold the 2 image + 6 video + 2 audio + 3 model3d model definitions and the pure pricing/resolution helpers.
 - Public API / exports:
   - `CATALOG: CatalogModel[]` — every entry validated by the shared `catalogModelSchema` (see `test/catalog.test.ts`).
   - `getModel(id)` → `CatalogModel | undefined` — lookup by product id.
-  - `creditsFor(model, duration)` → `number` — flat `credits` for images; `creditsByDuration[duration]` for video. Throws on missing/unsupported duration so a bad request can never be mischarged.
-  - `resolutionFor(model, aspect)` → `{ width, height }` — images use `square1024`; plus/pro/premium video tiers FHD, other video tiers HD.
+  - `creditsFor(model, duration?)` → `number` — flat `credits` for image/audio/model3d (duration is optional and ignored for these); `creditsByDuration[duration]` for video (duration required, throws if missing/unsupported).
+  - `resolutionFor(model, aspect)` → `{ width, height }` — images use `square1024`; plus/pro/premium video tiers FHD, other video tiers HD. Never called for audio or model3d (both skip resolution entirely).
   - `RESOLUTIONS` — aspect-ratio → pixel tables.
 - Inputs → Outputs: pure data + pure functions, no I/O, no state.
 - Side effects: none.
@@ -40,7 +40,13 @@ flowchart LR
 
 ## Commits
 - bdc4175 feat(api): curated model catalog with credit pricing
+- 45ce33e 2026-07-11 feat: design-system v4 (Card/surfaces) + Seedance direct via ByteDance ArkC
 
 ## Key decisions (2026-07-09) — CinemaStudio audio
 - Two `type: 'audio'` models added: `voiceover` (Inworld TTS 2, `air: inworld:tts@2`, 8 cr, `audioKind: 'tts'`, Russian voices) and `music` (MiniMax Music 2.6, `air: minimax:music@2.6`, 20 cr, `audioKind: 'music'`). Both flat-priced per generation.
 - `creditsFor` now returns the flat `credits` for BOTH image and audio (only video prices by duration). `resolutionFor` is never called for audio (the generation service's audio branch skips resolution — audio has no aspect ratio; the throwaway `aspectRatios: ['16:9']` only satisfies catalogBase's `min(1)`).
+
+## Key decisions (2026-07-11) — Studio3D catalog tiers (Task 6)
+- Three `type: 'model3d'` models added, ladder-priced ~2x provider cost like every other tier: `trellis-2` ("Sketch", `microsoft:trellis-2@4b`, fast, 6 cr, $0.0256 raw — MIT-licensed and an order of magnitude cheaper, the tier that makes 3D feel free to play with), `hunyuan-3d-rapid` ("Solid", `tencent:hunyuan-3d@3.1-rapid`, standard, 45 cr, $0.225 raw), `tripo-3d` ("Sculpt", `tripo:v3.1@0`, quality, 80 cr, $0.40 raw). All three: `supportsImageInput: true` (photo → mesh is the entire product), `pbr: true`, no `provider` field (implicitly Runware — routes.ts only gates on `type === 'video'`, so these are never hidden by the optional-backend filter), throwaway `aspectRatios: ['1:1']` since 3D has no aspect ratio and `resolutionFor` is never called for it.
+- `creditsFor`'s signature changed from `(model, duration: number | undefined)` to `(model, duration?: number)` — model3d joined the flat-priced guard alongside image/audio, and made `duration` optional so callers pricing a flat model don't have to pass `undefined` explicitly. This also fixed the pre-existing typecheck error at the old line 299 (`model.creditsByDuration` didn't exist on the narrowed type once `model3d` fell through to the video branch).
+- Prices are LIST prices seeding this credit table, not the ledger — Runware's 3dInference response `cost` field scales with quality settings and is what generations/service.ts will actually bill against (Task 7).

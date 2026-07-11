@@ -173,3 +173,26 @@ describe('provider parameter compatibility', () => {
     })
   })
 })
+
+describe('3D models', () => {
+  it('ships three model3d tiers and every one validates against the contract', () => {
+    const models3d = CATALOG.filter((m) => m.type === 'model3d')
+    expect(models3d).toHaveLength(3)
+    for (const m of models3d) expect(catalogModelSchema.parse(m)).toEqual(m)
+  })
+
+  it('prices every 3D model at roughly 2x its provider cost', () => {
+    // TRELLIS.2 $0.0256, Hunyuan Rapid $0.225, Tripo v3.1 $0.40 (research 2026-07-11).
+    expect(creditsFor(getModel('trellis-2')!)).toBe(6)
+    expect(creditsFor(getModel('hunyuan-3d-rapid')!)).toBe(45)
+    expect(creditsFor(getModel('tripo-3d')!)).toBe(80)
+  })
+
+  it('marks every 3D model as accepting an image input', () => {
+    // A 3D model with supportsImageInput:false could never be generated from a
+    // photo — which is the entire product.
+    for (const m of CATALOG.filter((m) => m.type === 'model3d')) {
+      expect(m.supportsImageInput).toBe(true)
+    }
+  })
+})
