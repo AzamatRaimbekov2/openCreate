@@ -40,4 +40,4 @@ flowchart LR
 
 ## Commits
 - 863a9c0 feat(contracts): portable scene preset (one JSON, N renderers)
-- (pending) fix(contracts): declare scene preset rotation unit, drop tautological test
+- 9aec552 fix(contracts): declare scene preset rotation unit, drop tautological test
