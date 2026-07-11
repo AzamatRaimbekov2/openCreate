@@ -13,7 +13,10 @@ import { apiErrorCodeSchema } from './errors'
 // the SAME async lifecycle as video (charge-at-submit, poll, refund) — see the
 // CinemaStudio ADR §1: audio is not a new subsystem, it is a third generation
 // type behind an AudioProvider seam shaped exactly like the VideoProvider seam.
-export const generationTypeSchema = z.enum(['image', 'video', 'audio'])
+// 'model3d' joins them for Studio3D (photo → 3D GLB mesh) — see the
+// photo-to-3d-studio ADR D1: a 3D model is not a new subsystem, it is a fourth
+// generation type behind a Mesh3dProvider seam shaped exactly like VideoProvider.
+export const generationTypeSchema = z.enum(['image', 'video', 'audio', 'model3d'])
 export const generationModeSchema = z.enum(['text', 'image'])
 export const generationStatusSchema = z.enum(['processing', 'succeeded', 'failed'])
 

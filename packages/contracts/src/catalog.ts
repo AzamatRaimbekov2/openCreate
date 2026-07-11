@@ -74,14 +74,34 @@ export const catalogAudioModelSchema = catalogBase.extend({
   // TTS voices offered in the composer; absent for music models.
   voices: z.array(z.string()).optional(),
 })
+// Which backend runs this 3D model. 'runware' is the only one built (3dInference);
+// 'comfy-3d' is the designed-but-unbuilt self-host seam (ADR D2 — hosted TRELLIS.2
+// at $0.0256 is cheaper than the electricity of running it ourselves).
+export const mesh3dProviderSchema = z.enum(['runware', 'comfy-3d'])
+export type Mesh3dProviderId = z.infer<typeof mesh3dProviderSchema>
+
+// A 3D model is flat-priced per generation (one mesh), so `credits` mirrors the
+// image shape rather than the video per-duration table. 3D has no aspect ratio,
+// but catalogBase requires >=1, so an entry carries a single throwaway ratio the
+// service never reads — the model3d path skips resolution entirely (like audio).
+export const catalogModel3dSchema = catalogBase.extend({
+  type: z.literal('model3d'),
+  credits: z.number().int().positive(),
+  // Does this model produce PBR maps (metallic/roughness/normal), or bare albedo?
+  // Surfaced in the composer so the user knows what they are buying.
+  pbr: z.boolean().optional(),
+  provider: mesh3dProviderSchema.optional(),
+})
 export const catalogModelSchema = z.discriminatedUnion('type', [
   catalogImageModelSchema,
   catalogVideoModelSchema,
   catalogAudioModelSchema,
+  catalogModel3dSchema,
 ])
 export type CatalogModel = z.infer<typeof catalogModelSchema>
 export type CatalogImageModel = z.infer<typeof catalogImageModelSchema>
 export type CatalogVideoModel = z.infer<typeof catalogVideoModelSchema>
 export type CatalogAudioModel = z.infer<typeof catalogAudioModelSchema>
+export type CatalogModel3d = z.infer<typeof catalogModel3dSchema>
 
 export const catalogResponseSchema = z.object({ models: z.array(catalogModelSchema) })

@@ -7,7 +7,7 @@ Contracts for the generation lifecycle: the `POST /api/generations` request body
 
 ## What it does (for an AI reader)
 - Responsibilities: validate creation input (prompt 2–2000 chars, optional aspect ratio, optional duration 1–15s, optional `inputImage` as data URI ≤14MB, optional structured `promptPreset`, optional TTS `voice`) and the full DTO (status/progress/mediaUrls/`composedPrompt`/`promptPreset`/errorMessage/`errorCode`/timestamps).
-- Public API / exports: `generationTypeSchema` (**image|video|audio**), `generationModeSchema`, `generationStatusSchema`, `createGenerationInputSchema`/`CreateGenerationInput`, `generationParamsSchema`, `generationSchema`/`Generation`, `generationListSchema`/`GenerationList`.
+- Public API / exports: `generationTypeSchema` (**image|video|audio|model3d**), `generationModeSchema`, `generationStatusSchema`, `createGenerationInputSchema`/`CreateGenerationInput`, `generationParamsSchema`, `generationSchema`/`Generation`, `generationListSchema`/`GenerationList`.
 - Inputs → Outputs: unknown JSON → typed input/DTO; API routes return 400 envelope on input parse failure.
 - Side effects: none (pure schemas).
 
@@ -31,6 +31,10 @@ flowchart LR
 - `errorCode` (nullable + optional, `apiErrorCodeSchema`) is the machine-readable failure reason on failed rows — the SPA maps `content_blocked` (NSFW safety filter) to a dedicated localized message instead of showing the raw provider errorMessage.
 - CinemaStudio additions (2026-07-09): `type` gains `'audio'`; `aspectRatio` is now optional on both input and params (audio has none — image/video still carry it and the service enforces it); input gains `promptPreset` (structure, composed server-side — never client-concatenated) and `voice` (TTS); DTO gains `composedPrompt` (what the model saw; null → read `prompt`) and `promptPreset` (echoed for Regenerate). All additive: a request with none of the new fields behaves exactly as before.
 
+## Key decisions (2026-07-11) — Studio3D
+- `type` gains `'model3d'` (Task 1 of the photo-to-3d-studio plan). It rides the exact same async lifecycle as video/audio — submit charges credits, the API polls the provider, failure refunds — behind a `Mesh3dProvider` seam mirroring `VideoProvider`. No new fields needed on `createGenerationInputSchema`/`generationSchema` for this step: a model3d request reuses `inputImage` (the source photo) and skips `aspectRatio`/`duration` like audio does. Purely additive — existing image/video/audio rows and requests are unaffected. Downstream exhaustive switches over `generationTypeSchema` in `apps/api` and `apps/web` now fail typecheck until later tasks add the `'model3d'` branch — that is intentional and tracked by those tasks, not a regression here.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
+- b6ab9ec feat: CinemaStudio, entity library and shared/ui listbox refactor

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { catalogModelSchema, catalogVideoModelSchema } from './catalog'
+import { generationTypeSchema } from './generation'
 
 describe('catalogModelSchema', () => {
   it('parses a video model with per-duration credits', () => {
@@ -76,6 +77,42 @@ describe('catalogModelSchema', () => {
       tier: 'fast',
       supportsImageInput: false,
       aspectRatios: ['1:1'],
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe('model3d catalog contract', () => {
+  it('accepts model3d as a generation type', () => {
+    expect(generationTypeSchema.parse('model3d')).toBe('model3d')
+  })
+  it('parses a model3d catalog entry with flat credits', () => {
+    const r = catalogModelSchema.safeParse({
+      id: 'trellis-2',
+      type: 'model3d',
+      name: 'Sketch',
+      providerLabel: 'TRELLIS.2',
+      air: 'microsoft:trellis-2@4b',
+      tier: 'fast',
+      supportsImageInput: true,
+      aspectRatios: ['1:1'],
+      credits: 6,
+      pbr: true,
+    })
+    expect(r.success).toBe(true)
+    if (r.success) expect(r.data.type).toBe('model3d')
+  })
+  it('rejects a model3d entry that carries video duration pricing', () => {
+    const r = catalogModelSchema.safeParse({
+      id: 'x',
+      type: 'model3d',
+      name: 'X',
+      providerLabel: 'X',
+      air: 'a:b@1',
+      tier: 'fast',
+      supportsImageInput: true,
+      aspectRatios: ['1:1'],
+      creditsByDuration: { '5': 10 },
     })
     expect(r.success).toBe(false)
   })
