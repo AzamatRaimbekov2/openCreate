@@ -15,11 +15,22 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   `credit_transaction(generation_id, kind)`; NULL generation_ids, i.e. signup
   bonuses, stay unconstrained; boot survives legacy dupes by skipping the index
   with a warning).
-- **Catalog** — curated model list (2 image + 6 video models) with honest provider
-  labels, Runware AIR ids, aspect ratios and credit prices. Single source of truth for
-  validation, pricing and resolution mapping. Video models carry an optional
-  `provider` (`runware` default, or `wan-runpod`) that routes them through the
-  VideoProvider seam; image models are always Runware.
+- **Catalog** — curated model list (4 image + 7 video + 2 audio models) with honest
+  provider labels, Runware AIR ids, aspect ratios and credit prices. Single source of
+  truth for validation, pricing and resolution mapping. Video models carry an optional
+  `provider` (`runware` default, or `wan-runpod`, or `bytedance`) that routes them
+  through the VideoProvider seam; image models are always Runware. **A video model whose
+  backend is unconfigured is hidden from `GET /api/catalog`** — listing it would only
+  produce a selectable option that walks the user to submit and then fails.
+- **References & the face-routing rule** — `nano-banana-pro` (Nano Banana Pro / Gemini 3
+  Pro Image, `google:4@2`, Runware) is the model characters and reference images are
+  generated with. It does **not** unlock faces on Seedance 2.0: ByteDance trusts only
+  ModelArk's own outputs, so a Google-generated portrait is refused there just like a
+  Flux one. The guard is the capability flag, not a special case — `seedance-2-0`
+  declares no `referenceMode`, so the composer filters it out the moment an entity is
+  tagged and the service re-validates. **Character shots route to Kling / Veo / PixVerse
+  / MiniMax / Wan; Seedance 2.0 keeps t2v and face-free i2v.** Pinned by catalog tests
+  (no reference-capable model may be ByteDance-backed). See `seedance-direct-bytedance`.
 - **Video providers (seam)** — a small `VideoProvider { submit(); poll() }` abstraction
   (`integrations/video-provider.ts`) lets a video model run on either **Runware** (the
   fast tier, via a thin adapter over the unchanged `RunwareClient`) or **wan-runpod**
@@ -35,6 +46,23 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   like a Runware URL. **Known gap:** self-hosted ComfyUI has no provider-side NSFW
   check, so wan-runpod always reports `nsfw:false` — the §9.4 gate never fires for it
   until a worker-side classifier is added (see the ADR moderation-parity note).
+- **ByteDance direct (`bytedance`)** — the third provider: Seedance 2.0 straight from
+  BytePlus ModelArk, no aggregator in the path (`integrations/bytedance/ark-client.ts`,
+  ADR `seedance-direct-bytedance`). Gated on `ARK_API_KEY`; unset → the `seedance-2-0`
+  model is hidden from the catalog and a submit returns a clean `provider_error`.
+  submit `POST /api/v3/contents/generations/tasks` → a `cgt-…` job handle; poll
+  `GET …/tasks/{id}` folds ModelArk's six-state status into the neutral union. Assets
+  land on `*.volces.com` (**not** the API's `*.bytepluses.com`) and are **hard-deleted
+  after 24h** — `saveFromUrl` copies them out on the existing settle path.
+  **Economics, honestly:** the direct channel saves only ~5% over Runware, not the ~72%
+  the 2026-07-07 research claimed — that figure used ByteDance's *video-input* token
+  rate ($4.30/M); text→video and image→video pay **$7.00/M**, i.e. **$0.756** per 5s 720p
+  clip vs Runware's $0.80. It exists for the model and its levers, not for the price.
+  **Product constraint:** Seedance 2.0 **refuses any input image containing a real human
+  face** (input moderation on the whole `content` array — collides with the Entity
+  Library's portrait premise). i2v is still offered because it works for everything else;
+  a refusal settles as a **refundable `content_blocked`** that names the real reason, via
+  the new `blocked` flag on the seam's error variant.
 - **Generations** — the core lifecycle: charge at submit → call the video provider
   (or Runware for images) → store the
   asset in our own storage → poll-on-read for async video → refund on failure.
@@ -132,7 +160,8 @@ src/
 │   ├── video-provider.ts       # VideoProvider seam: neutral submit/poll types
 │   ├── audio-provider.ts       # AudioProvider seam (submit only; polls via the video registry)
 │   ├── runware/                # REST client + video-adapter + audio-adapter (audioInference)
-│   └── runpod/                 # comfy-client.ts (wan-runpod) + embedded wan22-t2v-workflow.ts
+│   ├── runpod/                 # comfy-client.ts (wan-runpod) + embedded wan22-t2v-workflow.ts
+│   └── bytedance/              # ark-client.ts (bytedance): Seedance 2.0 direct via ModelArk
 ├── storage/local.ts            # StorageProvider: save-from-url + localPath (render I/O) → /media/<key>.<ext>
 └── scripts/verify-catalog.ts   # AIR id verification against Runware modelSearch
 scripts/build.mjs               # esbuild bundle → runnable dist/index.js (contracts inlined)
@@ -161,7 +190,10 @@ Env (see `.env.example`): `RUNWARE_API_KEY`, `BETTER_AUTH_SECRET` are required;
 cap, default 536870912), `TRUST_PROXY` (reverse-proxy header trust for rate-limit
 attribution, default off), `COMFY_BASE_URL` (optional; pod ComfyUI base URL for the
 `wan-runpod` video provider — its host is auto-added to `ASSET_HOST_ALLOWLIST`; unset
-leaves the `wan-2-2` model listed but a submit returns a clean `provider_error`),
+**hides** the `wan-2-2` model from `/api/catalog`, and a direct submit still returns a
+clean `provider_error`), `ARK_API_KEY` (optional; BytePlus ModelArk bearer token for the
+direct `bytedance` provider — `tos-ap-southeast-1.volces.com` is auto-added to
+`ASSET_HOST_ALLOWLIST` **only when it is set**; unset **hides** the `seedance-2-0` model),
 `ENV_FILE` optional.
 The nearest `.env` (repo root) is loaded natively at boot via Node 22
 `process.loadEnvFile` — no manual sourcing; real env vars always win. In prod,
@@ -195,6 +227,25 @@ full-workspace build → prod-only pnpm install → `node:22-slim` runtime, non-
   external monitor should use it.
 
 Runbook (env table, first run, TLS/reverse proxy, backup/restore): `PROD.md`.
+
+## Template catalog (Brainrot Studio)
+
+Pre-authored viral formats that instantiate into a whole film. ADR:
+`docs/wiki/decisions/template-catalog.md`.
+
+- `modules/templates/catalog/*.ts` — the templates, **one file per template**. This is where the
+  prompts live and they never leave the server: `GET /api/templates` returns a `TemplateSummary`
+  (name, beat sheet, priced tiers, knobs) with no prose in it.
+- `POST /api/films/from-template` — writes the film and every shot in **one transaction** and
+  **charges zero credits**. Shots land as drafts (`generationId = null`); the user generates them
+  one at a time, later.
+- **Tiers pin the model.** `draft|standard|premium` → `pixverse-v6 | wan-2-7 | veo-3-1-fast`,
+  written onto every clip's `shot.modelId`. Prices are computed from the live catalog.
+- **`assertTemplatesValid()` runs at boot and throws.** Every tier model must natively support the
+  template's aspect ratio and every clip's duration — otherwise `composeShotClipInput` silently
+  snaps the duration, changing both the cut and the price behind the user's back.
+- **Two substitution modes.** `{{var}}` in a visual prompt → the option's English fragment; in a
+  title or a spoken line → its Russian noun. Free text never reaches a visual prompt.
 
 ## Design references
 

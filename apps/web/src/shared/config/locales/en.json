@@ -7,7 +7,8 @@
     "signOut": "Sign out",
     "language": "Language",
     "entities": "Entities",
-    "cinema": "Cinema"
+    "cinema": "Cinema",
+    "templates": "Templates"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -238,6 +239,12 @@
       },
       "veo-3-1-fast": {
         "description": "Premium eight-second clips with synced sound, fast."
+      },
+      "seedance-2-0": {
+        "description": "ByteDance's flagship, direct. Won't accept frames with real human faces."
+      },
+      "nano-banana-pro": {
+        "description": "Holds a character's face shot to shot. The best pick for references."
       }
     },
     "mention": {
@@ -507,7 +514,14 @@
       "willSee": "The model will see:",
       "save": "Save",
       "generate": "Generate",
-      "selectHint": "Select a shot to edit it, or add one from the timeline."
+      "emptyTitle": "No shot selected",
+      "selectHint": "Select a shot to edit it, or add one from the timeline.",
+      "sections": {
+        "look": "Look",
+        "clip": "Clip",
+        "title": "Title card",
+        "voice": "Line"
+      }
     },
     "preview": {
       "title": "Preview",
@@ -539,7 +553,8 @@
       "kind": {
         "music": "Music",
         "voiceover": "Voiceover"
-      }
+      },
+      "shotLine": "Line · beat {{beat}}"
     },
     "editor": {
       "back": "All films",
@@ -551,6 +566,53 @@
         "body": "\"{{title}}\" and its shots will be removed permanently. This cannot be undone.",
         "confirm": "Delete"
       }
+    },
+    "fromTemplate": "From a template",
+    "voiceover": {
+      "toggle": "Spoken line",
+      "line": "What the character says",
+      "placeholder": "I am a strawberry... you are a strawberry... why is our baby an eggplant?!",
+      "voice": "Voice",
+      "voiced": "Line is on the timeline",
+      "notVoiced": "Not voiced yet",
+      "generate": "Voice it · {{count}} cr",
+      "regenerate": "Re-voice · {{count}} cr"
+    }
+  },
+  "templates": {
+    "title": "Templates",
+    "subtitle": "Ready-made viral formats: the prompts, the shot list, the lines and the settings are already in. Pick one, change a couple of details, and land in the editor with a built timeline.",
+    "empty": {
+      "title": "No templates",
+      "description": "The catalog is empty — that looks like a server-side fault."
+    },
+    "category": {
+      "brainrot": "Brainrot"
+    },
+    "beat": {
+      "free": "free",
+      "seconds": "{{count}}s"
+    },
+    "card": {
+      "voiced": "voiced",
+      "shape": "{{beats}} beats · {{seconds}}s",
+      "from": "from {{count}} cr"
+    },
+    "tier": {
+      "label": "Quality and price",
+      "draft": "Draft",
+      "standard": "Standard",
+      "premium": "Premium",
+      "credits": "{{count}} cr",
+      "tooExpensive": "not enough credits"
+    },
+    "detail": {
+      "beats": "Shot list · {{beats}} beats · {{seconds}}s",
+      "variables": "Story settings",
+      "music": "Music:",
+      "create": "Create the film",
+      "createFailed": "Could not create a film from this template.",
+      "freeNotice": "Creating the film is free. Credits are only spent when you press Generate on a specific shot yourself."
     }
   }
 }

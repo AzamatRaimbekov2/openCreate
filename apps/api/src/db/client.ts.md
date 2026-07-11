@@ -37,3 +37,23 @@ flowchart LR
 ## Key decisions (2026-07-09) — CinemaStudio
 - Now execs `FILM_DDL` alongside `DDL`/`ENTITY_DDL` (film/shot/film_audio/film_render tables).
 - Two more guarded micro-migrations on `generation`: `composed_prompt TEXT` and `prompt_preset_json TEXT` (nullable, additive — legacy rows read NULL → fall back to `prompt`).
+
+## Key decisions (2026-07-11) — template catalog
+Four more guarded micro-migrations, each preceded by its own `pragma table_info(...)` read (the
+`generation` column list can't answer for `shot`/`film`/`film_audio`, so there are now four separate
+column-name arrays: `generationColumns`, `shotColumns`, `filmColumns`, `filmAudioColumns`).
+
+- `shot.model_id TEXT` — the model this shot generates with; was transient inspector state (defaulted
+  to `videoModels[0]` on every mount). Persisting it is what lets a template pin a tier.
+- `shot.voiceover_json TEXT` — `{ text, voice }`, the spoken line as authored copy. A draft slot:
+  `film_audio` needs a `generation_id`, so a template previously could not ship a script without first
+  charging for the TTS.
+- `film.template_id TEXT` — provenance, so the audio panel can offer the template's music prompt and so
+  we can ask which templates convert.
+- `film_audio.shot_id TEXT` — which shot a voiceover track belongs to. Without it the editor cannot tell
+  whether a shot is already voiced, so a second click on "Voice this shot" would append a second
+  overlapping track AND charge for it again.
+
+All four are nullable and additive: every pre-existing film/shot reads NULL and behaves exactly as
+before. Same guarded pattern as `error_code`/`provider` — SQLite has no `ADD COLUMN IF NOT EXISTS`, so
+the `pragma table_info` check makes a re-run a no-op.

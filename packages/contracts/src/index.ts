@@ -14,5 +14,10 @@ export * from './presets'
 export * from './generation'
 // CinemaStudio film composition contracts (Film/Shot/FilmAudio/FilmRender)
 export * from './film'
+// Template catalog — the /templates gallery DTO and the from-template request.
+// NOT the templates themselves: their prompts live server-side (see the header of
+// templates.ts). Exported after film because a template instantiates into a
+// FilmDetail.
+export * from './templates'
 export * from './credits'
 export * from './user'

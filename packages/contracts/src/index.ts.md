@@ -37,3 +37,14 @@ flowchart LR
 
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
+
+## Update 2026-07-11 — template catalog
+- Now also re-exports `./templates` (the `/templates` gallery DTO + the from-template request:
+  `TemplateSummary`, `TemplateBeat`, `TemplateTierOffer`, `TemplateTier`, `TEMPLATE_TIERS`,
+  `TemplateCategory`, `TemplateList`, `createFilmFromTemplateInputSchema`/`CreateFilmFromTemplateInput`).
+- **Order matters here**: `./templates` is exported AFTER `./film`, because a template instantiates
+  into a `FilmDetail` — the same "export the dependency first" rule that puts `presets` before
+  `generation`.
+- What is NOT exported, on purpose: the templates THEMSELVES. Their prompts, and the English fragment
+  each knob option expands to, live server-side in `apps/api/src/modules/templates/` and never cross
+  the wire (see that module's `types.ts` header). Only a prompt-free `TemplateSummary` travels.

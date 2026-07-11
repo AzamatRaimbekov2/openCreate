@@ -41,3 +41,25 @@ erDiagram
 ## Key decisions (2026-07-09) — CinemaStudio
 - `generation.type` enum gains `'audio'`; two nullable columns `composedPrompt` / `promptPresetJson` added (mirror `ddl.ts` + `client.ts` micro-migration).
 - Four new tables: `film`, `shot`, `filmAudio`, `filmRender`. `shot.orderIndex` is `real()` (spaced reorder). `shot.generationId` / `filmAudio.generationId` have **no** `.references()` — a deleted generation leaves an empty ref, it does not cascade the film. `filmRender` has no cost/refund column (CPU, not a provider invoice); `mediaJson` mirrors `generation.mediaJson`'s `[url]` array shape so the same serve path is reused. `real` added to the drizzle-orm import.
+
+## Key decisions (2026-07-11) — template catalog
+Three tables gain one nullable column each. All additive: every pre-existing row reads NULL and
+behaves exactly as before. Mirrored in `ddl.ts` (`FILM_DDL`) **and** guarded by `client.ts`
+micro-migrations, because `CREATE TABLE IF NOT EXISTS` never alters a table that already exists.
+
+- **`shot.modelId`** (`model_id TEXT`) — the catalog model this shot generates with; NULL = no opinion
+  (fall back to the style's recommendation, then the first video model). Before this column the model
+  was transient inspector state: re-selecting a shot forgot which model made its clip, and a template
+  had nowhere to pin its price/quality tier.
+- **`shot.voiceoverJson`** (`voiceover_json TEXT`) — `{ text, voice }`, the line this shot's character
+  speaks, as authored copy. A DRAFT SLOT, not an asset: `film_audio` requires a `generation_id`, so
+  before this column there was no way to hand a user a script without first generating (and charging
+  for) the TTS. Generating it produces an audio generation and files a `film_audio` track at this
+  shot's timeline offset.
+- **`film.templateId`** (`template_id TEXT`) — which template this film was instantiated from; NULL for
+  a hand-made film. **Deliberately NOT an FK**: templates are code, not rows — retiring one from the
+  catalog must leave old films intact, just unlinked.
+- **`filmAudio.shotId`** (`shot_id TEXT`) — the shot a voiceover track belongs to; NULL = a film-wide
+  bed. It is what makes "voice this shot" a REPLACE rather than an append (without it, a second click
+  adds a second overlapping track and charges again). **No FK on purpose**: the film cascade already
+  removes these rows, and a stale link should read as an unattached track, not delete someone's audio.

@@ -11,6 +11,7 @@ import type { Db } from './db/client'
 import type { RunwareClient } from './integrations/runware/client'
 import { createRunwareVideoAdapter } from './integrations/runware/video-adapter'
 import { createComfyClient } from './integrations/runpod/comfy-client'
+import { createArkClient } from './integrations/bytedance/ark-client'
 import type { VideoProvider, VideoProviderId } from './integrations/video-provider'
 import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
@@ -24,6 +25,8 @@ import { registerGenerationRoutes } from './modules/generations/routes'
 import { createFilmService, settleStaleRenders } from './modules/films/service'
 import { registerFilmRoutes } from './modules/films/routes'
 import { createStoryboardService } from './modules/films/storyboard'
+import { assertTemplatesValid, createTemplateService } from './modules/templates/service'
+import { registerTemplateRoutes } from './modules/templates/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -37,11 +40,17 @@ export type AppDeps = {
   runware: RunwareClient
   // VIDEO provider registry (VideoProvider seam). Optional: when absent it is
   // DERIVED here from `runware` (adapter) + `config.comfyBaseUrl` (wan-runpod
-  // ComfyUI client), so index.ts stays minimal and existing tests that inject
-  // only `runware` keep routing video through the Runware adapter unchanged.
-  // Routing-focused tests inject an explicit registry to assert which backend
-  // ran; the image path never touches this.
-  videoProviders?: Record<VideoProviderId, VideoProvider>
+  // ComfyUI client) + `config.arkApiKey` (direct ByteDance), so index.ts stays
+  // minimal and existing tests that inject only `runware` keep routing video
+  // through the Runware adapter unchanged. Routing-focused tests inject an
+  // explicit registry to assert which backend ran; the image path never touches
+  // this.
+  //
+  // PARTIAL by design: a routing test that only cares about two backends must not
+  // be forced to stub every provider that exists, and the service already resolves
+  // a missing entry to Runware (or a clean provider_error). Production always
+  // derives the complete registry below.
+  videoProviders?: Partial<Record<VideoProviderId, VideoProvider>>
   // Optional pino destination override. Tests inject a capture stream to
   // assert on structured log lines; production leaves it unset (stdout).
   logStream?: { write: (msg: string) => void }
@@ -144,8 +153,15 @@ export async function buildApp(deps: AppDeps) {
   await registerAuth(app, auth)
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)
+  // Which video backends this deployment can actually reach. Runware is always
+  // on (its key is required at boot); the two optional providers each light up
+  // from their own env var. The catalog route hides the models of any backend
+  // that is off, so a user can never select a model that is guaranteed to fail.
+  const configuredProviders = new Set<VideoProviderId>(['runware'])
+  if (deps.config.comfyBaseUrl !== null) configuredProviders.add('wan-runpod')
+  if (deps.config.arkApiKey !== null) configuredProviders.add('bytedance')
   // Catalog is public (no requireUser): pricing must render before sign-in.
-  registerCatalogRoutes(app, deps.config.comfyBaseUrl !== null)
+  registerCatalogRoutes(app, configuredProviders)
   // The core (Task 10): generation lifecycle service gets the db + provider +
   // storage trio; routes stay thin and session-gated via requireUser. The
   // base logger is the fallback for money-path events — routes pass req.log
@@ -155,9 +171,17 @@ export async function buildApp(deps: AppDeps) {
   // client. The comfy client is ALWAYS registered even when COMFY_BASE_URL is
   // unset (it then returns a clean provider_error on submit), so the wan-2-2
   // catalog entry can be listed without the pod configured and boot never fails.
-  const videoProviders: Record<VideoProviderId, VideoProvider> = deps.videoProviders ?? {
+  // Every provider is ALWAYS registered, even when its env is unset — an
+  // unconfigured client returns a clean provider_error on submit rather than
+  // exploding at boot, which is what lets the catalog entries exist (and the
+  // routing tests run) without a pod or an ByteDance key present.
+  const videoProviders: Record<VideoProviderId, VideoProvider> = {
     runware: createRunwareVideoAdapter(deps.runware),
     'wan-runpod': createComfyClient({ baseUrl: deps.config.comfyBaseUrl }),
+    bytedance: createArkClient({ apiKey: deps.config.arkApiKey }),
+    // A test-injected registry overrides the derived defaults per provider, so a
+    // routing test can stub just the two backends it asserts on.
+    ...deps.videoProviders,
   }
   // One entity service instance, shared: the generation service needs it to
   // resolve tagged mentions, and the entity routes expose the same rules.
@@ -191,6 +215,17 @@ export async function buildApp(deps: AppDeps) {
     films: filmService,
   })
   registerFilmRoutes(app, filmService, storyboardService)
+  // Template catalog (ADR template-catalog): the /templates gallery and the
+  // one-call "instantiate a whole film from this template" endpoint. It writes
+  // through the film service (same ownership rules, one transaction) and charges
+  // nothing — every shot lands as a draft.
+  //
+  // assertTemplatesValid runs FIRST and throws: a template whose tier model cannot
+  // do its clips' duration or its aspect ratio would be silently re-priced and
+  // re-cut at generate time (composeShotClipInput snaps to the nearest legal
+  // value). That has to be a failed boot, not a surprise on someone's invoice.
+  assertTemplatesValid()
+  registerTemplateRoutes(app, createTemplateService({ films: filmService }))
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.

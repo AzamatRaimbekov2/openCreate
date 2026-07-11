@@ -55,6 +55,42 @@ export function createDb(path: string) {
   if (!generationColumns.includes('prompt_preset_json')) {
     sqlite.exec('ALTER TABLE generation ADD COLUMN prompt_preset_json TEXT')
   }
+  // Template catalog (ADR: template-catalog). Three additive, nullable columns —
+  // every pre-existing film/shot reads NULL and behaves exactly as before:
+  //  · shot.model_id      the model this shot generates with. Was transient
+  //                       inspector state (defaulted to videoModels[0] on every
+  //                       mount); persisting it is what lets a template pin a tier.
+  //  · shot.voiceover_json  { text, voice } — the spoken line, as authored copy.
+  //                       A draft slot: film_audio needs a generation_id, so a
+  //                       template previously could not ship a script without
+  //                       first charging for the TTS.
+  //  · film.template_id   provenance, so the audio panel can offer the template's
+  //                       music prompt and so we can ask which templates convert.
+  const shotColumns = (sqlite.pragma('table_info(shot)') as Array<{ name: string }>).map(
+    (column) => column.name,
+  )
+  if (!shotColumns.includes('model_id')) {
+    sqlite.exec('ALTER TABLE shot ADD COLUMN model_id TEXT')
+  }
+  if (!shotColumns.includes('voiceover_json')) {
+    sqlite.exec('ALTER TABLE shot ADD COLUMN voiceover_json TEXT')
+  }
+  const filmColumns = (sqlite.pragma('table_info(film)') as Array<{ name: string }>).map(
+    (column) => column.name,
+  )
+  if (!filmColumns.includes('template_id')) {
+    sqlite.exec('ALTER TABLE film ADD COLUMN template_id TEXT')
+  }
+  //  · film_audio.shot_id  which shot a voiceover track belongs to. Without it the
+  //                        editor cannot tell whether a shot is already voiced, so
+  //                        a second click on "Voice this shot" would append a
+  //                        second overlapping track AND charge for it again.
+  const filmAudioColumns = (sqlite.pragma('table_info(film_audio)') as Array<{ name: string }>).map(
+    (column) => column.name,
+  )
+  if (!filmAudioColumns.includes('shot_id')) {
+    sqlite.exec('ALTER TABLE film_audio ADD COLUMN shot_id TEXT')
+  }
   // DB-level refund-once backstop (review finding): UNIQUE(generation_id,
   // kind) makes a duplicate refund (or charge) ledger row physically
   // impossible even if a future code path bypasses the ledger's transactional

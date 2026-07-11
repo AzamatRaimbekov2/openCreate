@@ -175,6 +175,10 @@ export const film = sqliteTable('film', {
   title: text('title').notNull(),
   aspectRatio: text('aspect_ratio', { enum: ['16:9', '1:1', '9:16'] }).notNull(),
   defaultStyleId: text('default_style_id'),
+  // Which template this film was instantiated from (ADR: template-catalog), or
+  // NULL for a hand-made film. Not an FK: templates are code, not rows — deleting
+  // a template from the catalog must leave old films intact, just unlinked.
+  templateId: text('template_id'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
@@ -193,6 +197,11 @@ export const shot = sqliteTable('shot', {
   generationId: text('generation_id'),
   prompt: text('prompt').notNull().default(''),
   promptPresetJson: text('prompt_preset_json'),
+  // The catalog model this shot generates with; NULL = no opinion (fall back to
+  // the style's recommendation, then the first video model). Before this column
+  // the model was transient inspector state — re-selecting a shot forgot which
+  // model made its clip, and a template had nowhere to pin its tier.
+  modelId: text('model_id'),
   // Milliseconds — the timeline unit. Video shot plays [trimStart, trimStart+duration).
   durationMs: integer('duration_ms').notNull(),
   trimStartMs: integer('trim_start_ms').notNull().default(0),
@@ -201,6 +210,12 @@ export const shot = sqliteTable('shot', {
     .default('none'),
   transitionMs: integer('transition_ms').notNull().default(0),
   titleJson: text('title_json'),
+  // { text, voice } — the line this shot's character SPEAKS, as authored copy.
+  // A draft slot, not an asset: FilmAudio requires a generationId, so before this
+  // column there was no way to hand a user a script without first generating (and
+  // charging for) the TTS. Generating it produces an audio generation and files a
+  // FilmAudio track at this shot's timeline offset.
+  voiceoverJson: text('voiceover_json'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
@@ -213,6 +228,12 @@ export const filmAudio = sqliteTable('film_audio', {
     .references(() => film.id, { onDelete: 'cascade' }),
   kind: text('kind', { enum: ['music', 'voiceover'] }).notNull(),
   generationId: text('generation_id').notNull(),
+  // The shot this track voices; NULL = a film-wide bed. It makes "voice this
+  // shot" a REPLACE rather than an append — without it a second click would add a
+  // second overlapping track and charge for it again. No FK on purpose: the shot
+  // cascade already removes the film's rows, and a stale link should read as an
+  // unattached track, not delete someone's audio.
+  shotId: text('shot_id'),
   startMs: integer('start_ms').notNull().default(0),
   gainDb: real('gain_db').notNull().default(0),
 })

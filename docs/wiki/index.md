@@ -25,6 +25,7 @@ tags:
 - [[opencreate-mvp-architecture]] - **Accepted ADR**: openCreate MVP — Runware-backed image/video generation platform (pnpm monorepo, Vite SPA + Fastify API, credit ledger, own asset storage). Spec: `docs/superpowers/specs/2026-07-06-opencreate-mvp-design.md`.
 - [[opencreate-implementation]] - ADR → implementation map for the shipped openCreate MVP (decision-by-decision code locations, recorded deltas, verification results).
 - [[wan-selfhost-video-provider]] - **Proposed ADR** (pending user approval + spike): self-hosted Wan 2.2 A14B as a second video provider on RunPod serverless, behind a `VideoProvider { submit; poll }` seam and the unchanged async lifecycle; Runware kept as the fast tier; presigned-PUT delivery into our own bucket; ~$0.01–0.04/clip vs the $0.13 Seedance baseline. Feasibility gated by [[wan-runpod-feasibility-spike]].
+- [[seedance-direct-bytedance]] - **Accepted ADR** (2026-07-11): Seedance 2.0 straight from ByteDance ModelArk as a THIRD `VideoProvider` (`bytedance`, gated on `ARK_API_KEY`). **The cost case for it collapsed under verification and it was built anyway, deliberately** — the direct channel saves ~5%, not the ~72% the 2026-07-07 research claimed (that research used ByteDance's *video-input* token rate; our t2v/i2v flows pay $7.00/M, not $4.30/M). Built for the model itself (2.0 was absent from the catalog) and direct `generate_audio`/4k/15s control. **Key product constraint: Seedance 2.0 refuses any input image containing a real human face** — collides with the Entity Library's portrait premise; surfaced as a refundable `content_blocked`.
 - [[cinema-studio]] - **Accepted ADR** (2026-07-09): CinemaStudio — a film-composition layer OVER the existing generation lifecycle. Structured prompt presets (style/camera/motion/quality, composed server-side); audio as `generation.type='audio'` behind an `AudioProvider` seam reusing the whole money path (Runware audioInference — TTS+music, zero new client); server-side ffmpeg render (`film_render` table, no ledger); script→storyboard via Claude (optional `ANTHROPIC_API_KEY`). Charge/refund/stale-sweep/VideoProvider seam UNCHANGED.
 
 ## Workflows
@@ -48,6 +49,8 @@ tags:
 ## Entities
 
 ## Decisions
+
+- [[template-catalog]] - Pre-authored viral formats (Brainrot Studio) that instantiate into a whole film; server-side prompts, per-tier model pinning, zero-charge apply.
 
 - [[frontend-architecture-guardrails]] - Project guardrails for shared ownership, dependency rules, UI component sourcing, TanStack Router/Query, Zustand, ESLint, and bundle splitting.
 - [[frontend-error-ux-startup-required]] - Require frontend initialization to run `frontend-error-ux` and verify app-level failure/offline surfaces.

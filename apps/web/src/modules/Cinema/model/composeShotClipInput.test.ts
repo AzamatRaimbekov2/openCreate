@@ -15,11 +15,13 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     generationId: null,
     prompt: 'a lighthouse in a storm',
     promptPreset: { styleId: 'cinematic', cameraShot: 'wide', cameraMotion: 'dolly-in' },
+    modelId: null,
     durationMs: 6000,
     trimStartMs: 0,
     transition: 'none',
     transitionMs: 0,
     title: null,
+    voiceover: null,
     createdAt: '2026-07-09T10:00:00.000Z',
     ...overrides,
   }

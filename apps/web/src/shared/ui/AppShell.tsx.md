@@ -63,6 +63,16 @@ flowchart LR
   (elevation by color step, hover steps back down to steel). Roles/labels unchanged —
   `AppShell.test.tsx` queries by role/name only.
 
+## Update 2026-07-11 — template catalog
+- Nav gains a `/templates` typed `Link` (`t('nav.templates')`), same
+  `activeProps`/`inactiveProps` styling as every other item. Nav order is now
+  create · library · cinema · **templates** · entities · pricing.
+- **It sits next to Cinema, not next to Create, on purpose**: a template IS a film —
+  applying one lands you in the film editor at `/cinema/$filmId` — and the adjacency is
+  the hint. Putting it beside Create would suggest it produces a single generation.
+- `AppShell` stays presentational: the link is a plain typed `Link`, so `shared/ui` still
+  imports nothing from `modules/*`.
+
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)

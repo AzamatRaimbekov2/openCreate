@@ -57,3 +57,20 @@ flowchart LR
 
 ## Update 2026-07-09 — CinemaStudio
 - Wires `createFilmService({ db, storage })` + `registerFilmRoutes(app, filmService, storyboardService)` (films/shots/audio + renders + storyboard). `createStoryboardService({ anthropicApiKey: config.anthropicApiKey, films })` gates on the optional key. Adds `settleStaleRenders(db, now, log)` to the boot sweep (render reaper; no refund).
+
+## Update 2026-07-11 — template catalog (ADR: `docs/wiki/decisions/template-catalog.md`)
+- Wires the template module right after the film routes:
+  `assertTemplatesValid()` then `registerTemplateRoutes(app, createTemplateService({ films: filmService }))`
+  (`GET /api/templates`, `POST /api/films/from-template`). It writes THROUGH the film service — same
+  ownership rules, one transaction — and charges nothing: every shot lands as a draft.
+- **`assertTemplatesValid()` runs FIRST and it THROWS — a bad template is a FAILED BOOT.** The invariant
+  it guards: every tier model of every template must be a video model that natively supports that
+  template's aspect ratio AND every one of its clips' durations. If it doesn't, `composeShotClipInput`
+  silently snaps the duration to the nearest legal value at generate time — quietly changing both the
+  cut the user was promised and the price they were quoted. That has to be a deploy failure, not a
+  surprise on someone's invoice. The type system cannot see catalog data (templates pin model ids as
+  strings), so this runtime assertion at boot is the only place the check can live. It takes no
+  arguments here — it defaults to the whole `TEMPLATES` registry.
+- Note the ordering dependency: it must run **after** the catalog module is importable (it calls
+  `getModel`) and it is placed before `registerTemplateRoutes` so the process dies before it can serve a
+  single mispriced template.

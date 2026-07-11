@@ -38,3 +38,17 @@ flowchart LR
 ## Key decisions (2026-07-09) — CinemaStudio
 - `generation` gains `composed_prompt TEXT` (what the model saw) and `prompt_preset_json TEXT` (structured preset echoed back). Both nullable, additive; `client.ts` micro-migration ALTERs them onto legacy db files.
 - New `FILM_DDL` export (exec'd with the main DDL in `client.ts`): tables `film`, `shot`, `film_audio`, `film_render`. `shot.order_index` is REAL (spaced reorder, no whole-list renumber). `shot.generation_id` / `film_audio.generation_id` carry NO FK — a gallery-deleted generation must leave an empty ref, not cascade the film away. `film_render` has NO cost/refund column — it spends CPU, not a provider invoice (ADR §2).
+
+## Key decisions (2026-07-11) — template catalog
+`FILM_DDL` gains four nullable columns (mirroring `schema.ts`); no new tables — a template is CODE, not
+a row. All four are additive, so a fresh db gets them from the CREATE TABLE and an existing db gets them
+from the guarded `ALTER TABLE` micro-migrations in `client.ts`.
+
+- `film.template_id TEXT` — provenance; **no FK**, because templates are code: retiring one must leave
+  old films intact rather than cascading them away.
+- `shot.model_id TEXT` — the model this shot generates with. Persisting it is what lets a template pin
+  its price/quality tier onto every shot.
+- `shot.voiceover_json TEXT` — `{ text, voice }`, the spoken line as authored copy. Costs nothing to
+  hold; becomes an audio generation + a `film_audio` track only when the user asks for it.
+- `film_audio.shot_id TEXT` — the shot this track voices; NULL = a film-wide bed. Makes "voice this
+  shot" a replace rather than an append (no duplicate track, no duplicate charge).

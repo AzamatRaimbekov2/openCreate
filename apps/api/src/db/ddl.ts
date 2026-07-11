@@ -148,6 +148,9 @@ CREATE TABLE IF NOT EXISTS film (
   title TEXT NOT NULL,
   aspect_ratio TEXT NOT NULL,
   default_style_id TEXT,
+  -- Which template this film came from (ADR: template-catalog), NULL if hand-made.
+  -- No FK: templates are code, not rows — retiring one must leave old films intact.
+  template_id TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -166,11 +169,18 @@ CREATE TABLE IF NOT EXISTS shot (
   generation_id TEXT,
   prompt TEXT NOT NULL DEFAULT '',
   prompt_preset_json TEXT,
+  -- The catalog model this shot generates with; NULL = no opinion. Persisting it
+  -- is what lets a template pin its price/quality tier onto every shot.
+  model_id TEXT,
   duration_ms INTEGER NOT NULL,
   trim_start_ms INTEGER NOT NULL DEFAULT 0,
   transition TEXT NOT NULL DEFAULT 'none',
   transition_ms INTEGER NOT NULL DEFAULT 0,
   title_json TEXT,
+  -- { text, voice }: the line this shot's character speaks, as authored copy.
+  -- Costs nothing to hold; becomes an audio generation + a film_audio track only
+  -- when the user asks for it.
+  voiceover_json TEXT,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_shot_film_order ON shot(film_id, order_index);
@@ -183,6 +193,9 @@ CREATE TABLE IF NOT EXISTS film_audio (
   -- reason as shot.generation_id — a deleted generation leaves an empty ref,
   -- it does not cascade the film's audio track away.
   generation_id TEXT NOT NULL,
+  -- The shot this track voices; NULL = a film-wide bed. Makes "voice this shot"
+  -- a replace rather than an append (no duplicate track, no duplicate charge).
+  shot_id TEXT,
   start_ms INTEGER NOT NULL DEFAULT 0,
   gain_db REAL NOT NULL DEFAULT 0
 );

@@ -30,11 +30,20 @@ export const filmSchema = z.object({
   // The style new shots default to; null = no default. Not enforced on shots
   // (a shot may pick its own), just a composer convenience.
   defaultStyleId: styleIdSchema.nullable(),
+  // Provenance: the template this film was instantiated from (ADR: template-
+  // catalog), or null for a hand-made film. Read-only from the client's side —
+  // there is no way to set it via createFilm; only POST /films/from-template
+  // stamps it. Two things read it back: the audio panel (to pre-fill the music
+  // prompt the template authored, so the user doesn't have to invent "melancholic
+  // soap-opera strings" themselves) and analytics ("which templates get finished?").
+  templateId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
 export type Film = z.infer<typeof filmSchema>
 
+// Note there is no templateId here on purpose: a film's template provenance is
+// a fact the SERVER establishes, not a claim the client may assert.
 export const createFilmInputSchema = z.object({
   title: z.string().min(1).max(120),
   aspectRatio: aspectRatioSchema,
@@ -67,6 +76,33 @@ export const shotTitleSchema = z.object({
 })
 export type ShotTitle = z.infer<typeof shotTitleSchema>
 
+// The line this shot's character SPEAKS, and the catalog voice that speaks it.
+// Authored copy — not a generated asset: holding it costs nothing, and it is the
+// script the user edits before spending 8 credits to hear it.
+//
+// Why a shot owns a voice line at all (ADR: template-catalog §4). The formats the
+// template catalog ships — fruit dramas, cat soap operas, talking produce — ARE
+// dialogue. Without a voice they are a silent slideshow, which is not the format.
+// But FilmAudio requires a generationId, so a track cannot exist as a draft: a
+// template had no way to hand the user "here is what the strawberry says in beat
+// 4" without generating (and charging for) the TTS up front. This field is that
+// draft slot. Generating it produces an audio generation and files it as a
+// FilmAudio track whose startMs is the sum of the preceding shots' durations —
+// so the line lands under the beat that speaks it.
+//
+// It is NOT a lipsync contract. No model in the catalog does lipsync; the mouth
+// movement is whatever the video model hallucinates from the prompt, and the
+// voice is mixed under it by ffmpeg at render. (veo-3-1-fast can speak natively
+// from the prompt itself, which is why the premium tier exists.)
+export const shotVoiceoverSchema = z.object({
+  text: z.string().min(1).max(600),
+  // A voice id from the audio model's `voices` list ('Svetlana', 'Dmitry', …).
+  // Not enum'd: the list is catalog data that changes with the provider, so the
+  // API validates it against the live catalog rather than freezing it on the wire.
+  voice: z.string().min(1).max(80),
+})
+export type ShotVoiceover = z.infer<typeof shotVoiceoverSchema>
+
 export const shotSchema = z.object({
   id: z.string(),
   filmId: z.string(),
@@ -80,6 +116,17 @@ export const shotSchema = z.object({
   prompt: z.string(),
   // The structured preset this shot was (or will be) generated with.
   promptPreset: promptPresetSchema.nullable(),
+  // The catalog model this shot generates with. null = "no opinion", and the
+  // composer falls back to the shot's style recommendation, then to the first
+  // video model.
+  //
+  // This used to not exist, and the model was transient state inside the shot
+  // inspector: it defaulted to videoModels[0] on every mount, so re-selecting a
+  // shot silently forgot which model produced its clip and a re-Generate could
+  // come back on a different model at a different price. Persisting it fixes that
+  // AND is what lets a template pin a tier: "this eight-beat drama runs on
+  // veo-3-1-fast" is a per-shot fact, and there was nowhere to write it down.
+  modelId: z.string().nullable(),
   // How long this shot occupies the timeline, in ms. For a video source this is
   // the trimmed length; for image/title it is the display duration.
   durationMs: z.number().int().positive(),
@@ -88,6 +135,7 @@ export const shotSchema = z.object({
   transition: transitionSchema,
   transitionMs: z.number().int().min(0),
   title: shotTitleSchema.nullable(),
+  voiceover: shotVoiceoverSchema.nullable(),
   createdAt: z.string(),
 })
 export type Shot = z.infer<typeof shotSchema>
@@ -99,11 +147,15 @@ export const createShotInputSchema = z.object({
   generationId: z.string().nullable().optional(),
   prompt: z.string().max(2000).optional(),
   promptPreset: promptPresetSchema.nullable().optional(),
+  // Validated against the live catalog by the service (must be a video model),
+  // not by an enum here — model ids are catalog data, not wire constants.
+  modelId: z.string().max(80).nullable().optional(),
   durationMs: z.number().int().positive().max(60_000).optional(),
   trimStartMs: z.number().int().min(0).optional(),
   transition: transitionSchema.optional(),
   transitionMs: z.number().int().min(0).max(5000).optional(),
   title: shotTitleSchema.nullable().optional(),
+  voiceover: shotVoiceoverSchema.nullable().optional(),
 })
 export type CreateShotInput = z.infer<typeof createShotInputSchema>
 
@@ -129,6 +181,16 @@ export const filmAudioSchema = z.object({
   filmId: z.string(),
   kind: audioKindSchema,
   generationId: z.string(),
+  // The shot this track voices, or null for a film-wide bed (music, or a
+  // voiceover the user placed by hand).
+  //
+  // It exists to make "voice this shot" SAFE. Without it the editor cannot tell
+  // whether a shot has already been voiced, so a second click on Generate would
+  // quietly add a second overlapping track — and charge for it again. With it the
+  // action is a replace, not an append: the old track is dropped before the new
+  // one lands, and the button can honestly read "Re-voice" instead of "Voice".
+  // It also lets the track list say WHICH beat a line belongs to.
+  shotId: z.string().nullable(),
   // Where the track starts on the timeline, in ms.
   startMs: z.number().int().min(0),
   // Level trim in decibels; 0 = unchanged.
@@ -139,6 +201,7 @@ export type FilmAudio = z.infer<typeof filmAudioSchema>
 export const addFilmAudioInputSchema = z.object({
   kind: audioKindSchema,
   generationId: z.string().min(1),
+  shotId: z.string().nullable().optional(),
   startMs: z.number().int().min(0).optional(),
   gainDb: z.number().min(-40).max(20).optional(),
 })

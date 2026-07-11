@@ -74,6 +74,14 @@ react-hook-form + zod, i18next.
   LangSwitch, red-pill Sign in / sign-out (clears personal caches).
 - **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
   (loading skeletons / empty / error+retry / data) on every data surface.
+- **Surfaces (v4)** — every panel declares its depth through the shared `Card`
+  primitive instead of a hand-rolled `rounded-lg border border-white/10` string:
+  `glass` (frosted chrome that floats over content — the generator sheet), `well`
+  (recessed plates media sits INSIDE — gallery tiles, entity covers, the detail
+  modal's media box), `steel` (opaque, for text that must stay legible over a busy
+  backdrop). Media thumbnails are wells, never glass: the media is the hero, and
+  frost over a photo is chrome competing with content. Popup panels stay opaque —
+  a translucent menu over moving media is unreadable. Still no gradients anywhere.
 
 ## Module map (modular architecture — public API via index.ts, no cross-module imports)
 
@@ -149,6 +157,20 @@ pnpm --filter @opencreate/web build      # tsc --noEmit && vite build → dist/
 
 Unit tests mock `shared/libs/apiClient`; the e2e suite runs the real SPA against
 `page.route`-scripted `/api` + `/media` (no backend process — see `e2e/mocks.ts`).
+
+## Templates (`/templates`)
+
+The gallery of ready-made viral formats. ADR: `docs/wiki/decisions/template-catalog.md`.
+
+- `TemplateCatalog` (4-states) → `TemplateCard` → `TemplateDetailModal` (knobs + `TierPicker`).
+- Creating a film from a template is **free**; the tier is a model *pin*, not a purchase. The modal
+  says so under the button, and `TierPicker` disables a tier the user cannot afford **before** the
+  click rather than letting them build a film they can't generate.
+- Cards are **typographic, not fake-media**: `previewUrl` is null until we render a real example, and
+  `BeatStrip` draws the film's actual shape (free title cards read as hollow blocks).
+- The module **imports nothing from Cinema**. It creates a film via the API and navigates to
+  `/cinema/$filmId`; the film-editor route reads `useTemplates()` and hands the list down, the same
+  seam `useCatalog()` already uses.
 
 ## Design references
 

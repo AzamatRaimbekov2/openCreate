@@ -25,6 +25,7 @@ import type {
   PromptPreset,
   Shot,
   ShotTitle,
+  ShotVoiceover,
   UpdateFilmInput,
   UpdateShotInput,
 } from '@opencreate/contracts'
@@ -95,6 +96,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       title: row.title,
       aspectRatio: row.aspectRatio,
       defaultStyleId: row.defaultStyleId as Film['defaultStyleId'],
+      templateId: row.templateId,
       createdAt: new Date(row.createdAt).toISOString(),
       updatedAt: new Date(row.updatedAt).toISOString(),
     }
@@ -107,11 +109,13 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       generationId: row.generationId,
       prompt: row.prompt,
       promptPreset: row.promptPresetJson ? (JSON.parse(row.promptPresetJson) as PromptPreset) : null,
+      modelId: row.modelId,
       durationMs: row.durationMs,
       trimStartMs: row.trimStartMs,
       transition: row.transition,
       transitionMs: row.transitionMs,
       title: row.titleJson ? (JSON.parse(row.titleJson) as ShotTitle) : null,
+      voiceover: row.voiceoverJson ? (JSON.parse(row.voiceoverJson) as ShotVoiceover) : null,
       createdAt: new Date(row.createdAt).toISOString(),
     }
   }
@@ -121,6 +125,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       filmId: row.filmId,
       kind: row.kind,
       generationId: row.generationId,
+      shotId: row.shotId,
       startMs: row.startMs,
       gainDb: row.gainDb,
     }
@@ -163,11 +168,75 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         title: input.title.trim(),
         aspectRatio: input.aspectRatio,
         defaultStyleId: input.defaultStyleId ?? null,
+        // A hand-made film has no template. Only createFromTemplate stamps one —
+        // provenance is a fact the server establishes, never a client claim.
+        templateId: null,
         createdAt: now,
         updatedAt: now,
       })
       .run()
     return toFilmDto(db.select().from(film).where(eq(film.id, id)).get()!)
+  }
+
+  // Instantiate a whole film — the project row AND every shot — in ONE
+  // transaction. This is the template catalog's entry point (ADR: template-
+  // catalog) and the only bulk-create path in the service.
+  //
+  // Why it is not "createFilm() then addShot() × 8":
+  //  · Atomicity. A crash between shot 5 and 6 would leave the user staring at
+  //    half a drama with no way to tell it apart from a finished one. A template
+  //    either lands whole or not at all.
+  //  · Round trips. Eight POSTs and eight ['film', id] cache invalidations to put
+  //    up one screen is a visibly slow way to do an instant action.
+  //  · orderIndex. addShot recomputes max(orderIndex) per insert; here the order
+  //    is already known, so the indices are just (i+1)·STEP.
+  //
+  // It charges nothing and generates nothing: every shot lands with
+  // generationId = null. The prompts, presets, model and spoken lines are filled
+  // in — the credits are spent later, per shot, by the user.
+  function createFromTemplate(
+    userId: string,
+    templateId: string,
+    input: CreateFilmInput,
+    shots: CreateShotInput[],
+  ): FilmDetail {
+    const id = randomUUID()
+    const now = new Date()
+    db.transaction((tx) => {
+      tx.insert(film)
+        .values({
+          id,
+          userId,
+          title: input.title.trim(),
+          aspectRatio: input.aspectRatio,
+          defaultStyleId: input.defaultStyleId ?? null,
+          templateId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+      shots.forEach((s, i) => {
+        tx.insert(shot)
+          .values({
+            id: randomUUID(),
+            filmId: id,
+            orderIndex: (i + 1) * ORDER_STEP,
+            generationId: null,
+            prompt: (s.prompt ?? '').trim(),
+            promptPresetJson: s.promptPreset ? JSON.stringify(s.promptPreset) : null,
+            modelId: s.modelId ?? null,
+            durationMs: s.durationMs ?? 3000,
+            trimStartMs: s.trimStartMs ?? 0,
+            transition: s.transition ?? 'none',
+            transitionMs: s.transitionMs ?? 0,
+            titleJson: s.title ? JSON.stringify(s.title) : null,
+            voiceoverJson: s.voiceover ? JSON.stringify(s.voiceover) : null,
+            createdAt: now,
+          })
+          .run()
+      })
+    })
+    return getFilm(userId, id)
   }
 
   function listFilms(userId: string): Film[] {
@@ -233,12 +302,14 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         generationId: input.generationId ?? null,
         prompt: (input.prompt ?? '').trim(),
         promptPresetJson: input.promptPreset ? JSON.stringify(input.promptPreset) : null,
+        modelId: input.modelId ?? null,
         // Default a 3s slot so a freshly-added shot has a real timeline length.
         durationMs: input.durationMs ?? 3000,
         trimStartMs: input.trimStartMs ?? 0,
         transition: input.transition ?? 'none',
         transitionMs: input.transitionMs ?? 0,
         titleJson: input.title ? JSON.stringify(input.title) : null,
+        voiceoverJson: input.voiceover ? JSON.stringify(input.voiceover) : null,
         createdAt: new Date(),
       })
       .run()
@@ -264,11 +335,14 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     if (input.prompt !== undefined) patch.prompt = input.prompt.trim()
     if (input.promptPreset !== undefined)
       patch.promptPresetJson = input.promptPreset ? JSON.stringify(input.promptPreset) : null
+    if (input.modelId !== undefined) patch.modelId = input.modelId
     if (input.durationMs !== undefined) patch.durationMs = input.durationMs
     if (input.trimStartMs !== undefined) patch.trimStartMs = input.trimStartMs
     if (input.transition !== undefined) patch.transition = input.transition
     if (input.transitionMs !== undefined) patch.transitionMs = input.transitionMs
     if (input.title !== undefined) patch.titleJson = input.title ? JSON.stringify(input.title) : null
+    if (input.voiceover !== undefined)
+      patch.voiceoverJson = input.voiceover ? JSON.stringify(input.voiceover) : null
     db.update(shot).set(patch).where(eq(shot.id, shotId)).run()
     touchFilm(filmId)
     return toShotDto(db.select().from(shot).where(eq(shot.id, shotId)).get()!)
@@ -312,6 +386,16 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       .where(and(eq(generation.id, input.generationId), eq(generation.userId, userId)))
       .get()
     if (!gen || gen.type !== 'audio') throw new FilmValidationError('not an audio generation')
+    // A shot-attached track REPLACES whatever already voices that shot. Appending
+    // would mean a second click on "voice this shot" leaves two lines playing over
+    // each other — and the user paid twice to make it worse. The shot must be this
+    // film's, or the client is trying to attach a track to someone else's timeline.
+    if (input.shotId) {
+      requireShot(userId, filmId, input.shotId)
+      db.delete(filmAudio)
+        .where(and(eq(filmAudio.filmId, filmId), eq(filmAudio.shotId, input.shotId)))
+        .run()
+    }
     const id = randomUUID()
     db.insert(filmAudio)
       .values({
@@ -319,6 +403,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         filmId,
         kind: input.kind,
         generationId: input.generationId,
+        shotId: input.shotId ?? null,
         startMs: input.startMs ?? 0,
         gainDb: input.gainDb ?? 0,
       })
@@ -495,6 +580,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
 
   return {
     createFilm,
+    createFromTemplate,
     listFilms,
     getFilm,
     updateFilm,

@@ -97,6 +97,16 @@ export function AppShell({
             >
               {t('nav.cinema')}
             </Link>
+            {/* Next to Cinema, not next to Create: a template IS a film — it lands
+                you in the film editor — and the adjacency is the hint. */}
+            <Link
+              to="/templates"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.templates')}
+            </Link>
             <Link
               to="/entities"
               className={navLinkClass}
