@@ -36,4 +36,4 @@ flowchart LR
 - `dramatic` and `neon` presets are built by spreading a shared `base` object and then overriding `tonemap` afterward — object spread + key order means the later `tonemap` key wins; covered by the "applies the dramatic preset exposure override after spreading base" test so a future refactor that reorders the spread breaks loudly instead of silently reverting to `exposureEv: 0`.
 
 ## Commits
-- _no commit yet_
+- 863a9c0 feat(contracts): portable scene preset (one JSON, N renderers)

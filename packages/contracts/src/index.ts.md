@@ -40,6 +40,7 @@ flowchart LR
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 789adb5 feat: template catalog — Brainrot Studio (fruit/cat drama, talking food)
+- 863a9c0 feat(contracts): portable scene preset (one JSON, N renderers)
 
 ## Update 2026-07-11 — template catalog
 - Now also re-exports `./templates` (the `/templates` gallery DTO + the from-template request:
