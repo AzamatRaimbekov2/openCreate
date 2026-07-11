@@ -74,3 +74,19 @@ flowchart LR
 - Note the ordering dependency: it must run **after** the catalog module is importable (it calls
   `getModel`) and it is placed before `registerTemplateRoutes` so the process dies before it can serve a
   single mispriced template.
+
+## Key decisions (2026-07-12) — Studio3D mesh provider
+- **`AppDeps.meshProvider?: Mesh3dProvider`**, derived here when absent:
+  `deps.meshProvider ?? createRunwareMeshAdapter(deps.runware)`, then passed into
+  `createGenerationService({ ..., meshProvider })`.
+- **A single adapter, not a registry** (contrast `videoProviders`, which fans out to runware /
+  wan-runpod / bytedance). `'runware'` is the only 3D backend built; `'comfy-3d'` is a
+  designed-but-unbuilt self-host seam (ADR D2 — hosted TRELLIS.2 pricing beats running our own GPU).
+  If a second 3D backend ever ships, this becomes a registry shaped like `videoProviders` and the
+  service's `row.type === 'model3d'` poll branch grows a `resolveMeshProvider(row.provider)` the same
+  way video did.
+- **No new env var and no on/off gate.** The video providers each light up from their own env
+  (`COMFY_BASE_URL`, `ARK_API_KEY`) and `registerCatalogRoutes(app, configuredProviders)` HIDES the
+  models of any backend that is off — a listed model whose backend is unconfigured is just a broken
+  option. 3D needs none of that: it rides the same `RUNWARE_API_KEY` boot already requires, so the
+  `model3d` catalog entries are always reachable and `configuredProviders` is untouched.

@@ -63,7 +63,11 @@ export const generation = sqliteTable('generation', {
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
-  type: text('type', { enum: ['image', 'video', 'audio'] }).notNull(),
+  // 'model3d' (Studio3D) widens this enum at the TYPE level only: SQLite has no
+  // ENUM type — the column is plain TEXT — so no DDL/migration exists to change.
+  // Every legacy row keeps its exact value; the drizzle enum simply now admits
+  // the fourth media type the contracts already define.
+  type: text('type', { enum: ['image', 'video', 'audio', 'model3d'] }).notNull(),
   mode: text('mode', { enum: ['text', 'image'] }).notNull(),
   status: text('status', { enum: ['processing', 'succeeded', 'failed'] }).notNull(),
   prompt: text('prompt').notNull(),

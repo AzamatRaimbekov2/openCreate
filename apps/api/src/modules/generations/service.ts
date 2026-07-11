@@ -12,8 +12,10 @@ import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import { createRunwareVideoAdapter } from '../../integrations/runware/video-adapter'
 import { createRunwareAudioAdapter } from '../../integrations/runware/audio-adapter'
+import { createRunwareMeshAdapter } from '../../integrations/runware/mesh-adapter'
 import type { VideoProvider, VideoProviderId } from '../../integrations/video-provider'
 import type { AudioProvider } from '../../integrations/audio-provider'
+import type { Mesh3dProvider } from '../../integrations/mesh-provider'
 import type { StorageProvider } from '../../storage/local'
 import { generation, generationEntity } from '../../db/schema'
 import { chargeCredits, logCharge, logRefund, refundCredits, type MoneyLog } from '../credits/ledger'
@@ -75,6 +77,14 @@ type Deps = {
   // Audio submits through this; it POLLS through the video registry (an audio
   // row is provider:'runware', and the runware video adapter now maps audioURL).
   audioProvider?: AudioProvider
+  // MESH provider (Studio3D photo→3D). Optional, derived from `runware` when
+  // absent (createRunwareMeshAdapter) exactly like the audio fallback, so the
+  // direct-service unit tests that construct { db, runware, storage } keep a
+  // working 3D path. A single adapter rather than a registry: 'runware' is the
+  // only backend built ('comfy-3d' is the designed-but-unbuilt self-host seam).
+  // A 3D job submits AND polls through this — never through the video registry,
+  // whose videoInference task could never produce a mesh.
+  meshProvider?: Mesh3dProvider
   storage: StorageProvider
   // Entity library. Optional so the many direct-service unit tests that predate
   // tagging keep constructing the service with { db, runware, storage }: without
@@ -176,12 +186,15 @@ export function settleStaleGenerations(db: Db, now = Date.now(), log?: MoneyLog)
 }
 
 // The on-disk extension for a finished asset of each media type. Video → mp4,
-// audio → mp3 (CinemaStudio), everything else (image) → webp. One place owns the
-// mapping so the download (get), the discard-on-race cleanup (image path), and
-// remove() can never disagree about a generation's file name.
-function assetExt(type: 'image' | 'video' | 'audio'): 'mp4' | 'mp3' | 'webp' {
+// audio → mp3 (CinemaStudio), model3d → glb (Studio3D), everything else (image)
+// → webp. One place owns the mapping so the download (get), the discard-on-race
+// cleanup (image path), and remove() can never disagree about a generation's file
+// name — and so a mesh can never be written under an image extension, which would
+// produce a file no GLB loader on the web side can open.
+function assetExt(type: 'image' | 'video' | 'audio' | 'model3d'): 'mp4' | 'mp3' | 'glb' | 'webp' {
   if (type === 'video') return 'mp4'
   if (type === 'audio') return 'mp3'
+  if (type === 'model3d') return 'glb'
   return 'webp'
 }
 
@@ -222,6 +235,7 @@ export function createGenerationService({
   runware,
   videoProviders,
   audioProvider,
+  meshProvider,
   storage,
   entities,
   log: baseLog,
@@ -231,6 +245,10 @@ export function createGenerationService({
   // caller that injects only { db, runware, storage } still gets a working
   // audio submit path via the runware audioInference adapter.
   const audio: AudioProvider = audioProvider ?? createRunwareAudioAdapter(runware)
+  // Mesh provider fallback, same contract as audio's: a caller that injects only
+  // { db, runware, storage } still gets a working photo→3D path via the runware
+  // 3dInference adapter. Not a registry — see the Deps note.
+  const mesh: Mesh3dProvider = meshProvider ?? createRunwareMeshAdapter(runware)
   // Resolve the VIDEO provider registry. Fallback keeps direct-service callers
   // (unit tests passing only { db, runware, storage }) working: they get the
   // runware adapter wrapping their scripted RunwareClient, so submitVideo/
@@ -274,14 +292,24 @@ export function createGenerationService({
     const model = getModel(input.modelId)
     if (!model) throw new ValidationError(`unknown model ${input.modelId}`)
     // Aspect ratio is required for image/video and enforced against the model's
-    // list; audio has none (CinemaStudio) — the audio branch skips resolution.
-    if (model.type !== 'audio') {
+    // list; audio has none (CinemaStudio) and NEITHER DOES A MESH (Studio3D) —
+    // both skip resolution entirely, so both skip this gate. (The model3d catalog
+    // entries carry a throwaway '1:1' only because catalogBase demands >=1; the
+    // service never reads it.)
+    if (model.type !== 'audio' && model.type !== 'model3d') {
       if (!input.aspectRatio) throw new ValidationError(`aspectRatio required for ${model.id}`)
       if (!model.aspectRatios.includes(input.aspectRatio))
         throw new ValidationError(`aspect ${input.aspectRatio} unsupported for ${model.id}`)
     }
     if (input.inputImage && !model.supportsImageInput)
       throw new ValidationError(`${model.id} does not support image input`)
+    // v1 Studio3D is image→3D ONLY. Text→3D exists on the provider (Tripo) but the
+    // composer UX for it does not, and a model3d row with no photo would submit a
+    // 3dInference task with an empty `inputs.images` and fail AFTER the charge.
+    // Like every guard above it, this runs BEFORE chargeCredits: a job we already
+    // know cannot succeed must cost the user nothing.
+    if (model.type === 'model3d' && !input.inputImage)
+      throw new ValidationError(`${model.id} requires a photo`)
 
     // ── Tagged entities ──────────────────────────────────────────────────────
     // Everything here runs BEFORE the charge. A tag the model cannot honour, or
@@ -348,10 +376,15 @@ export function createGenerationService({
       // are caller mistakes, so surface as 400, not 500.
       throw new ValidationError(err instanceof Error ? err.message : 'invalid duration')
     }
-    // Resolution is derived for image/video only; audio has no aspect ratio.
-    // (0,0 placeholders for audio are never sent — the audio branch ignores them.)
+    // Resolution is derived for image/video only; audio has no aspect ratio and a
+    // MESH has no 2D resolution at all. (The 0,0 placeholders are never sent — the
+    // audio and model3d submit branches ignore them. Calling resolutionFor here
+    // with a model3d row would mean passing the `aspectRatio!` the guard above
+    // deliberately does not require.)
     const { width, height } =
-      model.type === 'audio' ? { width: 0, height: 0 } : resolutionFor(model, input.aspectRatio!)
+      model.type === 'audio' || model.type === 'model3d'
+        ? { width: 0, height: 0 }
+        : resolutionFor(model, input.aspectRatio!)
 
     // CinemaStudio preset composition (ADR §3). The entity substitution above
     // produced `composedPrompt` (the model-facing text with [[e1]] resolved);
@@ -512,13 +545,14 @@ export function createGenerationService({
       return { dto: toDto(row!), created: true }
     }
 
-    // Video AND audio are async: submit and return 202; progress arrives via
-    // get() polls. Only the provider CALL differs by media type — audio submits
-    // through the AudioProvider (audioInference), video through the VideoProvider
-    // registry (Runware or the wan-runpod ComfyUI adapter). Everything after the
-    // submit — the submit-window race guard, the status-guarded uuid publish, the
-    // shared poll path, and the guarded failure settlement — is byte-for-byte the
-    // same for both, which is exactly why audio is not a new subsystem (ADR §1).
+    // Video, audio AND model3d are async: submit and return 202; progress arrives
+    // via get() polls. Only the provider CALL differs by media type — audio submits
+    // through the AudioProvider (audioInference), 3D through the Mesh3dProvider
+    // (3dInference), video through the VideoProvider registry (Runware, wan-runpod
+    // ComfyUI, or ByteDance). Everything after the submit — the submit-window race
+    // guard, the status-guarded job-id publish, the shared poll path, and the
+    // guarded failure settlement — is byte-for-byte the same for all three, which is
+    // exactly why neither audio nor Studio3D is a new subsystem (ADR §1).
     try {
       let providerJobId: string
       if (model.type === 'audio') {
@@ -529,6 +563,22 @@ export function createGenerationService({
           model: model.air,
           audioKind: model.audioKind,
           ...(input.voice ? { voice: input.voice } : {}),
+        })
+        providerJobId = r.providerJobId
+      } else if (model.type === 'model3d') {
+        // 3D is async exactly like video — and it must NEVER fall through to the
+        // video arm below: a videoInference task cannot produce a mesh, so the
+        // user would be charged for a job that can only fail. No width/height/
+        // duration (a mesh has none); the photo and the quality knobs are the whole
+        // input. Runware requires the CALLER to mint the task id, so we hand it the
+        // taskUUID create() already generated — which is also the idempotency key
+        // for the client's single bounded retry.
+        const r = await mesh.submit({
+          taskUUID,
+          model: model.air,
+          // Non-null: the pre-charge guard above rejected any photo-less 3D request.
+          inputImage: input.inputImage!,
+          ...(model.pbr !== undefined ? { pbr: model.pbr } : {}),
         })
         providerJobId = r.providerJobId
       } else {
@@ -637,12 +687,18 @@ export function createGenerationService({
     if (lastPoll !== undefined && nowMs - lastPoll < pollMinIntervalMs) return toDto(row)
     lastPolledAt.set(id, nowMs)
 
-    // Poll the SAME provider the job was submitted to (durable state on the
-    // row). The neutral VideoPollResult union is identical across providers, so
-    // every settlement branch below is byte-for-byte the pre-seam logic — only
-    // the field names are the neutral ones (assetUrl/costUsd/nsfw).
-    const videoProvider = resolveProvider(row.provider)
-    const poll = await videoProvider.poll(row.runwareTaskUuid)
+    // Poll the SAME backend the job was submitted to. Which REGISTRY to ask is a
+    // function of the ROW's media type (durable state, never the live catalog — a
+    // catalog edit must never redirect an in-flight job's poll): a 3D job polls the
+    // mesh provider, everything else polls the video registry (audio rides it too,
+    // as an always-'runware' row). MeshPollResult is a type ALIAS of the neutral
+    // VideoPollResult, so every settlement branch below — the NSFW gate, the
+    // no-asset guard, the download-before-flip, the guarded refund — is byte-for-
+    // byte the pre-Studio3D logic.
+    const poll =
+      row.type === 'model3d'
+        ? await mesh.poll(row.runwareTaskUuid)
+        : await resolveProvider(row.provider).poll(row.runwareTaskUuid)
     if (poll.status === 'processing') {
       db.update(generation).set({ progress: poll.progress }).where(eq(generation.id, id)).run()
       return toDto({ ...row, progress: poll.progress })

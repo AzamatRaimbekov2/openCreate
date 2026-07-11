@@ -10,9 +10,11 @@ import type { AppConfig } from './config'
 import type { Db } from './db/client'
 import type { RunwareClient } from './integrations/runware/client'
 import { createRunwareVideoAdapter } from './integrations/runware/video-adapter'
+import { createRunwareMeshAdapter } from './integrations/runware/mesh-adapter'
 import { createComfyClient } from './integrations/runpod/comfy-client'
 import { createArkClient } from './integrations/bytedance/ark-client'
 import type { VideoProvider, VideoProviderId } from './integrations/video-provider'
+import type { Mesh3dProvider } from './integrations/mesh-provider'
 import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
 import { registerAuth } from './modules/auth/plugin'
@@ -51,6 +53,13 @@ export type AppDeps = {
   // a missing entry to Runware (or a clean provider_error). Production always
   // derives the complete registry below.
   videoProviders?: Partial<Record<VideoProviderId, VideoProvider>>
+  // MESH provider (Mesh3dProvider seam, Studio3D). Optional: when absent it is
+  // DERIVED below from `runware` (the 3dInference adapter). A single provider, not
+  // a registry like videoProviders — 'runware' is the only 3D backend built, and
+  // 'comfy-3d' is a designed-but-unbuilt self-host seam (ADR D2: hosted TRELLIS.2
+  // beats running our own GPU for this). 3D tests inject a fake to assert that a
+  // mesh job submits here and NEVER through the video registry.
+  meshProvider?: Mesh3dProvider
   // Optional pino destination override. Tests inject a capture stream to
   // assert on structured log lines; production leaves it unset (stdout).
   logStream?: { write: (msg: string) => void }
@@ -183,6 +192,12 @@ export async function buildApp(deps: AppDeps) {
     // routing test can stub just the two backends it asserts on.
     ...deps.videoProviders,
   }
+  // Studio3D (ADR: photo-to-3d-studio). Only the runware backend is built
+  // ('comfy-3d' is the designed-but-unbuilt self-host seam), so this is a single
+  // adapter, not a registry. It rides the same Runware key the image path already
+  // requires at boot, so there is no new env var and no on/off gate: the model3d
+  // catalog entries are always reachable.
+  const meshProvider: Mesh3dProvider = deps.meshProvider ?? createRunwareMeshAdapter(deps.runware)
   // One entity service instance, shared: the generation service needs it to
   // resolve tagged mentions, and the entity routes expose the same rules.
   const entityService = createEntityService({ db: deps.db, storage: deps.storage })
@@ -192,6 +207,7 @@ export async function buildApp(deps: AppDeps) {
       db: deps.db,
       runware: deps.runware,
       videoProviders,
+      meshProvider,
       storage: deps.storage,
       entities: entityService,
       log: app.log,

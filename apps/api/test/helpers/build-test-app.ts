@@ -9,6 +9,7 @@ import { buildApp } from '../../src/app'
 import { createDb } from '../../src/db/client'
 import type { RunwareClient } from '../../src/integrations/runware/client'
 import type { VideoProvider, VideoProviderId } from '../../src/integrations/video-provider'
+import type { Mesh3dProvider } from '../../src/integrations/mesh-provider'
 import { createLocalStorage } from '../../src/storage/local'
 
 // Fully-mocked RunwareClient (plan Task 10): each test scripts the provider's
@@ -32,6 +33,15 @@ export const fakeVideoProvider = () => ({
   poll: vi.fn(),
 })
 
+// Fully-mocked Mesh3dProvider (Studio3D seam). Identical shape to the video fake
+// because the seam is identical — two calls, and a poll union that is the SAME
+// neutral type. Tests script submit/poll and assert a 3D job never reached the
+// video registry.
+export const fakeMeshProvider = () => ({
+  submit: vi.fn(),
+  poll: vi.fn(),
+})
+
 export type TestAppOverrides = {
   // Task 9: point /media serving at a caller-owned temp dir so tests can put
   // files in it / assert on it. Default: a fresh mkdtemp per app.
@@ -43,6 +53,12 @@ export type TestAppOverrides = {
   // wan-runpod comfy + bytedance ark) and merges these on top, so a routing test
   // stubs only the backends it actually asserts on.
   videoProviders?: Partial<Record<VideoProviderId, VideoProvider>>
+  // Mesh3dProvider seam (Studio3D). NOT partial like videoProviders: only the
+  // runware backend is built ('comfy-3d' is a designed-but-unbuilt self-host
+  // seam), so 3D routing is a single adapter rather than a registry. Absent →
+  // buildApp derives the runware mesh adapter, so suites that never touch 3D are
+  // byte-for-byte unaffected.
+  meshProvider?: Mesh3dProvider
   signupBonusCredits?: number
   // Ops hardening: logger is SILENT by default so suites stay quiet; logging
   // tests raise the level and capture pino's NDJSON via a write stub.
@@ -83,6 +99,7 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
     storage: createLocalStorage(storageDir, overrides.assetHostAllowlist ?? ['runware.ai']),
     runware: overrides.runware ?? (fakeRunware() as unknown as RunwareClient),
     ...(overrides.videoProviders ? { videoProviders: overrides.videoProviders } : {}),
+    ...(overrides.meshProvider ? { meshProvider: overrides.meshProvider } : {}),
     ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
     // 0 disables the poll throttle by default (see TestAppOverrides note).
     pollMinIntervalMs: overrides.pollMinIntervalMs ?? 0,

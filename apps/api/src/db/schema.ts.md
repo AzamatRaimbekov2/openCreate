@@ -63,3 +63,19 @@ micro-migrations, because `CREATE TABLE IF NOT EXISTS` never alters a table that
   bed. It is what makes "voice this shot" a REPLACE rather than an append (without it, a second click
   adds a second overlapping track and charges again). **No FK on purpose**: the film cascade already
   removes these rows, and a stale link should read as an unattached track, not delete someone's audio.
+
+## Key decisions (2026-07-12) — Studio3D
+- **`generation.type` enum widens to `['image','video','audio','model3d']`.** This is a **TYPE-LEVEL
+  change only — there is NO DDL change and NO migration.** SQLite has no `ENUM` type: the column is and
+  always was plain `TEXT`, and the drizzle `{ enum: [...] }` list is a compile-time refinement drizzle
+  applies to `$inferSelect`/`$inferInsert`, not a database constraint. Widening it is therefore purely
+  additive and instantly reversible — every existing row keeps its exact value, and nothing in `ddl.ts`
+  moves.
+- It is what closes the deliberate typecheck gap left by the contracts task: `generationTypeSchema`
+  already admitted `'model3d'`, so `service.ts`'s `type: model.type` in the charge+insert transaction
+  could not assign until this enum admitted it too.
+- The reused neutral columns carry 3D unchanged: `runwareTaskUuid` holds the Runware `3dInference`
+  taskUUID (as it holds a ComfyUI `prompt_id` for wan-runpod), `runwareCostUsd` holds the mesh's actual
+  invoiced cost — which SCALES with the pbr/faceLimit knobs, which is why a settled 3D row bills from
+  the poll response and never from a catalog list price. `provider` stays `'runware'` on a 3D row; the
+  poll path branches on `type`, not on it (see `service.ts.md`).

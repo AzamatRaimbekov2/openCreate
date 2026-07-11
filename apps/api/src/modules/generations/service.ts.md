@@ -95,3 +95,44 @@ flowchart TD
 - Video submit now sends `modelPrompt` (was `input.prompt`) + the style preset `negativePrompt` (both omitted-when-empty). Image sends `modelPrompt` + `negativePrompt`. `negativePrompt` is wired through `VideoSubmitInput` → video-adapter → `RunwareVideoRequest`/`RunwareImageRequest`.
 - `assetExt(type)` helper: video→mp4, audio→mp3, image→webp. Used by the download (get), and remove(); the image discard-on-race stays literal 'webp'.
 - `toDto` now returns `composedPrompt` (null → client reads `prompt`) and `promptPreset` (parsed from `promptPresetJson`).
+
+## Key decisions (2026-07-12) — Studio3D (`model3d` on the existing lifecycle)
+`model3d` was routed through this service by adding **branches, not money code**. Zero lines of
+`chargeCredits`, `failGeneration`, any `db.transaction`, the poll throttle, or the stale reaper were
+touched. That is the whole design: a mesh is a fourth media type, not a fourth subsystem.
+
+- **`Deps.meshProvider?: Mesh3dProvider`** — resolved as `meshProvider ?? createRunwareMeshAdapter(runware)`,
+  exactly mirroring the audio fallback, so a caller injecting only `{ db, runware, storage }` (every
+  direct-service unit test) still gets a working 3D path. A single adapter, **not a registry** like
+  `videoProviders`: `'runware'` is the only 3D backend built; `'comfy-3d'` is a designed-but-unbuilt
+  self-host seam (ADR D2 — hosted TRELLIS.2 beats running our own GPU).
+- **`assetExt` gains `model3d → 'glb'`.** Load-bearing, not cosmetic: a mesh written under the default
+  `.webp` is a file no GLB loader (three.js, `<model-viewer>`, iOS Quick Look) can open — a succeeded,
+  paid-for, unopenable generation. One function owns the mapping so `get()`'s download, the
+  discard-on-race cleanup and `remove()` cannot disagree.
+- **Two PRE-charge guards in `create()`** (both before `chargeCredits` — a job we know will fail must
+  cost the user nothing):
+  1. the aspect-ratio gate now skips `model3d` as well as `audio` — a mesh has no 2D aspect ratio (the
+     catalog's `'1:1'` is a throwaway `catalogBase` requires and the service never reads), and
+     `resolutionFor` is likewise skipped (0,0 placeholders, never sent);
+  2. `model.type === 'model3d' && !input.inputImage` → `ValidationError`. **v1 is image→3D only.**
+     Text→3D exists on the provider (Tripo) but the composer UX does not, and a photo-less 3D row would
+     submit a `3dInference` task with an empty `inputs.images` and fail AFTER the charge.
+- **The async submit branch gains a `model3d` arm** next to audio's, submitting through `mesh.submit`
+  with the `taskUUID` `create()` already minted (Runware requires the CALLER to mint the task id; it
+  doubles as the idempotency key for the client's bounded retry). The arm exists precisely so a 3D job
+  can never fall through to the video arm: a `videoInference` task can never produce a mesh, so the user
+  would be charged for a job that can only fail. Everything AFTER the submit — the status-guarded job-id
+  publish, the submit-window race guard, the shared poll path, the guarded fail+refund — is byte-for-byte
+  unchanged and shared with video/audio.
+- **The poll in `get()` resolves the registry from the ROW's media type**, never the live catalog:
+  `row.type === 'model3d' ? mesh.poll(...) : resolveProvider(row.provider).poll(...)`. Durable state —
+  a catalog edit must never redirect an in-flight job's poll. `MeshPollResult` is a type ALIAS of
+  `VideoPollResult`, so every settlement branch below it (NSFW gate, no-asset guard,
+  download-before-flip, guarded refund) is byte-for-byte the pre-Studio3D logic.
+- **NSFW gap (inherited, documented):** `3dInference` exposes no moderation signal, so the mesh adapter
+  reports `nsfw: false` and the §9.4 gate never fires for 3D — exactly as it does not for self-hosted
+  wan-runpod.
+- Pinned by `test/generations-3d.test.ts`: 202-not-201 + charged once, `.glb` on disk, refund on provider
+  error, refund on success-with-no-asset, 400-before-charge without a photo, and **never submitted to the
+  video provider**.

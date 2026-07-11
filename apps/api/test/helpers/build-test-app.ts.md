@@ -56,3 +56,17 @@ flowchart LR
 
 ## Key decisions (2026-07-09) — wan-runpod
 - `fakeVideoProvider()` (scripted `submit`/`poll`) + `TestAppOverrides.videoProviders` let routing tests assert which backend ran. `assetHostAllowlist` override flows into BOTH the test storage and config (mirrors prod auto-adding the pod host) so wan `/view` URLs pass the SSRF gate. `config.comfyBaseUrl: null` by default (tests inject a fake registry, not a live pod).
+
+## Key decisions (2026-07-12) — Studio3D
+- **`fakeMeshProvider()`** (scripted `submit`/`poll`) — identical in shape to `fakeVideoProvider()`
+  because the seam is identical: two calls, and a poll union that is literally the SAME neutral type
+  (`MeshPollResult` is a type alias of `VideoPollResult`). Injecting BOTH fakes in one test is what lets
+  `generations-3d.test.ts` assert the load-bearing negative: a 3D job hits `mesh.submit` and **never**
+  `video.submit`.
+- **`TestAppOverrides.meshProvider?: Mesh3dProvider`** — threaded into `buildApp` exactly as
+  `videoProviders` is (spread-if-present, so `exactOptionalPropertyTypes` never sees an explicit
+  `undefined`). NOT `Partial<Record<...>>` like `videoProviders`: 3D routing is one adapter, not a
+  registry (`'comfy-3d'` is an unbuilt seam). Absent → `buildApp` derives the runware mesh adapter, so
+  every suite that never touches 3D is byte-for-byte unaffected.
+- `fakeRunware()` already carried `submit3d` (added with the client task), so the `RunwareClient` type is
+  satisfied for suites that exercise the derived adapter rather than injecting a fake provider.
