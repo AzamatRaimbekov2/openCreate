@@ -6,13 +6,13 @@
 Public API barrel of `@opencreate/contracts` — the only import path (`package.json` `exports` maps `.` → this file) for both apps.
 
 ## What it does (for an AI reader)
-- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `credits`, `user`.
+- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `scene3d`.
 - Public API / exports: the union of all modules' exports (schemas + inferred types).
 - Inputs → Outputs: none at runtime beyond module re-export.
 - Side effects: none.
 
 ## Dependencies
-- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./credits`, `./user`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
+- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./templates`, `./credits`, `./user`, `./scene3d`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
 - Used by: `apps/api` and `apps/web` via `import { ... } from '@opencreate/contracts'`.
 
 ## Diagram
@@ -27,6 +27,8 @@ flowchart LR
   F[film.ts] --> IDX
   CR[credits.ts] --> IDX
   U[user.ts] --> IDX
+  T[templates.ts] --> IDX
+  S3[scene3d.ts] --> IDX
   IDX --> API[apps/api]
   IDX --> WEB[apps/web]
 ```
@@ -37,6 +39,7 @@ flowchart LR
 
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
+- 789adb5 feat: template catalog — Brainrot Studio (fruit/cat drama, talking food)
 
 ## Update 2026-07-11 — template catalog
 - Now also re-exports `./templates` (the `/templates` gallery DTO + the from-template request:
@@ -48,3 +51,13 @@ flowchart LR
 - What is NOT exported, on purpose: the templates THEMSELVES. Their prompts, and the English fragment
   each knob option expands to, live server-side in `apps/api/src/modules/templates/` and never cross
   the wire (see that module's `types.ts` header). Only a prompt-free `TemplateSummary` travels.
+
+## Update 2026-07-11 — Studio3D scene preset (Task 2)
+- Now also re-exports `./scene3d`: `scenePresetSchema`/`ScenePreset`, `SCENE_PRESETS`, `getScenePreset`.
+- Exported last (after `user`) — nothing else in the barrel depends on it yet; it has no
+  dependency ordering constraint like `presets`→`generation` or `film`→`templates`.
+- Why this file exists at all: the Studio3D ADR's photo→3D flow needs ONE lighting/camera/tonemap
+  definition that both the browser's three.js viewer and a future server-side renderer (headless
+  Chromium or Blender) can read, so the preview the user tweaks matches the rendered turntable
+  video byte-for-byte in intent. Putting it in the shared barrel — not apps/web-only — is what makes
+  that guarantee possible.

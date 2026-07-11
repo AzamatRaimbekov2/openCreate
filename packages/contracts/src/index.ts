@@ -21,3 +21,6 @@ export * from './film'
 export * from './templates'
 export * from './credits'
 export * from './user'
+// The portable Studio3D scene preset (lighting/camera/tonemap) — one JSON read
+// by both the three.js viewer and any future server-side renderer.
+export * from './scene3d'
