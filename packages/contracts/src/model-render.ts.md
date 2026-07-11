@@ -36,4 +36,4 @@ flowchart LR
 
 ## Commits
 - 4ac1e8a feat(contracts): model render + share wire types
-- (pending) fix(contracts): anchor render data-URI validation, reject SVG posters
+- f33be9e fix(contracts): anchor render data-URI validation, reject SVG posters
