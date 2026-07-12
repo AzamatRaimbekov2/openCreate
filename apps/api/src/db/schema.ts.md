@@ -79,3 +79,16 @@ micro-migrations, because `CREATE TABLE IF NOT EXISTS` never alters a table that
   invoiced cost — which SCALES with the pbr/faceLimit knobs, which is why a settled 3D row bills from
   the poll response and never from a catalog list price. `provider` stays `'runware'` on a 3D row; the
   poll path branches on `type`, not on it (see `service.ts.md`).
+
+## Key decisions (2026-07-13) — Studio3D renders + shares
+Two new tables mirroring `MODEL3D_DDL` column-for-column. Both hang off `user` with a cascade and both
+reference `generation` **only by loose id**, never by FK.
+
+- **`modelRender`** — the `filmRender` bargain applied to 3D: identical status machine, and **no
+  `costCredits`, no refund, no ledger link**. A render spends our compute, not a provider invoice
+  (ADR §D3). `mediaJson` keeps the array shape of `generation.mediaJson` so the existing serve/download
+  path is reused rather than duplicated. `engine` is a drizzle enum (`browser | chromium | blender`)
+  defaulting to `'browser'`, the only built renderer.
+- **`modelShare`** — id-as-token. The uniqueness that makes sharing idempotent lives in the DDL index
+  (`idx_model_share_gen`), not here; drizzle's schema object does not express it, so **`ddl.ts` is the
+  source of truth for that constraint** and `test/db-ddl.test.ts` pins it.

@@ -262,3 +262,55 @@ export const filmRender = sqliteTable('film_render', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
 })
+
+// Studio3D (ADR: photo-to-3d-studio §D3) ---------------------------------------
+// A turntable video of a model3d generation, shot through a named scene preset.
+// Exactly the filmRender bargain: same status machine (processing →
+// succeeded/failed, poll-driven, stale-reaped), and NO ledger — a render spends
+// our compute, not a provider invoice, so there is no costCredits and no refund.
+// The absence of a cost column is load-bearing, not an omission (db-ddl.test.ts
+// asserts it): a cost here is what would tempt someone to wire this to credits.
+export const modelRender = sqliteTable('model_render', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  // No reference(): a generation may be deleted from the gallery while a render
+  // survives. Same rule as shot.generationId — a stale link should read as an
+  // orphaned render, not cascade the render away.
+  generationId: text('generation_id').notNull(),
+  // Which scene preset framed the shot. Validated against the shared preset table
+  // in @opencreate/contracts, so the id is portable across renderers.
+  presetId: text('preset_id').notNull(),
+  // Which renderer produced this. 'browser' is the built path (client-side
+  // WebCodecs); the other two are designed-but-unbuilt server paths. Storing it
+  // means a later engine swap is a query, not archaeology.
+  engine: text('engine', { enum: ['browser', 'chromium', 'blender'] })
+    .notNull()
+    .default('browser'),
+  status: text('status', { enum: ['processing', 'succeeded', 'failed'] }).notNull(),
+  progress: integer('progress'),
+  // Array shape mirrors generation.mediaJson so the same serve/download path is
+  // reused rather than duplicated.
+  mediaJson: text('media_json').notNull().default('[]'),
+  posterUrl: text('poster_url'),
+  errorMessage: text('error_message'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+})
+
+// A public link to a model. The id IS the token (an unguessable UUID), so
+// revoking a share is a DELETE and nothing on `generation` has to change — this
+// feature adds no is_public flag and does not touch the generation table at all.
+// The unique index on generationId (ddl.ts) is what makes "Share" idempotent:
+// without it a second click mints a second live token and revoke kills only one.
+export const modelShare = sqliteTable('model_share', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  generationId: text('generation_id').notNull(),
+  // The render to show on the public page; NULL = show the interactive model only.
+  renderId: text('render_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+})

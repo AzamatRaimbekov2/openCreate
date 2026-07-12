@@ -57,3 +57,9 @@ column-name arrays: `generationColumns`, `shotColumns`, `filmColumns`, `filmAudi
 All four are nullable and additive: every pre-existing film/shot reads NULL and behaves exactly as
 before. Same guarded pattern as `error_code`/`provider` — SQLite has no `ADD COLUMN IF NOT EXISTS`, so
 the `pragma table_info` check makes a re-run a no-op.
+
+## Key decisions (2026-07-13) — Studio3D
+`createDb` now also execs `MODEL3D_DDL` (after `FILM_DDL`), which creates `model_render` and
+`model_share`. No micro-migration accompanies it: both are new tables, so `CREATE TABLE IF NOT EXISTS`
+covers a fresh db and a legacy file alike. Adding `'model3d'` as a generation type needed no DDL and no
+`ALTER` either — `generation.type` is plain TEXT and the enum is a TypeScript-level refinement.

@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as schema from './schema'
-import { DDL, ENTITY_DDL, FILM_DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
+import { DDL, ENTITY_DDL, FILM_DDL, MODEL3D_DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
 
 export type Db = ReturnType<typeof createDb>['db']
 
@@ -25,6 +25,10 @@ export function createDb(path: string) {
   // CinemaStudio tables (film/shot/film_audio/film_render) — separate constant,
   // same idempotent CREATE IF NOT EXISTS contract.
   sqlite.exec(FILM_DDL)
+  // Studio3D tables (model_render/model_share) — same contract again. Adding
+  // 'model3d' as a generation type needs NO DDL at all (generation.type is TEXT
+  // with a TS-level enum), so these two tables are the feature's whole DB surface.
+  sqlite.exec(MODEL3D_DDL)
   // Micro-migrations: CREATE TABLE IF NOT EXISTS never alters tables that
   // already exist, so columns added after a db file was first created must be
   // back-filled here (SQLite has no ADD COLUMN IF NOT EXISTS). Guarded by

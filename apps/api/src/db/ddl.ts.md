@@ -52,3 +52,24 @@ from the guarded `ALTER TABLE` micro-migrations in `client.ts`.
   hold; becomes an audio generation + a `film_audio` track only when the user asks for it.
 - `film_audio.shot_id TEXT` — the shot this track voices; NULL = a film-wide bed. Makes "voice this
   shot" a replace rather than an append (no duplicate track, no duplicate charge).
+
+## Key decisions (2026-07-13) — Studio3D renders + shares
+New `MODEL3D_DDL` export, exec'd with the main DDL in `client.ts` (same idempotent
+`CREATE ... IF NOT EXISTS` contract). Two tables, and **no change to `generation`** — a 3D model IS a
+generation (`type = 'model3d'`, a TEXT column with a TS-level enum, so it needs no DDL at all). These
+tables only add what a generation cannot express: how a model was PRESENTED, and whether it was PUBLISHED.
+
+- **`model_render`** — a turntable video of a model, shot through a named scene preset. Same status
+  machine as `film_render` (`processing → succeeded/failed`, poll-driven, stale-reaped) and the same
+  bargain: **NO cost/credit column**, because a render spends our compute, not a provider invoice
+  (ADR §D3). The absence is the guard, and `test/db-ddl.test.ts` asserts on it — a cost column here is
+  precisely what would tempt a later change to wire this table to the credit ledger.
+  - `generation_id` carries **no FK** (matching `shot.generation_id`): a gallery-deleted generation must
+    leave the render readable as an orphan, not cascade it away.
+  - `engine TEXT DEFAULT 'browser'` — which renderer produced it. `'browser'` is the built path (client
+    WebCodecs); `'chromium'`/`'blender'` are designed-but-unbuilt server paths. Persisting it makes a
+    later engine swap a query rather than archaeology.
+- **`model_share`** — a public link. **The id IS the token** (an unguessable UUID), so revoking a share
+  is a DELETE and no `is_public` flag has to appear on `generation`. `idx_model_share_gen` is UNIQUE on
+  `generation_id`, which is what makes "Share" idempotent: without it a second click mints a second live
+  token and a revoke (one DELETE) kills only one of them, leaving the model quietly public.

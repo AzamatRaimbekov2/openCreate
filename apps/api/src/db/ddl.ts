@@ -214,3 +214,54 @@ CREATE TABLE IF NOT EXISTS film_render (
 );
 CREATE INDEX IF NOT EXISTS idx_film_render_film ON film_render(film_id, created_at DESC);
 `
+
+// Studio3D tables (ADR: photo-to-3d-studio §D3). Exec'd with the main DDL — all
+// CREATE ... IF NOT EXISTS, so re-running on every boot is a no-op.
+//
+// Note what is NOT here: no change to `generation`. A 3D model IS a generation
+// (type = 'model3d', a TEXT column with a TS-level enum), so it already has its
+// media, its status and its charge. These two tables only add what a generation
+// cannot express — how a model was PRESENTED (a turntable render) and whether it
+// was PUBLISHED (a share token).
+//
+// Like film_render, NEITHER table touches the credit ledger: a render spends our
+// compute, not a provider invoice. There is deliberately no cost column — its
+// absence is the guard, and db-ddl.test.ts asserts on that absence.
+export const MODEL3D_DDL = `
+CREATE TABLE IF NOT EXISTS model_render (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  -- The model3d generation this renders. No FK, matching shot.generation_id: a
+  -- generation may be deleted from the gallery while a render survives, and the
+  -- render should read as an orphan rather than cascade away.
+  generation_id TEXT NOT NULL,
+  preset_id TEXT NOT NULL,
+  -- Which renderer produced this. 'browser' today (the client-side WebCodecs path);
+  -- 'chromium'/'blender' are the designed-but-unbuilt server paths. Persisting it
+  -- means a later engine swap is queryable, not archaeological.
+  engine TEXT NOT NULL DEFAULT 'browser',
+  status TEXT NOT NULL,
+  progress INTEGER,
+  media_json TEXT NOT NULL DEFAULT '[]',
+  poster_url TEXT,
+  error_message TEXT,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_model_render_gen ON model_render(generation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_model_render_user ON model_render(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS model_share (
+  -- The id IS the public token: an unguessable UUID. Revoking a share is a DELETE,
+  -- which is why no is_public flag was added to \`generation\` — this feature does not
+  -- touch the generation table at all.
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  generation_id TEXT NOT NULL,
+  render_id TEXT,
+  created_at INTEGER NOT NULL
+);
+-- One live token per model. Without this, "Share" clicked twice mints a second
+-- token and revoke (a DELETE) kills only one — leaving the model quietly public.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_model_share_gen ON model_share(generation_id);
+`
