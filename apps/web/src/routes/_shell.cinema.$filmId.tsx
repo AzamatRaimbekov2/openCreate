@@ -7,6 +7,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { requireSession } from 'modules/Auth'
 import { FilmEditor } from 'modules/Cinema'
+import { useEntities } from 'modules/Entities'
 import { useCatalog } from 'modules/Generator'
 import { useTemplates } from 'modules/Templates'
 
@@ -28,6 +29,13 @@ function FilmEditorPage() {
   // is the one that loads the film. Cached with staleTime: Infinity, so this is
   // shared with /templates and costs nothing on a second visit.
   const templates = useTemplates()
+  // The THIRD seam, same shape as the other two. A shot's CAST is what makes a
+  // film hold together — tag a character and shot 2 shows the same one — but
+  // Cinema must not import Entities, so the list is read here and handed down.
+  // Only id+name travel: the inspector shows a name and sends an id; the photo is
+  // the server's business (it resolves and attaches it as a reference).
+  const entities = useEntities()
+  const castableEntities = (entities.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
 
   return (
     <main className="flex w-full flex-col gap-8 px-6 py-8 xl:px-10">
@@ -35,6 +43,7 @@ function FilmEditorPage() {
         filmId={filmId}
         models={catalog.data?.models ?? []}
         templates={templates.data?.items ?? []}
+        entities={castableEntities}
       />
     </main>
   )

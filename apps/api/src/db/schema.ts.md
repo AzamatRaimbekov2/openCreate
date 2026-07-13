@@ -92,3 +92,19 @@ reference `generation` **only by loose id**, never by FK.
 - **`modelShare`** — id-as-token. The uniqueness that makes sharing idempotent lives in the DDL index
   (`idx_model_share_gen`), not here; drizzle's schema object does not express it, so **`ddl.ts` is the
   source of truth for that constraint** and `test/db-ddl.test.ts` pins it.
+
+## Key decisions (2026-07-13) — AI Soul Studio
+Two additive columns on the entity library, and one widened TS enum. No new table: a soul-built
+character **is** an `entity`, so it inherits ownership, soft delete and `[[e1]]` tagging for free.
+
+- **`entity.soul`** — `text('soul')`, nullable, holds a JSON `Soul`. A JSON column rather than ten
+  typed ones because nothing queries *into* it: the server reads it whole, composes text from it, and
+  writes it back whole. It carries an invariant the database cannot express and the service must:
+  **`soul != null` ⟹ `description` is DERIVED** (`composeSoul(soul)`), and a client-sent description
+  is ignored. One writer, no override flag.
+- **`entityImage.view`** — nullable drizzle enum (`front | three-quarter | profile | full-body`). It is
+  what makes the sheet render in a stable order AND what makes re-rolling one view *replace* that view
+  rather than append a fifth image. Without it, "re-roll the profile" and "add another photo" are the
+  same write.
+- **`entityImage.source`** gained `'generated'` — a TS-level widening only. The column is plain TEXT, so
+  there is no DDL to change, exactly as when `generation.type` gained `'model3d'`.

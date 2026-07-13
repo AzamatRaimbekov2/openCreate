@@ -79,6 +79,12 @@ export function createDb(path: string) {
   if (!shotColumns.includes('voiceover_json')) {
     sqlite.exec('ALTER TABLE shot ADD COLUMN voiceover_json TEXT')
   }
+  //  · shot.entity_refs_json  the shot's CAST: which characters are tagged in it.
+  //    Additive and nullable — an existing film simply has no tags, which is what
+  //    it always meant. Nothing to backfill.
+  if (!shotColumns.includes('entity_refs_json')) {
+    sqlite.exec('ALTER TABLE shot ADD COLUMN entity_refs_json TEXT')
+  }
   const filmColumns = (sqlite.pragma('table_info(film)') as Array<{ name: string }>).map(
     (column) => column.name,
   )
@@ -94,6 +100,31 @@ export function createDb(path: string) {
   )
   if (!filmAudioColumns.includes('shot_id')) {
     sqlite.exec('ALTER TABLE film_audio ADD COLUMN shot_id TEXT')
+  }
+  // Soul Studio (ADR ai-soul-studio). Two additive, nullable columns — the whole
+  // DB surface of the feature. Nothing is backfilled and nothing needs to be:
+  //  · entity.soul       the structured character spec (JSON). NULL is not a gap,
+  //                      it is the legacy entity's meaning: "free prose, no
+  //                      constructor". So the expand step IS the migration — there
+  //                      is no contract step, and rolling the code back leaves a
+  //                      column the old writers simply never read.
+  //  · entity_image.view which slot of the reference sheet a photo fills. NULL =
+  //                      an ordinary upload, which is exactly what every existing
+  //                      row is. Re-rolling a view replaces the row holding it,
+  //                      so without this column a re-roll would silently append.
+  // entity_image.source gaining 'generated' needs NO statement here: the column is
+  // plain TEXT and the enum lives only in TypeScript.
+  const entityColumns = (sqlite.pragma('table_info(entity)') as Array<{ name: string }>).map(
+    (column) => column.name,
+  )
+  if (!entityColumns.includes('soul')) {
+    sqlite.exec('ALTER TABLE entity ADD COLUMN soul TEXT')
+  }
+  const entityImageColumns = (
+    sqlite.pragma('table_info(entity_image)') as Array<{ name: string }>
+  ).map((column) => column.name)
+  if (!entityImageColumns.includes('view')) {
+    sqlite.exec('ALTER TABLE entity_image ADD COLUMN view TEXT')
   }
   // DB-level refund-once backstop (review finding): UNIQUE(generation_id,
   // kind) makes a duplicate refund (or charge) ledger row physically

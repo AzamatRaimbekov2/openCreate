@@ -9,8 +9,14 @@ envelope in one place so every module gets a machine-readable `ApiClientError`.
 
 ## What it does (for an AI reader)
 
-- Responsibilities: perform fetch with session cookies + JSON headers; parse 2xx JSON;
-  map non-2xx to `ApiClientError` from the contracts envelope (fallback `internal_error`).
+- Responsibilities: perform fetch with session cookies; parse 2xx JSON; map non-2xx to
+  `ApiClientError` from the contracts envelope (fallback `internal_error`).
+- **Content-Type is set ONLY when a body is actually sent.** Declaring
+  `application/json` on a bodyless request makes Fastify reject it outright —
+  "Body cannot be empty when content-type is set to 'application/json'" (400).
+  That silently killed every bodyless POST, notably `POST /films/:id/renders`
+  (the CinemaStudio export button never worked). A caller-supplied header still
+  wins, so non-JSON payloads are unaffected.
 - Public API / exports: `api<T>(path, init?): Promise<T>`, `class ApiClientError extends Error { code: ApiErrorCode; status: number }`.
 - Inputs → Outputs: path + optional RequestInit → parsed `T`; 204 → `undefined`; non-2xx → throws `ApiClientError`.
 - Side effects (I/O, network, state): network request via global `fetch`; no state.

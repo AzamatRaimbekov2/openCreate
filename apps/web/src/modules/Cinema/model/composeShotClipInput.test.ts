@@ -15,6 +15,9 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     generationId: null,
     prompt: 'a lighthouse in a storm',
     promptPreset: { styleId: 'cinematic', cameraShot: 'wide', cameraMotion: 'dolly-in' },
+    // A shot always carries a cast, even an empty one — the API answers with an
+    // array, never null, so a client never has to null-check before mapping it.
+    entityRefs: [],
     modelId: null,
     durationMs: 6000,
     trimStartMs: 0,
@@ -103,5 +106,29 @@ describe('composeShotClipInput', () => {
     // The film is 1:1 but the video model only offers 16:9 / 9:16
     const input = composeShotClipInput(makeShot(), videoModel, '1:1')
     expect(input.aspectRatio).toBe('16:9')
+  })
+
+  // THE CAST IS THE FILM. Drop this on the floor and every shot invents a new
+  // stranger — which is exactly what a two-shot film did before it existed: two
+  // different foxes. The server reads entityRefs to substitute each name into the
+  // prompt AND to attach that character's photo as a reference (Wan 2.7's r2v).
+  it('forwards the shot cast so the same character carries across shots', () => {
+    const cast = [{ placeholder: 'e1', entityId: 'alice' }]
+    const input = composeShotClipInput(
+      makeShot({ prompt: '[[e1]] walks through snow', entityRefs: cast }),
+      videoModel,
+      '16:9',
+    )
+    expect(input.entityRefs).toEqual(cast)
+    // The raw token travels UNTOUCHED: the server owns substitution (ADR §3), and
+    // a client that pre-resolved it would send fragment soup the row cannot explain.
+    expect(input.prompt).toBe('[[e1]] walks through snow')
+  })
+
+  // Omitted, not `[]` — an empty array is a claim that the user deliberately cast
+  // nobody, and the API's tagging branch keys off a non-empty list.
+  it('omits entityRefs entirely when nobody is cast', () => {
+    const input = composeShotClipInput(makeShot({ entityRefs: [] }), videoModel, '16:9')
+    expect('entityRefs' in input).toBe(false)
   })
 })

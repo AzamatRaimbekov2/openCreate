@@ -50,8 +50,13 @@ export const PRICE_COMPARISON_ROWS: PriceComparisonRow[] = [
   row('image', 1, 'Midjourney', 0.05),
   // Swift (PixVerse V6) 5s vs Higgsfield Seedance 5s on the Ultra plan
   row('video5s', 35, 'Higgsfield', 0.83),
-  // Cinema (Wan 2.7) 5s vs Runway Gen-4 5s pay-as-you-go
-  row('cinema5s', 55, 'Runway', 1.15),
+  // Cinema (Wan 2.7) 5s vs Runway Gen-4 5s pay-as-you-go.
+  // 85, not 55: the old number was set against a cost nobody had measured and
+  // sold every clip BELOW it — $0.55 charged against the $0.7557 Runware actually
+  // billed. Wan now runs DIRECT on Alibaba at their published $0.10/second, so a
+  // 5s clip costs us $0.50 and 85 credits ($0.85) leaves ~41%. Still under
+  // Runway's $1.15, so the comparison this row exists to make still holds.
+  row('cinema5s', 85, 'Runway', 1.15),
 ]
 
 // Shared USD formatter so every surface prints prices identically ($0.35)

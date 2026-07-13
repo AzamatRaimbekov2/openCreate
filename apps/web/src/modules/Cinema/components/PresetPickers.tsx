@@ -8,10 +8,10 @@ import { useTranslation } from 'react-i18next'
 import type { CameraMotion, CameraShot, Quality } from '@opencreate/contracts'
 import { Select } from 'shared/ui'
 import {
-  CAMERA_MOTION_OPTIONS,
-  CAMERA_SHOT_OPTIONS,
-  QUALITY_OPTIONS,
-  STYLE_OPTIONS,
+  cameraMotionOptions,
+  cameraShotOptions,
+  qualityOptions,
+  styleOptions,
 } from '../model/presetOptions'
 import type { PresetDraft, StyleChoice } from '../model/presetOptions'
 
@@ -27,25 +27,25 @@ export function PresetPickers({ value, onChange }: PresetPickersProps) {
     <div className="grid grid-cols-2 gap-2">
       <Select<StyleChoice>
         label={t('cinema.inspector.style')}
-        options={[{ value: '', label: t('cinema.settings.styleNone') }, ...STYLE_OPTIONS]}
+        options={[{ value: '', label: t('cinema.settings.styleNone') }, ...styleOptions(t)]}
         value={value.styleId}
         onChange={(styleId) => onChange({ styleId })}
       />
       <Select<CameraShot>
         label={t('cinema.inspector.camera')}
-        options={CAMERA_SHOT_OPTIONS}
+        options={cameraShotOptions(t)}
         value={value.cameraShot}
         onChange={(cameraShot) => onChange({ cameraShot })}
       />
       <Select<CameraMotion>
         label={t('cinema.inspector.motion')}
-        options={CAMERA_MOTION_OPTIONS}
+        options={cameraMotionOptions(t)}
         value={value.cameraMotion}
         onChange={(cameraMotion) => onChange({ cameraMotion })}
       />
       <Select<Quality>
         label={t('cinema.inspector.quality')}
-        options={QUALITY_OPTIONS}
+        options={qualityOptions(t)}
         value={value.quality}
         onChange={(quality) => onChange({ quality })}
       />

@@ -8,7 +8,8 @@
     "language": "Language",
     "entities": "Entities",
     "cinema": "Cinema",
-    "templates": "Templates"
+    "templates": "Templates",
+    "soul": "Souls"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -577,6 +578,50 @@
       "notVoiced": "Not voiced yet",
       "generate": "Voice it · {{count}} cr",
       "regenerate": "Re-voice · {{count}} cr"
+    },
+    "preset": {
+      "style": {
+        "disney": "Disney",
+        "anime": "Anime",
+        "2d-cartoon": "2D cartoon",
+        "3d-cartoon": "3D cartoon",
+        "hand-drawn": "Hand-drawn (on twos)",
+        "cinematic": "Cinematic"
+      },
+      "shot": {
+        "none": "Any shot",
+        "wide": "Wide shot",
+        "medium": "Medium shot",
+        "close-up": "Close-up",
+        "extreme-close-up": "Extreme close-up",
+        "aerial": "Aerial",
+        "low-angle": "Low angle"
+      },
+      "motion": {
+        "none": "Any motion",
+        "static": "Static",
+        "dolly-in": "Dolly in",
+        "dolly-out": "Dolly out",
+        "pan": "Pan",
+        "orbit": "Orbit",
+        "handheld": "Handheld",
+        "crane": "Crane"
+      },
+      "quality": {
+        "none": "Default",
+        "draft": "Draft",
+        "standard": "Standard",
+        "cinematic": "Cinematic",
+        "ultra": "Ultra"
+      }
+    },
+    "cast": {
+      "title": "Cast",
+      "add": "Character",
+      "remove": "Remove {{name}}",
+      "empty": "No characters yet — add one in Entities.",
+      "unsupported": "This model cannot hold a character.",
+      "unsupportedWarning": "The chosen model ignores references — pick Cinema (Wan 2.7) or the character will not carry over."
     }
   },
   "templates": {
@@ -587,7 +632,8 @@
       "description": "The catalog is empty — that looks like a server-side fault."
     },
     "category": {
-      "brainrot": "Brainrot"
+      "brainrot": "Brainrot",
+      "animation": "Animation"
     },
     "beat": {
       "free": "free",
@@ -613,6 +659,96 @@
       "create": "Create the film",
       "createFailed": "Could not create a film from this template.",
       "freeNotice": "Creating the film is free. Credits are only spent when you press Generate on a specific shot yourself."
+    }
+  },
+  "soul": {
+    "title": "Soul Studio",
+    "subtitle": "Build a character from parts — style, archetype, traits — then mint a reference sheet of them and bring them to life.",
+    "price": "{{credits}} cr",
+    "constructor": {
+      "title": "Constructor",
+      "name": "Name",
+      "namePlaceholder": "Iron Captain",
+      "notes": "Notes",
+      "notesPlaceholder": "Anything the pickers cannot say — added to the prompt verbatim",
+      "submit": "Create character",
+      "save": "Save",
+      "free": "Creating a character is free — portraits are priced separately."
+    },
+    "field": {
+      "any": "Any",
+      "archetype": "Archetype",
+      "style": "Style",
+      "age": "Age",
+      "build": "Build",
+      "hairColor": "Hair color",
+      "hairStyle": "Hair style",
+      "eyeColor": "Eyes",
+      "skin": "Skin",
+      "outfit": "Outfit",
+      "vibe": "Vibe",
+      "traits": "Traits"
+    },
+    "traits": {
+      "count": "{{picked}} / {{max}}",
+      "cap": "{{max}} traits is the limit — past that the model starts dropping them. Release one to add another."
+    },
+    "preview": {
+      "title": "What the model will see",
+      "negative": "Negative",
+      "copy": "Copy",
+      "copied": "Copied"
+    },
+    "library": {
+      "title": "Ready-made characters",
+      "description": "Copy the prompt, or open it in the constructor and change anything.",
+      "open": "Open in constructor"
+    },
+    "characters": {
+      "title": "Your characters",
+      "noPhoto": "No portrait yet",
+      "empty": {
+        "title": "No characters yet",
+        "description": "Build one in the constructor — it costs nothing until you shoot the first portrait."
+      }
+    },
+    "card": {
+      "back": "Back",
+      "edit": "Edit character",
+      "facts": "Characteristics"
+    },
+    "sheet": {
+      "title": "Reference sheet",
+      "empty": "Not shot yet",
+      "hero": "First portrait",
+      "rest": "Complete the sheet",
+      "create": "Shoot",
+      "reroll": "Reshoot",
+      "refunded": "Credits refunded",
+      "hint": "The first portrait decides the face; every later view references it, which is why it costs more.",
+      "confirm": {
+        "title": "Shoot portraits?",
+        "description": "Portraits: {{views}}. Credits charged now: {{credits}}.",
+        "submit": "Confirm · {{credits}} cr"
+      }
+    },
+    "animate": {
+      "title": "Bring to life",
+      "model": "Video model",
+      "duration": "Duration",
+      "prompt": "What happens in the clip",
+      "cta": "Bring to life",
+      "needPhoto": "Shoot the first portrait first — a video starts from a photo.",
+      "processing": "Rendering the clip",
+      "confirm": {
+        "title": "Bring this character to life?",
+        "description": "A video costs {{credits}} credits, charged now.",
+        "submit": "Confirm · {{credits}} cr"
+      }
+    },
+    "errors": {
+      "notFound": "This character does not exist, or is not yours.",
+      "notSoul": "This entity was not built in Soul Studio — open it in the library."
     }
   }
 }

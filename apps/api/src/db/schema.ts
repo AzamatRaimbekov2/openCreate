@@ -128,7 +128,17 @@ export const entity = sqliteTable('entity', {
   // domain records what a thing IS, not how a given vendor conditions on it.
   kind: text('kind', { enum: ['character', 'object', 'place', 'other'] }).notNull(),
   name: text('name').notNull(),
+  // INVARIANT (Soul Studio, ADR ai-soul-studio): when `soul` is not null this
+  // column is DERIVED — the service overwrites it with composeSoul(soul) on every
+  // soul change and ignores any description the client sends. A constructor
+  // cannot round-trip prose, so there is exactly one writer.
   description: text('description').notNull().default(''),
+  // The structured character spec (a JSON `Soul`), or NULL for every legacy /
+  // hand-made entity. A COLUMN rather than a table because a soul-built character
+  // IS an entity: it inherits ownership, soft delete and `[[e1]]` tagging from the
+  // moment it exists. JSON rather than 10 columns because nothing queries INTO it —
+  // the server reads it whole, composes text, and writes it back whole.
+  soul: text('soul'),
   // The ONE image sent as a reference (Runware accepts a single one). Nullable:
   // an entity exists before its first photo is uploaded. No FK to entity_image —
   // that would be circular; the service validates the id belongs to this entity.
@@ -148,7 +158,16 @@ export const entityImage = sqliteTable('entity_image', {
   // Served from OUR storage, never a provider URL: Runware assets expire after
   // 7 days, so an entity pointing at one silently breaks a week after creation.
   url: text('url').notNull(),
-  source: text('source', { enum: ['upload', 'library'] }).notNull(),
+  // 'generated' (Soul Studio) widens this the same way 'model3d' widened
+  // generation.type: SQLite has no ENUM — the column is plain TEXT — so there is
+  // no DDL to migrate. Every legacy row keeps its exact value; the drizzle enum
+  // simply now admits the third source a photo can have.
+  source: text('source', { enum: ['upload', 'library', 'generated'] }).notNull(),
+  // Which portrait of the reference sheet this is, or NULL for an ordinary upload.
+  // It is what makes the sheet render in a stable order AND what makes re-rolling
+  // one view REPLACE that view instead of appending a fifth image nobody asked for
+  // — without it, "re-roll the profile" and "add another photo" are the same write.
+  view: text('view', { enum: ['front', 'three-quarter', 'profile', 'full-body'] }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
@@ -201,6 +220,11 @@ export const shot = sqliteTable('shot', {
   generationId: text('generation_id'),
   prompt: text('prompt').notNull().default(''),
   promptPresetJson: text('prompt_preset_json'),
+  // The shot's CAST: [{ placeholder, entityId }] as JSON. NULL = nobody tagged.
+  // This is what makes a film rather than a pile of clips — the server substitutes
+  // each character's name into the prompt AND attaches her photo as a reference,
+  // so shot 2 shows the same fox as shot 1. Per-shot because a cast is per-beat.
+  entityRefsJson: text('entity_refs_json'),
   // The catalog model this shot generates with; NULL = no opinion (fall back to
   // the style's recommendation, then the first video model). Before this column
   // the model was transient inspector state — re-selecting a shot forgot which

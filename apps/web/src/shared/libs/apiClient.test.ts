@@ -24,7 +24,7 @@ function jsonResponse(body: unknown, status: number) {
 }
 
 describe('api', () => {
-  it('parses JSON on 2xx and sends cookies + JSON content type', async () => {
+  it('parses JSON on 2xx and sends cookies', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ id: 'u1', creditsBalance: 200 }, 200))
     await expect(api<{ id: string; creditsBalance: number }>('/api/me')).resolves.toEqual({
       id: 'u1',
@@ -32,11 +32,40 @@ describe('api', () => {
     })
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/me',
+      expect.objectContaining({ credentials: 'include' }),
+    )
+  })
+
+  it('declares the JSON content type when it actually sends a body', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }, 200))
+    await api('/api/films', { method: 'POST', body: JSON.stringify({ title: 'x' }) })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/films',
       expect.objectContaining({
-        credentials: 'include',
         headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
       }),
     )
+  })
+
+  // Regression: a bodyless POST (POST /films/:id/renders) used to carry
+  // `Content-Type: application/json` with an EMPTY body, which Fastify rejects
+  // outright — "Body cannot be empty when content-type is set to
+  // 'application/json'" (400). The export button was dead for every user.
+  // Declaring a body type when there is no body is a lie; don't tell it.
+  it('omits the content type when there is no body (bodyless POST)', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ id: 'r1', status: 'processing' }, 202))
+    await api('/api/films/f1/renders', { method: 'POST' })
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    const headers = init.headers as Record<string, string>
+    expect(headers['Content-Type']).toBeUndefined()
+  })
+
+  it('lets an explicit content type through untouched', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }, 200))
+    await api('/api/upload', { method: 'POST', body: 'raw', headers: { 'Content-Type': 'text/plain' } })
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    const headers = init.headers as Record<string, string>
+    expect(headers['Content-Type']).toBe('text/plain')
   })
 
   it('resolves undefined on 204 (no body to parse)', async () => {

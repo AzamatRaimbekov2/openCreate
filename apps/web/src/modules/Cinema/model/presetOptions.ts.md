@@ -46,3 +46,20 @@ flowchart LR
 ## Commits
 
 - _no commit yet_
+
+## Change log (behaviour)
+
+### 2026-07-12 — preset labels come from i18n, not from the contract table
+`STYLE_OPTIONS` / `CAMERA_SHOT_OPTIONS` / `CAMERA_MOTION_OPTIONS` /
+`QUALITY_OPTIONS` (constants) are replaced by `styleOptions(t)` /
+`cameraShotOptions(t)` / `cameraMotionOptions(t)` / `qualityOptions(t)`.
+
+`contracts/presets.ts` carries a `label` per preset, but those strings are
+hardcoded **Russian** — they are the API's naming of a preset, not UI copy.
+Rendering them directly left the Framing / Camera motion / Quality pickers
+reading "Любой план" while the app was switched to EN.
+
+The contract still owns the **enum and the id order** (so a new preset cannot be
+missed); the SPA owns how it is spelled to a human, under
+`cinema.preset.<axis>.<id>`. A preset added without copy now shows a visible
+missing key instead of silently flipping language.

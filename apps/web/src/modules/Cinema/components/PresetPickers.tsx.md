@@ -38,3 +38,11 @@ flowchart LR
 ## Commits
 
 - _no commit yet_
+
+## Change log (behaviour)
+
+### 2026-07-12 — pickers translate their own labels
+Now builds options via `styleOptions(t)` / `cameraShotOptions(t)` /
+`cameraMotionOptions(t)` / `qualityOptions(t)` instead of importing the
+constant arrays, whose labels came from `contracts/presets.ts` and were
+hardcoded Russian regardless of the active language.

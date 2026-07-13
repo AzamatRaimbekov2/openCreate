@@ -21,12 +21,25 @@ export class ApiClientError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  // Only DECLARE a JSON body when we actually send one. Setting Content-Type
+  // unconditionally made every bodyless POST (e.g. POST /films/:id/renders)
+  // arrive at Fastify as "application/json with an empty body", which its JSON
+  // parser rejects with a 400 — the CinemaStudio export button never worked.
+  // A GET/DELETE needs no request content type at all, so this is not a
+  // special case for renders: it is the header being honest about the payload.
+  const hasBody = init?.body !== undefined && init.body !== null
+  const headers: HeadersInit = {
+    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    // Spread last so an explicit caller-supplied type (or a deliberate override)
+    // still wins — e.g. a non-JSON upload.
+    ...init?.headers,
+  }
+
   const res = await fetch(path, {
     // Session cookie must always travel with API calls
     credentials: 'include',
     ...init,
-    // Headers merge AFTER the init spread so Content-Type survives custom inits
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers,
   })
   // 204 = intentionally empty (e.g. DELETE) — nothing to parse
   if (res.status === 204) return undefined as T

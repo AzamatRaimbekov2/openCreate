@@ -95,3 +95,17 @@ flowchart TD
 ## Commits
 
 - _no commit yet_
+
+## Change log (behaviour)
+
+### 2026-07-12 — a failed Generate is no longer invisible
+`handleGenerate` had no `onError`, and `ShotClipStatus` only renders when
+`shot.generationId !== null`. So a submit that failed BEFORE a generation row
+existed (502 provider refused, 402 out of credits, 400 model not enabled) showed
+the user **nothing** — no toast, no line, nothing in the console. They just
+clicked Generate again.
+
+The panel now derives `actionErrorCode` from the newest failure across the three
+mutations it drives (generate → voiceover → update; generate first because it is
+the one that spends credits) and renders it as a `role="alert"` line keyed off
+the machine code via `errorCodeMessageKey` — never raw server text (design.md §9).

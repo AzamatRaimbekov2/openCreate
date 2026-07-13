@@ -17,6 +17,7 @@
 //    JSON has no Date).
 import { z } from 'zod'
 import { aspectRatioSchema } from './catalog'
+import { entityRefSchema } from './entity'
 import { cameraMotionSchema, cameraShotSchema, promptPresetSchema, styleIdSchema } from './presets'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +117,20 @@ export const shotSchema = z.object({
   prompt: z.string(),
   // The structured preset this shot was (or will be) generated with.
   promptPreset: promptPresetSchema.nullable(),
+  // The characters tagged in THIS shot's prompt — the `[[e1]]` tokens and which
+  // entity each one is. This is what makes a FILM instead of a pile of clips: tag
+  // a character here and shot 2 shows the same one as shot 1, because the server
+  // attaches her photo as a reference (Wan 2.7's r2v mode) and substitutes her
+  // name into the text.
+  //
+  // It lives on the SHOT, not on the film, because a cast is per-beat: the fox is
+  // in shots 1–3, the bear enters in shot 4. A film-level cast would either send
+  // every character into every shot (paying to condition on people who are not in
+  // frame) or need a second per-shot filter anyway.
+  //
+  // Empty array = nobody tagged, which is the honest default and reads identically
+  // to the old shape for every film that predates this.
+  entityRefs: z.array(entityRefSchema),
   // The catalog model this shot generates with. null = "no opinion", and the
   // composer falls back to the shot's style recommendation, then to the first
   // video model.
@@ -147,6 +162,11 @@ export const createShotInputSchema = z.object({
   generationId: z.string().nullable().optional(),
   prompt: z.string().max(2000).optional(),
   promptPreset: promptPresetSchema.nullable().optional(),
+  // The cast of this shot. Capped at 5 — Wan 2.7 r2v's own limit, and the only
+  // model that can honour references at all today. A longer list would be accepted
+  // here and then rejected at generate time, after the user had already arranged
+  // the shot; refusing it at the door is the kinder failure.
+  entityRefs: z.array(entityRefSchema).max(5).optional(),
   // Validated against the live catalog by the service (must be a video model),
   // not by an enum here — model ids are catalog data, not wire constants.
   modelId: z.string().max(80).nullable().optional(),

@@ -18,6 +18,7 @@ import type {
   AddFilmAudioInput,
   CreateFilmInput,
   CreateShotInput,
+  EntityRef,
   Film,
   FilmAudio,
   FilmDetail,
@@ -109,6 +110,10 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       generationId: row.generationId,
       prompt: row.prompt,
       promptPreset: row.promptPresetJson ? (JSON.parse(row.promptPresetJson) as PromptPreset) : null,
+      // Never null on the wire: the contract promises an ARRAY, and a client that
+      // has to null-check a cast before mapping it is a client that will forget to.
+      // A shot from before this column simply has nobody in it.
+      entityRefs: row.entityRefsJson ? (JSON.parse(row.entityRefsJson) as EntityRef[]) : [],
       modelId: row.modelId,
       durationMs: row.durationMs,
       trimStartMs: row.trimStartMs,
@@ -224,6 +229,9 @@ export function createFilmService({ db, storage, runRender }: Deps) {
             generationId: null,
             prompt: (s.prompt ?? '').trim(),
             promptPresetJson: s.promptPreset ? JSON.stringify(s.promptPreset) : null,
+            // A template can ship a cast per beat — the whole point of a cartoon
+            // template being that the SAME character carries every shot.
+            entityRefsJson: s.entityRefs?.length ? JSON.stringify(s.entityRefs) : null,
             modelId: s.modelId ?? null,
             durationMs: s.durationMs ?? 3000,
             trimStartMs: s.trimStartMs ?? 0,
@@ -302,6 +310,10 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         generationId: input.generationId ?? null,
         prompt: (input.prompt ?? '').trim(),
         promptPresetJson: input.promptPreset ? JSON.stringify(input.promptPreset) : null,
+        // An EMPTY cast stores as null, not as '[]': "nobody is tagged" is the
+        // same fact however it arrived, and one representation means the read path
+        // has one branch instead of two.
+        entityRefsJson: input.entityRefs?.length ? JSON.stringify(input.entityRefs) : null,
         modelId: input.modelId ?? null,
         // Default a 3s slot so a freshly-added shot has a real timeline length.
         durationMs: input.durationMs ?? 3000,
@@ -335,6 +347,11 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     if (input.prompt !== undefined) patch.prompt = input.prompt.trim()
     if (input.promptPreset !== undefined)
       patch.promptPresetJson = input.promptPreset ? JSON.stringify(input.promptPreset) : null
+    // `undefined` = the client did not touch the cast; an EMPTY array = it removed
+    // everyone. Collapsing the two would make un-tagging the last character
+    // impossible — the very edit a user makes when a shot turns out not to need her.
+    if (input.entityRefs !== undefined)
+      patch.entityRefsJson = input.entityRefs.length ? JSON.stringify(input.entityRefs) : null
     if (input.modelId !== undefined) patch.modelId = input.modelId
     if (input.durationMs !== undefined) patch.durationMs = input.durationMs
     if (input.trimStartMs !== undefined) patch.trimStartMs = input.trimStartMs
@@ -386,6 +403,13 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       .where(and(eq(generation.id, input.generationId), eq(generation.userId, userId)))
       .get()
     if (!gen || gen.type !== 'audio') throw new FilmValidationError('not an audio generation')
+    // The status check the comment above always PROMISED but never performed.
+    // Without it a still-processing voiceover could be attached: the Audio panel
+    // showed the track at once, and a render started before the mp3 landed on
+    // disk mixed nothing and still reported success — a silent film the user had
+    // already paid for. Attaching is only legal once the asset actually exists.
+    if (gen.status !== 'succeeded')
+      throw new FilmValidationError('audio generation is not ready yet')
     // A shot-attached track REPLACES whatever already voices that shot. Appending
     // would mean a second click on "voice this shot" leaves two lines playing over
     // each other — and the user paid twice to make it worse. The shot must be this
@@ -485,10 +509,19 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         .from(generation)
         .where(and(eq(generation.id, a.generationId), eq(generation.userId, userId)))
         .get()
-      if (gen && gen.status === 'succeeded' && gen.type === 'audio') {
-        const file = storage.localPath(gen.id, 'mp3')
-        if (existsSync(file)) audio.push({ file, startSec: a.startMs / 1000, gainDb: a.gainDb })
-      }
+      // A track the user attached and PAID for must reach the mux or stop the
+      // export. The previous `if (existsSync) push` silently skipped anything
+      // missing and let the render settle as 'succeeded' — the single worst
+      // outcome, because a muted mp4 looks finished. addAudio now refuses any
+      // non-succeeded generation, so reaching this branch means the row is fine
+      // but the ASSET is gone (pruned, expired, or a lost save). That is a real
+      // failure and says so: a 400 the user can act on, not a quiet downgrade.
+      if (!gen || gen.type !== 'audio' || gen.status !== 'succeeded')
+        throw new FilmValidationError('an audio track is not ready — remove it or wait for it')
+      const file = storage.localPath(gen.id, 'mp3')
+      if (!existsSync(file))
+        throw new FilmValidationError('an audio track has no media file — remove it and re-add')
+      audio.push({ file, startSec: a.startMs / 1000, gainDb: a.gainDb })
     }
 
     return { width: canvas.width, height: canvas.height, segments, audio, fontPath: resolveFontPath(), fps: 30 }

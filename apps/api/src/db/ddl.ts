@@ -109,7 +109,13 @@ CREATE TABLE IF NOT EXISTS entity (
   user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
   kind TEXT NOT NULL,
   name TEXT NOT NULL,
+  -- DERIVED whenever soul is not null (ADR ai-soul-studio): the service
+  -- write-throughs composeSoul(soul) and ignores any client-sent description.
   description TEXT NOT NULL DEFAULT '',
+  -- Soul Studio: the structured character spec as JSON, NULL for every legacy /
+  -- hand-made entity. Additive and nullable, so an existing library keeps working
+  -- with no backfill — NULL already means exactly what it should ("free prose").
+  soul TEXT,
   primary_image_id TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
@@ -122,7 +128,14 @@ CREATE TABLE IF NOT EXISTS entity_image (
   id TEXT PRIMARY KEY,
   entity_id TEXT NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
   url TEXT NOT NULL,
+  -- upload | library | generated. Plain TEXT, so widening the set (Soul Studio
+  -- added 'generated') is a TS-level change with no migration.
   source TEXT NOT NULL,
+  -- Which slot of the reference sheet this photo fills (front | three-quarter |
+  -- profile | full-body), NULL for an ordinary upload. Re-rolling a view replaces
+  -- the row holding that view — that is the whole reason this is a column and not
+  -- an ordering convention.
+  view TEXT,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_entity_image_entity ON entity_image(entity_id);
@@ -169,6 +182,13 @@ CREATE TABLE IF NOT EXISTS shot (
   generation_id TEXT,
   prompt TEXT NOT NULL DEFAULT '',
   prompt_preset_json TEXT,
+  -- The characters tagged in this shot: [{ placeholder, entityId }]. What turns a
+  -- pile of clips into a film — the server substitutes each name into the prompt
+  -- and attaches that character's photo as a reference, so shot 2 shows the same
+  -- fox as shot 1. Per-SHOT, not per-film: a cast is a per-beat fact.
+  -- NULL / absent reads as "nobody tagged", which is exactly what every film that
+  -- predates this column means.
+  entity_refs_json TEXT,
   -- The catalog model this shot generates with; NULL = no opinion. Persisting it
   -- is what lets a template pin its price/quality tier onto every shot.
   model_id TEXT,

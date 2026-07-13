@@ -11,7 +11,7 @@ import type { StyleId } from '@opencreate/contracts'
 import { Button, Modal, Select } from 'shared/ui'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { useStoryboard } from '../model/storyboardApi'
-import { STYLE_OPTIONS } from '../model/presetOptions'
+import { styleOptions } from '../model/presetOptions'
 import type { StyleChoice } from '../model/presetOptions'
 
 export type StoryboardModalProps = {
@@ -71,7 +71,7 @@ export function StoryboardModal({ filmId, defaultStyleId, isOpen, onClose }: Sto
         <div className="grid grid-cols-2 gap-2">
           <Select<StyleChoice>
             label={t('cinema.settings.style')}
-            options={[{ value: '', label: t('cinema.settings.styleNone') }, ...STYLE_OPTIONS]}
+            options={[{ value: '', label: t('cinema.settings.styleNone') }, ...styleOptions(t)]}
             value={styleId}
             onChange={setStyleId}
           />

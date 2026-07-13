@@ -36,6 +36,7 @@ import { Timeline } from './Timeline'
 import { PreviewPlayer } from './PreviewPlayer'
 import { RenderBar } from './RenderBar'
 import { AudioTracks } from './AudioTracks'
+import type { CastableEntity } from './ShotCastField'
 import { ShotInspector } from './ShotInspector'
 import { StoryboardModal } from './StoryboardModal'
 
@@ -55,6 +56,12 @@ export type FilmEditorProps = {
   // handing it over as an editable default is most of the difference between a
   // film that sounds like the format and one that doesn't.
   templates?: TemplateSummary[]
+  // The character library, injected FROM THE ROUTE — the third use of the same
+  // seam, and for the same reason: Cinema must not import Entities. Only id+name
+  // travel, because that is all the inspector needs to show a chip and send a tag.
+  // Empty while the library is empty; the cast control then says so rather than
+  // offering a dead button.
+  entities?: CastableEntity[]
 }
 
 // Stage takes the slack, the inspector rail is fixed. minmax(0,1fr) (not 1fr)
@@ -64,7 +71,7 @@ const WORKSPACE = 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]'
 // inspector underneath it as you scroll.
 const RAIL = 'flex flex-col gap-6 lg:sticky lg:top-20 lg:h-fit lg:self-start'
 
-export function FilmEditor({ filmId, models, templates = [] }: FilmEditorProps) {
+export function FilmEditor({ filmId, models, templates = [], entities = [] }: FilmEditorProps) {
   const { t } = useTranslation()
   const { data, isPending, isError, refetch } = useFilm(filmId)
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null)
@@ -138,6 +145,7 @@ export function FilmEditor({ filmId, models, templates = [] }: FilmEditorProps) 
               filmAspect={filmAspect}
               videoModels={videoModels}
               ttsModel={ttsModel}
+              entities={entities}
               startMs={selectedStartMs}
               isVoiced={isSelectedVoiced}
             />

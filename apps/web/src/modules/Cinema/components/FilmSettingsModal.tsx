@@ -10,7 +10,7 @@ import type { AspectRatio, Film } from '@opencreate/contracts'
 import { aspectRatioSchema } from '@opencreate/contracts'
 import { Button, Input, Modal, PillGroup, Select } from 'shared/ui'
 import { useCreateFilm, useUpdateFilm } from '../model/filmsApi'
-import { STYLE_OPTIONS } from '../model/presetOptions'
+import { styleOptions } from '../model/presetOptions'
 import type { StyleChoice } from '../model/presetOptions'
 
 export type FilmSettingsModalProps = {
@@ -30,7 +30,7 @@ export function FilmSettingsModal({ film, isOpen, onClose }: FilmSettingsModalPr
 
   const [title, setTitle] = useState(film?.title ?? '')
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(film?.aspectRatio ?? '16:9')
-  // '' = no default style; STYLE_OPTIONS carry the enum values
+  // '' = no default style; styleOptions(t) carry the enum values
   const [styleId, setStyleId] = useState<StyleChoice>(film?.defaultStyleId ?? '')
 
   const isEdit = film !== null
@@ -82,7 +82,7 @@ export function FilmSettingsModal({ film, isOpen, onClose }: FilmSettingsModalPr
 
         <Select<StyleChoice>
           label={t('cinema.settings.style')}
-          options={[{ value: '', label: t('cinema.settings.styleNone') }, ...STYLE_OPTIONS]}
+          options={[{ value: '', label: t('cinema.settings.styleNone') }, ...styleOptions(t)]}
           value={styleId}
           onChange={setStyleId}
         />

@@ -5,10 +5,6 @@
 // sentinel row is prepended by the inspector with a translated label, because
 // styleId — unlike the modifier axes — has no first-class 'none'.
 import {
-  CAMERA_MOTIONS,
-  CAMERA_SHOTS,
-  QUALITY_PRESETS,
-  STYLE_PRESETS,
   cameraMotionSchema,
   cameraShotSchema,
   qualitySchema,
@@ -67,23 +63,35 @@ export function hasAnyPreset(draft: PresetDraft): boolean {
 
 // Built from the enum's option order (not Object.values) so each value stays
 // typed as its literal union member, and the picker order is deterministic.
-export const STYLE_OPTIONS: SelectOption<StyleId>[] = styleIdSchema.options.map((id) => ({
-  value: id,
-  label: STYLE_PRESETS[id].label,
-}))
+//
+// THE LABEL COMES FROM i18n, NOT FROM THE CONTRACT TABLE. contracts/presets.ts
+// carries a `label` per preset, but those strings are hardcoded RUSSIAN — they
+// are the API's own naming of a preset, not UI copy. Rendering them directly is
+// what left the Framing/Camera motion/Quality pickers reading "Любой план" while
+// the app was switched to EN. The contract still owns the ID ORDER and the enum
+// (so a new preset cannot be missed); the SPA owns how it is spelled to a human.
+// Keys live under cinema.preset.<axis>.<id>, so adding a preset without copy
+// surfaces as a visible missing key rather than a silent language flip.
+type Translate = (key: string) => string
 
-export const CAMERA_SHOT_OPTIONS: SelectOption<CameraShot>[] = cameraShotSchema.options.map(
-  (id) => ({ value: id, label: CAMERA_SHOTS[id].label }),
-)
+export function styleOptions(t: Translate): SelectOption<StyleId>[] {
+  return styleIdSchema.options.map((id) => ({ value: id, label: t(`cinema.preset.style.${id}`) }))
+}
 
-export const CAMERA_MOTION_OPTIONS: SelectOption<CameraMotion>[] = cameraMotionSchema.options.map(
-  (id) => ({ value: id, label: CAMERA_MOTIONS[id].label }),
-)
+export function cameraShotOptions(t: Translate): SelectOption<CameraShot>[] {
+  return cameraShotSchema.options.map((id) => ({ value: id, label: t(`cinema.preset.shot.${id}`) }))
+}
 
-export const QUALITY_OPTIONS: SelectOption<Quality>[] = qualitySchema.options.map((id) => ({
-  value: id,
-  label: QUALITY_PRESETS[id].label,
-}))
+export function cameraMotionOptions(t: Translate): SelectOption<CameraMotion>[] {
+  return cameraMotionSchema.options.map((id) => ({
+    value: id,
+    label: t(`cinema.preset.motion.${id}`),
+  }))
+}
+
+export function qualityOptions(t: Translate): SelectOption<Quality>[] {
+  return qualitySchema.options.map((id) => ({ value: id, label: t(`cinema.preset.quality.${id}`) }))
+}
 
 // Timeline display lengths in seconds (stored as durationMs). Model-independent:
 // a video shot's *generation* duration is snapped separately to the model's own

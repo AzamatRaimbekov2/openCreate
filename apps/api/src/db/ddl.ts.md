@@ -73,3 +73,15 @@ tables only add what a generation cannot express: how a model was PRESENTED, and
   is a DELETE and no `is_public` flag has to appear on `generation`. `idx_model_share_gen` is UNIQUE on
   `generation_id`, which is what makes "Share" idempotent: without it a second click mints a second live
   token and a revoke (one DELETE) kills only one of them, leaving the model quietly public.
+
+## Key decisions (2026-07-13) — AI Soul Studio
+`ENTITY_DDL` gained two columns so a **fresh** database is born with them (`db/client.ts` carries the
+matching guarded `ALTER`s for databases that already exist — the two must stay in lockstep, which is
+what `test/db-ddl.test.ts` exists to catch):
+
+- `entity.soul TEXT` — the JSON `Soul`. NULL = a legacy/hand-made entity on free prose.
+- `entity_image.view TEXT` — `front | three-quarter | profile | full-body`, NULL = an ordinary upload.
+
+Both nullable and additive, so no backfill exists or is needed: NULL already means the right thing on
+every row that predates the feature. `entity_image.source` widening to admit `'generated'` needed no
+change here — it is plain TEXT and the enum is TypeScript-level.

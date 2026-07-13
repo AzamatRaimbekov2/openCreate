@@ -84,3 +84,28 @@ Appending would mean a second click on "voice this shot" leaves two lines playin
 the user paid twice to make it worse. A film-wide bed (`shotId: null`, e.g. music) is unaffected and
 still appends. The pre-existing guard is unchanged: the cited generation must be the caller's, must be
 `type: 'audio'`, else 400.
+
+## Change log (behaviour)
+
+### 2026-07-12 — audio can no longer vanish from an export
+Found by an end-to-end run: a film exported as a **silent** mp4 while the render
+reported `succeeded`, and the user had already paid for the voiceover + music.
+
+Two defects, both closed here:
+
+1. `addAudio` — the comment always claimed the cited generation "must be the
+   caller's, **succeeded**, and actually audio", but the code only checked
+   `type`. A still-processing TTS row could be attached: the Audio panel showed
+   the track at once, and a render started before the mp3 landed on disk found
+   nothing to mix. It now rejects any non-`succeeded` generation
+   (`audio generation is not ready yet`, 400).
+2. `buildPlan` — used to do `if (existsSync(file)) audio.push(...)`, i.e.
+   silently DROP any track whose asset was missing and let the render settle as
+   succeeded. A muted mp4 looks finished, which makes this the worst possible
+   outcome. It now throws a `FilmValidationError` instead: a missing asset is a
+   real failure and says so.
+
+Net rule: **a track the user attached and paid for either reaches the mux or
+stops the export.** Never a quiet downgrade.
+
+Covered by `test/films-audio-integrity.test.ts`.

@@ -328,3 +328,81 @@ Follow-up research on the rejected alternative — "generate references with See
 - Seedream image API (for the record): `POST /api/v3/images/generations`, **synchronous** (no polling), both regions, `watermark` **defaults TRUE** (opposite of Seedance video), output URLs valid 24h.
 
 **Net:** routing characters to Kling / Veo / PixVerse / MiniMax / Wan is not a workaround for the face policy — it is **the only branch in which a user's character is permanent**. The shipped design stands; no code change.
+
+## [2026-07-12] fix | CinemaStudio end-to-end run: export was dead, audio could vanish, failures were invisible
+
+Drove the whole CinemaStudio flow in a real browser against the live API (film → shot → clip → voiceover → music → export). Four defects, all reproduced, all fixed. Plus the answer on Seedance 2.0.
+
+- **`Render mp4` never worked, for anyone.** `apiClient` set `Content-Type: application/json` on EVERY request, and `rendersApi` POSTs the render with **no body** → Fastify: *"Body cannot be empty when content-type is set to 'application/json'"* (400). The same call with `{}` returned 202 and rendered fine, which is what made the bug invisible in tests. The header now goes out only when a body actually does. A caller-supplied type still wins. — `apiClient.ts`
+- **Audio could be dropped from an export while the render reported `succeeded`.** `addAudio`'s comment promised the cited generation must be *"succeeded"*; the code only checked `type`. A still-processing TTS row could be attached, the Audio panel showed it immediately, and a render started before the mp3 hit disk mixed nothing — `buildPlan` did `if (existsSync) push`, i.e. **silently skipped** it. Result: a silent mp4 the user had already paid 28 credits for. Both halves closed: attaching requires `succeeded`; a missing asset now **fails the render loudly** instead of downgrading it. A muted mp4 looks finished — that is precisely why it must never be the outcome. — `films/service.ts`, `test/films-audio-integrity.test.ts`
+- **A failed `Generate` showed the user nothing.** No `onError` on the mutation, and `ShotClipStatus` only renders once `shot.generationId !== null` — so a submit that died *before* a generation row existed (502/402/400) produced no toast, no line, not even a console entry. Now a `role="alert"` line keyed off the machine error code. — `ShotInspector.tsx`
+- **`ModelArk HTTP 404` was undiagnosable.** The adapter parsed ModelArk's error body only to test for moderation, then threw the bare status. The body already named the cause. Provider `code: message` now rides on `ArkError.providerDetail`, which the error handler **logs**. Deliberately NOT in `message`: `app.ts` serializes `message` to the browser for any `apiCode`-carrying error, and ModelArk's text contains **our BytePlus account id**. — `ark-client.ts`, `app.ts`
+- **i18n leak:** the Framing / Camera motion / Quality pickers read `label` straight off `contracts/presets.ts`, whose 25 labels are hardcoded **Russian** — so they stayed Russian under EN. The contract keeps the enum + id order; the SPA now owns the wording under `cinema.preset.<axis>.<id>`. — `presetOptions.ts`
+
+**Seedance 2.0 (`seedance-2-0`) is blocked by the ACCOUNT, not by our code.** A live probe against ModelArk returned `ModelNotOpen`: *"Your account 3003474417 has not activated the model dreamina-seedance-2-0-260128."* Host, path, model id and bearer auth are all correct (the wrong region answered 401, which is what proves the key is good). In the BytePlus console the model shows **Free inference quota: 0 / total 0 tokens** — alone among the media models, which all carry 500k free — so it requires a **purchased resource package** before `Activate` does anything. Console pricing confirms the catalog's assumption (`Exclude video input: 7 USD/M tokens` = the $0.0070/1k the 130-credit price is derived from); at the top of the published range ($0.0077/1k) margin falls 42% → ~36% but never negative. **No code change needed — the catalog is right.**
+
+Not a bug, recorded so it is not "fixed" later: the shot Duration picker offers 2/3/5/8/10s regardless of model. That is deliberate (`presetOptions.ts`) — the strip length is an editorial choice and `composeShotClipInput` snaps the *generation* duration to the model's nearest supported option. Worth noting that a 3s shot on a 5s-minimum model is still billed at 5s, and CinemaStudio shows no per-shot cost anywhere; surfacing it is a product decision, not a defect.
+
+Verification: `@opencreate/api` 337/337, `@opencreate/web` 221/221, typecheck clean both apps. Export re-driven from the real UI afterwards: `Download mp4` appears and the file carries a `soun`/`mp4a` track.
+
+## [2026-07-12] feat | Wan 2.7 уходит с Runware напрямую в Alibaba Model Studio
+
+Пока считали себестоимость, выяснилось, что **наценка Runware не плоская, а зависит от модели** — обобщение «Runware near cost» было неверным:
+
+| Модель | Прайс вендора | Счёт Runware (замер) | Наценка |
+|---|---|---|---|
+| Seedance 1.5 Pro, 5s 720p | $0.2592 (ByteDance) | **$0.26136** | **+0.8%** |
+| Wan 2.7, 5s 720p | **$0.50** (Alibaba, $0.10/s) | **$0.7557** | **+51%** |
+
+Поэтому на прямой канал переведён Wan 2.7 — и **только он**. Остальные модели остаются на Runware, где агрегатор действительно продаёт почти по себестоимости и один ключ заменяет одиннадцать интеграций.
+
+- **Новый провайдер `alibaba`** (`integrations/alibaba/dashscope-client.ts`) на нейтральном шве `VideoProvider`. Async submit → poll; их шесть статусов (`PENDING/RUNNING/SUCCEEDED/FAILED/CANCELED/UNKNOWN`) сворачиваются в наши три. Модерационный отказ настраивается как **возвратный `content_blocked`**, а не как 502.
+- **Главная ловушка, ради которой писались тесты:** у Model Studio `resolution` **по умолчанию 1080P** — это $0.15/с против $0.10/с у 720P. Не передать разрешение явно значит молча переплачивать **50% на каждом клипе**. Ровно тот же класс бага, что этим же днём вырезан из Runware-пути (неотключённое аудио). Адаптер всегда шлёт `resolution` явно, выводя тир по КОРОТКОЙ стороне (720P портрет — это 720×1280).
+- Прочее load-bearing: workspace id живёт **в хосте** (`{ws}.ap-southeast-1.maas.aliyuncs.com`), не в заголовке — ключ без него не образует URL, поэтому конфиг обнуляет пару целиком; `X-DashScope-Async: enable` обязателен на submit, иначе task id не вернётся; режим зашит в id модели (`wan2.7-t2v` / `wan2.7-i2v`) и выбирается по наличию стартового кадра, поэтому в каталоге одна строка на оба режима; `prompt_extend` (их дефолт — **true**) выключен, иначе модель перепишет промпт и сохранённая строка перестанет объяснять результат.
+- **Цена пересчитана по реальной ставке.** Было 55 кредитов ($0.55) при себестоимости $0.7557 — **каждая генерация приносила −$0.21**. Стало **85 кредитов** за 5 с и **135** за 8 с: против $0.50 и $0.80 оптовой цены это ~41% маржи.
+- Ассеты живут на OSS (`*.aliyuncs.com`), а НЕ на API-хосте `*.maas.aliyuncs.com`, и **умирают через 24 часа** — SSRF-аллоулист расширяется только когда провайдер сконфигурирован; копирование в свой сторедж делает общий settle-путь.
+- Аудио: у прямого канала переключателя **нет** — Wan 2.7 всегда со звуком, и $0.10/с уже включает его. В отличие от Runware-пути, где `settings.audio: false` режет счёт вдвое, выключать тут нечего.
+
+Требует в `.env`: `DASHSCOPE_API_KEY` + `DASHSCOPE_WORKSPACE_ID` (регион **ap-southeast-1**, Сингапур). Пока не заданы — провайдер выключен, `wan-2-7` скрыт из каталога, загрузка закрыта.
+
+Проверка: `@opencreate/api` 368/368, `@opencreate/contracts` 38/38, `@opencreate/web` 221/221, typecheck + lint чисто. Живая генерация **не прогнана** — нужен ключ.
+
+## [2026-07-13] feat | Seedance 2.0 оживлён через DeepInfra — в обход платной стены ByteDance
+
+Строка `seedance-2-0` висела в каталоге мёртвой: прямой канал отвечает `ModelNotOpen` и не рендерит ни кадра, пока аккаунт не купит resource pack — **минимум $30.10, сгорает за 90 дней, возврата нет**, и купить его в консоли вообще нельзя (он живёт на маркетинговой странице акции). DeepInfra продаёт **ту же модель по той же цене** без активации, предоплаты и минимума.
+
+**Цена проверена, а не принята на веру.** Их заголовочные «$4.30 / 1M tokens» — это ставка **с видео на входе**. Их же строка прайсинга (вытащена из API): `"$4.3/M with video, $7/M without for 480p and 780p; $4.7/M with video, $7.7/M without for 1080p"`. Мы шлём текст или картинку, никогда видео → наша строка **$7/M**, что и есть $0.0070/1k у самого ByteDance. **Дешевле не стало** — исчезла стена. Цена 130 кредитов сохранена (~42% маржи против $0.756).
+
+- **Новый провайдер `deepinfra`** на том же шве `VideoProvider`. Клиент: `integrations/deepinfra/deepinfra-client.ts`, 15 тестов.
+- **Главная архитектурная проблема — у них НЕТ поллинга.** API либо синхронный (один HTTP висит все ~60 с рендера), либо webhook. Их доки прямо говорят: способа забрать результат по `request_id` не существует. Наш шов — `submit → jobId → poll`, и на нём держится весь денежный путь (списание при сабмите → 202 → SPA опрашивает → settle один раз).
+  **Решение:** `submit()` запускает запрос **detached**, сам чеканит `jobId` и кладёт исход в in-process map; `poll()` читает её. Сервис, реестр и SPA не тронуты.
+  **Честная цена решения:** незавершённые задачи живут **в памяти**. Рестарт API их теряет, строка висит `processing`, и её подбирает существующий часовой reaper — деньги возвращаются, но **деплой убивает Seedance-генерации в полёте**. Webhook (публичный колбэк + верификация подписи) — правильный ответ на потом; этот — работающий сегодня и заперт в одном файле.
+- **Деньги, снова.** Их схема даёт `duration: -1` = «модель сама решит» (4–15 с), а длительность **драйвит биллинг** — выбранные моделью 15 с стоили бы втрое дороже оплаченных 5. И `resolution` без явного значения не даёт понять, купили мы строку $7/M (480p/720p) или $7.7/M (1080p). Оба пинятся явно. Тот же класс бага, что вырезан вчера из Runware (аудио) и позавчера из Alibaba (дефолт 1080P).
+- **`generate_audio: false`** — как у всех: рендер замешивает свою озвучку и музыку поверх, родной саундтрек это оплаченный мусор.
+- **Себестоимость приходит от них** — `inference_status.cost` в ответе. Единственный провайдер, который просто говорит, сколько списал; остальных мы оцениваем по прайс-листу.
+- AIR-регекс в контракте расширен на `/`: у DeepInfra id — **пути** (`ByteDance/Seedance-2.0`), а не слаги. Все остальные провайдеры матчатся как раньше.
+- **`referenceMode` НЕ объявлен, намеренно.** DeepInfra принимает референсы как URL или `asset://`, **не data-URI**, а сервис резолвит фото сущностей именно в data-URI. Объявить возможность до закрытия этой дыры значило бы позволить пользователю тегнуть персонажа, заплатить и получить незнакомца. Следующая работа, а не недосмотр.
+- `ark-client` **остаётся** со своими тестами: если пакет когда-нибудь купят, вернуть `provider: 'bytedance'` — правка в одно слово.
+
+Проверка: `@opencreate/api` 434/434, `@opencreate/contracts` 60/60, typecheck + lint чисто. **Живьём не прогнано — нужен `DEEPINFRA_TOKEN`.**
+
+## [2026-07-13] feat | Провайдерская цепочка: одна модель — несколько бэкендов, переключение под капотом
+
+Сегодня один пустой баланс Runware разом убил PixVerse, Seedance 1.5, Kling, Veo, озвучку и музыку. Не деградировал — **убил**. Цепочка превращает «наш провайдер лёг» из аварии в чуть более медленный запрос.
+
+`createFailoverProvider(links)` — сам является `VideoProvider`, поэтому реестр, сервис, денежный путь и SPA видят **один** провайдер. Композиция, а не спецслучай. `seedance-2-0` теперь ходит по цепочке `deepinfra → bytedance`; пользователь выбирает «Auteur» и не знает, чьи GPU его отрисовали.
+
+**Два правила, и оба — про деньги:**
+
+1. **Переключение ТОЛЬКО на сабмите.** Как только бэкенд **принял** задачу, он её рендерит и уже выставляет нам счёт. Переотправка следующему при падении его поллинга означала бы оплату ДВУМ провайдерам за одну генерацию, которую пользователь оплатил один раз, — тихая дыра в марже, растущая с каждой аварией. Падение после принятия = failed + возврат. Точка.
+2. **Никогда не переключаться на `content_blocked`.** Модерация детерминирована: та же модель, тот же кадр, другой реселлер — тот же отказ. Проход по цепочке сжёг бы её деньги целиком ради одного «нет», а пользователь ждал бы это «нет» в N раз дольше.
+
+**Как `poll()` находит дорогу обратно.** Сервис сохраняет ОДИН job id и опрашивает по нему позже, возможно после рестарта. Поэтому победивший линк **зашит в сам id** (`deepinfra#abc-123`) и разбирается на входе. Ни новой колонки, ни правки схемы — и правда о том, какой бэкенд реально отработал, остаётся **в строке**, а не в чьей-то памяти. Голый id без префикса (строка, написанная до этой фичи) опрашивает первый линк, поэтому деплой не убивает генерации в полёте.
+
+**Логируется каждый переход** (`event: provider.failover`). Цепочка, молча поглощающая мёртвого провайдера, — это цепочка, которая его **прячет**: фолбэк тихо становится основным путём, и никто не узнаёт, пока не умрёт и он.
+
+**PiAPI сознательно НЕ поставлен первым.** Он экономит $0.021/сек против DeepInfra — 10 центов на клипе 5 с. Их же FAQ описывает модель: *«вы будете использовать пул аккаунтов, управляемый нами... задания будут обрабатываться нашими аккаунтами»* — это автоматизация потребительских подписок, а не оптовый канал. Его $0.13/сек **ниже себестоимости самого ByteDance** ($0.1512/сек при 21 600 ток/с × $0.0070/1k), что возможно только через арбитраж чужих ToS. Механизм провайдер-агностичен, порядок задаётся конфигом — но дефолтом такое не ставится.
+
+Сегодня в цепочке отвечает ровно один линк (ByteDance ждёт покупки пакета), так что ценность пока в **шве**: добавление PiAPI / fal / Replicate — это один файл и одна строка.
+
+Проверка: `@opencreate/api` 446/446 (10 юнит + 2 сквозных на цепочку), typecheck + lint чисто.

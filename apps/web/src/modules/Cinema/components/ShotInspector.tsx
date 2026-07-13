@@ -16,6 +16,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   AspectRatio,
+  EntityRef,
   CatalogAudioModel,
   CatalogVideoModel,
   Shot,
@@ -24,12 +25,17 @@ import type {
   UpdateShotInput,
 } from '@opencreate/contracts'
 import { STYLE_PRESETS, applyPromptPreset } from '@opencreate/contracts'
+import { ApiClientError } from 'shared/libs/apiClient'
+import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from 'shared/libs/mentions'
+import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { Button, Card } from 'shared/ui'
 import { useUpdateShot } from '../model/shotsApi'
 import { useGenerateShotClip, useShotGeneration } from '../model/shotGeneration'
 import { useGenerateVoiceover } from '../model/voiceoverApi'
 import { SHOT_DURATIONS_SECONDS, draftToPreset, hasAnyPreset, presetToDraft } from '../model/presetOptions'
 import type { PresetDraft } from '../model/presetOptions'
+import type { CastableEntity } from './ShotCastField'
+import { ShotCastField } from './ShotCastField'
 import { InspectorSection } from './InspectorSection'
 import { PresetPickers } from './PresetPickers'
 import { ShotClipFields } from './ShotClipFields'
@@ -48,6 +54,9 @@ export type ShotInspectorProps = {
   videoModels: CatalogVideoModel[]
   // The tts model, if the catalog offers one. undefined → the voice group hides.
   ttsModel: CatalogAudioModel | undefined
+  // Characters available to cast in this shot (route-injected; Cinema must not
+  // import Entities). Empty while the library is empty.
+  entities: CastableEntity[]
   // Where this shot starts on the timeline, in ms — the offset a generated voice
   // track is filed at, so the line plays under the beat that speaks it. Computed
   // by the editor (it is the one that knows every shot's duration).
@@ -90,6 +99,7 @@ export function ShotInspector({
   filmAspect,
   videoModels,
   ttsModel,
+  entities,
   startMs,
   isVoiced,
 }: ShotInspectorProps) {
@@ -112,6 +122,24 @@ export function ShotInspector({
   const [hasVoice, setHasVoice] = useState(shot.voiceover !== null)
   const [voiceText, setVoiceText] = useState(shot.voiceover?.text ?? '')
   const [voiceId, setVoiceId] = useState(shot.voiceover?.voice ?? voices[0] ?? '')
+  // The shot's CAST. Held as a draft like everything else here, and DERIVED down
+  // to the live set at save/generate: a mapping whose `[[eN]]` token the user has
+  // since deleted from the prompt is not a tag any more, and sending it would
+  // reference a character who is no longer named in the text.
+  const [cast, setCast] = useState<EntityRef[]>(shot.entityRefs)
+
+  const addCharacter = (entityId: string) => {
+    const placeholder = nextPlaceholder(cast)
+    // The token goes into the TEXT — that is where a tag lives. The user can move
+    // it, or delete it to untag, and no separate bookkeeping has to notice.
+    setPrompt((text) => `${text}${text && !text.endsWith(' ') ? ' ' : ''}${entityPlaceholderToken(placeholder)}`)
+    setCast((refs) => [...refs, { placeholder, entityId }])
+  }
+
+  const removeCharacter = (placeholder: string) => {
+    setPrompt((text) => text.replace(entityPlaceholderToken(placeholder), '').replace(/\s{2,}/g, ' ').trim())
+    setCast((refs) => refs.filter((ref) => ref.placeholder !== placeholder))
+  }
 
   const model = videoModels.find((m) => m.id === modelId)
   const isBusy = update.isPending || generate.isPending
@@ -129,6 +157,10 @@ export function ShotInspector({
   const buildPatch = (): UpdateShotInput => ({
     prompt: prompt.trim(),
     promptPreset: hasAnyPreset(preset) ? draftToPreset(preset) : null,
+    // Only the LIVE cast: a mapping whose token the user deleted from the prompt
+    // is not a tag any more. Deriving from the text (rather than trusting the
+    // draft list) is the whole invariant — one source of truth, and it is the words.
+    entityRefs: deriveEntityRefs(prompt, cast),
     // Persist the model choice. It used to live and die with this component.
     modelId: modelId || null,
     durationMs: Number(seconds) * 1000,
@@ -139,6 +171,14 @@ export function ShotInspector({
   })
 
   const handleSave = () => update.mutate({ filmId, shotId: shot.id, input: buildPatch() })
+
+  // The newest failure across the three mutations this panel drives. Generate is
+  // checked first because it is the one that spends credits, so its failure is
+  // the one the user most needs explained. Unknown/non-API errors fall through
+  // errorCodeMessageKey to the generic copy — never a raw string on screen.
+  const failure = generate.error ?? voiceover.error ?? update.error
+  const actionErrorCode =
+    failure instanceof ApiClientError ? failure.code : failure ? 'internal_error' : null
 
   // Voicing charges credits against the line the user is LOOKING AT, so the draft
   // is saved first — otherwise an edited line would be paid for at its old text.
@@ -177,6 +217,10 @@ export function ShotInspector({
             ...shot,
             prompt: prompt.trim(),
             promptPreset: hasAnyPreset(preset) ? draftToPreset(preset) : null,
+            // The LIVE cast — same derivation as buildPatch. Without this the clip
+            // would generate against the shot as it was BEFORE this edit: the user
+            // tags a character, hits Generate, and gets a stranger.
+            entityRefs: deriveEntityRefs(prompt, cast),
             durationMs: Number(seconds) * 1000,
           }
           generate.mutate({ filmId, shot: draftShot, model, filmAspect })
@@ -209,7 +253,26 @@ export function ShotInspector({
           ) : null}
         </InspectorSection>
 
-        {/* 2 — Look: the four structured preset axes */}
+        {/* 2 — Cast: WHO is in this beat. Sits directly under the prompt because a
+            tag IS a piece of the prompt (it appends a `[[eN]]` token to the text),
+            and because "who is in this shot" is the question a user answers right
+            after "what happens in it". Tagging a character attaches her photo as a
+            reference, which is what makes shot 2 show the same fox as shot 1. */}
+        <InspectorSection legend={t('cinema.cast.title')}>
+          <ShotCastField
+            entities={entities}
+            prompt={prompt}
+            cast={cast}
+            onAdd={addCharacter}
+            onRemove={removeCharacter}
+            // The catalog decides, not us: a model with no referenceMode cannot
+            // hold a character, and the API refuses the tag before charging. The
+            // control says so up front rather than letting the user pay to find out.
+            modelSupportsReferences={Boolean(model?.referenceMode)}
+          />
+        </InspectorSection>
+
+        {/* 3 — Look: the four structured preset axes */}
         <InspectorSection legend={t('cinema.inspector.sections.look')}>
           <PresetPickers
             value={preset}
@@ -272,6 +335,19 @@ export function ShotInspector({
             progress={clip.data?.progress ?? null}
             hasClip={shot.generationId !== null}
           />
+          {/* A SUBMIT that never became a generation has no clip row to report on,
+              so ShotClipStatus (which keys off shot.generationId) stays blank —
+              which is exactly how a 502 from the provider used to vanish without
+              a trace: no toast, no line, nothing in the console, and the user
+              simply clicked Generate again. Every action in this panel can fail
+              before a row exists (402 out of credits, 502 provider refused, 400
+              the model is not enabled), so surface the failure here, keyed off
+              the machine code — never the raw server text (design.md §9). */}
+          {actionErrorCode !== null ? (
+            <p role="alert" className="text-xs text-glow-red">
+              {t(errorCodeMessageKey(actionErrorCode))}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center justify-end gap-3">
             <Button
               variant="ghost"

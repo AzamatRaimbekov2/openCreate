@@ -63,3 +63,19 @@ the `pragma table_info` check makes a re-run a no-op.
 `model_share`. No micro-migration accompanies it: both are new tables, so `CREATE TABLE IF NOT EXISTS`
 covers a fresh db and a legacy file alike. Adding `'model3d'` as a generation type needed no DDL and no
 `ALTER` either — `generation.type` is plain TEXT and the enum is a TypeScript-level refinement.
+
+## Key decisions (2026-07-13) — AI Soul Studio
+Two more guarded micro-migrations, each with its own `pragma table_info(...)` read (`entityColumns`,
+`entityImageColumns`):
+
+- `entity.soul TEXT` — the structured character spec as JSON.
+- `entity_image.view TEXT` — which slot of the reference sheet a photo fills.
+
+Both nullable, both additive, and **neither is backfilled** — because NULL already carries the right
+meaning on every pre-existing row: a soul-less entity is one built from free prose, and a view-less
+image is an ordinary upload. That makes the expand step the *whole* migration: there is no dual-write
+phase and no contract phase, and rolling the code back simply leaves two columns nobody reads.
+
+`entity_image.source` gaining `'generated'` needed **no** statement here at all — the column is plain
+TEXT and the enum lives only in TypeScript, exactly as `generation.type` did when Studio3D added
+`'model3d'`.

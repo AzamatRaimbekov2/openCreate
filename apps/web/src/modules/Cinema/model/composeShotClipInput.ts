@@ -47,6 +47,14 @@ export function composeShotClipInput(
     // Omit the key entirely when the shot has no preset — an absent preset
     // composes to exactly the user's text (exactOptionalPropertyTypes: no null).
     ...(shot.promptPreset ? { promptPreset: shot.promptPreset } : {}),
+    // The shot's CAST. Forwarding it is what makes the film hold together: the
+    // server substitutes each name into the prompt and attaches that character's
+    // photo as a reference, so shot 2 shows the same fox as shot 1.
+    //
+    // Omitted when empty, exactly like the preset above — sending `[]` would be a
+    // claim that the user tagged nobody ON PURPOSE, and the API's own tagging
+    // branch keys off a non-empty list.
+    ...(shot.entityRefs.length > 0 ? { entityRefs: shot.entityRefs } : {}),
   }
 
   if (model.type === 'video') {
