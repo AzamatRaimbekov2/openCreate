@@ -466,10 +466,20 @@ export function createGenerationService({
           taskUUID,
           // The preset-composed prompt (== composedPrompt when no preset).
           positivePrompt: modelPrompt,
-          // Style preset negative (empty string when no style) — steers the
-          // model away from the wrong medium (a Disney render must push off
-          // "photorealistic, live action").
-          ...(negativePrompt ? { negativePrompt } : {}),
+          // Style/framing preset negative (empty string when neither is set) —
+          // steers the model away from the wrong medium (a Disney render must push
+          // off "photorealistic, live action") and, for a Soul Studio sheet, away
+          // from a busy background.
+          //
+          // ...unless the model has no negative channel. Runware does not ignore a
+          // parameter a model cannot take, it REJECTS THE WHOLE TASK — so sending
+          // one to FLUX.1 Kontext costs the user credits and returns nothing. The
+          // capability is declared in the catalogue (supportsNegativePrompt) and
+          // enforced HERE, because the composer upstream cannot know which model
+          // the request will land on.
+          ...(negativePrompt && model.supportsNegativePrompt !== false
+            ? { negativePrompt }
+            : {}),
           model: model.air,
           // Omitted entirely when untagged — exactOptionalPropertyTypes keeps a
           // stray `referenceImages: undefined` out of the task envelope
@@ -598,6 +608,14 @@ export function createGenerationService({
           ...(model.type === 'video' && model.supportsSafetyParam === false
             ? { omitSafety: true }
             : {}),
+          // The style id (NOT the composed fragment): an adapter whose backend has
+          // a native style mode uses it, everyone else ignores it. The prompt still
+          // carries the fragment, so this is purely additive.
+          ...(preset?.styleId ? { styleId: preset.styleId } : {}),
+          // Tagged-character photos, already authorized and turned into data URIs
+          // above (and refused, before the charge, if the model cannot use them).
+          // This is what makes shot 2 show the SAME character as shot 1.
+          ...(referenceImages ? { referenceImages } : {}),
         })
         providerJobId = r.providerJobId
       }

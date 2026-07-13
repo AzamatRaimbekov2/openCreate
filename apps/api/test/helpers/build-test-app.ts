@@ -89,6 +89,15 @@ export type TestAppOverrides = {
   // Direct ByteDance on/off: default null (off), same contract as comfyBaseUrl —
   // set a key so /api/catalog lists the bytedance-backed Seedance models.
   arkApiKey?: string | null
+  // Direct Alibaba (DashScope) on/off: default null (off). Unlike the other two
+  // this is a PAIR — the workspace id lives in the request host, so config treats
+  // key-without-workspace as unconfigured. Setting both lists the alibaba models.
+  dashscopeApiKey?: string | null
+  dashscopeWorkspaceId?: string | null
+  // DeepInfra on/off: default null (off), same contract as the others — the
+  // catalog hides seedance-2-0 until a token exists, so a test that wants it must
+  // say so.
+  deepinfraToken?: string | null
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -107,6 +116,11 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       databasePath: ':memory:',
       storageDir,
       runwareApiKey: 'test-key',
+      // DashScope (direct Wan channel): both default null → provider unconfigured,
+      // its catalog models hidden (see the override note above for why it is a pair).
+      dashscopeApiKey: overrides.dashscopeApiKey ?? null,
+      dashscopeWorkspaceId: overrides.dashscopeWorkspaceId ?? null,
+      deepinfraToken: overrides.deepinfraToken ?? null,
       // CinemaStudio config (parallel feature): null → no LLM-backed features in tests
       anthropicApiKey: null,
       betterAuthSecret: 'test-secret-test-secret-test-secret',

@@ -65,6 +65,16 @@ export const CATALOG: CatalogModel[] = [
     // entityRefs at 1 today; raising it needs no change to this entry.
     maxReferenceImages: 2,
     resolutionProfile: 'kontext',
+    // Kontext is an EDIT model — it is steered by the reference image, not by a
+    // negative channel, and it has none. Runware does not ignore the parameter,
+    // it rejects the whole task: "Invalid parameter detected. The parameter
+    // 'negativePrompt' is not recognized or supported."
+    //
+    // This is why it matters: this is the ONE model a Soul Studio reference sheet
+    // uses for views 2-4, and a style preset always produces a negative. Before
+    // this flag, every referencing view failed at the provider and refunded —
+    // the sheet could never be more than its hero shot.
+    supportsNegativePrompt: false,
   },
   {
     // Nano Banana Pro (Gemini 3 Pro Image) — the REFERENCE model: the one we
@@ -149,21 +159,59 @@ export const CATALOG: CatalogModel[] = [
     supportsSafetyParam: false,
   },
   {
+    // Wan 2.7 straight from Alibaba Cloud Model Studio — no Runware in the path.
+    // `provider: 'alibaba'` routes submit/poll to the dashscope client; the `air`
+    // carries the model FAMILY only (`wan2.7`), because the mode is part of their
+    // model id and the adapter appends `-t2v`/`-i2v` from whether a seed frame is
+    // present. The synthetic `alibaba:` prefix exists purely to satisfy the shared
+    // AIR regex — it is not a Runware id, and verify-catalog skips it.
+    //
+    // WHY WE LEFT RUNWARE FOR THIS ONE MODEL — the numbers, not a preference:
+    // Runware's markup is not flat. On Seedance it is ~0.8% (they billed $0.26136
+    // where ByteDance lists $0.2592). On Wan 2.7 it is ~51%: a 5s 720p clip cost
+    // us $0.7557 (measured, from the ledger) against Alibaba's published
+    // $0.10/second — $0.50. Every other model stays on Runware, where the
+    // aggregator is genuinely near cost.
+    //
+    // PRICE, recomputed from the real rate: 720p is $0.10/s, so 5s = $0.50 and 8s
+    // = $0.80 wholesale. At 1 credit = $0.01, 5s at 85 credits ($0.85) leaves ~41%
+    // margin and 8s at 135 ($1.35) leaves ~41%. The OLD price (55 / 88 credits)
+    // was set against a cost nobody had measured and sold every clip BELOW cost:
+    // $0.55 charged against $0.7557 paid, i.e. −$0.21 per generation.
+    //
+    // 720p is pinned by the resolution tier, deliberately: Model Studio DEFAULTS
+    // to 1080P, which bills at $0.15/s — 50% more for a size the user never asked
+    // for. The adapter always sends `resolution` explicitly.
+    //
+    // Audio: unlike the Runware path, there is no switch here. Wan 2.7 always
+    // generates its own soundtrack and the $0.10/s rate includes it, so there is
+    // nothing to turn off and nothing being wasted.
     id: 'wan-2-7',
     type: 'video',
     name: 'Cinema',
-    providerLabel: 'Wan 2.7',
-    air: 'alibaba:wan@2.7',
+    providerLabel: 'Wan 2.7 · Alibaba',
+    air: 'alibaba:wan2.7',
     tier: 'plus',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 8],
-    creditsByDuration: { '5': 55, '8': 88 },
-    // Alibaba/Wan models reject Runware's `safety` task param
-    // (unsupportedParameter, verified live 2026-07-09) — same quirk as
-    // ByteDance/Seedance. Flag off so the client omits it; moderation relies
-    // on the NSFWContent result flag.
-    supportsSafetyParam: false,
+    creditsByDuration: { '5': 85, '8': 135 },
+    provider: 'alibaba',
+    // THE FIRST VIDEO MODEL THAT CAN HOLD A CHARACTER. Until now `referenceMode`
+    // existed only on image models, so tagging a character produced a picture of
+    // them and nothing more — every video shot invented a new stranger, which is
+    // precisely why a two-shot film showed two different foxes.
+    //
+    // Wan 2.7's r2v mode fixes that, and the adapter reaches it automatically:
+    // references present → `wan2.7-r2v`. Verified live — our fox, photographed in
+    // a snowy forest, was prompted onto a tropical beach and came back as the SAME
+    // fox. 'both' because it holds faces AND objects/animals alike.
+    //
+    // 5 references: their limit, and it is per-character, so a scene can carry a
+    // whole small cast. All three modes bill identically ($0.10/s at 720P), so
+    // tagging a character costs the user exactly nothing extra.
+    referenceMode: 'both',
+    maxReferenceImages: 5,
   },
   {
     id: 'kling-3-pro',
@@ -240,18 +288,42 @@ export const CATALOG: CatalogModel[] = [
     // still offered because it works for everything else (landscape, product,
     // animal, illustration); a refused portrait comes back as a refundable
     // 'content_blocked' with a message naming the real reason.
+    //
+    // ROUTED THROUGH DEEPINFRA, NOT BYTEDANCE DIRECT — and the reason is not price.
+    // The direct channel (ark-client.ts, still built and still tested) refuses to
+    // run a single frame: `ModelNotOpen`, i.e. the account must first BUY a
+    // Seedance 2.0 resource pack — $30.10 minimum, 90-day expiry, non-refundable,
+    // and not even purchasable inside the console (it lives on a marketing page).
+    // That wall is why this row was dead.
+    //
+    // DeepInfra resells the SAME model at the SAME price with no activation, no
+    // prepay and no minimum. Their headline "$4.30/M tokens" is the WITH-VIDEO-INPUT
+    // rate; their own pricing string reads "$4.3/M with video, $7/M without for
+    // 480p and 780p". We send text or an image, never a video, so we pay $7/M —
+    // which IS ByteDance's own $0.0070/1k. Nobody is cheaper; the win is that
+    // nobody has to buy anything first. The 130-credit price therefore stands
+    // unchanged (~42% margin against $0.756).
+    //
+    // The ark-client stays: if the pack is ever bought, flipping `provider` back is
+    // a one-word change, and its tests already pin the wire contract.
+    //
+    // NO `referenceMode` YET, deliberately: DeepInfra takes references as URLs or
+    // `asset://` ids — NOT the data URIs the service resolves entity photos into.
+    // Declaring the capability before that gap is closed would let a user tag a
+    // character, pay, and receive a stranger. That is the next piece of work, not
+    // an oversight.
     id: 'seedance-2-0',
     type: 'video',
     name: 'Auteur',
     providerLabel: 'Seedance 2.0 · ByteDance',
-    air: 'bytedance:dreamina-seedance-2-0-260128',
+    air: 'deepinfra:ByteDance/Seedance-2.0',
     tier: 'premium',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 10],
     creditsByDuration: { '5': 130, '10': 260 },
     resolutionProfile: 'hd',
-    provider: 'bytedance',
+    provider: 'deepinfra',
   },
   {
     // CinemaStudio audio — voiceover (TTS). Runware audioInference, verified to

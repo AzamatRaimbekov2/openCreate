@@ -23,7 +23,15 @@ import { z } from 'zod'
 // and a recommended model (the seam through which a LoRA-backed style could
 // later swap the model — see the ADR's rejected-alternatives note).
 // ─────────────────────────────────────────────────────────────────────────────
-export const styleIdSchema = z.enum(['disney', 'anime', '2d-cartoon', '3d-cartoon', 'cinematic'])
+export const styleIdSchema = z.enum([
+  'disney',
+  'anime',
+  '2d-cartoon',
+  '3d-cartoon',
+  'hand-drawn',
+  'comic',
+  'cinematic',
+])
 export type StyleId = z.infer<typeof styleIdSchema>
 
 export type StylePreset = {
@@ -48,7 +56,7 @@ export const STYLE_PRESETS = {
     fragment:
       '3D animated feature film style, Disney/Pixar aesthetic, expressive characters, soft global illumination, warm cinematic color grading',
     negative: 'photorealistic, live action, gritty, low quality',
-    recommendedModelId: 'wan-2-7',
+    recommendedModelId: 'pixverse-v6',
   },
   anime: {
     id: 'anime',
@@ -56,7 +64,7 @@ export const STYLE_PRESETS = {
     fragment:
       'anime style, cel-shaded, clean line art, vibrant saturated colors, detailed backgrounds, Japanese animation aesthetic',
     negative: 'photorealistic, 3d render, western cartoon, low quality',
-    recommendedModelId: 'wan-2-7',
+    recommendedModelId: 'pixverse-v6',
   },
   '2d-cartoon': {
     id: '2d-cartoon',
@@ -72,7 +80,54 @@ export const STYLE_PRESETS = {
     fragment:
       '3D cartoon style, stylized characters, rounded soft geometry, bright playful lighting, family animation look',
     negative: 'photorealistic, live action, gritty, low quality',
+    recommendedModelId: 'pixverse-v6',
+  },
+  // The authored-animation style, extracted from the «Буран» template's reference
+  // prompt (apps/api/src/modules/templates/catalog/buran.ts). It is NOT a second
+  // '2d-cartoon': that one is flat, bold and playful (Saturday-morning TV). This
+  // one is an animated FEATURE — painted, hand-made, deliberately unsmooth.
+  //
+  // THE ONE IDEA THIS FRAGMENT ENCODES: "animated on twos". A drawing is held for
+  // two frames, then replaced — 12 real drawings a second, stepped pose-to-pose,
+  // with no interpolation between them. Video models default to buttery
+  // frame-interpolated motion (they are trained on live action), so the cadence
+  // has to be demanded in the positive prompt AND actively pushed away in the
+  // negative one. Without "no smooth in-between interpolation" in `fragment` and
+  // "smooth interpolated motion, motion blur" in `negative`, the model renders a
+  // 2D-looking picture moving like a 3D render — which is the exact uncanny
+  // failure this style exists to prevent.
+  //
+  // WHAT IS DELIBERATELY *NOT* HERE: light and camera. The reference prompt also
+  // pins a lightless night blizzard and a handheld operator — but those belong to
+  // the SCENE, not the technique. Lighting stays in the shot's own prompt; camera
+  // is its own preset axis (cameraMotion: 'handheld'). Keeping this fragment to
+  // the drawing technique alone is what makes the style reusable for a sunlit
+  // hand-drawn film instead of only for a snowstorm.
+  'hand-drawn': {
+    id: 'hand-drawn',
+    label: 'Рисованная (на двойках)',
+    fragment:
+      'traditional hand-drawn 2D animation, animated on twos at 12 frames per second, each drawing held for two frames then replaced, choppy stepped pose-to-pose motion cadence with distinct keyframe drawings and no smooth in-between interpolation, hand-painted oil-brush texture on every drawing, brushstrokes shifting and redrawn from frame to frame, visible line jitter and boil between frames, flat painted colour shapes with no gradient shading',
+    negative:
+      '3d render, CGI, game engine, photorealistic, live action, smooth interpolated motion, motion blur, gradient shading, glossy highlights, low quality',
+    // Cinema (wan-2-7) holds a painted look across 8 seconds better than the
+    // cheaper models do. Advisory only — the template's tier still picks the model.
     recommendedModelId: 'wan-2-7',
+  },
+  // Western comic book — added for Soul Studio (the owner asked for comics by
+  // name). It is NOT '2d-cartoon': that one is flat, soft and playful. This one
+  // is INKED — hard black linework, halftone dots, cel colour inside the lines.
+  // The negative carries the two things a diffusion model reaches for when it
+  // hears "comic" and gets it wrong: a soft painterly render (no ink at all) and
+  // an anime face (the other illustrated tradition it has far more training data
+  // for). Both are pushed away explicitly, or "comic" quietly renders as "anime".
+  comic: {
+    id: 'comic',
+    label: 'Комикс',
+    fragment:
+      'western comic book art style, bold black ink outlines, heavy cross-hatching, halftone dot shading, flat saturated cel colors, dynamic graphic novel illustration',
+    negative: 'photorealistic, 3d render, anime, soft painterly render, blurry lines, low quality',
+    recommendedModelId: 'pixverse-v6',
   },
   cinematic: {
     id: 'cinematic',
@@ -160,6 +215,38 @@ export const QUALITY_PRESETS = {
 } satisfies Record<Quality, PresetOption>
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Framing — the SECOND axis to carry a negative prompt (style was the first).
+//
+// It exists because Soul Studio's whole promise is a reference sheet that is
+// "clean and unambiguous": one character, plain background, even light, nothing
+// else in frame. That is not a phrase you can bolt onto a prompt and hope — a
+// diffusion model, left alone, will happily put the character in a forest, add a
+// second figure, and stamp a signature in the corner. Half the work is in the
+// NEGATIVE (busy background, multiple characters, text, watermark, cropped), and
+// a positive-only axis (PresetOption) cannot express that.
+//
+// Making it a NAMED axis rather than a magic string in the API means the phrase
+// is testable, tunable without a schema change, and reusable by CinemaStudio
+// (a clean product shot wants exactly the same thing).
+// ─────────────────────────────────────────────────────────────────────────────
+export type NegatingPresetOption = PresetOption & { negative: string }
+
+export const framingSchema = z.enum(['none', 'reference-sheet'])
+export type Framing = z.infer<typeof framingSchema>
+
+export const FRAMING_PRESETS = {
+  none: { id: 'none', label: 'Любой кадр', fragment: '', negative: '' },
+  'reference-sheet': {
+    id: 'reference-sheet',
+    label: 'Лист персонажа',
+    fragment:
+      'character reference sheet, one single character centered in frame, plain neutral seamless studio background, even soft diffused lighting, entire subject visible, sharp focus, no props, no scenery',
+    negative:
+      'busy background, cluttered scene, multiple characters, extra people, text, caption, watermark, signature, logo, cropped, out of frame, blurry',
+  },
+} satisfies Record<Framing, NegatingPresetOption>
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The wire shape. Every field optional and additive: a request with NO
 // promptPreset composes to exactly the user's prompt, so the existing
 // ChatComposer keeps working untouched.
@@ -169,6 +256,10 @@ export const promptPresetSchema = z.object({
   cameraShot: cameraShotSchema.optional(),
   cameraMotion: cameraMotionSchema.optional(),
   quality: qualitySchema.optional(),
+  // Soul Studio's reference-sheet framing (see FRAMING_PRESETS). Optional and
+  // additive: absent → the composed prompt and negative are byte-for-byte what
+  // they were before this axis existed.
+  framing: framingSchema.optional(),
 })
 export type PromptPreset = z.infer<typeof promptPresetSchema>
 
@@ -176,22 +267,35 @@ export type ComposedPrompt = { positivePrompt: string; negativePrompt: string }
 
 // Compose the model-facing prompt from the user's text + the structured preset.
 //
-// Order (fixed, so a stored composedPrompt is reproducible): style, shot,
-// motion, quality, then the user's own text LAST so it carries the semantic
-// weight. Empty fragments ('none' options, or an unset field) contribute
-// nothing — no dangling commas. The negative prompt is the style's negative
-// (the only axis that has one). An unknown id (should be impossible past zod,
-// but this is the correctness core) is treated as absent, never as a literal.
+// Order (fixed, so a stored composedPrompt is reproducible): style, framing,
+// shot, motion, quality, then the user's own text LAST so it carries the
+// semantic weight. Empty fragments ('none' options, or an unset field)
+// contribute nothing — no dangling commas. An unknown id (should be impossible
+// past zod, but this is the correctness core) is treated as absent, never as a
+// literal.
+//
+// NEGATIVES ARE NOW JOINED, not assigned. Style used to be the only axis with a
+// negative, so a single `=` was enough; framing (Soul Studio) is the second, and
+// `negativePrompt = framing.negative` would have silently DROPPED the style's —
+// a Disney reference sheet would stop pushing away "photorealistic" the moment
+// it started pushing away "busy background". Collecting and joining is the shape
+// that survives a third axis. With exactly one negative present the result is
+// that string verbatim, so every pre-existing (style-only) request is unchanged.
 export function applyPromptPreset(userPrompt: string, preset?: PromptPreset): ComposedPrompt {
   const fragments: string[] = []
-  let negativePrompt = ''
+  const negatives: string[] = []
 
   if (preset?.styleId) {
     const style = STYLE_PRESETS[preset.styleId]
     if (style) {
       fragments.push(style.fragment)
-      negativePrompt = style.negative
+      if (style.negative) negatives.push(style.negative)
     }
+  }
+  if (preset?.framing) {
+    const framing = FRAMING_PRESETS[preset.framing]
+    if (framing?.fragment) fragments.push(framing.fragment)
+    if (framing?.negative) negatives.push(framing.negative)
   }
   if (preset?.cameraShot) {
     const shot = CAMERA_SHOTS[preset.cameraShot]
@@ -209,5 +313,5 @@ export function applyPromptPreset(userPrompt: string, preset?: PromptPreset): Co
   const trimmed = userPrompt.trim()
   if (trimmed) fragments.push(trimmed)
 
-  return { positivePrompt: fragments.join(', '), negativePrompt }
+  return { positivePrompt: fragments.join(', '), negativePrompt: negatives.join(', ') }
 }

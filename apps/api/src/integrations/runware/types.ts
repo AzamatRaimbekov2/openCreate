@@ -46,6 +46,16 @@ export type RunwareVideoRequest = {
   // as unsupportedParameter — when true the client omits it entirely. This is
   // client-internal routing metadata and is never sent to Runware.
   omitSafety?: boolean | undefined
+  // Per-provider knobs, keyed by model family (bytedance / pixverse / …). We use
+  // it for exactly one thing today: `{ <family>: { audio: false } }`, which stops
+  // us paying the 2× with-audio rate for a soundtrack the render discards. Both
+  // of these spread FLAT into the task, so the client needs no new code — but a
+  // key the model does not know is a 400, so only the adapter fills them
+  // (video-adapter.ts `audioOffFor`).
+  providerSettings?: Record<string, Record<string, unknown>> | undefined
+  // Wan/alibaba has no providerSettings namespace: its switches (promptExtend,
+  // promptEnhancer, audio) live in a top-level `settings` object instead.
+  settings?: Record<string, unknown> | undefined
 }
 
 // CinemaStudio audio (Runware audioInference — same envelope as videoInference,

@@ -67,6 +67,171 @@ describe('runware video adapter', () => {
     expect(arg.frameImages).toEqual([{ image: 'data:image/png;base64,AAAA', frame: 'first' }])
   })
 
+  // ── Native audio is OFF, and it is a MONEY rule, not a preference ────────────
+  //
+  // ByteDance bills Seedance 1.5 Pro at $0.0024/1k tokens WITH audio and
+  // $0.0012/1k WITHOUT — exactly 2×. Their default is ON, and Runware forwards
+  // that default, so a request that stays silent about audio pays double. A
+  // measured 5s 720p clip cost $0.26136 (the with-audio rate) against a 35-credit
+  // ($0.35) price: 25% margin instead of 63%.
+  //
+  // And we never USE that soundtrack: CinemaStudio generates its own voiceover
+  // (Inworld TTS) and music, and the ffmpeg render muxes those over the clip. The
+  // direct ByteDance adapter already guards this (`generate_audio: false`, see
+  // ark-client.ts header) — the Runware path simply never did.
+  //
+  // Each provider spells the switch differently and REJECTS keys it does not know
+  // (400 unsupportedParameter), so the mapping must be exact per model family —
+  // enumerated from Runware's own `allowedValues` errors.
+  it('submit() disables ByteDance native audio (providerSettings.bytedance.audio)', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'lake',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'bytedance:seedance@1.5-pro',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.providerSettings).toEqual({ bytedance: { audio: false } })
+  })
+
+  it('submit() disables PixVerse native audio (providerSettings.pixverse.audio)', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'lake',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'pixverse:1@8',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.providerSettings).toEqual({ pixverse: { audio: false } })
+  })
+
+  // Wan is the odd one out: `providerSettings.alibaba` does not exist at all — its
+  // switches live under a TOP-LEVEL `settings` object (promptExtend /
+  // promptEnhancer / audio). Sending it the providerSettings shape would 400.
+  it('submit() disables Wan native audio via top-level settings.audio', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'lake',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'alibaba:wan@2.7',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.settings).toEqual({ audio: false })
+    expect(arg).not.toHaveProperty('providerSettings')
+  })
+
+  // MiniMax exposes only `promptOptimizer` — no audio switch. Sending one would be
+  // a 400, so the adapter must send NOTHING rather than guess. Same for any model
+  // family we have not verified: silence is the safe default.
+  it('submit() sends no audio switch for a family that has none (MiniMax)', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'lake',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'minimax:4@1',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg).not.toHaveProperty('providerSettings')
+    expect(arg).not.toHaveProperty('settings')
+  })
+
+  // ── PixVerse native cartoon modes ────────────────────────────────────────────
+  //
+  // PixVerse ships REAL style modes — Runware's own allowedValues for
+  // providerSettings.pixverse.style are: anime, 3d_animation, clay, comic,
+  // cyberpunk. A first-class mode steers the model far harder than a prompt
+  // fragment, and cartoons are the product. We were sending none of them.
+  //
+  // Only styles with a genuine PixVerse counterpart map; `cinematic` deliberately
+  // does NOT (its counterpart would be "no style", and forcing `comic` on a live-
+  // action look would be a regression). The prompt fragment still applies either
+  // way, so an unmapped style is not a downgrade — it is just prompt-only.
+  it.each([
+    ['anime', 'anime'],
+    ['3d-cartoon', '3d_animation'],
+    ['2d-cartoon', 'comic'],
+    ['disney', '3d_animation'],
+  ])('submit() maps style %s onto the PixVerse native mode %s', async (styleId, native) => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'a fox',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'pixverse:1@8',
+      styleId: styleId as 'anime',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    // Rides ALONGSIDE the audio kill-switch in the same provider namespace.
+    expect(arg.providerSettings).toEqual({ pixverse: { audio: false, style: native } })
+  })
+
+  it('submit() sends no PixVerse style for a style with no native counterpart', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'a fox',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'pixverse:1@8',
+      styleId: 'cinematic',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.providerSettings).toEqual({ pixverse: { audio: false } })
+  })
+
+  // The style knob is PixVerse-only. Sending `style` to ByteDance would be a 400
+  // (its allowed keys are cameraFixed | audio | draft), i.e. a dead generation.
+  it('submit() never sends a style to a non-PixVerse model', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'a fox',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'bytedance:seedance@1.5-pro',
+      styleId: 'anime',
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.providerSettings).toEqual({ bytedance: { audio: false } })
+  })
+
   it('submit() propagates a submitVideo rejection unchanged (service settles fail+refund)', async () => {
     const rw = fakeRunware()
     rw.submitVideo.mockRejectedValue(new Error('runware down'))

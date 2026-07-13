@@ -9,7 +9,7 @@
 // `assetUrl` (was videoURL/imageURL), `costUsd` (was cost), `nsfw` (was
 // NSFWContent). A Runware adapter maps the existing RunwareClient 1:1 onto this
 // shape; the wan-runpod adapter maps our self-hosted ComfyUI worker onto it.
-import type { VideoProviderId } from '@opencreate/contracts'
+import type { StyleId, VideoProviderId } from '@opencreate/contracts'
 
 export type { VideoProviderId }
 
@@ -33,12 +33,31 @@ export type VideoSubmitInput = {
   // image→video seed frame as a data URI (never a URL). Providers that only do
   // text→video (wan-runpod today) ignore it.
   inputImage?: string | undefined
+  // Tagged-character reference photos, as data URIs. NOT a seed frame: a seed
+  // frame is the literal first picture of the clip, whereas a reference says
+  // "whoever this is, that is who appears" — the character can be somewhere else
+  // entirely, in a different pose, in a different scene. It is what turns a pile
+  // of clips into a film: tag the character once and shot 2 shows the same one.
+  //
+  // Already resolved and authorized by the service (entity → photo → data URI)
+  // and validated against the model's `referenceMode` / `maxReferenceImages`
+  // BEFORE the user is charged. A provider whose backend has no reference mode
+  // simply ignores this; the composed prompt still names the character either way.
+  referenceImages?: string[] | undefined
   // Optional deterministic seed. Absent → the adapter picks a random one.
   seed?: number | undefined
   // Runware-internal routing: some models 400 on Runware's `safety` param, so
   // the service forwards the catalog flag and the Runware adapter omits it.
   // Other providers ignore this field entirely.
   omitSafety?: boolean | undefined
+  // The chosen style preset id, forwarded so an adapter can reach for its
+  // backend's NATIVE style control instead of relying on prompt text alone.
+  // PixVerse ships real cartoon modes (anime / 3d_animation / clay / comic /
+  // cyberpunk) — a first-class knob that steers the model far harder than a
+  // prompt fragment can. Providers with no such control simply ignore this: the
+  // composed prompt already carries the style fragment either way, so passing it
+  // is additive and never changes behaviour for a backend that does not use it.
+  styleId?: StyleId | undefined
 }
 
 // The three poll outcomes the service already knows how to settle. Discriminated

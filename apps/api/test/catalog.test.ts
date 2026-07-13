@@ -32,10 +32,20 @@ describe('catalog', () => {
 describe('GET /api/catalog', () => {
   // The rule the route implements: a video model is listed only when the backend
   // that runs it is configured. Runware is always on; wan-runpod needs
-  // COMFY_BASE_URL and bytedance needs ARK_API_KEY. Listing a model whose backend
-  // cannot run is worse than omitting it — it is a selectable option that walks
-  // the user all the way to submit and only then fails.
-  const optionalProviders = ['wan-runpod', 'bytedance']
+  // COMFY_BASE_URL, bytedance needs ARK_API_KEY, and alibaba needs BOTH
+  // DASHSCOPE_API_KEY and DASHSCOPE_WORKSPACE_ID (its workspace id lives in the
+  // request host, so config nulls the pair together). Listing a model whose
+  // backend cannot run is worse than omitting it — it is a selectable option that
+  // walks the user all the way to submit and only then fails.
+  // 'deepinfra' joined the list when Seedance 2.0 moved off the direct ByteDance
+  // channel: that one refuses to run until the account buys a resource pack, so
+  // the row was listed and dead. DeepInfra runs the same model at the same price
+  // with no pack — but only once DEEPINFRA_TOKEN exists, hence the gate.
+  //
+  // 'bytedance' stays in the list even though NO catalog model uses it today: the
+  // provider is still registered and still tested (ark-client.test.ts), and the
+  // gate must keep working for the day the pack is bought and `provider` flips back.
+  const optionalProviders = ['wan-runpod', 'bytedance', 'alibaba', 'deepinfra']
 
   it('is public and lists only Runware models when both optional backends are off', async () => {
     // buildTestApp defaults comfyBaseUrl AND arkApiKey to null.
@@ -52,35 +62,55 @@ describe('GET /api/catalog', () => {
     for (const m of body.models) expect(catalogModelSchema.safeParse(m).success).toBe(true)
   })
 
-  it('lists wan-runpod models when self-host IS configured (and still hides bytedance)', async () => {
+  it('lists wan-runpod models when self-host IS configured (and still hides the rest)', async () => {
     const app = await buildTestApp({ comfyBaseUrl: 'https://pod-8188.proxy.runpod.net' })
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     const body = res.json() as { models: Array<{ provider?: string }> }
     expect(body.models.some((m) => m.provider === 'wan-runpod')).toBe(true)
-    // Each backend is gated by its OWN env: turning the pod on must not smuggle
-    // in a ByteDance model whose key is still absent.
-    expect(body.models.some((m) => m.provider === 'bytedance')).toBe(false)
+    // Each backend is gated by its OWN env: turning the pod on must not smuggle in
+    // a model whose provider key is still absent.
+    expect(body.models.some((m) => m.provider === 'deepinfra')).toBe(false)
+    expect(body.models.some((m) => m.provider === 'alibaba')).toBe(false)
   })
 
-  it('lists bytedance models only when ARK_API_KEY IS configured', async () => {
+  it('lists Seedance 2.0 only when DEEPINFRA_TOKEN IS configured', async () => {
     const off = await buildTestApp()
     const offBody = (await off.inject({ method: 'GET', url: '/api/catalog' })).json() as {
       models: Array<{ id: string }>
     }
     expect(offBody.models.some((m) => m.id === 'seedance-2-0')).toBe(false)
 
-    const on = await buildTestApp({ arkApiKey: 'ark-key' })
+    const on = await buildTestApp({ deepinfraToken: 'di-key' })
     const onBody = (await on.inject({ method: 'GET', url: '/api/catalog' })).json() as {
       models: Array<{ id: string; provider?: string }>
     }
-    expect(onBody.models.some((m) => m.id === 'seedance-2-0')).toBe(true)
+    const seedance = onBody.models.find((m) => m.id === 'seedance-2-0')
+    expect(seedance?.provider).toBe('deepinfra')
     expect(onBody.models.some((m) => m.provider === 'wan-runpod')).toBe(false)
   })
 
-  it('lists every model when both optional backends are configured', async () => {
+  // ARK_API_KEY still gates the bytedance provider even though no catalog model
+  // uses it right now. Seedance 2.0 sat behind that key and never ran — the direct
+  // channel refuses until a resource pack is bought — so the row moved to
+  // DeepInfra. The gate must survive the move: flipping `provider` back the day the
+  // pack is bought has to keep working, and a key that gates nothing must not
+  // accidentally start listing something.
+  it('ARK_API_KEY alone lists nothing (no catalog model routes to bytedance today)', async () => {
+    const app = await buildTestApp({ arkApiKey: 'ark-key' })
+    const body = (await app.inject({ method: 'GET', url: '/api/catalog' })).json() as {
+      models: Array<{ id: string; provider?: string }>
+    }
+    expect(body.models.some((m) => m.provider === 'bytedance')).toBe(false)
+    expect(body.models.some((m) => m.id === 'seedance-2-0')).toBe(false)
+  })
+
+  it('lists every model when every optional backend is configured', async () => {
     const app = await buildTestApp({
       comfyBaseUrl: 'https://pod-8188.proxy.runpod.net',
       arkApiKey: 'ark-key',
+      dashscopeApiKey: 'ds-key',
+      dashscopeWorkspaceId: 'ws-1',
+      deepinfraToken: 'di-key',
     })
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     const body = res.json() as { models: Array<{ provider?: string }> }
@@ -137,19 +167,29 @@ describe('face policy — Seedance 2.0 must never be reference-capable', () => {
   })
 })
 
-describe('seedance 2.0 — direct ByteDance channel', () => {
+describe('seedance 2.0 — routed through DeepInfra, not the blocked direct channel', () => {
   const m = getModel('seedance-2-0')
 
-  it('routes to the bytedance provider, not the Runware aggregator', () => {
+  // The direct ByteDance channel answers `ModelNotOpen` and renders nothing until
+  // the account buys a resource pack — $30.10 minimum, 90-day expiry,
+  // non-refundable, and not purchasable in their console at all. This row was
+  // listed and dead. DeepInfra runs the SAME model at the SAME price with no pack.
+  it('routes to the deepinfra provider (the direct ByteDance channel needs a paid pack)', () => {
     expect(m).toBeDefined()
-    expect(m!.type === 'video' && m!.provider).toBe('bytedance')
+    expect(m!.type === 'video' && m!.provider).toBe('deepinfra')
   })
 
-  it('carries the dreamina- prefixed ModelArk id behind the synthetic AIR prefix', () => {
-    // ByteDance 404s InvalidEndpointOrModel.NotFound without the `dreamina-`
-    // prefix (2.0 has it; 1.x does not). The `bytedance:` half is ours — it only
-    // exists to satisfy the shared AIR regex and is stripped by the adapter.
-    expect(m!.air).toBe('bytedance:dreamina-seedance-2-0-260128')
+  it("carries DeepInfra's PATH-shaped model id behind the synthetic AIR prefix", () => {
+    // Their ids are paths, not slugs — which is why the shared AIR regex now admits
+    // `/`. The `deepinfra:` half is ours and the adapter strips it.
+    expect(m!.air).toBe('deepinfra:ByteDance/Seedance-2.0')
+  })
+
+  // Same model, same manufacturer, same policy: the 2.0 series refuses any input
+  // image containing a real human face. Reselling it does not relax that, so the
+  // routing rule that keeps character shots away from it still stands.
+  it('still declares no referenceMode — a tagged character must never route here', () => {
+    expect(m!.referenceMode ?? null).toBeNull()
   })
 
   it('is pinned to the 720p (hd) table so a premium tier cannot silently buy 1080p', () => {

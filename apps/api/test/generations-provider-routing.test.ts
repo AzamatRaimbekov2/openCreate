@@ -123,19 +123,19 @@ describe('video provider routing', () => {
     expect(me.json().creditsBalance).toBe(200)
   })
 
-  it('routes a bytedance model to the ByteDance provider (never Runware) and settles', async () => {
+  it('routes seedance-2-0 to the DeepInfra provider (never Runware) and settles', async () => {
     const runware = fakeVideoProvider()
-    const bytedance = fakeVideoProvider()
-    bytedance.submit.mockResolvedValue({ providerJobId: 'cgt-1' })
-    bytedance.poll.mockResolvedValueOnce({ status: 'processing', progress: null }).mockResolvedValueOnce({
+    const deepinfra = fakeVideoProvider()
+    deepinfra.submit.mockResolvedValue({ providerJobId: 'cgt-1' })
+    deepinfra.poll.mockResolvedValueOnce({ status: 'processing', progress: null }).mockResolvedValueOnce({
       status: 'success',
-      assetUrl: 'https://ark-content-generation-ap-southeast-1.tos-ap-southeast-1.volces.com/x.mp4',
+      assetUrl: 'https://deepinfra.com/model/inference/x.mp4',
       costUsd: 0.756,
       nsfw: false,
     })
     const app = await buildTestApp({
-      videoProviders: { runware, bytedance },
-      assetHostAllowlist: ['runware.ai', 'tos-ap-southeast-1.volces.com'],
+      videoProviders: { runware, deepinfra },
+      assetHostAllowlist: ['runware.ai', 'deepinfra.com'],
     })
     const cookie = await registerAndGetCookie(app)
 
@@ -149,13 +149,13 @@ describe('video provider routing', () => {
     const id = created.json().id
 
     expect(runware.submit).not.toHaveBeenCalled()
-    expect(bytedance.submit).toHaveBeenCalledTimes(1)
+    expect(deepinfra.submit).toHaveBeenCalledTimes(1)
     // The adapter receives the AIR id verbatim and strips the prefix itself — the
     // service must not pre-mangle it.
-    expect(bytedance.submit.mock.calls[0]![0]).toMatchObject({
+    expect(deepinfra.submit.mock.calls[0]![0]).toMatchObject({
       prompt: 'a lighthouse in a storm',
       durationSeconds: 5,
-      model: 'bytedance:dreamina-seedance-2-0-260128',
+      model: 'deepinfra:ByteDance/Seedance-2.0',
       // resolutionProfile 'hd' → the 720p row of ByteDance's own table.
       width: 1280,
       height: 720,
@@ -165,7 +165,7 @@ describe('video provider routing', () => {
     const p2 = await app.inject({ method: 'GET', url: `/api/generations/${id}`, headers: { cookie } })
     expect(p2.json().status).toBe('succeeded')
     expect(p2.json().mediaUrls[0]).toMatch(/\.mp4$/)
-    expect(bytedance.poll).toHaveBeenCalledWith('cgt-1')
+    expect(deepinfra.poll).toHaveBeenCalledWith('cgt-1')
     expect(runware.poll).not.toHaveBeenCalled()
   })
 
@@ -174,14 +174,14 @@ describe('video provider routing', () => {
     // containing a real human face. The user must get their credits back and a
     // message that names the actual reason — not an opaque provider error they
     // would "fix" by retrying the same portrait.
-    const bytedance = fakeVideoProvider()
-    bytedance.submit.mockRejectedValue(
+    const deepinfra = fakeVideoProvider()
+    deepinfra.submit.mockRejectedValue(
       Object.assign(
         new Error('ByteDance refused this input. Seedance 2.0 does not accept images or video containing real human faces.'),
         { statusCode: 400, apiCode: 'content_blocked' },
       ),
     )
-    const app = await buildTestApp({ videoProviders: { bytedance } })
+    const app = await buildTestApp({ videoProviders: { deepinfra } })
     const cookie = await registerAndGetCookie(app)
 
     const res = await app.inject({
@@ -205,14 +205,14 @@ describe('video provider routing', () => {
   })
 
   it('a ByteDance output-moderation kill at poll fails as content_blocked AND refunds', async () => {
-    const bytedance = fakeVideoProvider()
-    bytedance.submit.mockResolvedValue({ providerJobId: 'cgt-blocked' })
-    bytedance.poll.mockResolvedValue({
+    const deepinfra = fakeVideoProvider()
+    deepinfra.submit.mockResolvedValue({ providerJobId: 'cgt-blocked' })
+    deepinfra.poll.mockResolvedValue({
       status: 'error',
       message: 'The generated video may contain sensitive information.',
       blocked: true,
     })
-    const app = await buildTestApp({ videoProviders: { bytedance } })
+    const app = await buildTestApp({ videoProviders: { deepinfra } })
     const cookie = await registerAndGetCookie(app)
     const created = await app.inject({
       method: 'POST',
@@ -230,10 +230,10 @@ describe('video provider routing', () => {
   })
 
   it('an ordinary ByteDance poll failure stays a plain provider failure (not content_blocked)', async () => {
-    const bytedance = fakeVideoProvider()
-    bytedance.submit.mockResolvedValue({ providerJobId: 'cgt-err' })
-    bytedance.poll.mockResolvedValue({ status: 'error', message: 'model worker crashed' })
-    const app = await buildTestApp({ videoProviders: { bytedance } })
+    const deepinfra = fakeVideoProvider()
+    deepinfra.submit.mockResolvedValue({ providerJobId: 'cgt-err' })
+    deepinfra.poll.mockResolvedValue({ status: 'error', message: 'model worker crashed' })
+    const app = await buildTestApp({ videoProviders: { deepinfra } })
     const cookie = await registerAndGetCookie(app)
     const created = await app.inject({
       method: 'POST',

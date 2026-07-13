@@ -74,3 +74,20 @@ Every one of these breaks the integration **silently** if changed:
 ## Commits
 
 - _no commit yet_ — feat(api): Seedance 2.0 direct via ByteDance ModelArk as a third video provider
+
+## Change log (behaviour)
+
+### 2026-07-12 — ModelArk failures are diagnosable again
+`request()` used to throw a bare `ModelArk HTTP 404` and DISCARD the response
+body. 404 reads identically for "wrong host", "wrong model id", and the one that
+actually happens in practice — `ModelNotOpen`, i.e. the BytePlus account never
+activated (bought the resource package for) Dreamina-Seedance-2.0. Naming that
+cost a live debugging session; the body had said it in plain English all along.
+
+The provider's own `code: message` now rides on `ArkError.providerDetail`, which
+the central error handler LOGS (`event: 'provider_error'`).
+
+It is deliberately NOT folded into `message`: `app.ts` serializes `err.message`
+verbatim to the browser for any error carrying an `apiCode`, and ModelArk's body
+names our **BytePlus account id** ("Your account 3003474417 has not activated…").
+Client copy stays the mapped `provider_error` string; operators get the detail.

@@ -90,3 +90,26 @@ flowchart LR
   models of any backend that is off — a listed model whose backend is unconfigured is just a broken
   option. 3D needs none of that: it rides the same `RUNWARE_API_KEY` boot already requires, so the
   `model3d` catalog entries are always reachable and `configuredProviders` is untouched.
+
+## Change log (behaviour)
+
+### 2026-07-12 — error handler logs `providerDetail`
+`HttpError` may now carry `providerDetail`: an upstream's own error code + text
+(see `ArkError`). The handler logs it at `warn` (`event: 'provider_error'`) and
+**never serializes it** — the envelope keeps sending `message`, and a provider
+body can name internals (ModelArk's includes our BytePlus account id). Without
+this, an upstream 502 reached an operator as an untraceable `ModelArk HTTP 404`.
+
+### 2026-07-13 — Soul Studio: the generation service is hoisted, and a third service appears
+`createGenerationService(...)` used to be constructed **inline** inside the
+`registerGenerationRoutes(...)` call. It is now a `const generationService`,
+because Soul Studio's portrait orchestrator needs *that* instance: it is the
+single money path, and a second instance would also mean a second (useless)
+poll-throttle map.
+
+`createPortraitService({ entities, generations })` is then wired from both
+existing services and handed to `registerEntityRoutes(app, entityService,
+portraitService)`. It depends on both; **neither depends on it**, which is what
+keeps the graph acyclic — the generation service already depends on the entity
+service (it resolves `[[e1]]` mentions through `loadForMentions`), so the sheet
+logic could not have lived inside either one without closing a cycle.

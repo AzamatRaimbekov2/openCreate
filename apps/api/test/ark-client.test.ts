@@ -178,6 +178,25 @@ describe('ark client — submit', () => {
     expect(err.statusCode).toBe(502)
   })
 
+  it('keeps the client message free of the provider body but carries it for the log', async () => {
+    // The real body names our BytePlus ACCOUNT ID ("Your account 3003474417 has
+    // not activated the model…"). app.ts serializes `message` to the browser
+    // verbatim for any apiCode-carrying error, so the account id must never live
+    // there. It rides on `providerDetail`, which only the error handler logs —
+    // without it a 502 reaches an operator as an untraceable "ModelArk HTTP 404".
+    stubFetch(404, {
+      error: {
+        code: 'ModelNotOpen',
+        message: 'Your account 3003474417 has not activated the model dreamina-seedance-2-0-260128.',
+      },
+    })
+    const err = await createArkClient({ apiKey: KEY }).submit(t2v).catch((e) => e)
+    expect(err.message).toBe('ModelArk HTTP 404')
+    expect(err.message).not.toContain('3003474417')
+    expect(err.providerDetail).toContain('ModelNotOpen')
+    expect(err.providerDetail).toContain('3003474417')
+  })
+
   it('throws provider_error when the API returns no task id', async () => {
     stubFetch(200, { not_an_id: true })
     const err = await createArkClient({ apiKey: KEY }).submit(t2v).catch((e) => e)

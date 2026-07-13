@@ -15,7 +15,11 @@ const catalogBase = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   providerLabel: z.string().min(1),
-  air: z.string().regex(/^[a-z0-9-]+:[a-z0-9.@-]+$/i),
+  // `provider:model`. The model half now admits `/` because DeepInfra's ids are
+  // PATHS (`ByteDance/Seedance-2.0`), not flat slugs — every other provider's ids
+  // still match exactly as before, so this widens the alphabet without loosening
+  // the shape (a colon is still required, and the provider half is still a slug).
+  air: z.string().regex(/^[a-z0-9-]+:[a-z0-9./@-]+$/i),
   tier: modelTierSchema,
   supportsImageInput: z.boolean(),
   aspectRatios: z.array(aspectRatioSchema).min(1),
@@ -33,13 +37,43 @@ const catalogBase = z.object({
   // Which resolution table this model reads (see resolution.ts). Absent → the
   // tier ladder. Present when the provider only accepts its own dimension list.
   resolutionProfile: z.enum(['hd', 'fhd', 'square1024', 'kontext', 'nanobanana']).optional(),
+  // Does this model accept a `negativePrompt`? Absent/true = yes.
+  //
+  // The same shape as supportsSafetyParam below, and for the same reason: Runware
+  // does not silently ignore a parameter a model cannot take, it REJECTS THE WHOLE
+  // TASK ("Invalid parameter detected. The parameter 'negativePrompt' is not
+  // recognized or supported"). FLUX.1 Kontext (bfl:3@1) is such a model — an edit
+  // model conditioned on a reference image, with no negative channel at all.
+  //
+  // Found the only way it could be: by minting a real reference sheet. The hero
+  // shot (flux-dev) took its negative happily; all three referencing views died at
+  // the provider, were refunded, and delivered nothing. A capability the catalogue
+  // does not state is a capability the service will guess wrong.
+  supportsNegativePrompt: z.boolean().optional(),
 })
 
 export const catalogImageModelSchema = catalogBase.extend({
   type: z.literal('image'),
   credits: z.number().int().positive(),
 })
-export const videoProviderSchema = z.enum(['runware', 'wan-runpod', 'bytedance'])
+// 'alibaba' = Alibaba Cloud Model Studio (DashScope) direct, bypassing Runware.
+// Reason is PRICE, and unusually so: Runware's markup is model-dependent, not
+// flat. On Seedance it is ~0.8% (measured: $0.26136 billed against ByteDance's
+// own $0.2592 list). On Wan 2.7 it is ~51% — Runware billed $0.7557 for a 5s
+// 720p clip that Alibaba lists at $0.10/second, i.e. $0.50. At the volumes a
+// cartoon product generates, that gap is the whole margin.
+// 'deepinfra' = Seedance 2.0 WITHOUT ByteDance's resource-pack wall. Same model,
+// same price ($7/M tokens without a video input — their published rate is
+// ByteDance's own), but no activation, no prepay, no 90-day expiry. The direct
+// channel refuses to run a single frame until the account buys a $30.10 pack that
+// is not even purchasable in the console; this one just works.
+export const videoProviderSchema = z.enum([
+  'runware',
+  'wan-runpod',
+  'bytedance',
+  'alibaba',
+  'deepinfra',
+])
 export type VideoProviderId = z.infer<typeof videoProviderSchema>
 
 export const catalogVideoModelSchema = catalogBase.extend({

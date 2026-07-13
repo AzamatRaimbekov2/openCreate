@@ -13,6 +13,9 @@ import { createRunwareVideoAdapter } from './integrations/runware/video-adapter'
 import { createRunwareMeshAdapter } from './integrations/runware/mesh-adapter'
 import { createComfyClient } from './integrations/runpod/comfy-client'
 import { createArkClient } from './integrations/bytedance/ark-client'
+import { createDashscopeClient } from './integrations/alibaba/dashscope-client'
+import { createDeepinfraClient } from './integrations/deepinfra/deepinfra-client'
+import { createFailoverProvider } from './integrations/failover-provider'
 import type { VideoProvider, VideoProviderId } from './integrations/video-provider'
 import type { Mesh3dProvider } from './integrations/mesh-provider'
 import type { StorageProvider } from './storage/local'
@@ -22,6 +25,7 @@ import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
 import { registerEntityRoutes } from './modules/entities/routes'
 import { createEntityService } from './modules/entities/service'
+import { createPortraitService } from './modules/entities/portraits'
 import { createGenerationService, settleStaleGenerations } from './modules/generations/service'
 import { registerGenerationRoutes } from './modules/generations/routes'
 import { createFilmService, settleStaleRenders } from './modules/films/service'
@@ -72,7 +76,10 @@ export type AppDeps = {
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
 // (contracts errors.ts); the central handler below maps them to the envelope.
-type HttpError = Error & { statusCode?: number; apiCode?: string }
+// `providerDetail` is an upstream's own error code+text (see ArkError): it is
+// LOGGED and never serialized — the envelope sends `message`, and a provider
+// body can name internals (ModelArk's includes our BytePlus account id).
+type HttpError = Error & { statusCode?: number; apiCode?: string; providerDetail?: string }
 
 export async function buildApp(deps: AppDeps) {
   // bodyLimit 15 MiB: inputImage data URIs are allowed up to 14 MB by contract.
@@ -124,6 +131,17 @@ export async function buildApp(deps: AppDeps) {
         .status(status)
         .send({ error: { code: 'internal_error', message: 'Something went wrong' } })
     }
+    // A domain error may carry a `providerDetail`: the upstream's own code+text,
+    // deliberately kept off `message` because everything below IS serialized to
+    // the client (ModelArk's body, for one, names our BytePlus account id). It is
+    // the only thing that distinguishes "wrong model id" from "the account never
+    // activated this model", so log it — otherwise a 502 reaches an operator as
+    // an untraceable `ModelArk HTTP 404`.
+    if (typeof err.providerDetail === 'string')
+      req.log.warn(
+        { event: 'provider_error', apiCode: err.apiCode, detail: err.providerDetail },
+        'provider rejected the request',
+      )
     const code = err.apiCode ?? 'validation_failed'
     reply.status(status).send({ error: { code, message: err.message } })
   })
@@ -169,6 +187,11 @@ export async function buildApp(deps: AppDeps) {
   const configuredProviders = new Set<VideoProviderId>(['runware'])
   if (deps.config.comfyBaseUrl !== null) configuredProviders.add('wan-runpod')
   if (deps.config.arkApiKey !== null) configuredProviders.add('bytedance')
+  // Alibaba needs BOTH the key and the workspace id (the workspace lives in the
+  // request host), and config already nulls them as a pair — so one check is the
+  // whole condition.
+  if (deps.config.dashscopeApiKey !== null) configuredProviders.add('alibaba')
+  if (deps.config.deepinfraToken !== null) configuredProviders.add('deepinfra')
   // Catalog is public (no requireUser): pricing must render before sign-in.
   registerCatalogRoutes(app, configuredProviders)
   // The core (Task 10): generation lifecycle service gets the db + provider +
@@ -184,10 +207,52 @@ export async function buildApp(deps: AppDeps) {
   // unconfigured client returns a clean provider_error on submit rather than
   // exploding at boot, which is what lets the catalog entries exist (and the
   // routing tests run) without a pod or an ByteDance key present.
+  // The direct ByteDance channel for Seedance 2.0, kept as its own value so the
+  // failover chain below can hold it as a SECOND link without constructing it twice.
+  const arkClient = createArkClient({ apiKey: deps.config.arkApiKey })
+
   const videoProviders: Record<VideoProviderId, VideoProvider> = {
     runware: createRunwareVideoAdapter(deps.runware),
     'wan-runpod': createComfyClient({ baseUrl: deps.config.comfyBaseUrl }),
-    bytedance: createArkClient({ apiKey: deps.config.arkApiKey }),
+    bytedance: arkClient,
+    alibaba: createDashscopeClient({
+      apiKey: deps.config.dashscopeApiKey,
+      workspaceId: deps.config.dashscopeWorkspaceId,
+    }),
+    // SEEDANCE 2.0 IS A CHAIN, NOT A PROVIDER. The catalog names `deepinfra` as its
+    // backend and that is still true — it is where the chain STARTS — but if
+    // DeepInfra cannot take the job (out of balance, 5xx, network), the same
+    // request walks on to the direct ByteDance channel without the user ever
+    // learning that anything happened. They picked "Auteur"; whose GPUs render it
+    // is our problem.
+    //
+    // Today taught us why: the Runware balance ran dry and PixVerse, Seedance 1.5,
+    // Kling, Veo, voiceover AND music died together. One dead account, six dead
+    // features. A chain turns that into a slower request.
+    //
+    // The order is deliberate. DeepInfra first because it needs no resource pack;
+    // ByteDance second because it will only ever answer once a $30.10 pack is
+    // bought, and until then it fails fast and costs nothing to have in the chain.
+    // A cheaper third link (PiAPI, fal, Replicate) drops in as one more entry —
+    // that seam is most of the value here, since today only one link can actually
+    // answer.
+    //
+    // Failover happens at SUBMIT ONLY, and never on a content refusal. Both rules
+    // are money rules; failover-provider.ts explains what each one costs to get
+    // wrong.
+    deepinfra: createFailoverProvider(
+      [
+        { id: 'deepinfra', provider: createDeepinfraClient({ apiKey: deps.config.deepinfraToken }) },
+        { id: 'bytedance', provider: arkClient },
+      ],
+      {
+        // A chain that silently absorbs a dead provider HIDES a dead provider: the
+        // fallback quietly becomes the permanent path and nobody finds out until it
+        // dies too. Every hop is a warn line.
+        onFailover: ({ from, to, reason }) =>
+          app.log.warn({ event: 'provider.failover', from, to, reason }, 'video provider failed over'),
+      },
+    ),
     // A test-injected registry overrides the derived defaults per provider, so a
     // routing test can stub just the two backends it asserts on.
     ...deps.videoProviders,
@@ -201,25 +266,33 @@ export async function buildApp(deps: AppDeps) {
   // One entity service instance, shared: the generation service needs it to
   // resolve tagged mentions, and the entity routes expose the same rules.
   const entityService = createEntityService({ db: deps.db, storage: deps.storage })
-  registerGenerationRoutes(
-    app,
-    createGenerationService({
-      db: deps.db,
-      runware: deps.runware,
-      videoProviders,
-      meshProvider,
-      storage: deps.storage,
-      entities: entityService,
-      log: app.log,
-      // undefined → the service's own 3s default; only tests override this.
-      ...(deps.pollMinIntervalMs !== undefined
-        ? { pollMinIntervalMs: deps.pollMinIntervalMs }
-        : {}),
-    }),
-  )
-  // Entity library (characters/objects/places) — independent of generations for
-  // now; the mention wiring into POST /generations lands with the capability flag.
-  registerEntityRoutes(app, entityService)
+  // Hoisted to a const (it used to be constructed inline in the register call)
+  // because Soul Studio's portrait orchestrator needs THIS instance: it is the
+  // single money path, and a second instance would mean a second poll-throttle map.
+  const generationService = createGenerationService({
+    db: deps.db,
+    runware: deps.runware,
+    videoProviders,
+    meshProvider,
+    storage: deps.storage,
+    entities: entityService,
+    log: app.log,
+    // undefined → the service's own 3s default; only tests override this.
+    ...(deps.pollMinIntervalMs !== undefined ? { pollMinIntervalMs: deps.pollMinIntervalMs } : {}),
+  })
+  registerGenerationRoutes(app, generationService)
+  // Entity library (characters/objects/places) + Soul Studio's reference sheet.
+  //
+  // The portrait service is a third, tiny service that depends on BOTH of the
+  // above; neither depends on IT, which is what keeps the graph acyclic (the
+  // generation service already depends on entities, to resolve `[[e1]]` mentions).
+  // It spends no credits of its own — it calls generationService.create() N times
+  // and lets the one money path do the only thing it does.
+  const portraitService = createPortraitService({
+    entities: entityService,
+    generations: generationService,
+  })
+  registerEntityRoutes(app, entityService, portraitService)
   // CinemaStudio (ADR cinema-studio): films/shots/audio + ffmpeg renders, plus
   // the optional script→storyboard endpoint. The film service owns the render
   // pipeline (ffmpeg spawn, semaphore-bounded); the storyboard service gates on

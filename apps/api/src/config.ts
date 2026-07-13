@@ -96,6 +96,23 @@ const envSchema = z.object({
   // whose backend cannot run. A plain bearer token (ModelArk does no request
   // signing). `|| null` normalizes '' → null (not configured) below.
   ARK_API_KEY: z.string().optional(),
+  // Alibaba Cloud Model Studio (DashScope) — the DIRECT Wan channel. OPTIONAL,
+  // same treatment as ARK_API_KEY: unset keeps boot healthy and hides the
+  // alibaba-backed models from /api/catalog, so nobody can select a model whose
+  // backend cannot run.
+  //
+  // TWO vars, because their Singapore endpoint puts the workspace IN THE HOST
+  // (`https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com`) — there is no
+  // account-wide host to fall back on. Both must be set for the provider to
+  // count as configured; one without the other is a misconfiguration, not a
+  // half-working provider.
+  DASHSCOPE_API_KEY: z.string().optional(),
+  DASHSCOPE_WORKSPACE_ID: z.string().optional(),
+  // DeepInfra bearer token — Seedance 2.0 WITHOUT ByteDance's resource-pack wall.
+  // Same treatment as the other optional providers: unset keeps boot healthy and
+  // hides its models from /api/catalog, so nobody can select a model whose backend
+  // cannot run. `|| null` normalizes '' → null (not configured) below.
+  DEEPINFRA_TOKEN: z.string().optional(),
   // Anthropic API key for the CinemaStudio script→storyboard feature. OPTIONAL,
   // same treatment as COMFY_BASE_URL / Google OAuth: unset keeps boot healthy —
   // the /storyboard endpoint then returns a clean provider_error instead of
@@ -141,6 +158,15 @@ export type AppConfig = {
   // ByteDance ModelArk bearer token for the direct Seedance provider; null when
   // unset (provider disabled, its catalog models hidden, boot stays healthy).
   arkApiKey: string | null
+  // Alibaba Model Studio (DashScope) credentials for the direct Wan provider.
+  // BOTH are required together — the workspace id lives in the request HOST, so
+  // a key without it cannot form a URL. Null when either is missing (provider
+  // disabled, its catalog models hidden, boot stays healthy).
+  dashscopeApiKey: string | null
+  dashscopeWorkspaceId: string | null
+  // DeepInfra bearer token for the pack-free Seedance 2.0 channel; null when unset
+  // (provider disabled, its catalog models hidden, boot stays healthy).
+  deepinfraToken: string | null
   // Anthropic key for the storyboard feature; null when unset (feature disabled,
   // boot stays healthy).
   anthropicApiKey: string | null
@@ -181,6 +207,14 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
   // same treatment as the Google OAuth creds below.
   const comfyBaseUrl = e.COMFY_BASE_URL || null
   const arkApiKey = e.ARK_API_KEY || null
+  // BOTH or NEITHER: the workspace id is part of the request HOST, so a key on
+  // its own cannot form a URL. Treating a half-set pair as "configured" would
+  // list the Wan models in the catalog and then fail every submit — the exact
+  // trap the provider-gating exists to prevent.
+  const deepinfraToken = e.DEEPINFRA_TOKEN || null
+  const dashscopeConfigured = Boolean(e.DASHSCOPE_API_KEY && e.DASHSCOPE_WORKSPACE_ID)
+  const dashscopeApiKey = dashscopeConfigured ? (e.DASHSCOPE_API_KEY ?? null) : null
+  const dashscopeWorkspaceId = dashscopeConfigured ? (e.DASHSCOPE_WORKSPACE_ID ?? null) : null
   return {
     runwareApiKey: e.RUNWARE_API_KEY,
     betterAuthSecret: e.BETTER_AUTH_SECRET,
@@ -213,20 +247,29 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     // wan-runpod pod's /view host is folded in below so its finished mp4s pass
     // the SSRF gate — driven entirely by COMFY_BASE_URL, so pointing at a new
     // pod is one env edit with no allowlist bookkeeping.
-    assetHostAllowlist: withArkHost(
-      withComfyHost(
-        e.ASSET_HOST_ALLOWLIST.split(',')
-          .map((h) => h.trim())
-          .filter(Boolean),
-        comfyBaseUrl,
+    assetHostAllowlist: withDeepinfraHost(
+      withDashscopeHost(
+      withArkHost(
+        withComfyHost(
+          e.ASSET_HOST_ALLOWLIST.split(',')
+            .map((h) => h.trim())
+            .filter(Boolean),
+          comfyBaseUrl,
+        ),
+        arkApiKey,
       ),
-      arkApiKey,
+        dashscopeApiKey,
+      ),
+      deepinfraToken,
     ),
     assetFetchTimeoutMs: e.ASSET_FETCH_TIMEOUT_MS,
     assetMaxBytes: e.ASSET_MAX_BYTES,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
     comfyBaseUrl,
     arkApiKey,
+    dashscopeApiKey,
+    dashscopeWorkspaceId,
+    deepinfraToken,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.
     anthropicApiKey: e.ANTHROPIC_API_KEY || null,
@@ -269,4 +312,38 @@ export const ARK_ASSET_HOST = 'tos-ap-southeast-1.volces.com'
 function withArkHost(allowlist: string[], arkApiKey: string | null): string[] {
   if (!arkApiKey) return allowlist
   return allowlist.includes(ARK_ASSET_HOST) ? allowlist : [...allowlist, ARK_ASSET_HOST]
+}
+
+// Where Alibaba Model Studio publishes a finished Wan video. Same trap as
+// ByteDance: the API host is `*.maas.aliyuncs.com`, but the asset lands on OSS
+// object storage under `*.oss-*.aliyuncs.com` — allowlisting the API domain would
+// pass the gate for zero real downloads. `aliyuncs.com` is the suffix that admits
+// their OSS buckets across region/bucket renames; the gate matches on a dot
+// boundary, so it cannot be widened by a lookalike domain.
+//
+// Their URL dies after 24 HOURS, so storage.saveFromUrl copying it out is not an
+// optimization — it is the only reason the asset survives at all.
+export const DASHSCOPE_ASSET_HOST = 'aliyuncs.com'
+
+// Fold it in ONLY when the direct Alibaba provider is configured, keeping the
+// download surface closed by default — exactly like the two hosts above.
+function withDashscopeHost(allowlist: string[], dashscopeApiKey: string | null): string[] {
+  if (!dashscopeApiKey) return allowlist
+  return allowlist.includes(DASHSCOPE_ASSET_HOST)
+    ? allowlist
+    : [...allowlist, DASHSCOPE_ASSET_HOST]
+}
+
+// Where DeepInfra serves a finished clip. Unlike ByteDance and Alibaba — whose API
+// host and asset host are DIFFERENT domains, a trap that would have passed the SSRF
+// gate for zero real downloads — DeepInfra serves the video from its own domain.
+export const DEEPINFRA_ASSET_HOST = 'deepinfra.com'
+
+// Folded in ONLY when the provider is configured; the download surface stays closed
+// by default, exactly like the three hosts above.
+function withDeepinfraHost(allowlist: string[], deepinfraToken: string | null): string[] {
+  if (!deepinfraToken) return allowlist
+  return allowlist.includes(DEEPINFRA_ASSET_HOST)
+    ? allowlist
+    : [...allowlist, DEEPINFRA_ASSET_HOST]
 }

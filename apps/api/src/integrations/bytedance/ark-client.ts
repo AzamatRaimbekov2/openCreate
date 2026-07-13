@@ -31,11 +31,20 @@ import type { VideoPollResult, VideoProvider, VideoSubmitInput } from '../video-
 export class ArkError extends Error {
   statusCode: number
   apiCode: string
-  constructor(message: string, opts?: { statusCode?: number; apiCode?: string }) {
+  // ModelArk's own error code + text, kept OFF `message` because app.ts sends
+  // `message` straight to the browser for any apiCode-carrying error and the
+  // provider's body names our account id. Operators read this in the logs; the
+  // user reads the mapped provider_error copy. Never serialize it to a client.
+  providerDetail?: string
+  constructor(
+    message: string,
+    opts?: { statusCode?: number; apiCode?: string; providerDetail?: string },
+  ) {
     super(message)
     this.name = 'ArkError'
     this.statusCode = opts?.statusCode ?? 502
     this.apiCode = opts?.apiCode ?? 'provider_error'
+    if (opts?.providerDetail !== undefined) this.providerDetail = opts.providerDetail
   }
 }
 
@@ -254,7 +263,9 @@ async function request(
   if (!res.ok) {
     // Read the documented error envelope to classify. A body we cannot parse is
     // not a reason to fail differently — it just stays a generic provider error.
-    const parsed = (await res.json().catch(() => null)) as { error?: { code?: string } } | null
+    const parsed = (await res.json().catch(() => null)) as {
+      error?: { code?: string; message?: string }
+    } | null
     const code = parsed?.error?.code
     if (isModerationCode(code))
       throw new ArkError(
@@ -264,7 +275,20 @@ async function request(
         'ByteDance refused this input. Seedance 2.0 does not accept images or video containing real human faces.',
         { statusCode: 400, apiCode: 'content_blocked' },
       )
-    throw new ArkError(`ModelArk HTTP ${res.status}`)
+    // The client-facing message stays sanitized ON PURPOSE: app.ts sends
+    // `err.message` verbatim for any error carrying an apiCode, and ModelArk's
+    // body names our BytePlus ACCOUNT ID ("Your account 3003474417 has not
+    // activated the model…"). That must never reach a browser.
+    //
+    // But throwing a bare `ModelArk HTTP 404` and dropping the body is what made
+    // this undiagnosable: 404 reads identically for "wrong host", "wrong model
+    // id" and the one that actually happens — ModelNotOpen, i.e. nobody bought
+    // the Seedance resource package. So the provider's own code+text rides along
+    // in `providerDetail`, which the error handler LOGS and never serializes.
+    const detail = [code, parsed?.error?.message].filter(Boolean).join(': ')
+    throw new ArkError(`ModelArk HTTP ${res.status}`, {
+      ...(detail ? { providerDetail: detail } : {}),
+    })
   }
 
   return res.json().catch(() => {
