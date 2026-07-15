@@ -67,3 +67,40 @@ export function parseImageDataUri(dataUri: string, maxBytes: number): ParsedImag
 
   return { bytes, ext }
 }
+
+// Turntable uploads (Studio3D). A SEPARATE allowlist from the image one on
+// purpose: widening MIME_TO_EXT would let a video through every entity-photo and
+// inputImage field in the app, none of which are prepared for one. Keeping the two
+// parsers apart means "images accept video" can never happen by accident.
+//
+// mp4 only. The client encodes H.264 through WebCodecs, and the API re-muxes the
+// result anyway (models3d/normalize.ts), so there is nothing to gain from a second
+// container and plenty to lose — every extra accepted format is another demuxer
+// ffmpeg has to be trusted with on untrusted bytes.
+const VIDEO_MIME_TO_EXT: Record<string, string> = {
+  'video/mp4': 'mp4',
+}
+
+export function parseVideoDataUri(dataUri: string, maxBytes: number): ParsedImage {
+  const match = DATA_URI_PATTERN.exec(dataUri)
+  if (!match) throw new InvalidImageDataUriError('malformed data URI')
+
+  const [, mime = '', payload = ''] = match
+  const ext = VIDEO_MIME_TO_EXT[mime.toLowerCase()]
+  if (!ext) throw new InvalidImageDataUriError(`unsupported video type: ${mime}`)
+
+  if (payload.length === 0) throw new InvalidImageDataUriError('malformed data URI: empty payload')
+
+  // Buffer.from silently DROPS invalid base64 rather than throwing, so an empty
+  // result is the only signal the payload was garbage.
+  const bytes = Buffer.from(payload, 'base64')
+  if (bytes.length === 0) throw new InvalidImageDataUriError('malformed data URI: no bytes decoded')
+
+  // Measured on the DECODED buffer — a cap on the base64 string is off by 4/3 and
+  // lets ~33% more onto the disk than intended.
+  if (bytes.length > maxBytes) {
+    throw new InvalidImageDataUriError(`video too large: ${bytes.length} bytes (max ${maxBytes})`)
+  }
+
+  return { bytes, ext }
+}

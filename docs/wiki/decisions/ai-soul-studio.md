@@ -1,7 +1,7 @@
 ---
 type: decision
-status: proposed
-updated: 2026-07-10
+status: accepted
+updated: 2026-07-13
 tags:
   - decision
   - soul-studio
@@ -10,8 +10,8 @@ tags:
 
 # ADR: AI Soul Studio — a structured character constructor over the entity library
 
-- **Status:** PROPOSED — awaiting owner approval (architecture gate, `feature-architecture`)
-- **Date:** 2026-07-10
+- **Status:** ACCEPTED — approved by the owner 2026-07-13; implemented in the same session
+- **Date:** 2026-07-10 (proposed) · 2026-07-13 (accepted + built)
 - **Feature / area:** `packages/contracts/src/soul.ts`, `apps/api/src/modules/entities`, `apps/web/src/modules/Soul`
 - **Deciders:** owner + agent
 - **Related:** [[entity-library-reference-tagging]], [[cinema-studio]], [[opencreate-mvp-architecture]]
@@ -334,7 +334,88 @@ stateDiagram-v2
 | E. Four independent portraits, no self-reference | Cheaper (4×2 = 8 cr) | `flux-dev` cannot condition on a reference, so the four views are four different people — the feature's whole promise | Rejected: fails the requirement |
 | F. Auto-generate the video on create | Impressive first run | 60–170 credits on one click; a constructor typo is paid for in full | Rejected by the owner |
 
+## Refinements made during implementation
+
+Two things the design got *wrong on paper* and right in the code. Both are recorded here rather
+than quietly diverging, because the ADR is what the next reader will trust.
+
+### 1. `composeSoul` returns a string, not `{ positivePrompt, negativePrompt }`
+
+The Decision section above has `composeSoul(soul) → { positivePrompt, negativePrompt }`, implying
+the soul composes its own style fragment. It must not, for two reasons that only became obvious once
+the entity invariant was written down:
+
+- `entity.description` is **derived** from this text, and a soul-built character is *taggable as
+  `[[e1]]` in any prompt* — including a scene with a different style. A description that begins
+  "3D animated Disney/Pixar style…" would fight the scene's own style at generation time.
+- A style carries a **negative** prompt. Composing only its positive fragment here would silently
+  drop the negative half — the exact class of failure `presets.ts` exists to prevent.
+
+So `composeSoul(soul): string` yields the **subject only**, and `soulPromptPreset(soul)` returns
+`{ styleId, framing: 'reference-sheet' }` for `applyPromptPreset` to expand — which owns both
+halves. The negative-joining change to `applyPromptPreset` (below) is what makes this safe.
+
+### 2. `applyPromptPreset` now JOINS negatives instead of assigning one
+
+Style used to be the only axis with a negative, so `negativePrompt = style.negative` was enough.
+`framing` is the second, and leaving the assignment would have meant a Disney reference sheet stopped
+pushing away *"photorealistic"* the moment it started pushing away *"busy background"*. Negatives are
+collected and joined; with a single negative present the output is byte-identical to before, so every
+pre-existing request is unaffected.
+
+### 3. The portraits endpoint attaches the images itself
+
+The sequence diagram has the client POST `/portraits`, then POST `/images` to attach. But an **image
+generation is synchronous** in this codebase (`generations/service.ts` resolves the asset before
+returning), so that second call buys nothing and opens a window in which a client crash leaves the
+user holding a **paid, orphaned portrait**. `POST /entities/:id/portraits` therefore generates *and*
+attaches, returning the finished entity plus a per-view result array. A view that fails is reported
+individually (`{ view, generationId: null, error }`) and does not abort the remaining views — it has
+already been refunded by the generation service, and collapsing four paid jobs into one error would
+hide which of them the user actually got.
+
+## What minting a real sheet taught us (2026-07-13)
+
+Both of these were invisible to the test suite — which was green — and only appeared when a real
+sheet was minted against the live provider. They are the argument for driving the flow, not just
+running the tests.
+
+### 4. FLUX.1 Kontext has no negative channel — and Runware rejects the whole task
+
+`flux-kontext-pro` (`bfl:3@1`) is an **edit** model: it is steered by the reference image, not by a
+negative prompt, and it does not accept one. Runware does not ignore the parameter — it fails the
+task outright (*"Invalid parameter detected. The parameter 'negativePrompt' is not recognized or
+supported"*). Since a style preset **always** produces a negative, every referencing view (2–4) died
+at the provider, was refunded, and delivered nothing: the sheet could never be more than its hero
+shot.
+
+Fixed exactly like the pre-existing `supportsSafetyParam` (ByteDance rejects `safety`): a
+`supportsNegativePrompt` capability on the catalogue entry, enforced in the generation service.
+The test that would have caught it now exists — the old one only asserted the negative on `calls[0]`
+(flux-dev, which *does* take one), which is precisely how three broken calls hid behind a green suite.
+
+**Consequence for the design:** the `reference-sheet` framing negative reaches the hero shot only.
+Views 2–4 get its positive fragment and rely on the reference image (already clean-backed) to carry
+the rest. Acceptable, but it means the framing axis is *half* as strong on the referencing model as
+the ADR assumed.
+
+### 5. The risk was mis-identified: identity holds, POSE does not
+
+The ADR listed "identity drift across views" as the quality risk to watch. The live sheet shows the
+opposite: identity is excellent (same beard, same iron arm, same vest across all four), but the
+**views barely differ** — "profile" is not a true side view, and "full-body" came back cropped at the
+thigh. Kontext preserves the reference's composition; asking it to *re-pose* the subject fights what
+an edit model is for. The self-reference that buys us a consistent face is the same mechanism that
+resists a new camera angle.
+
+Not fixed here. The options, in rough order of appeal: strengthen the view fragment with explicit
+camera language and let the framing positive do more work; try `nano-banana-pro` (better
+instruction-following, but 28 credits a view — a 4-view sheet becomes 86); or generate views 2–4
+from the hero with an explicit pose-transfer prompt rather than a plain view fragment. Worth a spike
+before this is sold as a "four-view sheet".
+
 ## Links
 
 - Feature docs: `apps/api/FEATURE.md`, `apps/web/FEATURE.md`
+- Contracts: `packages/contracts/src/soul.ts` (+ its sidecar), `presets.ts` (`framing` axis)
 - Related ADRs: [[entity-library-reference-tagging]], [[cinema-studio]], [[wan-selfhost-video-provider]]

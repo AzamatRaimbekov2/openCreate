@@ -12,11 +12,17 @@
 // Order matters: it is the order of the cards in the gallery. Cheapest/simplest
 // last is deliberate — the dramas are the reason someone opens this page.
 import type { Template } from '../types'
+import { buran } from './buran'
 import { fruitDrama } from './fruit-drama'
 import { catDrama } from './cat-drama'
 import { talkingFood } from './talking-food'
 
-export const TEMPLATES: Template[] = [fruitDrama, catDrama, talkingFood]
+// This order is the order of the SHELVES too, not just the cards: the gallery
+// groups by category in first-seen order. «Буран» leads because it is the one
+// template here that is not disposable — the brainrot dramas are picked to be
+// posted, «Буран» is picked to be worked on, and that is the better first
+// impression of what CinemaStudio is for.
+export const TEMPLATES: Template[] = [buran, fruitDrama, catDrama, talkingFood]
 
 export function getTemplate(id: string): Template | undefined {
   return TEMPLATES.find((t) => t.id === id)

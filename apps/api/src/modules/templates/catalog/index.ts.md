@@ -42,9 +42,11 @@ flowchart LR
   prompts are the thing that gets iterated on most. One file per template keeps each one
   reviewable in a diff, keeps blame legible, and makes adding a template a new file plus
   one line here — never an edit to a shared blob.
-- **Array order IS gallery order.** It is curated: the dramas lead because they are why
-  anyone opens the page; the cheap, simple `talking-food` is last. `TemplateCatalog`
-  preserves this order within each category shelf.
+- **Array order IS gallery order — and SHELF order.** `TemplateCatalog` groups by category in
+  first-seen order, so the first entry also decides which shelf leads. It is curated:
+  `buran` (Анимация) leads because it is the one template here that is not disposable — the
+  brainrot dramas are picked to be *posted*, «Буран» is picked to be *worked on*. Then the
+  dramas, because they are why anyone opens the page; the cheap, simple `talking-food` is last.
 
 ## Commits
 

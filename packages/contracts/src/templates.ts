@@ -26,7 +26,14 @@ import { aspectRatioSchema } from './catalog'
 // free string so the rail's tabs are exhaustive and typo-proof; adding a shelf is
 // a deliberate contract change, which is what we want while the catalog is small.
 // ─────────────────────────────────────────────────────────────────────────────
-export const templateCategorySchema = z.enum(['brainrot'])
+//
+// 'animation' is the second shelf, and it is a genuinely different product from
+// 'brainrot': an authored hand-drawn short (one scene, four hard cuts, a spoken
+// performance) rather than a 30-second viral format. It gets its own shelf rather
+// than being filed under brainrot because the two want different things from the
+// user — a brainrot template is picked to be posted, an animation template is
+// picked to be *edited*.
+export const templateCategorySchema = z.enum(['brainrot', 'animation'])
 export type TemplateCategory = z.infer<typeof templateCategorySchema>
 
 // ─────────────────────────────────────────────────────────────────────────────

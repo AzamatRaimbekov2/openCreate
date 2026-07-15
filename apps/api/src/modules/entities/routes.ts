@@ -7,10 +7,13 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
 import {
   addEntityImageInputSchema,
   createEntityInputSchema,
+  createPortraitsInputSchema,
   updateEntityInputSchema,
 } from '@opencreate/contracts'
 import { InvalidImageDataUriError } from '../../storage/dataUri'
-import { EntityImageInvalidError, EntityNotFoundError } from './service'
+import { SoulRequiredError } from './portraits'
+import type { PortraitService } from './portraits'
+import { EntityImageInvalidError, EntityNotFoundError, GenerationNotAttachableError } from './service'
 import type { EntityService } from './service'
 
 // The service throws domain errors; HTTP is where they become status codes.
@@ -32,6 +35,24 @@ function mapDomainError(error: unknown) {
       message: 'That image does not belong to this entity',
     }
   }
+  if (error instanceof GenerationNotAttachableError) {
+    // 400, not 404, and with a message that says NOTHING about which of the four
+    // checks failed (not yours / not finished / not an image / no asset). A
+    // response that distinguished them would confirm that a given generation id
+    // exists on someone else's account.
+    return {
+      status: 400 as const,
+      code: 'validation_failed' as const,
+      message: 'That generation cannot be attached to this entity',
+    }
+  }
+  if (error instanceof SoulRequiredError) {
+    return {
+      status: 400 as const,
+      code: 'validation_failed' as const,
+      message: 'This character has no soul to render — build one in the constructor first',
+    }
+  }
   return null
 }
 
@@ -39,7 +60,19 @@ function mapDomainError(error: unknown) {
 // than the global read limit. 20/min still lets a user add a photo set quickly.
 const UPLOAD_RATE_LIMIT = { max: 20, timeWindow: '1 minute' }
 
-export function registerEntityRoutes(app: FastifyInstance, service: EntityService) {
+// A reference sheet is the most expensive single call in the product: four views
+// cost 2 + 3×8 = 26 credits and hold the connection open for four provider
+// round-trips. The generation service's own 20/min bucket does not protect this —
+// one call there is one image, one call HERE is up to four. 6/min is far above a
+// human clicking "generate the sheet" and a hard wall against a script that would
+// otherwise drain an account (or our provider quota) in seconds.
+const PORTRAIT_RATE_LIMIT = { max: 6, timeWindow: '1 minute' }
+
+export function registerEntityRoutes(
+  app: FastifyInstance,
+  service: EntityService,
+  portraits: PortraitService,
+) {
   // Every handler funnels through this so a thrown domain error becomes the
   // right envelope instead of a 500 from the central handler.
   async function guard<T>(reply: FastifyReply, fn: () => Promise<T>) {
@@ -97,6 +130,9 @@ export function registerEntityRoutes(app: FastifyInstance, service: EntityServic
     })
   })
 
+  // The body is a UNION now (upload | generated). The upload branch DEFAULTS its
+  // source, so the SPA's pre-existing `{ dataUri }` call still parses byte-for-
+  // byte as it did before Soul Studio existed.
   app.post<{ Params: { id: string } }>(
     '/api/entities/:id/images',
     { config: { rateLimit: UPLOAD_RATE_LIMIT } },
@@ -112,6 +148,32 @@ export function registerEntityRoutes(app: FastifyInstance, service: EntityServic
         const entity = await service.addImage(sessionUser.id, req.params.id, parsed.data)
         return reply.status(201).send(entity)
       })
+    },
+  )
+
+  // Mint the reference sheet. The client asks for VIEWS — never for a model and
+  // never for a prompt: both are server-side rules (see portraits.ts), and a
+  // client that could choose the model could pick the 2-credit one for a view that
+  // needs the 8-credit one and receive a stranger, for a price, silently.
+  //
+  // Answers 200, not 201/202: the call is a batch of N paid jobs, some of which
+  // may have failed and been refunded, so there is no single created resource to
+  // point at. The per-view outcomes are in the body.
+  app.post<{ Params: { id: string } }>(
+    '/api/entities/:id/portraits',
+    { config: { rateLimit: PORTRAIT_RATE_LIMIT } },
+    async (req, reply) => {
+      const sessionUser = await app.requireUser(req)
+      const parsed = createPortraitsInputSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: { code: 'validation_failed', message: parsed.error.issues[0]?.message ?? 'invalid input' },
+        })
+      }
+      // req.log rides along so the charges/refunds this call causes carry its reqId.
+      return guard(reply, () =>
+        portraits.create(sessionUser.id, req.params.id, parsed.data, req.log),
+      )
     },
   )
 }

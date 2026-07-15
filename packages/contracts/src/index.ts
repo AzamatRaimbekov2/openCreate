@@ -8,9 +8,14 @@ export * from './resolution'
 // The entity library (characters/objects/places) + the structured mention
 // channel that makes tagging work at all (see entity.ts header)
 export * from './entity'
-// CinemaStudio prompt presets (style/camera/motion/quality) + applyPromptPreset.
-// Exported before generation because generation.ts imports promptPresetSchema.
+// CinemaStudio prompt presets (style/camera/motion/quality/framing) +
+// applyPromptPreset. Exported before generation because generation.ts imports
+// promptPresetSchema.
 export * from './presets'
+// AI Soul Studio — the structured character spec (trait tables + composeSoul).
+// Exported after presets because soul.ts builds on styleIdSchema, and it is what
+// entity.soul is typed by.
+export * from './soul'
 export * from './generation'
 // CinemaStudio film composition contracts (Film/Shot/FilmAudio/FilmRender)
 export * from './film'
