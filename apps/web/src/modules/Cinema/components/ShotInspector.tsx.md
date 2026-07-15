@@ -135,6 +135,20 @@ error surfacing, money-path guards) unchanged.
   Generator for exactly this cross-module reuse). Transition Selects in the ⛶
   drawer are unchanged.
 
+## Update 2026-07-15 — v6.2: prompt grows UPWARD
+- Native `resize-y` is GONE from the prompt: its handle grew the field by
+  dragging DOWN, and the dock is pinned to the viewport bottom — growth can
+  only travel up, so the gesture fought the layout (owner report).
+- A grip now sits on the prompt's TOP edge — the same keyboard-operable
+  `role="separator"` anatomy as the timeline's height edge: drag UP = grow,
+  drag DOWN = shrink (pointer capture, 1:1 delta), ArrowUp/ArrowDown ±16px
+  (clamped 40–480), double-click returns to AUTO.
+- Two sizing modes: `promptHeight === null` = AUTO (`field-sizing-content`
+  follows the text, `max-h-[30svh]` cap); a number = manual — the explicit
+  height wins and the auto classes step aside so they cannot fight it. The
+  first drag starts from the element's LIVE height (`offsetHeight`), so the
+  grip picks up exactly what the user sees.
+
 ## Commits
 
 - _no commit yet_

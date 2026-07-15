@@ -198,6 +198,19 @@ describe('ShotInspector (docked composer)', () => {
     expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
   })
 
+  it('grows the prompt by dragging its TOP edge up (keyboard mirror)', () => {
+    renderComposer(makeShot())
+
+    // The handle sits on the prompt's top edge: UP = grow (the dock is pinned
+    // to the viewport bottom, so growth has nowhere to go but up)
+    const grip = screen.getByRole('separator', { name: /prompt height/i })
+    const before = Number(grip.getAttribute('aria-valuenow'))
+    fireEvent.keyDown(grip, { key: 'ArrowUp' })
+    expect(Number(grip.getAttribute('aria-valuenow'))).toBeGreaterThan(before)
+    fireEvent.keyDown(grip, { key: 'ArrowDown' })
+    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(before)
+  })
+
   it('toggles native generation audio and persists it with the draft', async () => {
     apiMock.mockResolvedValue(makeShot())
     renderComposer(makeShot())

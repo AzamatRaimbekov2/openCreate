@@ -22,7 +22,8 @@
 // selection re-initialises cleanly — no useEffect sync). Generate is chained
 // through onSuccess (no floating async) so the shot is saved before the
 // composed request is built.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   AspectRatio,
@@ -83,6 +84,12 @@ type DockPanel = 'cast' | 'voice' | 'more'
 // The only crossfade lengths we offer — short enough that a 4s shot survives one
 const CROSSFADE_MS = [300, 500, 800] as const
 
+// Manual prompt-height bounds (px) and the keyboard step. 40 = one line; 480
+// keeps even a hand-stretched prompt from burying the stage.
+const MIN_PROMPT_H = 40
+const MAX_PROMPT_H = 480
+const PROMPT_STEP = 16
+
 // Toolbar icon toggle: a quiet chip that lights amber (the selection tint) while
 // its drawer is open. size-8 = the compact chrome scale of the v5 pass.
 const TOOL =
@@ -133,6 +140,45 @@ export function ShotInspector({
   const voices = ttsModel?.voices ?? []
   const [openPanel, setOpenPanel] = useState<DockPanel | null>(null)
   const [isModelOpen, setIsModelOpen] = useState(false)
+  // Manual prompt height. null = AUTO (field-sizing-content grows with the
+  // text); a number = the user took over via the TOP-edge grip. The dock is
+  // pinned to the viewport bottom, so growth travels UP — which is why the
+  // grip lives on the top edge and dragging UP means "bigger" (native
+  // resize-y grew by dragging DOWN, exactly the wrong direction here).
+  const [promptHeight, setPromptHeight] = useState<number | null>(null)
+  const [promptDrag, setPromptDrag] = useState<{ y: number; height: number } | null>(null)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
+
+  const clampPromptH = (px: number) => Math.min(MAX_PROMPT_H, Math.max(MIN_PROMPT_H, px))
+  // The height the grip is standing on right now: the manual value if set,
+  // else the auto-sized element's real height (so the first drag starts from
+  // what the user sees, not from a constant). `||` (not `??`): a not-yet-laid-
+  // out element measures 0, and 0 is as useless as undefined here. Only called
+  // from EVENT HANDLERS — reading a ref during render is a hooks violation.
+  const livePromptHeight = () => promptHeight ?? (promptRef.current?.offsetHeight || MIN_PROMPT_H)
+
+  const handlePromptGripKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    // Top edge: up = the edge travels up = the field grows
+    if (event.key === 'ArrowUp') setPromptHeight(clampPromptH(livePromptHeight() + PROMPT_STEP))
+    else if (event.key === 'ArrowDown')
+      setPromptHeight(clampPromptH(livePromptHeight() - PROMPT_STEP))
+    else return
+    event.preventDefault()
+  }
+
+  const handlePromptDragStart = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setPromptDrag({ y: event.clientY, height: livePromptHeight() })
+  }
+
+  const handlePromptDragMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (promptDrag === null) return
+    // Pointer moving UP (smaller clientY) grows the field — the edge follows
+    // the finger 1:1, same delta math as the timeline's separator.
+    setPromptHeight(clampPromptH(promptDrag.height + (promptDrag.y - event.clientY)))
+  }
+
+  const handlePromptDragEnd = () => setPromptDrag(null)
   const [prompt, setPrompt] = useState(shot.prompt)
   const [preset, setPreset] = useState<PresetDraft>(presetToDraft(shot.promptPreset))
   const [modelId, setModelId] = useState(() => initialModelId(shot, videoModels))
@@ -367,21 +413,56 @@ export function ShotInspector({
           </div>
         ) : null}
 
-        {/* The prompt — the dock's whole face, as an iOS-glass plate (owner
-            request 2026-07-15): the kit's GLASS_SURFACE gives the translucent
-            white wash, the backdrop blur/saturate, the bright specular TOP edge
-            (the no-gradient "reflection") and the inner glass ring — one recipe
-            with Card/Modal, so the materials cannot drift. field-sizing-content
-            grows it with the text; resize-y hands the user the same edge the
-            timeline has; the 30svh cap keeps a pasted novella from eating the
-            stage. mx/mt margins float the plate inside the steel dock. */}
+        {/* The prompt's resize grip, on the TOP edge (v6.2): the dock is pinned
+            to the viewport bottom, so a bigger field can only grow UPWARD —
+            native resize-y grew by dragging DOWN, exactly the wrong direction,
+            which is why it is gone. Drag up = grow, drag down = shrink, arrows
+            mirror it, double-click returns to auto-grow. Same keyboard-operable
+            separator anatomy as the timeline's height edge. */}
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t('cinema.inspector.promptResize')}
+          aria-valuemin={MIN_PROMPT_H}
+          aria-valuemax={MAX_PROMPT_H}
+          // State only, never the ref: render must not read the DOM (hooks
+          // rule). Until the user takes over, AT hears the auto floor — the
+          // first interaction snaps this to the real measured height.
+          aria-valuenow={promptHeight ?? MIN_PROMPT_H}
+          tabIndex={0}
+          onKeyDown={handlePromptGripKeyDown}
+          onPointerDown={handlePromptDragStart}
+          onPointerMove={handlePromptDragMove}
+          onPointerUp={handlePromptDragEnd}
+          onPointerCancel={handlePromptDragEnd}
+          onDoubleClick={() => setPromptHeight(null)}
+          className="group flex h-3 cursor-row-resize touch-none items-center justify-center focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+        >
+          <span
+            aria-hidden="true"
+            className="h-1 w-10 rounded-full bg-white/10 transition-colors duration-200 group-hover:bg-white/25 group-focus-visible:bg-white/25"
+          />
+        </div>
+
+        {/* The prompt — the dock's whole face, as an iOS-glass plate: the kit's
+            GLASS_SURFACE gives the translucent white wash, the backdrop
+            blur/saturate, the bright specular TOP edge (the no-gradient
+            "reflection") and the inner glass ring — one recipe with Card/Modal,
+            so the materials cannot drift. Two sizing modes: AUTO
+            (field-sizing-content follows the text, capped 30svh) until the user
+            takes over via the grip above — then the explicit height wins and
+            the auto classes step aside so they cannot fight it. */}
         <textarea
           rows={1}
+          ref={promptRef}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           placeholder={t('cinema.inspector.promptPlaceholder')}
           aria-label={t('cinema.inspector.prompt')}
-          className={`${GLASS_SURFACE} field-sizing-content mx-2 mt-2 max-h-[30svh] min-h-10 resize-y rounded-xl border px-3 py-2.5 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
+          style={promptHeight !== null ? { height: `${promptHeight}px` } : undefined}
+          className={`${GLASS_SURFACE} ${
+            promptHeight === null ? 'field-sizing-content max-h-[30svh]' : 'resize-none'
+          } mx-2 min-h-10 rounded-xl border px-3 py-2.5 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
         />
 
         {/* Status strip: the clip's lifecycle + the newest action failure, keyed

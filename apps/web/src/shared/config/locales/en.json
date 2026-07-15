@@ -533,7 +533,8 @@
       "more": "More settings",
       "audio": "Generation audio",
       "audioX2": "Generation audio (2× price)",
-      "audioNone": "This model has no audio"
+      "audioNone": "This model has no audio",
+      "promptResize": "Prompt height"
     },
     "preview": {
       "title": "Preview",
