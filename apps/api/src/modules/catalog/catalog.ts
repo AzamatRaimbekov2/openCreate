@@ -128,6 +128,12 @@ export const CATALOG: CatalogModel[] = [
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 8],
     creditsByDuration: { '5': 35, '8': 56 },
+    // providerSettings.pixverse.audio exists (enumerated from Runware's own
+    // allowedValues — see runware/video-adapter.ts) and the with-audio rate is
+    // ~2× the silent one, so audio-on is priced at 2× (owner decision
+    // 2026-07-15: honest margin over a flat price).
+    nativeAudio: 'switchable',
+    creditsByDurationWithAudio: { '5': 70, '8': 112 },
   },
   {
     id: 'minimax-hailuo',
@@ -153,6 +159,12 @@ export const CATALOG: CatalogModel[] = [
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 10],
     creditsByDuration: { '5': 35, '10': 70 },
+    // ByteDance bills Seedance at EXACTLY 2× with audio ($0.0024/1k vs
+    // $0.0012/1k — measured, see runware/video-adapter.ts header), so audio-on
+    // carries the 2× price (owner decision 2026-07-15). The silent table above
+    // keeps the margin the audio-off economics pass restored.
+    nativeAudio: 'switchable',
+    creditsByDurationWithAudio: { '5': 70, '10': 140 },
     // ByteDance models reject Runware's `safety` param (unsupportedParameter,
     // verified live 2026-07-08) — flag off so the client omits it. Moderation
     // still applies via the NSFWContent flag on results.
@@ -197,6 +209,12 @@ export const CATALOG: CatalogModel[] = [
     durationOptions: [5, 8],
     creditsByDuration: { '5': 85, '8': 135 },
     provider: 'alibaba',
+    // The direct Alibaba channel has NO audio switch — every clip ships with the
+    // model's soundtrack and the $0.10/s list price already includes it, so the
+    // 85/135 table above needs no with-audio twin. 'always' tells the service to
+    // stamp params.audio=true on every row (render provenance) and tells the
+    // composer the toggle costs nothing here.
+    nativeAudio: 'always',
     // THE FIRST VIDEO MODEL THAT CAN HOLD A CHARACTER. Until now `referenceMode`
     // existed only on image models, so tagging a character produced a picture of
     // them and nothing more — every video shot invented a new stranger, which is
@@ -409,13 +427,25 @@ export function getModel(id: string): CatalogModel | undefined {
   return CATALOG.find((m) => m.id === id)
 }
 
-export function creditsFor(model: CatalogModel, duration?: number): number {
+export function creditsFor(model: CatalogModel, duration?: number, withAudio = false): number {
   // Image, audio and model3d are flat-priced per generation (a picture, a song,
   // an utterance, a mesh); only video prices by duration. `duration` is optional
   // so callers pricing a flat model (e.g. the 3D tiers) don't have to pass
   // `undefined` explicitly.
   if (model.type === 'image' || model.type === 'audio' || model.type === 'model3d') return model.credits
   if (duration === undefined) throw new Error('duration required for video')
+  // Native audio ON reads the with-audio table on 'switchable' models — the
+  // provider bills sound separately (ByteDance: exactly 2×), so the silent price
+  // would sell it below margin. 'always' models (Wan 2.7) include audio in the
+  // base table, and a model with no nativeAudio never reaches here with
+  // withAudio=true (the service refuses the request before pricing it) — the
+  // throw is the config-drift backstop, not a user-facing path.
+  if (withAudio && model.nativeAudio === 'switchable') {
+    const audioCredits = model.creditsByDurationWithAudio?.[String(duration)]
+    if (!audioCredits)
+      throw new Error(`no with-audio price for duration ${duration} on ${model.id}`)
+    return audioCredits
+  }
   const credits = model.creditsByDuration[String(duration)]
   if (!credits) throw new Error(`unsupported duration ${duration} for ${model.id}`)
   return credits

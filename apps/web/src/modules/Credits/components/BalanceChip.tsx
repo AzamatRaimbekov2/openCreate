@@ -19,7 +19,7 @@ export function BalanceChip() {
 
   // Loading: chip-shaped skeleton, no layout shift when the number arrives
   if (isPending) {
-    return <Skeleton className="h-10 w-20 rounded-full" />
+    return <Skeleton className="h-8 w-20 rounded-full" />
   }
 
   if (isError) {
@@ -34,7 +34,7 @@ export function BalanceChip() {
         type="button"
         onClick={() => void refetch()}
         aria-label={t('credits.reload')}
-        className="flex size-10 items-center justify-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-mist focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+        className="flex size-8 items-center justify-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-mist focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         <span aria-hidden="true">↻</span>
       </button>
@@ -53,7 +53,7 @@ export function BalanceChip() {
         type="button"
         onClick={() => setIsHistoryOpen(true)}
         aria-label={t('credits.balance')}
-        className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-white/10 bg-specimen-amber/20 px-3 py-2 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+        className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/10 bg-specimen-amber/20 px-3 py-1 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         {/* Decorative bolt — the aria-label already names the control.
             Inline SVG (currentColor) instead of the ⚡ emoji: OS emoji render
@@ -73,8 +73,8 @@ export function BalanceChip() {
           <path d="M13 2 4.5 13.5H11L9.5 22 19.5 9.5H12.5L13 2Z" />
         </svg>
         {/* Mono numeral at the 500 weight ceiling — the same numeral voice as
-            the price index, scaled for the 40px control */}
-        <span className="text-base leading-none font-medium">{data.creditsBalance}</span>
+            the price index, scaled for the 32px control */}
+        <span className="text-sm leading-none font-medium">{data.creditsBalance}</span>
       </button>
       <TransactionsList isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </>

@@ -47,6 +47,11 @@ flowchart TD
 - Disabled when `canRender` is false (no shots) or while processing — the honest
   client mirror of the API's concurrency cap.
 
+## Update 2026-07-15 — v5 compact bar
+- Caption text-sm→text-xs, CTA `size="sm"`, download link min-h-10 px-5 py-2 text-sm →
+  min-h-8 px-4 py-1 text-xs — the export row is tool chrome on the same 32px scale as
+  the timeline's authoring buttons.
+
 ## Commits
 
 - _no commit yet_

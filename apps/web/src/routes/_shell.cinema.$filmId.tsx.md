@@ -58,6 +58,11 @@ flowchart LR
   simply reads as "no template" (the audio panel opens empty, exactly as it did before
   templates existed).
 
+## Update 2026-07-15 — v5 compact canvas
+- Route canvas gap-8 px-6 py-8 xl:px-10 → gap-4 px-4 py-4 xl:px-6: the editor is a
+  workbench; its chrome budget goes to the timeline + stage. Browsing screens keep the
+  roomier canvas.
+
 ## Commits
 
 - _no commit yet_

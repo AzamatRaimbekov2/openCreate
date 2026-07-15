@@ -31,5 +31,11 @@ flowchart LR
 - Nouns are renamed off Runware: `videoURL/imageURL → assetUrl`, `cost → costUsd`, `NSFWContent → nsfw`. The service switches on this union identically for every provider — that is what keeps the money path byte-for-byte unchanged.
 - `submit` returns the job id (provider owns it); the service persists it and polls with it. This preserves the submit-window race guard (poll refuses until the id is set).
 
+## Update 2026-07-15 — native generation audio
+- `VideoSubmitInput` += `audio?: boolean`. Set ONLY after the service validated
+  the catalog capability and charged the with-audio price; adapters merely
+  translate it into their backend's spelling. Absent/false keeps the audio
+  kill-switch — the money rule the adapters were built on.
+
 ## Commits
 - _no commit yet_

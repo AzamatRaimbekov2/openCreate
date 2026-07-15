@@ -310,6 +310,20 @@ export function createGenerationService({
     // know cannot succeed must cost the user nothing.
     if (model.type === 'model3d' && !input.inputImage)
       throw new ValidationError(`${model.id} requires a photo`)
+    // Native generation audio is a CAPABILITY (catalog `nativeAudio`), and the
+    // API decides — the composer filters the toggle, but a capability the client
+    // can lie about is not one (same law as referenceMode). Runs BEFORE the
+    // charge: on models without a switch the request would silently render a
+    // silent clip at whatever price we guessed.
+    if (input.audio === true && (model.type !== 'video' || !model.nativeAudio))
+      throw new ValidationError(`${model.id} has no native audio`)
+    // Whether THIS clip will carry a soundtrack — provenance for the film render
+    // (it maps a clip's audio stream only when the row says one exists) and the
+    // pricing input below. 'always' models (Wan 2.7 direct) ship audio in every
+    // clip whether or not the request asked.
+    const nativeAudio =
+      model.type === 'video' &&
+      (model.nativeAudio === 'always' || (input.audio === true && model.nativeAudio === 'switchable'))
 
     // ── Tagged entities ──────────────────────────────────────────────────────
     // Everything here runs BEFORE the charge. A tag the model cannot honour, or
@@ -370,7 +384,10 @@ export function createGenerationService({
 
     let cost: number
     try {
-      cost = creditsFor(model, input.duration)
+      // Audio-on prices from the with-audio table on 'switchable' models — the
+      // provider bills sound at ~2×, and the owner chose honest margin over a
+      // flat price (2026-07-15). 'always' models price identically either way.
+      cost = creditsFor(model, input.duration, input.audio === true)
     } catch (err) {
       // creditsFor throws plain Errors (missing/unsupported duration) — those
       // are caller mistakes, so surface as 400, not 500.
@@ -443,7 +460,15 @@ export function createGenerationService({
           promptPresetJson,
           modelId: model.id,
           provider: providerId,
-          paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, duration: input.duration }),
+          // `audio: true` is stamped for ANY clip that will carry a soundtrack
+          // (asked-for on switchable models, unconditional on 'always' ones) —
+          // the render maps the clip's audio stream into the export mix off this
+          // flag, so it never probes files. JSON.stringify drops the undefined.
+          paramsJson: JSON.stringify({
+            aspectRatio: input.aspectRatio,
+            duration: input.duration,
+            audio: nativeAudio || undefined,
+          }),
           costCredits: cost,
           createdAt: now,
         })
@@ -612,6 +637,9 @@ export function createGenerationService({
           // a native style mode uses it, everyone else ignores it. The prompt still
           // carries the fragment, so this is purely additive.
           ...(preset?.styleId ? { styleId: preset.styleId } : {}),
+          // Native audio, already capability-checked and PRICED above — the
+          // adapter only translates the flag into its backend's spelling.
+          ...(input.audio === true ? { audio: true } : {}),
           // Tagged-character photos, already authorized and turned into data URIs
           // above (and refused, before the charge, if the model cannot use them).
           // This is what makes shot 2 show the SAME character as shot 1.

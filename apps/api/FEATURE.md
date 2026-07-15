@@ -113,7 +113,13 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   **renders**: a render is NOT a generation — its own `film_render` table, status-guarded
   settle, boot reaper, and NO ledger (it spends CPU, not a provider invoice). The render is a
   PURE ffmpeg-argv builder (`films/render.ts`, unit-tested) + a spawn runner (ffmpeg-static),
-  bounded by a semaphore. **Storyboard**: `POST /api/films/:id/storyboard` sends a script to
+  bounded by a semaphore. **Native generation audio** (ADR addendum 2026-07-15): catalog
+  `nativeAudio: 'switchable' | 'always'` + `creditsByDurationWithAudio` (audio-on = 2× on
+  switchable models — capability-checked and priced BEFORE the charge; `audio: true` on a
+  model without the capability is a 400); the row stamps `params.audio` provenance, and the
+  render maps a clip's own `[i:a]` stream into the amix only when `shot.audio` AND the row
+  agree (atrim to the shot window, adelay to the segment's fold-computed timeline start).
+  **Storyboard**: `POST /api/films/:id/storyboard` sends a script to
   Claude (`claude-opus-4-8`, optional `ANTHROPIC_API_KEY`) → draft shots (nothing charged until
   the user generates each). Charge/refund/stale-sweep and the VideoProvider seam are UNCHANGED.
 
@@ -246,6 +252,44 @@ Pre-authored viral formats that instantiate into a whole film. ADR:
   snaps the duration, changing both the cut and the price behind the user's back.
 - **Two substitution modes.** `{{var}}` in a visual prompt → the option's English fragment; in a
   title or a spoken line → its Russian noun. Free text never reaches a visual prompt.
+
+## AI Soul Studio
+
+A structured character constructor over the entity library. ADR:
+`docs/wiki/decisions/ai-soul-studio.md`. It adds **no new subject store, no new money code and no
+new storage code** — a soul-built character *is* an `entity`, taggable as `[[e1]]` from the moment
+it exists.
+
+- **`entity.soul`** — a nullable JSON column holding the structured `Soul` (archetype, style, age,
+  build, hair, eyes, skin, outfit, vibe, ≤6 traits, notes). **Invariant: `soul != null` ⟹
+  `description` is DERIVED** — the service writes `composeSoul(soul)` on every create/update, forces
+  `kind = 'character'`, and **ignores any description the client sends**. One writer, no override
+  flag: a constructor cannot round-trip prose, and `soul.notes` is the escape hatch.
+- **`POST /api/entities/:id/portraits { views }`** — mints the reference sheet and answers **200**
+  with `{ entity, portraits: [{ view, generationId | null, error | null }] }`. The client asks for
+  **views only**; the model and the prompt are server-side rules.
+- **The model rule (ADR §3).** `flux-kontext-pro` is the only catalogue entry that accepts a
+  reference image, so: **no primary photo → `flux-dev`, no refs** (2 credits); **primary photo exists
+  → `flux-kontext-pro` + `entityRefs: [{ e1, entityId }]`** (8 credits) — the character referencing
+  *itself*. That self-reference is what keeps the face the same across views; without it a four-view
+  sheet is four strangers. The loop is therefore **sequential and reloads the entity**: the hero shot
+  must land and become primary before the next view is submitted.
+- **A full sheet costs 2 + 3×8 = 26 credits**, charged by `generationService.create()` — the one
+  money path (charge-at-submit, guarded fail+refund, NSFW gate). Soul Studio adds **zero ledger
+  code**; `modules/entities/portraits.ts` depends on the generation service through a
+  `Pick<…, 'create'>` type so it cannot grow one.
+- **A failed view does not abort the sheet.** It comes back as `{ generationId: null, error }` (the
+  generation service already refunded it) and the remaining views still render — collapsing N paid
+  jobs into one error would hide which ones the user actually received.
+- **`POST /api/entities/:id/images` is now a union.** `{ dataUri, source? }` (unchanged; source
+  defaults, so the existing SPA call still parses) **or** `{ source: 'generated', generationId, view }`
+  — which validates the generation is the caller's, succeeded and an *image*, then copies the asset
+  **inside our own storage** (`readAsDataUri` → `saveDataUri`). The API never fetches a
+  client-supplied URL, and all four rejections raise the same error so a probe cannot learn that a
+  generation id exists on another account.
+- **`entity_image.view`** makes the sheet render in a stable order and makes **re-rolling one view
+  REPLACE it** (old row deleted, file removed; if it was the primary, the new one inherits that).
+  Without the column, a re-roll would silently append a fifth image.
 
 ## Design references
 

@@ -25,6 +25,7 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     transitionMs: 0,
     title: null,
     voiceover: null,
+    audio: false,
     createdAt: '2026-07-09T10:00:00.000Z',
     ...overrides,
   }
@@ -130,5 +131,26 @@ describe('composeShotClipInput', () => {
   it('omits entityRefs entirely when nobody is cast', () => {
     const input = composeShotClipInput(makeShot({ entityRefs: [] }), videoModel, '16:9')
     expect('entityRefs' in input).toBe(false)
+  })
+
+  // NATIVE AUDIO IS MONEY. `audio: true` on a model without `nativeAudio` is a
+  // 400 by design (the API refuses the capability before charging), and on a
+  // 'switchable' model it doubles the price — so the flag travels ONLY when the
+  // shot asks AND the model declares the capability.
+  it('forwards audio only when the shot asks and the model declares nativeAudio', () => {
+    const audioModel = { ...videoModel, nativeAudio: 'switchable' as const }
+    const input = composeShotClipInput(makeShot({ audio: true }), audioModel, '16:9')
+    expect(input.audio).toBe(true)
+  })
+
+  it('drops a stale audio flag when the chosen model has no nativeAudio', () => {
+    const input = composeShotClipInput(makeShot({ audio: true }), videoModel, '16:9')
+    expect('audio' in input).toBe(false)
+  })
+
+  it('sends no audio key for a silent shot even on an audio-capable model', () => {
+    const audioModel = { ...videoModel, nativeAudio: 'always' as const }
+    const input = composeShotClipInput(makeShot({ audio: false }), audioModel, '16:9')
+    expect('audio' in input).toBe(false)
   })
 })

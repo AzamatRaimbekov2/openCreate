@@ -1,12 +1,14 @@
 // apps/web/src/modules/Cinema/components/Timeline.test.tsx
-// Behavior of the film strip. The load-bearing assertion is a LAYOUT regression
-// guard: "add shot" and "title card" used to live at the tail of the horizontally
-// scrolling rail, so on a film with many shots the primary way to add a shot was
-// scrolled off the right edge. They now belong to the timeline header and must
-// stay OUT of the rail (the rail is the <ul> of shots) — that is what a real
-// editor does, and what a keyboard user needs.
+// Behavior of the film strip. Two load-bearing groups:
+//   * AUTHORING lives behind ONE "+" trigger that opens an actions dialog —
+//     the strip band stays clean, and none of the actions ever sit inside the
+//     horizontally scrolling rail (the old regression: "add shot" scrolled off
+//     the right edge of an 8-shot film).
+//   * The strip is RESIZABLE: a size Select with three presets and a keyboard-
+//     operable separator drive one height value, surfaced via aria-valuenow —
+//     the tests read the accessible value, not pixels.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { FilmDetail, Shot } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
@@ -29,6 +31,7 @@ function makeShot(overrides: Partial<Shot>): Shot {
     generationId: null,
     prompt: '',
     promptPreset: null,
+    entityRefs: [],
     modelId: null,
     durationMs: 4000,
     trimStartMs: 0,
@@ -36,6 +39,7 @@ function makeShot(overrides: Partial<Shot>): Shot {
     transitionMs: 0,
     title: null,
     voiceover: null,
+    audio: false,
     createdAt: '2026-07-09T10:00:00.000Z',
     ...overrides,
   }
@@ -60,17 +64,25 @@ function makeFilm(shots: Shot[]): FilmDetail {
 function renderTimeline(shots: Shot[]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const onSelectShot = vi.fn()
+  const onOpenStoryboard = vi.fn()
   render(
     <QueryClientProvider client={queryClient}>
       <Timeline
         film={makeFilm(shots)}
         selectedShotId={null}
         onSelectShot={onSelectShot}
-        onOpenStoryboard={vi.fn()}
+        onOpenStoryboard={onOpenStoryboard}
       />
     </QueryClientProvider>,
   )
-  return { onSelectShot }
+  return { onSelectShot, onOpenStoryboard }
+}
+
+// The "+" trigger, then the action row inside the opened dialog
+async function chooseAction(name: RegExp) {
+  await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+  const dialog = screen.getByRole('dialog', { name: /^add$/i })
+  await userEvent.click(within(dialog).getByRole('button', { name }))
 }
 
 beforeEach(() => {
@@ -78,7 +90,7 @@ beforeEach(() => {
 })
 
 describe('Timeline', () => {
-  it('keeps the add-shot controls reachable outside the scrolling shot rail', () => {
+  it('keeps ALL authoring behind the "+" dialog, never inside the scrolling rail', async () => {
     renderTimeline([
       makeShot({ id: 'a', orderIndex: 1 }),
       makeShot({ id: 'b', orderIndex: 2 }),
@@ -91,43 +103,85 @@ describe('Timeline', () => {
     expect(within(rail).queryByRole('button', { name: /add shot/i })).toBeNull()
     expect(within(rail).queryByRole('button', { name: /title card/i })).toBeNull()
 
-    // …while both add controls, and the storyboard CTA, stay in the header
-    expect(screen.getByRole('button', { name: /add shot/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /title card/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /storyboard/i })).toBeInTheDocument()
+    // Collapsed: only the "+" trigger is visible, no action buttons on screen
+    expect(screen.queryByRole('button', { name: /add shot/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /storyboard/i })).toBeNull()
+
+    // Open the dialog — all three actions are there
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    const dialog = screen.getByRole('dialog', { name: /^add$/i })
+    expect(within(dialog).getByRole('button', { name: /add shot/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /title card/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /storyboard/i })).toBeInTheDocument()
   })
 
-  it('offers the same controls on an empty film, next to the empty hint', () => {
+  it('offers the same "+" dialog on an empty film, next to the empty hint', () => {
     renderTimeline([])
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
     expect(screen.getByText(/no shots yet/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add shot/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /title card/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^add$/i })).toBeInTheDocument()
   })
 
-  it('adds a shot and selects it', async () => {
+  it('adds a shot from the dialog and selects it', async () => {
     apiMock.mockResolvedValue(makeShot({ id: 'new' }))
     const { onSelectShot } = renderTimeline([])
 
-    await userEvent.click(screen.getByRole('button', { name: /add shot/i }))
+    await chooseAction(/add shot/i)
 
     expect(apiMock).toHaveBeenCalledWith(
       '/api/films/film1/shots',
       expect.objectContaining({ method: 'POST' }),
     )
     await vi.waitFor(() => expect(onSelectShot).toHaveBeenCalledWith('new'))
+    // Choosing an action closes the dialog — no stacked modal left behind
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('adds a title card as a shot with title text', async () => {
     apiMock.mockResolvedValue(makeShot({ id: 'card' }))
     renderTimeline([])
 
-    await userEvent.click(screen.getByRole('button', { name: /title card/i }))
+    await chooseAction(/title card/i)
 
     const [, init] = apiMock.mock.calls[0] ?? []
     expect(JSON.parse(String(init?.body))).toMatchObject({
       generationId: null,
       title: { position: 'center' },
     })
+  })
+
+  it('hands storyboard off to the editor and closes the dialog', async () => {
+    const { onOpenStoryboard } = renderTimeline([])
+
+    await chooseAction(/storyboard/i)
+
+    expect(onOpenStoryboard).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('resizes via the size preset select', async () => {
+    renderTimeline([makeShot({ id: 'a' })])
+
+    // Medium is the default — the separator announces its value
+    const separator = screen.getByRole('separator', { name: /strip height/i })
+    expect(separator).toHaveAttribute('aria-valuenow', '64')
+
+    await userEvent.click(screen.getByRole('button', { name: /size/i }))
+    await userEvent.click(screen.getByRole('option', { name: /small/i }))
+    expect(separator).toHaveAttribute('aria-valuenow', '48')
+
+    await userEvent.click(screen.getByRole('button', { name: /size/i }))
+    await userEvent.click(screen.getByRole('option', { name: /large/i }))
+    expect(separator).toHaveAttribute('aria-valuenow', '88')
+  })
+
+  it('resizes from the keyboard on the separator', () => {
+    renderTimeline([makeShot({ id: 'a' })])
+
+    const separator = screen.getByRole('separator', { name: /strip height/i })
+    fireEvent.keyDown(separator, { key: 'ArrowDown' })
+    expect(separator).toHaveAttribute('aria-valuenow', '72')
+    fireEvent.keyDown(separator, { key: 'ArrowUp' })
+    expect(separator).toHaveAttribute('aria-valuenow', '64')
   })
 })

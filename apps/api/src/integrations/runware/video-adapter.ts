@@ -7,7 +7,11 @@ import { randomUUID } from 'node:crypto'
 import type { RunwareClient } from './client'
 import type { VideoPollResult, VideoProvider, VideoSubmitInput } from '../video-provider'
 
-// NATIVE AUDIO IS ALWAYS OFF, AND THAT IS A MONEY RULE.
+// NATIVE AUDIO IS OFF BY DEFAULT, AND THAT IS A MONEY RULE.
+// (2026-07-15: a request may now turn it ON — but only after the SERVICE has
+// validated the catalog capability and charged the with-audio price. This file
+// still hard-defaults to false: an adapter that guessed "on" would re-open the
+// exact 2× leak documented below.)
 //
 // ByteDance bills Seedance 1.5 Pro at $0.0024/1k tokens WITH audio and $0.0012/1k
 // WITHOUT — exactly 2×. Their default is ON and Runware forwards that default, so
@@ -59,20 +63,26 @@ type RunwareExtras = {
   settings?: Record<string, unknown>
 }
 
-export function runwareExtrasFor(air: string, styleId?: string): RunwareExtras {
+// `audio` arrives from the service ONLY after the capability was validated and
+// the with-audio price charged (catalog `nativeAudio` + creditsByDurationWithAudio).
+// The parameter defaults to false so every caller that says nothing keeps the
+// silent rate — the 2× leak this table was built to close.
+export function runwareExtrasFor(air: string, styleId?: string, audio = false): RunwareExtras {
   const family = air.split(':')[0] ?? ''
 
   if (family === 'pixverse') {
     const style = styleId ? PIXVERSE_STYLE[styleId] : undefined
-    return { providerSettings: { pixverse: { audio: false, ...(style ? { style } : {}) } } }
+    return { providerSettings: { pixverse: { audio, ...(style ? { style } : {}) } } }
   }
   // ByteDance takes cameraFixed | audio | draft — a `style` key here is a 400.
-  if (family === 'bytedance') return { providerSettings: { bytedance: { audio: false } } }
+  if (family === 'bytedance') return { providerSettings: { bytedance: { audio } } }
   // Wan/alibaba has NO providerSettings namespace: promptExtend | promptEnhancer |
   // audio live in a TOP-LEVEL `settings` object instead.
-  if (family === 'alibaba') return { settings: { audio: false } }
+  if (family === 'alibaba') return { settings: { audio } }
   // MiniMax exposes only promptOptimizer; anything else 400s. An unverified family
   // gets nothing — guessing a key kills the generation, so silence is the default.
+  // (This is also why the catalog gives minimax-hailuo no `nativeAudio`: the
+  // service refuses audio:true before it could ever reach this branch.)
   return {}
 }
 
@@ -101,9 +111,10 @@ export function createRunwareVideoAdapter(client: RunwareClient): VideoProvider 
         // Client-internal routing metadata (ByteDance models 400 on `safety`);
         // only forwarded when the service set it from the catalog flag.
         ...(input.omitSafety ? { omitSafety: true } : {}),
-        // Per-family knobs: the audio kill-switch (we pay 2× for a soundtrack the
-        // render discards) plus PixVerse's native cartoon mode. See above.
-        ...runwareExtrasFor(input.model, input.styleId),
+        // Per-family knobs: the audio switch (default OFF — we pay 2× for a
+        // soundtrack the render discards; ON only when the service charged the
+        // with-audio price) plus PixVerse's native cartoon mode. See above.
+        ...runwareExtrasFor(input.model, input.styleId, input.audio === true),
       })
       return { providerJobId }
     },

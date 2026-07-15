@@ -464,7 +464,14 @@
       "title": "Timeline",
       "empty": "No shots yet. Add a shot or generate a storyboard from a script.",
       "addShot": "Add shot",
-      "addTitle": "Title card"
+      "addTitle": "Title card",
+      "add": "Add",
+      "size": "Size",
+      "sizeS": "Small",
+      "sizeM": "Medium",
+      "sizeL": "Large",
+      "sizeCustom": "Custom",
+      "resize": "Strip height"
     },
     "storyboard": {
       "cta": "Storyboard",
@@ -522,7 +529,11 @@
         "clip": "Clip",
         "title": "Title card",
         "voice": "Line"
-      }
+      },
+      "more": "More settings",
+      "audio": "Generation audio",
+      "audioX2": "Generation audio (2× price)",
+      "audioNone": "This model has no audio"
     },
     "preview": {
       "title": "Preview",

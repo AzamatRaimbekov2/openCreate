@@ -37,12 +37,15 @@ export function FilmEditorHeader({ film }: FilmEditorHeaderProps) {
       <div className="flex min-w-0 items-center gap-3">
         <Link
           to="/cinema"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           aria-label={t('cinema.editor.back')}
         >
           <ChevronLeftIcon />
         </Link>
-        <h1 className="truncate text-2xl font-normal text-white">{film.title}</h1>
+        {/* text-lg, not the page-title 2xl (v5): inside the editor the title is
+            a label on a workbench, and every step of its size is a step the
+            timeline + stage cannot use */}
+        <h1 className="truncate text-lg font-normal text-white">{film.title}</h1>
         <Badge>{film.aspectRatio}</Badge>
       </div>
 
@@ -57,7 +60,7 @@ export function FilmEditorHeader({ film }: FilmEditorHeaderProps) {
             onSelect: () => setIsConfirmOpen(true),
           },
         ]}
-        triggerClassName="flex size-9 items-center justify-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+        triggerClassName="flex size-8 items-center justify-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         <span aria-hidden="true">⋯</span>
       </Menu>

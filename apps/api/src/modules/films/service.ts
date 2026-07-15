@@ -121,6 +121,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       transitionMs: row.transitionMs,
       title: row.titleJson ? (JSON.parse(row.titleJson) as ShotTitle) : null,
       voiceover: row.voiceoverJson ? (JSON.parse(row.voiceoverJson) as ShotVoiceover) : null,
+      audio: row.audio,
       createdAt: new Date(row.createdAt).toISOString(),
     }
   }
@@ -322,6 +323,9 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         transitionMs: input.transitionMs ?? 0,
         titleJson: input.title ? JSON.stringify(input.title) : null,
         voiceoverJson: input.voiceover ? JSON.stringify(input.voiceover) : null,
+        // Native generation audio: false unless asked — the silent default is
+        // what every pre-feature shot means, and what keeps generate cheap.
+        audio: input.audio ?? false,
         createdAt: new Date(),
       })
       .run()
@@ -360,6 +364,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     if (input.title !== undefined) patch.titleJson = input.title ? JSON.stringify(input.title) : null
     if (input.voiceover !== undefined)
       patch.voiceoverJson = input.voiceover ? JSON.stringify(input.voiceover) : null
+    if (input.audio !== undefined) patch.audio = input.audio
     db.update(shot).set(patch).where(eq(shot.id, shotId)).run()
     touchFilm(filmId)
     return toShotDto(db.select().from(shot).where(eq(shot.id, shotId)).get()!)
@@ -482,6 +487,12 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         const ext = gen.type === 'video' ? 'mp4' : 'webp'
         const file = storage.localPath(gen.id, ext)
         if (!existsSync(file)) throw new FilmValidationError('a shot’s media file is missing')
+        // Native audio reaches the mix only when BOTH halves agree: the shot asks
+        // for it (user intent) AND the generation row says a soundtrack exists
+        // (params.audio provenance, stamped at submit). Trusting the shot alone
+        // would map [i:a] on a silent mp4 and kill the whole render; trusting the
+        // row alone would force sound on users who turned it off after the fact.
+        const genParams = JSON.parse(gen.paramsJson) as { audio?: boolean }
         segments.push({
           file,
           kind: gen.type === 'video' ? 'video' : 'image',
@@ -490,6 +501,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
           crossfade,
           transitionSec,
           title,
+          nativeAudio: gen.type === 'video' && s.audio && genParams.audio === true,
         })
       } else if (title) {
         // A title-only shot renders as a card over a black background.

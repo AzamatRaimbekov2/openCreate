@@ -104,6 +104,48 @@ describe('buildFfmpegArgs', () => {
   // A film is as long as its picture: an over-long music bed is trimmed to the
   // timeline rather than stretching the export (and `-shortest` is not used, as
   // it would truncate the picture when the audio is the shorter stream).
+  // Native generation audio (2026-07-15): a clip generated WITH sound carries
+  // its own stream into the mix — trimmed to the shot's window and delayed to
+  // the segment's timeline start, so picture and soundtrack stay in lockstep.
+  it('maps a native-audio segment stream into the mix at its timeline offset', () => {
+    const args = buildFfmpegArgs(
+      plan([
+        videoSeg({ durationSec: 4 }),
+        videoSeg({ file: '/media/b.mp4', nativeAudio: true, trimStartSec: 0.5, durationSec: 3 }),
+      ]),
+    )
+    const graph = args[args.indexOf('-filter_complex') + 1]!
+    // [1:a] = the second segment's own stream; delayed to its start (4s, hard cut)
+    expect(graph).toContain('[1:a]atrim=start=0.500:duration=3.000')
+    expect(graph).toContain('adelay=4000|4000[na1]')
+    expect(graph).toContain('[na1]amix=inputs=1')
+    expect(args).toContain('[outa]')
+    expect(args).toContain('aac')
+  })
+
+  it('mixes native segment audio together with film tracks', () => {
+    const args = buildFfmpegArgs(
+      plan([videoSeg({ nativeAudio: true })], {
+        audio: [{ file: '/media/m.mp3', startSec: 0, gainDb: 0 }],
+      }),
+    )
+    const graph = args[args.indexOf('-filter_complex') + 1]!
+    expect(graph).toContain('[na0]')
+    expect(graph).toContain('amix=inputs=2')
+  })
+
+  it('a crossfaded native-audio segment starts inside the overlap, like its picture', () => {
+    const args = buildFfmpegArgs(
+      plan([
+        videoSeg({ durationSec: 4 }),
+        videoSeg({ file: '/media/b.mp4', nativeAudio: true, crossfade: true, transitionSec: 1 }),
+      ]),
+    )
+    const graph = args[args.indexOf('-filter_complex') + 1]!
+    // xfade offset = 4 - 1 = 3s → the clip's sound enters WITH its first frame
+    expect(graph).toContain('adelay=3000|3000[na1]')
+  })
+
   it('trims the audio mix to the visible timeline length', () => {
     const args = buildFfmpegArgs(
       plan([videoSeg({ durationSec: 4 }), videoSeg({ file: '/media/b.mp4', crossfade: true, transitionSec: 1 })], {

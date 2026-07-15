@@ -59,6 +59,12 @@ flowchart LR
   (`rounded-full`); numeral weight is `font-medium` — the 500 ceiling.
   States, roles and aria-labels untouched.
 
+- v3.1 compact bar (2026-07-15): the pill follows the shell's 32px control scale —
+  `min-h-10→min-h-8`, `py-2→py-1`, numeral `text-base→text-sm`, skeleton
+  `h-10→h-8`, retry button `size-10→size-8`. Same reason as AppShell: header
+  chrome gives its pixels back to the editor canvas. Anatomy (amber tint,
+  hairline, glow bolt) unchanged.
+
 ## Commits
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal

@@ -36,6 +36,11 @@ flowchart TD
   never in one click.
 - Rename reuses `FilmSettingsModal` in edit mode (one component, two modes).
 
+## Update 2026-07-15 — v5 compact header row
+- Title text-2xl→text-lg, back link and menu trigger size-9→size-8: inside the editor
+  the title is a label on a workbench, not a page hero. Modals untouched (overlays keep
+  the full-size controls).
+
 ## Commits
 
 - _no commit yet_

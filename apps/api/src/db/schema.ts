@@ -244,6 +244,10 @@ export const shot = sqliteTable('shot', {
   // charging for) the TTS. Generating it produces an audio generation and files a
   // FilmAudio track at this shot's timeline offset.
   voiceoverJson: text('voiceover_json'),
+  // Native generation audio: generate this shot's clip WITH the model's own
+  // soundtrack and carry it into the export mix. 0/1 integer (SQLite boolean);
+  // default 0 = the pre-feature behaviour, which also backfills legacy rows.
+  audio: integer('audio', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
 

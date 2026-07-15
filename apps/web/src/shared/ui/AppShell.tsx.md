@@ -73,6 +73,17 @@ flowchart LR
 - `AppShell` stays presentational: the link is a plain typed `Link`, so `shared/ui` still
   imports nothing from `modules/*`.
 
+## Update 2026-07-15 — v3.1 compact bar
+- Chrome height dropped **64→44px**: bar `py-3→py-1.5`, controls `min-h-10→min-h-8`,
+  wordmark `text-xl→text-base`, nav/account/sign-in labels `text-sm→text-xs`
+  (sign-in pill `px-5 py-2→px-4 py-1`, menu trigger `py-2→py-1`, session skeleton
+  `h-10→h-8`). The dropdown menu panel/items are NOT shrunk — they overlay content,
+  not chrome, so their hit area stays 40px.
+- **Why**: the editor screens (CinemaStudio timeline, Soul sheet) are
+  vertical-space-hungry; the header is pure chrome, so every pixel it gives up goes
+  to the canvas. `BalanceChip` (modules/Credits) mirrors the same 32px control scale.
+- Roles, labels and states untouched — behavior tests unaffected.
+
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)

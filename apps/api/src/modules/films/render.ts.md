@@ -65,5 +65,16 @@ flowchart LR
   truncate the picture whenever the audio is the shorter stream (a voiceover over a long film).
 - ffmpeg 6 `-progress` emits `out_time_ms` whose value is microseconds; the runner divides by 1000.
 
+## Update 2026-07-15 — native generation audio
+- `RenderSegment` += `nativeAudio?: boolean`. The video fold now records each
+  segment's timeline START (cut = end of accumulated stream; crossfade = t
+  earlier, inside the overlap); native-audio chains `[i:a]atrim,asetpts,adelay`
+  each clip's own soundtrack to that offset and join the amix with the film
+  tracks. During a crossfade two soundtracks overlap for the fade's length —
+  the same overlap the picture has. Mix exists when native chains + film tracks
+  > 0; still atrim-capped to the picture length.
+- Pinned by render.test.ts (offsets incl. crossfade) and render-ffmpeg.test.ts
+  (a real clip WITH sound reaches the export as an aac stream).
+
 ## Commits
 - _no commit yet_

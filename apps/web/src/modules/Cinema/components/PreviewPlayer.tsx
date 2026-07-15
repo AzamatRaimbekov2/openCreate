@@ -109,8 +109,13 @@ export function PreviewPlayer({ shots, filmAspect }: PreviewPlayerProps) {
     // rounded corners, so nothing frames the picture but the card itself.
     <Card surface="well" padding="none" className="overflow-hidden">
       <section aria-label={t('cinema.preview.title')}>
-        {/* The canvas — sized to the film's real output shape */}
-        <div className={`relative w-full ${ASPECT_CLASS[filmAspect]}`}>
+        {/* The canvas — sized to the film's real output shape, CAPPED at 42svh
+            (v5): uncapped, a 16:9 canvas in the ~1000px stage column is ~580px
+            tall and single-handedly pushes the export bar and audio below the
+            fold. When the cap bites, the box is wider than the film's aspect and
+            object-contain letterboxes the media inside the dark well — the same
+            thing a real monitor does with an off-shape source. */}
+        <div className={`relative max-h-[42svh] w-full ${ASPECT_CLASS[filmAspect]}`}>
           {clip ? (
             <>
               {clip.kind === 'video' && clip.src ? (
@@ -151,13 +156,13 @@ export function PreviewPlayer({ shots, filmAspect }: PreviewPlayerProps) {
 
         {/* Transport strip: chrome hanging off the picture, separated by a
             hairline rather than a gap — one object, not a card plus a toolbar. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 px-3 py-1.5">
           <button
             type="button"
             onClick={togglePlay}
             disabled={playlist.length === 0}
             aria-label={isPlaying ? t('cinema.preview.pause') : t('cinema.preview.play')}
-            className="grid size-10 shrink-0 place-items-center rounded-full border border-white/10 bg-specimen-amber/20 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:opacity-50"
+            className="grid size-8 shrink-0 place-items-center rounded-full border border-white/10 bg-specimen-amber/20 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:opacity-50"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>

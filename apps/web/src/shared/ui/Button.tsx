@@ -8,14 +8,15 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 export type ButtonVariant = 'primary' | 'ghost' | 'danger'
-export type ButtonSize = 'md' | 'lg'
+export type ButtonSize = 'sm' | 'md' | 'lg'
 
 export type ButtonProps = {
   // Visible content of the button (label, optionally with an icon)
   children: ReactNode
   // Visual role: primary = the single main action, ghost = secondary/quiet, danger = destructive only
   variant?: ButtonVariant
-  // md for regular UI; lg reserved for landing/hero CTAs
+  // sm for dense tool chrome (editor toolbars), md for regular UI; lg reserved
+  // for landing/hero CTAs
   size?: ButtonSize
   // Shows the inline spinner and disables the button while an async action runs
   isLoading?: boolean
@@ -31,8 +32,11 @@ const variantClasses: Record<ButtonVariant, string> = {
   danger: 'bg-specimen-red/20 text-lumen-red hover:bg-specimen-red/35',
 }
 
-// min-h keeps the 40px minimum hit area from the a11y rules
+// md keeps the 40px hit area from the a11y rules; sm (32px) matches the v3.1
+// compact chrome scale (AppShell controls) and is reserved for pointer-first
+// tool surfaces where density buys canvas space — never for primary page CTAs
 const sizeClasses: Record<ButtonSize, string> = {
+  sm: 'min-h-8 px-4 py-1 text-xs',
   md: 'min-h-10 px-5 py-2 text-sm',
   lg: 'min-h-12 px-7 py-3 text-base',
 }

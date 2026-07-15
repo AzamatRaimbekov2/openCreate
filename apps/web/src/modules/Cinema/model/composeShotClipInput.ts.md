@@ -51,6 +51,12 @@ flowchart LR
 - `duration` is video-only; snapped to the nearest `durationOptions` value because
   a video model prices per that list and rejects arbitrary seconds.
 
+## Update 2026-07-15 — native generation audio
+- Video branch forwards `audio: true` ONLY when the shot asks AND the model
+  declares `nativeAudio` — a stale shot flag must never 400 a request (the API
+  refuses unsupported audio before charging) or double a price on a model that
+  cannot sing. Covered by three new cases in composeShotClipInput.test.ts.
+
 ## Commits
 
 - _no commit yet_

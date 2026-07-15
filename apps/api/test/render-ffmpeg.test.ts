@@ -162,6 +162,45 @@ describe.skipIf(!FFMPEG_PATH)('render pipeline against the real ffmpeg', () => {
     120_000,
   )
 
+  // Native generation audio (2026-07-15): a clip generated WITH sound must carry
+  // its soundtrack into the export — trimmed to the shot's window, delayed to the
+  // clip's place on the timeline, mixed with the film's own tracks. Pinned against
+  // the real binary because the [i:a] chain is exactly the kind of graph a pure
+  // test can bless while ffmpeg rejects it.
+  it(
+    'carries a native-audio clip soundtrack into the export mix',
+    async () => {
+      const noisy = join(dir, 'noisy-clip.mp4')
+      // A clip WITH an audio track — video and sine muxed together, like a
+      // provider delivers when generation audio is on.
+      await ff([
+        '-y',
+        '-f', 'lavfi', '-i', `testsrc2=size=320x240:rate=${FPS}:duration=2`,
+        '-f', 'lavfi', '-i', 'sine=frequency=660:duration=2',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest',
+        noisy,
+      ])
+
+      const p = plan(
+        [
+          { file: noisy, kind: 'video', durationSec: 1.5, trimStartSec: 0.2, crossfade: false, transitionSec: 0, title: null, nativeAudio: true },
+          titleSeg('QUIET END', { durationSec: 0.8 }),
+        ],
+        { outputPath: join(dir, 'native-audio.mp4') },
+      )
+
+      const result = await runFfmpeg(buildFfmpegArgs(p), 2300, () => {})
+      expect(result).toEqual({ ok: true })
+      await assertDecodes(p.outputPath)
+
+      const info = await ff(['-i', p.outputPath])
+      expect(info.stderr).toMatch(/Stream.*Audio: aac/)
+      // The film is still picture-length: 1.5 + 0.8 = 2.3s
+      expect(await durationSec(p.outputPath)).toBeCloseTo(2.3, 0)
+    },
+    120_000,
+  )
+
   // The film's length is the timeline, in both directions: a long music bed is
   // capped, and a short voiceover must not truncate the picture.
   it(

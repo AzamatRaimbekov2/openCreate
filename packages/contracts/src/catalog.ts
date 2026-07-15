@@ -80,6 +80,22 @@ export const catalogVideoModelSchema = catalogBase.extend({
   type: z.literal('video'),
   durationOptions: z.array(z.number().int().positive()).min(1),
   creditsByDuration: z.record(z.string(), z.number().int().positive()),
+  // Native (model-generated) audio capability. Absent = the provider path has no
+  // switch we can honour (MiniMax/Kling/Veo via Runware) — the composer must not
+  // offer the toggle. 'switchable' = the request decides, and turning it ON is
+  // priced from creditsByDurationWithAudio (ByteDance bills Seedance at exactly
+  // 2× with audio; silence is what keeps the silent price). 'always' = the model
+  // ships audio in every clip and the listed price already includes it (Wan 2.7
+  // direct: $0.10/s flat, no switch exists).
+  //
+  // This is a CAPABILITY, not a preference — same law as referenceMode: the API
+  // re-validates it because a capability the client can lie about is not one.
+  nativeAudio: z.enum(['switchable', 'always']).optional(),
+  // Per-duration credits when native audio is ON. Required in practice for every
+  // 'switchable' model (the provider charges more for sound; selling it at the
+  // silent price would be margin out the door) — the service throws if asked to
+  // price audio-on without it.
+  creditsByDurationWithAudio: z.record(z.string(), z.number().int().positive()).optional(),
   // Runware's `safety` task param is model-specific: ByteDance/Seedance models
   // reject it as unsupportedParameter. Absent/true = model accepts `safety`.
   supportsSafetyParam: z.boolean().optional(),

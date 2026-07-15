@@ -7,7 +7,7 @@ The design-system button of the v3 "Bioluminescent Terminal" kit: a translucent 
 
 ## What it does (for an AI reader)
 - Responsibilities: render an accessible `<button>` with triad/size styling, loading spinner + `aria-busy`, disabled handling (loading always disables — no double submits).
-- Public API / exports / props / endpoints: `Button`, `ButtonProps` (`children`, `variant: 'primary' | 'ghost' | 'danger'` default primary, `size: 'md' | 'lg'` default md, `isLoading`, plus all native button attributes), `ButtonVariant`, `ButtonSize`.
+- Public API / exports / props / endpoints: `Button`, `ButtonProps` (`children`, `variant: 'primary' | 'ghost' | 'danger'` default primary, `size: 'sm' | 'md' | 'lg'` default md, `isLoading`, plus all native button attributes), `ButtonVariant`, `ButtonSize`.
 - Inputs → Outputs: props → styled `<button>`; `isLoading` → spinner (`data-testid="button-spinner"`, aria-hidden) + disabled + `aria-busy`.
 - Side effects: none.
 
@@ -28,6 +28,10 @@ flowchart LR
 - `font-medium` (500) is the weight ceiling app-wide; focus ring is portal blue (`ring-portal`), no ring offset (offsets against varying surfaces caused halo mismatches on the void).
 - Loading state is also disabled and exposes `aria-busy`; the spinner is decorative (`aria-hidden`).
 - Tests (`Button.test.tsx`) are behavior-only: label/click, loading disables + spinner, idle has no spinner — restyles must keep them green.
+- `sm` (32px: `min-h-8 px-4 py-1 text-xs`) landed with the v3.1 compact pass
+  (2026-07-15) for dense pointer-first tool chrome — CinemaStudio editor toolbars
+  — matching the compact AppShell control scale. `md` stays the floor for primary
+  page CTAs and touch-reachable actions; `sm` is a density tool, not a new default.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

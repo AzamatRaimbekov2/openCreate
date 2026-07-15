@@ -78,6 +78,16 @@ flowchart TD
 - Neutral field rename only — `poll.assetUrl` / `poll.costUsd` / `poll.nsfw` replace `videoURL/imageURL` / `cost` / `NSFWContent`. Provider job id + cost REUSE the `runwareTaskUuid` / `runwareCostUsd` columns. Every money-path guard (charge+insert atomic, submit-window null-id guard, guarded fail+refund, stale reaper, poll throttle) is byte-for-byte unchanged.
 - wan-runpod reports `nsfw:false` (no self-host moderation) → the §9.4 gate never fires for it; documented gap.
 
+## Update 2026-07-15 — native generation audio
+- New guard BEFORE the charge: `input.audio === true` on a non-video model or a
+  model without catalog `nativeAudio` → 400 (capability law, as referenceMode).
+- Pricing: `creditsFor(model, duration, input.audio === true)` — audio-on reads
+  the with-audio table on 'switchable' models (2×, owner decision 2026-07-15).
+- Provenance: `paramsJson.audio = true` stamped for any clip that will carry a
+  soundtrack (asked-for on switchable, unconditional on 'always' models like
+  Wan 2.7 direct) — the film render maps clip audio off this flag, never probes.
+- Submit: `audio: true` forwarded to the VideoProvider seam.
+
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
 - 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes

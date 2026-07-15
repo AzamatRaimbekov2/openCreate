@@ -69,6 +69,11 @@ flowchart TD
   hand-placed, film-wide path — it posts `shotId: null` and therefore APPENDS rather
   than replaces.
 
+## Update 2026-07-15 — v5 compact tracks
+- Track rows py-2→py-1.5 text-sm→text-xs, remove button size-8→size-7, add/generate/
+  cancel buttons `size="sm"`, mini-form input py-2 text-sm→py-1.5 text-xs. Anatomy and
+  the 4 states unchanged.
+
 ## Commits
 
 - _no commit yet_

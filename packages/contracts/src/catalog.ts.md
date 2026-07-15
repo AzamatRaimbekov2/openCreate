@@ -40,6 +40,13 @@ flowchart LR
 ## Key decisions (2026-07-11) — Studio3D model3d
 - Added `catalogModel3dSchema` (`type: 'model3d'`) as a fourth discriminated-union member, Task 1 of the photo-to-3d-studio plan. Flat `credits` (one mesh per generation) mirrors image/audio, not video's per-duration table. Same "throwaway aspect ratio, service skips resolution" trick as audio — a 3D mesh has no 2D aspect ratio. Adds `pbr?: boolean` so the composer can tell the user whether a model outputs full PBR maps (metallic/roughness/normal) or bare albedo. Adds `mesh3dProviderSchema` (`'runware' | 'comfy-3d'`) + `Mesh3dProviderId`, mirroring `videoProviderSchema`: `'runware'` is the only backend actually built (Runware's `3dInference` task); `'comfy-3d'` is a designed-but-unbuilt self-host seam (ADR D2 — hosted TRELLIS.2 pricing beats running our own GPU for this). Purely additive: existing image/video/audio entries and their consumers are unaffected. This lands the contract only — apps/api and apps/web exhaustive switches over `type` do not yet handle `'model3d'` and will fail typecheck until later Studio3D tasks add that branch; that gap is intentional here, not a regression.
 
+## Update 2026-07-15 — native generation audio
+- `catalogVideoModelSchema` += `nativeAudio: 'switchable' | 'always'` (absent =
+  no switch we can honour; composer must not offer the toggle) and
+  `creditsByDurationWithAudio` (per-duration price when audio is ON — providers
+  bill sound separately; ByteDance charges exactly 2×). Capability, not
+  preference: the API re-validates, same law as `referenceMode`.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 45ce33e feat: design-system v4 (Card/surfaces) + Seedance direct via ByteDance ArkC

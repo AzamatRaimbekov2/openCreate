@@ -43,8 +43,15 @@ export function RenderBar({ filmId, canRender }: RenderBarProps) {
     <Card>
       <section aria-label={t('cinema.render.title')} className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-sm text-mist-dim">{t('cinema.render.title')}</span>
-          <Button onClick={start} isLoading={isProcessing} disabled={!canRender || isProcessing}>
+          <span className="text-xs text-mist-dim">{t('cinema.render.title')}</span>
+          {/* size="sm" — editor tool chrome (v5 compact pass), same scale as the
+              timeline's authoring buttons */}
+          <Button
+            size="sm"
+            onClick={start}
+            isLoading={isProcessing}
+            disabled={!canRender || isProcessing}
+          >
             {t('cinema.render.cta')}
           </Button>
         </div>
@@ -65,7 +72,7 @@ export function RenderBar({ filmId, canRender }: RenderBarProps) {
           <a
             href={render.mediaUrl}
             download
-            className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-full border border-white/10 bg-specimen-green/20 px-5 py-2 text-sm font-medium text-glow-green shadow-pill transition-colors duration-200 hover:bg-specimen-green/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            className="inline-flex min-h-8 items-center justify-center gap-2 self-start rounded-full border border-white/10 bg-specimen-green/20 px-4 py-1 text-xs font-medium text-glow-green shadow-pill transition-colors duration-200 hover:bg-specimen-green/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
             <DownloadIcon />
             {t('cinema.render.download')}

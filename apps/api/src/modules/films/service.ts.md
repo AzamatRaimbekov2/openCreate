@@ -50,6 +50,13 @@ flowchart TD
   foreign shot into this film's ordering).
 - `runRender` is injectable so tests exercise the full render lifecycle without a real ffmpeg binary.
 
+## Update 2026-07-15 — native generation audio
+- `toShotDto`/`addShot`/`updateShot` carry `shot.audio` (default false).
+- `buildPlan` marks a segment `nativeAudio` only when BOTH halves agree: the
+  shot asks (user intent) AND the generation row's `params.audio === true`
+  (provenance). Shot alone would map [i:a] on a silent mp4 and kill the render;
+  row alone would force sound on users who turned it off after the fact.
+
 ## Commits
 - _no commit yet_
 

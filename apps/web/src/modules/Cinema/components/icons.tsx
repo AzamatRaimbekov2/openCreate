@@ -125,6 +125,39 @@ export function MicIcon({ className = 'size-4' }: { className?: string }) {
   )
 }
 
+// Speaker = the shot's NATIVE generation audio toggle (the model's own
+// soundtrack — a paid capability on some models, absent on others)
+export function SpeakerIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <path d="M11 5 6.5 9H3v6h3.5L11 19V5Z" />
+      <path d="M15 9a4 4 0 0 1 0 6" />
+      <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
+    </svg>
+  )
+}
+
+// Paperclip = attach a reference (the shot composer's cast tool)
+export function PaperclipIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L10.2 17.7a1.7 1.7 0 0 1-2.4-2.4L15.5 7.5" />
+    </svg>
+  )
+}
+
+// Expand = open the composer's full-settings drawer
+export function ExpandIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <path d="M15 3h6v6" />
+      <path d="M21 3l-7 7" />
+      <path d="M9 21H3v-6" />
+      <path d="M3 21l7-7" />
+    </svg>
+  )
+}
+
 // Storyboard = a document with a spark, i.e. "script → shots"
 export function StoryboardIcon({ className = 'size-4' }: { className?: string }) {
   return (

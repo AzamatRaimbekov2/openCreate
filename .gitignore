@@ -67,3 +67,6 @@ spikes/**/.venv/
 
 # --- TanStack Router generated cache (build artifact, not source) -----------
 apps/web/.tanstack/
+
+# graphify knowledge-graph tool cache
+graphify-out/

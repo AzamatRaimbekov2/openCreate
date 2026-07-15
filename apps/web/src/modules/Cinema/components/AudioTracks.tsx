@@ -102,8 +102,8 @@ export function AudioTracks({
               // hiding it.
               const beat = track.shotId ? shotIds.indexOf(track.shotId) : -1
               return (
-              <li key={track.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                <span className="flex items-center gap-2 text-sm text-mist">
+              <li key={track.id} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                <span className="flex items-center gap-2 text-xs text-mist">
                   {track.kind === 'music' ? <MusicIcon /> : <MicIcon />}
                   {beat >= 0
                     ? t('cinema.audio.shotLine', { beat: beat + 1 })
@@ -113,7 +113,7 @@ export function AudioTracks({
                   type="button"
                   onClick={() => deleteAudio.mutate({ filmId, audioId: track.id })}
                   aria-label={t('cinema.audio.remove')}
-                  className="grid size-8 place-items-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-glow-red focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+                  className="grid size-7 place-items-center rounded-full text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-glow-red focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
                 >
                   <TrashIcon />
                 </button>
@@ -127,13 +127,13 @@ export function AudioTracks({
         {openKind === null ? (
           <div className="flex flex-wrap gap-2">
             {musicModel ? (
-              <Button variant="ghost" onClick={() => open('music')}>
+              <Button variant="ghost" size="sm" onClick={() => open('music')}>
                 <MusicIcon />
                 {t('cinema.audio.addMusic')}
               </Button>
             ) : null}
             {ttsModel ? (
-              <Button variant="ghost" onClick={() => open('voiceover')}>
+              <Button variant="ghost" size="sm" onClick={() => open('voiceover')}>
                 <MicIcon />
                 {t('cinema.audio.addVoice')}
               </Button>
@@ -152,7 +152,7 @@ export function AudioTracks({
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder={promptPlaceholder}
                 aria-label={promptPlaceholder}
-                className="rounded-lg border border-white/10 bg-steel px-3 py-2 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none"
+                className="rounded-lg border border-white/10 bg-steel px-3 py-1.5 text-xs text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none"
               />
               {openKind === 'voiceover' && voices.length > 0 ? (
                 <Select
@@ -163,10 +163,11 @@ export function AudioTracks({
                 />
               ) : null}
               <div className="flex items-center justify-end gap-2">
-                <Button variant="ghost" onClick={() => setOpenKind(null)}>
+                <Button variant="ghost" size="sm" onClick={() => setOpenKind(null)}>
                   {t('common.cancel')}
                 </Button>
                 <Button
+                  size="sm"
                   onClick={submit}
                   isLoading={addTrack.isPending}
                   disabled={prompt.trim().length < 2 || addTrack.isPending}

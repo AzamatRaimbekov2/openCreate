@@ -50,6 +50,13 @@ export type VideoSubmitInput = {
   // the service forwards the catalog flag and the Runware adapter omits it.
   // Other providers ignore this field entirely.
   omitSafety?: boolean | undefined
+  // Native generation audio. The SERVICE has already validated the capability
+  // (catalog `nativeAudio`) and priced it (with-audio table) before this flag is
+  // set — an adapter only translates it into its backend's spelling (Runware:
+  // per-family providerSettings/settings audio key). Absent/false = the audio
+  // kill-switch stays on, which is the money rule the adapters were built on.
+  // Providers with no switch (direct Alibaba: always-on) ignore it.
+  audio?: boolean | undefined
   // The chosen style preset id, forwarded so an adapter can reach for its
   // backend's NATIVE style control instead of relying on prompt text alone.
   // PixVerse ships real cartoon modes (anime / 3d_animation / clay / comic /

@@ -31,6 +31,10 @@ erDiagram
 - `creditsBalance` is mutated ONLY inside the same transaction as a `credit_transaction` row (ledger invariant).
 - `credit_transaction.amount` is signed: negative for `charge`, positive for `signup_bonus`/`refund`.
 
+## Update 2026-07-15 — shot.audio
+- `shot` += `audio integer(boolean) NOT NULL DEFAULT false` — native generation
+  audio intent. DEFAULT 0 backfills legacy rows silent (what those clips are).
+
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

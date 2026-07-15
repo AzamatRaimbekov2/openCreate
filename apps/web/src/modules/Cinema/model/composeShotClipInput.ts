@@ -61,6 +61,11 @@ export function composeShotClipInput(
     return {
       ...input,
       duration: nearestDuration(model.durationOptions, Math.round(shot.durationMs / 1000)),
+      // Native generation audio — sent ONLY when the shot asks for it AND the
+      // model declares the capability. Sending `audio: true` to a model without
+      // `nativeAudio` is a 400 by design (the API refuses before charging), so
+      // the composer must not let a stale shot flag leak onto a switched model.
+      ...(shot.audio && model.nativeAudio ? { audio: true } : {}),
     }
   }
   return input

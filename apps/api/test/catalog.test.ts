@@ -16,6 +16,28 @@ describe('catalog', () => {
   it('creditsFor video uses duration table', () => {
     expect(creditsFor(getModel('pixverse-v6')!, 5)).toBe(35)
   })
+  // Native audio is billed separately by the provider (ByteDance: exactly 2×) —
+  // audio-on must read the with-audio table, never the silent one.
+  it('creditsFor video with audio reads the with-audio table on switchable models', () => {
+    expect(creditsFor(getModel('seedance-1-5-pro')!, 5, true)).toBe(70)
+    expect(creditsFor(getModel('pixverse-v6')!, 8, true)).toBe(112)
+  })
+
+  it("creditsFor with audio on an 'always' model prices from the base table", () => {
+    // Wan 2.7 direct ships audio in every clip; the list price already includes it
+    expect(creditsFor(getModel('wan-2-7')!, 5, true)).toBe(85)
+    expect(creditsFor(getModel('wan-2-7')!, 5, false)).toBe(85)
+  })
+
+  it('every switchable model carries a complete with-audio price table', () => {
+    for (const m of CATALOG) {
+      if (m.type !== 'video' || m.nativeAudio !== 'switchable') continue
+      for (const d of m.durationOptions) {
+        expect(m.creditsByDurationWithAudio?.[String(d)], `${m.id} @ ${d}s`).toBeGreaterThan(0)
+      }
+    }
+  })
+
   it('creditsFor video with unsupported duration throws', () => {
     expect(() => creditsFor(getModel('pixverse-v6')!, 99)).toThrow()
   })

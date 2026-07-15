@@ -85,6 +85,11 @@ export function createDb(path: string) {
   if (!shotColumns.includes('entity_refs_json')) {
     sqlite.exec('ALTER TABLE shot ADD COLUMN entity_refs_json TEXT')
   }
+  //  · shot.audio  native generation audio (0/1). DEFAULT 0 backfills every
+  //    pre-feature shot as silent — exactly what those clips are.
+  if (!shotColumns.includes('audio')) {
+    sqlite.exec('ALTER TABLE shot ADD COLUMN audio INTEGER NOT NULL DEFAULT 0')
+  }
   const filmColumns = (sqlite.pragma('table_info(film)') as Array<{ name: string }>).map(
     (column) => column.name,
   )

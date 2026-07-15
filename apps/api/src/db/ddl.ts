@@ -201,6 +201,9 @@ CREATE TABLE IF NOT EXISTS shot (
   -- Costs nothing to hold; becomes an audio generation + a film_audio track only
   -- when the user asks for it.
   voiceover_json TEXT,
+  -- Native generation audio: 1 = generate the clip WITH the model's soundtrack
+  -- and carry it into the export mix. DEFAULT 0 backfills legacy rows silent.
+  audio INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_shot_film_order ON shot(film_id, order_index);

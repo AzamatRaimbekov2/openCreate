@@ -65,6 +65,12 @@ export type RenderSegment = {
   // Crossfade duration in seconds (only read when `crossfade` is true).
   transitionSec: number
   title: ShotTitle | null
+  // Map this segment's OWN audio stream into the export mix (native generation
+  // audio). Only ever true for a video segment whose generation row carries
+  // params.audio provenance — mapping [i:a] on a file with no audio stream kills
+  // the whole render, so the caller (buildPlan) gates it on the row, never on a
+  // guess. Absent/false = the pre-feature behaviour: the clip contributes video only.
+  nativeAudio?: boolean
 }
 
 export type RenderAudio = {
@@ -184,6 +190,12 @@ export function buildFfmpegArgs(plan: RenderPlan): string[] {
   })
 
   // ── Fold the segments into one [outv] via xfade (crossfade) or concat (cut) ──
+  // The fold also records each segment's START on the final timeline (a cut
+  // starts where the accumulated stream ends; a crossfade starts t earlier,
+  // inside the overlap) — the native-audio chains below delay each clip's own
+  // soundtrack to exactly this offset, so picture and sound stay in lockstep
+  // through any mix of cuts and fades.
+  const segmentStartSec: number[] = [0]
   let acc = '[v0]'
   let accLen = segments[0]!.durationSec
   for (let i = 1; i < segments.length; i++) {
@@ -195,12 +207,14 @@ export function buildFfmpegArgs(plan: RenderPlan): string[] {
     const t = Math.min(seg.transitionSec, accLen - 0.05, seg.durationSec - 0.05)
     if (!seg.crossfade || t <= 0) {
       filters.push(`${acc}${next}concat=n=2:v=1:a=0${out}`)
+      segmentStartSec.push(accLen)
       accLen = accLen + seg.durationSec
     } else {
       const offset = accLen - t
       filters.push(
         `${acc}${next}xfade=transition=fade:duration=${t.toFixed(3)}:offset=${offset.toFixed(3)}${out}`,
       )
+      segmentStartSec.push(offset)
       accLen = accLen + seg.durationSec - t
     }
     acc = out
@@ -208,26 +222,42 @@ export function buildFfmpegArgs(plan: RenderPlan): string[] {
   // Single-shot film: no boundary was folded, so [v0] never got renamed. Alias it.
   if (segments.length === 1) filters.push(`[v0]null[outv]`)
 
-  // ── Audio: delay each track to its start, apply gain, mix, cap to the film ──
+  // ── Audio: native clip soundtracks + film tracks → one mix, capped to film ──
+  // Native audio (a clip generated WITH sound, shot.audio on): the clip's own
+  // stream is trimmed to the shot's window and delayed to the segment's timeline
+  // start recorded by the fold above. During a crossfade two soundtracks overlap
+  // for the fade's length — the same overlap the PICTURE has, which is what a
+  // crossfade sounds like everywhere else.
+  const mixLabels: string[] = []
+  segments.forEach((seg, i) => {
+    if (!seg.nativeAudio) return
+    const delayMs = Math.round((segmentStartSec[i] ?? 0) * 1000)
+    filters.push(
+      `[${i}:a]atrim=start=${seg.trimStartSec.toFixed(3)}:duration=${seg.durationSec.toFixed(3)},` +
+        `asetpts=PTS-STARTPTS,adelay=${delayMs}|${delayMs}[na${i}]`,
+    )
+    mixLabels.push(`[na${i}]`)
+  })
+  // Film tracks (music beds / voiceover): delay each to its start, apply gain.
   // The film's length is the VIDEO timeline (accLen). A music bed longer than the
   // timeline must not stretch the export, so the mix is trimmed to accLen. We
   // cannot use `-shortest` for this: when a track is SHORTER than the timeline
   // (a voiceover over a long film) it would truncate the video instead. atrim
   // caps a long mix and leaves a short one alone, which is the behaviour we want
   // in both directions.
+  const audioBase = segments.length
+  audio.forEach((track, j) => {
+    const idx = audioBase + j
+    const delayMs = Math.round(track.startSec * 1000)
+    const volume = Math.pow(10, track.gainDb / 20) // dB → linear amplitude
+    filters.push(`[${idx}:a]adelay=${delayMs}|${delayMs},volume=${volume.toFixed(3)}[a${j}]`)
+    mixLabels.push(`[a${j}]`)
+  })
   let hasAudio = false
-  if (audio.length > 0) {
-    const audioBase = segments.length
-    audio.forEach((track, j) => {
-      const idx = audioBase + j
-      const delayMs = Math.round(track.startSec * 1000)
-      const volume = Math.pow(10, track.gainDb / 20) // dB → linear amplitude
-      filters.push(
-        `[${idx}:a]adelay=${delayMs}|${delayMs},volume=${volume.toFixed(3)}[a${j}]`,
-      )
-    })
-    const labels = audio.map((_t, j) => `[a${j}]`).join('')
-    filters.push(`${labels}amix=inputs=${audio.length}:duration=longest:normalize=0[amixed]`)
+  if (mixLabels.length > 0) {
+    filters.push(
+      `${mixLabels.join('')}amix=inputs=${mixLabels.length}:duration=longest:normalize=0[amixed]`,
+    )
     filters.push(`[amixed]atrim=0:${accLen.toFixed(3)},asetpts=PTS-STARTPTS[outa]`)
     hasAudio = true
   }

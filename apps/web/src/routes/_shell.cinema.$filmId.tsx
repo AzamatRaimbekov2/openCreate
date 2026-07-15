@@ -38,7 +38,9 @@ function FilmEditorPage() {
   const castableEntities = (entities.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
 
   return (
-    <main className="flex w-full flex-col gap-8 px-6 py-8 xl:px-10">
+    // Tighter canvas than the browsing screens (v5 compact pass): this is a
+    // workbench, and its chrome budget goes to the timeline + stage
+    <main className="flex w-full flex-col gap-4 px-4 py-4 xl:px-6">
       <FilmEditor
         filmId={filmId}
         models={catalog.data?.models ?? []}

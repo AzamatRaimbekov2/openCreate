@@ -47,10 +47,22 @@ react-hook-form + zod, i18next.
 - **CinemaStudio (`/cinema`, `/cinema/$filmId`, guarded)** — compose films on top
   of the generation lifecycle. The library lists film cards (canvas-shaped abyss
   plates, `Link` into the editor) with a green "New film" modal (title + aspect
-  `PillGroup` + default-style `Select`). The editor is a header (rename/delete-
-  confirm) + a horizontal `Timeline` of `ShotThumb`s (live clip status from the
-  shared `['generation', id]` cache, reorder by chevron buttons, add shot / title
-  card / storyboard) beside a `ShotInspector` (prompt + style/framing/motion/
+  `PillGroup` + default-style `Select`). The editor (v5 COMPACT: dense route
+  canvas, `size="sm"` tool buttons, `text-xs` captions) is a header (rename/
+  delete-confirm) + a horizontal RESIZABLE `Timeline` DIRECTLY UNDER THE TITLE —
+  always on screen, never below the fold: a size `Select` (S/M/L) plus a
+  keyboard-operable drag separator drive one `--tl-h` var the `ShotThumb`s read;
+  authoring (add shot / title card / storyboard) lives behind ONE "+" trigger
+  that opens an actions `Modal`; per-thumb move/delete is a hover/focus overlay
+  on the tile (live clip status from the shared `['generation', id]` cache) —
+  above the full-width stage. The shot editor is a COMPOSER DOCK fixed to the
+  viewport bottom (v6): auto-growing/resizable prompt, toolbar with compact
+  model+duration pickers, a generation-audio speaker toggle (amber = the clip
+  generates WITH the model's soundtrack; label carries the ×2 price on
+  switchable models, disabled where the catalog has no `nativeAudio`) and
+  icon-toggled drawers (cast · spoken line · expand),
+  a slim hint bar when nothing is selected — the dock version of the
+  `ShotInspector` (prompt + style/framing/motion/
   quality `Select`s built FROM the contract preset tables + a video-model picker +
   duration/transition/title; Generate composes a **structured** `promptPreset`,
   POSTs `/api/generations`, links it to the shot, then polls). A `PreviewPlayer`
@@ -61,6 +73,25 @@ react-hook-form + zod, i18next.
   into draft shots (key-gated — an unset LLM key surfaces as a calm inline notice).
   The module has NO cross-module imports: the catalog is read at the route (the
   seam) and decoupling from Gallery/Generator is through the shared query cache.
+- **AI Soul Studio (`/soul`, `/soul/$entityId`, guarded)** — build a CHARACTER from a
+  constructor instead of a text box, then mint photos of them. `/soul` is the
+  constructor (archetype + style pills, eight optional axes as `Select`s, the trait
+  chips — all rendered FROM the contract tables, never a hardcoded list — a capped
+  multi-select at `MAX_TRAITS` = 6 that visibly DISABLES the 7th chip, a notes escape
+  hatch, and a live "what the model will see" preview composed by the contract
+  functions), beside the prompt library (each ready-made character shows its composed
+  text with Copy **and** "open in constructor" — free, because a library entry is a
+  `Soul` literal, not a string), over a grid of the user's characters. Creating a
+  character is FREE. `/soul/$entityId` is the soul card: the four-view reference sheet,
+  the readable list of characteristics (picked LABELS, not the prompt), the priced mint
+  actions — "First portrait · 2 cr" with no photo, "Complete the sheet · 24 cr" once one
+  exists (the later views self-reference the first on `flux-kontext-pro`, which is the
+  only way four views stay the same person) — and "Оживить", a plain
+  `POST /api/generations` with the portrait as `inputImage` (35–140 cr). Every paid
+  action prints its price BEFORE the click and passes through an alertdialog that
+  repeats it; a per-view failure shows a localized reason plus the "credits refunded"
+  chip. No cross-module imports: the catalog (and therefore the prices) is read at the
+  route — the seam — and the entity/generation caches are shared with Gallery/Entities.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
   full per-model credit table from the catalog query, a "200 free credits" amber
   chip by the title, and the visitor signup CTA as a steel card with a green pill.
@@ -91,7 +122,8 @@ src/
 ├── routes/                     # composition-only file routes
 │   ├── __root.tsx              # providers, crash boundary, offline overlay, 404
 │   ├── index.tsx  login.tsx    # standalone (no shell)
-│   └── _shell.tsx + _shell.{create,library,cinema.index,cinema.$filmId,entities,pricing}.tsx
+│   └── _shell.tsx + _shell.{create,library,cinema.index,cinema.$filmId,entities,
+│                              soul.index,soul.$entityId,pricing}.tsx
 ├── modules/
 │   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, requireSession
 │   ├── Generator/              # generatorStore (draft), catalog query, create mutation,
@@ -100,6 +132,13 @@ src/
 │   ├── Cinema/                 # films/shots/audio/renders/storyboard hooks, timeline,
 │   │                           # shot inspector (preset pickers), preview player, render bar
 │   │                           # (public: CinemaLibrary, FilmEditor; catalog fed from route)
+│   ├── Soul/                   # AI Soul Studio: soulApi (entity + portraits + animate
+│   │                           # hooks), portraitSheet (the PRICE math — pure, tested),
+│   │                           # soulPresentation (composed prompt + readable facts),
+│   │                           # soulOptions/soulDraft (pickers from the contract tables,
+│   │                           # the MAX_TRAITS cap), constructor, prompt library,
+│   │                           # reference sheet, "Оживить"
+│   │                           # (public: SoulStudio, SoulCard; catalog fed from route)
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, showcase spread, section heading, price tables
 │                               # (+ TableScrollRegion overflow wrapper), how-it-works,

@@ -7,6 +7,11 @@
 // v3 terminal: the bar is a STICKY steel surface step over the void; nav is
 // lowercase mono (active = white, inactive = dimmed mist); the wordmark's
 // trailing dot is portal blue — the brand's cursor.
+// v3.1 COMPACT BAR: chrome height dropped 64→44px (controls min-h-10→min-h-8,
+// bar py-3→py-1.5, wordmark xl→base, labels sm→xs) — the editor screens
+// (CinemaStudio timeline, Soul sheet) are vertical-space-hungry and the header
+// is pure chrome, so every pixel it gives up goes straight to the canvas.
+// BalanceChip mirrors the same 32px control scale (modules/Credits).
 import { useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -40,7 +45,7 @@ export type AppShellProps = {
 // text-* utilities never fight inside one className; the active state is plain
 // white — presence, not a color accent (portal stays reserved for links/brand).
 const navLinkClass =
-  'inline-flex min-h-10 items-center rounded-full px-3 text-sm transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none'
+  'inline-flex min-h-8 items-center rounded-full px-3 text-xs transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none'
 
 export function AppShell({
   user,
@@ -59,13 +64,13 @@ export function AppShell({
       <header className="sticky top-0 z-40 bg-steel">
         {/* Full-bleed bar: app chrome spans the viewport (tool UI, not a
             centered reading column) — the page canvas below matches its gutter */}
-        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3 xl:px-10">
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-6 py-1.5 xl:px-10">
           {/* Mono wordmark "openCreate·" doubles as the home link. The trailing
               middle dot is the brand's cursor — portal blue and aria-hidden so
               the accessible name stays "openCreate". */}
           <Link
             to="/"
-            className="rounded-lg text-xl font-medium text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            className="rounded-lg text-base font-medium text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
             openCreate
             <span aria-hidden="true" className="text-portal">
@@ -106,6 +111,17 @@ export function AppShell({
               inactiveProps={{ className: 'text-mist-dim' }}
             >
               {t('nav.templates')}
+            </Link>
+            {/* Soul Studio owns CHARACTERS (built from the constructor); /entities
+                stays the generic library of objects, places and plain uploads. The
+                adjacency is the hint that one is a specialization of the other. */}
+            <Link
+              to="/soul"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.soul')}
             </Link>
             <Link
               to="/entities"
@@ -150,7 +166,7 @@ function AccountArea({ user, isSessionPending, onSignOut }: AccountAreaProps) {
 
   if (isSessionPending) {
     // Pill-shaped stepped pulse mirrors the sign-in pill / menu trigger silhouette
-    return <Skeleton className="h-10 w-24 rounded-full" />
+    return <Skeleton className="h-8 w-24 rounded-full" />
   }
 
   if (!user) {
@@ -159,7 +175,7 @@ function AccountArea({ user, isSessionPending, onSignOut }: AccountAreaProps) {
     return (
       <Link
         to="/login"
-        className="inline-flex min-h-10 items-center justify-center rounded-full border border-white/10 bg-specimen-red/20 px-5 py-2 text-sm font-medium text-lumen-red shadow-pill transition-colors duration-200 hover:bg-specimen-red/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+        className="inline-flex min-h-8 items-center justify-center rounded-full border border-white/10 bg-specimen-red/20 px-4 py-1 text-xs font-medium text-lumen-red shadow-pill transition-colors duration-200 hover:bg-specimen-red/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         {t('nav.signIn')}
       </Link>
@@ -203,7 +219,7 @@ function UserMenu({ user, onSignOut }: UserMenuProps) {
         onClick={() => setIsOpen((prev) => !prev)}
         // Quiet trigger: the hover steps the surface up to ridge — the account
         // is chrome, not a call to action, so it never gets a triad tint
-        className="inline-flex min-h-10 max-w-48 items-center gap-1 truncate rounded-full px-3 py-2 text-sm font-medium text-mist transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+        className="inline-flex min-h-8 max-w-48 items-center gap-1 truncate rounded-full px-3 py-1 text-xs font-medium text-mist transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         <span className="truncate">{label}</span>
         {/* Decorative chevron — the aria-expanded state carries the meaning */}

@@ -5,18 +5,18 @@
 // arrive from the route (the cross-module seam), split here into the video/audio
 // lists the child surfaces need.
 //
-// v4 LAYOUT — why it is shaped like this:
-//   * The old deck was `lg:grid-cols-2`: preview + render + audio stacked on the
-//     left, and ONE inspector panel on the right stretched to their combined
-//     height. With no shot selected that right half was a tall empty rectangle
-//     with a hint floating in the middle of it. Dead space, and it made the
-//     inspector look like the main event.
-//   * Now: a STAGE column (`minmax(0,1fr)`) carries the preview as the hero, the
-//     export bar as compact chrome under it, and audio as a quiet card; a narrow
-//     INSPECTOR RAIL (380px) is `sticky` + `h-fit`, so it is exactly as tall as
-//     its content and follows you down the page instead of stretching.
-//   * The timeline moved BELOW the workspace and spans the full width — a film
-//     strip, the way every real editor arranges it.
+// v6 LAYOUT — why it is shaped like this:
+//   * v5 put the timeline ABOVE the workspace, right under the title row (at
+//     the bottom it lived below the fold, and selecting a beat meant scrolling
+//     twice per edit). That stands.
+//   * v6 retired the 360px side rail: the shot editor became a COMPOSER DOCK
+//     fixed to the bottom of the viewport (ShotInspector renders the fixed
+//     shell itself). The rail was the one column fighting the preview for
+//     width, and a long prompt lived in a cramped corner box; a bottom dock is
+//     the shape prompt-first tools train users on — type below, result above.
+//   * The stage (preview · export · audio) now spans the full width. The editor
+//     body carries pb-36 so the docked composer never hides the audio card;
+//     with no shot selected a slim hint dock stands in for the composer.
 // Panels are `Card` (design.md v4); the module no longer hand-rolls a PANEL
 // class string, which is what made the player, the export button and the track
 // list read with identical weight.
@@ -28,7 +28,7 @@ import type {
   CatalogVideoModel,
   TemplateSummary,
 } from '@opencreate/contracts'
-import { EmptyState, ErrorState, Skeleton } from 'shared/ui'
+import { ErrorState, Skeleton } from 'shared/ui'
 import { useFilm } from '../model/filmsApi'
 import { shotStartMs } from '../model/voiceoverApi'
 import { FilmEditorHeader } from './FilmEditorHeader'
@@ -64,12 +64,9 @@ export type FilmEditorProps = {
   entities?: CastableEntity[]
 }
 
-// Stage takes the slack, the inspector rail is fixed. minmax(0,1fr) (not 1fr)
-// so a wide video/prompt can never push the rail off the grid.
-const WORKSPACE = 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]'
-// top-20 clears the app's sticky steel nav bar (h-16); top-6 would slide the
-// inspector underneath it as you scroll.
-const RAIL = 'flex flex-col gap-6 lg:sticky lg:top-20 lg:h-fit lg:self-start'
+// The floating dock shell shared by the composer's stand-in hint (the composer
+// itself renders the same shell inside ShotInspector)
+const DOCK = 'fixed inset-x-0 bottom-0 z-30 px-4 pb-3'
 
 export function FilmEditor({ filmId, models, templates = [], entities = [] }: FilmEditorProps) {
   const { t } = useTranslation()
@@ -81,17 +78,14 @@ export function FilmEditor({ filmId, models, templates = [], entities = [] }: Fi
   // action bar + audio), inspector rail, then the strip. Nothing jumps in.
   if (isPending) {
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-9 w-64" />
-        <div className={WORKSPACE}>
-          <div className="flex min-w-0 flex-col gap-6">
-            <Skeleton className="aspect-video w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-28 w-full" />
-          </div>
-          <Skeleton className="h-96 w-full" />
+      <div className="flex flex-col gap-4 pb-36">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-28 w-full" />
+        <div className="flex min-w-0 flex-col gap-4">
+          <Skeleton className="aspect-video max-h-[42svh] w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
-        <Skeleton className="h-48 w-full" />
       </div>
     )
   }
@@ -117,54 +111,56 @@ export function FilmEditor({ filmId, models, templates = [], entities = [] }: Fi
     templates.find((template) => template.id === data.film.templateId)?.musicPrompt ?? null
 
   return (
-    <div className="flex flex-col gap-6">
+    // pb-36 clears the fixed composer dock — the audio card must stay reachable
+    // with the dock floating over the page bottom
+    <div className="flex flex-col gap-4 pb-36">
       <FilmEditorHeader film={data.film} />
 
-      <div className={WORKSPACE}>
-        {/* Stage: what you look at, then what you do with it, then the extras */}
-        <div className="flex min-w-0 flex-col gap-6">
-          <PreviewPlayer shots={data.shots} filmAspect={filmAspect} />
-          <RenderBar filmId={filmId} canRender={data.shots.length > 0} />
-          <AudioTracks
-            filmId={filmId}
-            audio={data.audio}
-            audioModels={audioModels}
-            musicPrompt={musicPrompt}
-            shotIds={data.shots.map((shot) => shot.id)}
-          />
-        </div>
-
-        {/* Inspector rail. Keyed by shot.id so a new selection re-inits the draft.
-            With nothing selected it is a short EmptyState, never a tall void. */}
-        <aside className={RAIL}>
-          {selectedShot ? (
-            <ShotInspector
-              key={selectedShot.id}
-              filmId={filmId}
-              shot={selectedShot}
-              filmAspect={filmAspect}
-              videoModels={videoModels}
-              ttsModel={ttsModel}
-              entities={entities}
-              startMs={selectedStartMs}
-              isVoiced={isSelectedVoiced}
-            />
-          ) : (
-            <EmptyState
-              title={t('cinema.inspector.emptyTitle')}
-              description={t('cinema.inspector.selectHint')}
-            />
-          )}
-        </aside>
-      </div>
-
-      {/* The film strip spans the full width, below the workspace */}
+      {/* The film strip: the table of contents, right under the title — always
+          on screen next to the stage it indexes (v5; see the layout note above) */}
       <Timeline
         film={data}
         selectedShotId={selectedShotId}
         onSelectShot={setSelectedShotId}
         onOpenStoryboard={() => setIsStoryboardOpen(true)}
       />
+
+      {/* Stage: what you look at, then what you do with it, then the extras —
+          full width since v6 (the shot editor docked to the viewport bottom) */}
+      <div className="flex min-w-0 flex-col gap-4">
+        <PreviewPlayer shots={data.shots} filmAspect={filmAspect} />
+        <RenderBar filmId={filmId} canRender={data.shots.length > 0} />
+        <AudioTracks
+          filmId={filmId}
+          audio={data.audio}
+          audioModels={audioModels}
+          musicPrompt={musicPrompt}
+          shotIds={data.shots.map((shot) => shot.id)}
+        />
+      </div>
+
+      {/* The composer dock. Keyed by shot.id so a new selection re-inits the
+          draft. With nothing selected, a slim hint bar holds the dock's place
+          so the layout (and the pb-36 clearance) never jumps. */}
+      {selectedShot ? (
+        <ShotInspector
+          key={selectedShot.id}
+          filmId={filmId}
+          shot={selectedShot}
+          filmAspect={filmAspect}
+          videoModels={videoModels}
+          ttsModel={ttsModel}
+          entities={entities}
+          startMs={selectedStartMs}
+          isVoiced={isSelectedVoiced}
+        />
+      ) : (
+        <div className={DOCK}>
+          <p className="mx-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-steel px-4 py-3 text-xs text-mist-dim shadow-2xl shadow-black/50">
+            {t('cinema.inspector.selectHint')}
+          </p>
+        </div>
+      )}
 
       <StoryboardModal
         filmId={filmId}

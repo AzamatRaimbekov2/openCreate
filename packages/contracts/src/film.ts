@@ -151,6 +151,11 @@ export const shotSchema = z.object({
   transitionMs: z.number().int().min(0),
   title: shotTitleSchema.nullable(),
   voiceover: shotVoiceoverSchema.nullable(),
+  // Native generation audio for THIS shot: generate the clip with the model's
+  // own soundtrack (where the model offers one — see catalog `nativeAudio`) and
+  // carry that track into the film's export mix. false = the pre-feature
+  // behaviour: silent clip, render mixes only music/voiceover tracks.
+  audio: z.boolean(),
   createdAt: z.string(),
 })
 export type Shot = z.infer<typeof shotSchema>
@@ -176,6 +181,8 @@ export const createShotInputSchema = z.object({
   transitionMs: z.number().int().min(0).max(5000).optional(),
   title: shotTitleSchema.nullable().optional(),
   voiceover: shotVoiceoverSchema.nullable().optional(),
+  // See shotSchema.audio. Optional on the way in; the service defaults it false.
+  audio: z.boolean().optional(),
 })
 export type CreateShotInput = z.infer<typeof createShotInputSchema>
 

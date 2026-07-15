@@ -229,3 +229,32 @@ if the Entity library later adds a "cut character from photo" button.
 
 Net effect on this ADR: the `generation.type = 'audio'` decision (Context §1) now costs **one
 Runware adapter method and one credits-catalog row**, not a new integration.
+
+## Addendum 2026-07-15 — native generation audio (owner-approved pricing)
+
+The audio-off economics stand as the DEFAULT; the user can now opt a shot INTO the
+model's own soundtrack, end to end:
+
+- **Capability in the catalog, not in the client:** `nativeAudio: 'switchable' | 'always'`
+  on video models. `switchable` (Seedance 1.5 Pro, PixVerse) = the request decides and
+  audio-on is priced from `creditsByDurationWithAudio` — **2× the silent table** (owner
+  decision 2026-07-15: ByteDance bills exactly 2× with audio; honest margin over a flat
+  price). `always` (Wan 2.7 direct) = audio ships in every clip, already in the list
+  price. Absent (MiniMax/Kling/Veo/Seedance 2.0) = no verified switch → the composer
+  disables the toggle and the API refuses `audio: true` before charging.
+- **Provenance over probing:** the generation row stamps `params.audio = true` for any
+  clip that carries a soundtrack. The ffmpeg render maps a clip's `[i:a]` stream into
+  the export mix only when the SHOT asks (`shot.audio`) AND the row's provenance agrees —
+  a shot flag alone would map a silent mp4's missing stream and kill the render; the row
+  alone would force sound on users who turned it off after the fact.
+- **Render:** the video fold now records each segment's timeline start (crossfades start
+  inside the overlap); native chains atrim to the shot's window, adelay to that offset,
+  and join the existing amix with music/voiceover tracks. Pinned by pure-args tests and
+  a real-ffmpeg integration case (a clip WITH sound reaches the export as aac).
+- **Adapters:** `runwareExtrasFor(air, styleId, audio=false)` — the flag flips the
+  per-family key; the default stays false so nothing silent ever pays the 2× rate.
+  DeepInfra/ark keep `generate_audio: false` (Seedance 2.0 audio pricing unverified).
+- **Composer:** a speaker STATE toggle in the dock toolbar; the aria-label carries the
+  ×2 on switchable models, disabled with an explanatory title where no switch exists.
+  `shot.audio` persists the intent; `composeShotClipInput` forwards it only when the
+  chosen model declares the capability.

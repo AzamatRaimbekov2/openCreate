@@ -47,6 +47,12 @@ flowchart TD
 - No crossfade compositing / wasm — deliberately (ADR). The caveat line says the
   preview is approximate.
 
+## Update 2026-07-15 — v5 canvas cap
+- The canvas is capped at `max-h-[42svh]`: uncapped, a 16:9 canvas in the ~1000px stage
+  column was ~580px tall and alone pushed export + audio below the fold. When the cap
+  bites, object-contain letterboxes the media inside the dark well (like a real monitor
+  with an off-shape source). Transport strip px-4 py-3→px-3 py-1.5, play size-10→size-8.
+
 ## Commits
 
 - _no commit yet_

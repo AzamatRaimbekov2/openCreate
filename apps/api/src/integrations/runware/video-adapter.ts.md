@@ -28,6 +28,14 @@ flowchart LR
 - `taskUUID` is generated here (was previously in the service) and returned as the job id — semantics identical to pre-seam: minted before the HTTP call (idempotency), persisted by the service only after submit resolves.
 - A `submitVideo` rejection propagates unchanged so the service's guarded fail+refund settles the row.
 
+## Update 2026-07-15 — native generation audio
+- `runwareExtrasFor(air, styleId, audio = false)` — the third parameter flips the
+  per-family audio key (bytedance/pixverse providerSettings, alibaba top-level
+  settings). Defaults to false so every caller that says nothing keeps the
+  silent rate; `true` arrives only from a request the service priced from the
+  with-audio table. MiniMax branch unchanged (no switch exists — the catalog
+  gives it no `nativeAudio`, so the service refuses audio:true upstream).
+
 ## Commits
 - _no commit yet_
 

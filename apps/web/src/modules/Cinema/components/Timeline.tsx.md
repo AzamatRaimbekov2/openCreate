@@ -4,50 +4,73 @@
 
 ## Purpose
 
-The film strip: a full-width band under the workspace. A HEADER of authoring
-controls (add shot · title card · storyboard) over a recessed RAIL that holds
-only the ordered `ShotThumb`s.
+The film strip: a compact, RESIZABLE band between the title row and the
+workspace. A minimal chrome row (strip name · size `Select` · one "+" trigger)
+over a recessed RAIL of ordered `ShotThumb`s, with a drag/keyboard resize
+separator on the rail's bottom edge. Authoring actions live in a dialog behind
+the "+" trigger, not in standing chrome.
 
 ## What it does (for an AI reader)
 
-- Responsibilities: own the strip layout + shot CRUD/reorder; lift selection to
-  the editor.
+- Responsibilities: own the strip layout, the strip HEIGHT (one value driving a
+  CSS custom property), the "+" actions dialog, and shot CRUD/reorder; lift
+  selection to the editor.
 - Public API / exports: `Timeline`, `TimelineProps`
   (`film`, `selectedShotId`, `onSelectShot`, `onOpenStoryboard`).
-- Inputs → Outputs: `FilmDetail` → the strip; button clicks → shot mutations.
-- Side effects: `useAddShot`, `useDeleteShot`, `useReorderShots`.
+- Inputs → Outputs: `FilmDetail` → the strip; dialog actions → shot mutations;
+  size Select / separator drag / arrow keys → `--tl-h` custom property on the
+  rail `<ul>` (read by `ShotThumb` as `h-[var(--tl-h)]`).
+- Side effects: `useAddShot`, `useDeleteShot`, `useReorderShots`. Local UI
+  state only for `isAddOpen`, `tileHeight`, and the drag origin.
 
 ## Dependencies
 
-- Imports: `react-i18next`, `Button` + `Card` from `shared/ui`, shot mutations,
-  `ShotThumb`, icons.
+- Imports: `react`, `react-i18next`, `Button` + `Card` + `Modal` + `Select`
+  from `shared/ui`, shot mutations, `ShotThumb`, icons.
 - Used by: `FilmEditor`.
-- Tested by: `Timeline.test.tsx`.
+- Tested by: `Timeline.test.tsx` (dialog flow, rail purity, resize via select +
+  keyboard, storyboard handoff).
 
 ## Diagram
 
 ```mermaid
 flowchart TD
   FILM[FilmDetail.shots] --> T[Timeline]
-  T --> H["header: add shot · title card · storyboard (always on screen)"]
-  T --> R["rail: Card surface=well → ul of ShotThumbs (overflow-x-auto)"]
-  H -->|add / add-title| ADD[useAddShot → select new]
-  H -->|storyboard| SB[onOpenStoryboard]
-  R -->|move| RE[useReorderShots → cache patch]
-  R -->|delete| DEL[useDeleteShot]
+  T --> H["chrome row: size Select · '+' trigger"]
+  H -->|"+"| DLG["Modal: add shot · title card · storyboard"]
+  DLG -->|add / add-title| ADD[useAddShot → select new]
+  DLG -->|storyboard| SB[onOpenStoryboard]
+  T --> R["rail: Card surface=well → ul.style --tl-h → ShotThumbs"]
+  T --> SEP["separator (drag + arrows) → tileHeight state"]
+  SEP --> R
+  R -->|move / delete via ShotThumb hover overlay| MUT[useReorderShots / useDeleteShot]
 ```
 
 ## Key decisions / gotchas
 
-- **The add controls live in the header, never in the rail.** They used to be
-  pinned to the tail of the `overflow-x-auto` strip, so a film with many shots
-  scrolled its primary "add shot" affordance off the right edge. `Timeline.test.tsx`
-  guards this: the buttons must not be inside the shot `<ul>`.
+- **v6: authoring collapsed into ONE "+" dialog.** Three always-visible pills
+  claimed a chrome row for actions used a few times per film; the dialog costs
+  one click and zero standing pixels. `Timeline.test.tsx` asserts the actions
+  are NOT on screen collapsed, ARE all present in the dialog, and that choosing
+  one closes it (feedback must not appear behind a stale sheet).
+- **v6: the height is one value, two dials.** The `Select` (S/M/L → 48/64/88px)
+  and the bottom-edge separator (pointer drag with `setPointerCapture`, or
+  ArrowUp/ArrowDown ±8px, clamped 40–120) both set `tileHeight`; the rail
+  publishes it as `--tl-h` so resizing re-renders only this component. A dragged
+  in-between value matches no preset and the Select shows the "custom"
+  placeholder. The separator is a REAL `role="separator"` with
+  `aria-valuemin/max/now` — tests read the accessible value, not pixels.
 - The rail is a `<ul>`/`<li>` list — real list semantics, and the `<li>` (the flex
   child) carries `shrink-0`, not the thumb.
 - Reorder swaps two ids and POSTs the FULL order — the client never computes
   `orderIndex`; the server owns it and the returned list is patched into cache.
 - Deleting the selected shot clears the selection so the inspector never dangles.
+- `RailStyle`/`isPreset`: typed CSSProperties extension + a key-list type guard,
+  so neither the CSS variable nor the Select round-trip needs an `as` cast.
+
+## Update 2026-07-15 — v5 compact strip
+- The strip became a compact band between the title row and the workspace
+  (placement owned by FilmEditor); superseded by v6 above on the same day.
 
 ## Commits
 

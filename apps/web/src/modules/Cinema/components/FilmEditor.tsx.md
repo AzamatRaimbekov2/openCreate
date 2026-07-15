@@ -88,6 +88,25 @@ flowchart TD
 - `ttsModel` is pulled out of `audioModels` here and passed down; `undefined` hides
   the inspector's whole Voice section.
 
+## Update 2026-07-15 — v5 compact editor pass
+- The Timeline moved ABOVE the workspace (right under the title row). At the bottom it
+  lived below the fold on laptop viewports — selecting a beat meant scrolling twice per
+  edit. The strip is the film's table of contents; contents go first.
+- Density: outer/stage/WORKSPACE gaps 6→4, inspector rail 380→360px, RAIL sticky offset
+  top-20→top-14 (the app bar is 44px since the v3.1 compact shell). Loading skeleton
+  mirrors the new order (title → strip band → stage/rail).
+
+## Update 2026-07-15 — v6 composer dock
+- The 360px sticky inspector rail is RETIRED: `ShotInspector` became a composer
+  dock fixed to the viewport bottom (it renders its own fixed shell). The stage
+  (preview · export · audio) spans the full width now.
+- The editor body carries `pb-36` so the floating dock never hides the audio
+  card; with no shot selected a slim steel hint bar (same `DOCK` shell,
+  `cinema.inspector.selectHint`) holds the dock's place so clearance never jumps.
+- `EmptyState` import dropped (the hint bar replaced it); `WORKSPACE`/`RAIL`
+  grid constants replaced by the single `DOCK` shell class. Loading skeleton is
+  single-column.
+
 ## Commits
 
 - _no commit yet_

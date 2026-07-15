@@ -34,6 +34,14 @@ flowchart LR
 ## Key decisions (2026-07-11) — Studio3D
 - `type` gains `'model3d'` (Task 1 of the photo-to-3d-studio plan). It rides the exact same async lifecycle as video/audio — submit charges credits, the API polls the provider, failure refunds — behind a `Mesh3dProvider` seam mirroring `VideoProvider`. No new fields needed on `createGenerationInputSchema`/`generationSchema` for this step: a model3d request reuses `inputImage` (the source photo) and skips `aspectRatio`/`duration` like audio does. Purely additive — existing image/video/audio rows and requests are unaffected. Downstream exhaustive switches over `generationTypeSchema` in `apps/api` and `apps/web` now fail typecheck until later tasks add the `'model3d'` branch — that is intentional and tracked by those tasks, not a regression here.
 
+## Update 2026-07-15 — native generation audio
+- `createGenerationInputSchema` += `audio?: boolean` (video only; the service
+  refuses it on models without `nativeAudio` and prices it from the with-audio
+  table on 'switchable' ones).
+- `generationParamsSchema` += `audio?: boolean` — PROVENANCE: stamped true when
+  the clip carries a native soundtrack ('switchable'+requested, or 'always').
+  The film render trusts this instead of probing files.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

@@ -141,6 +141,47 @@ describe('runware video adapter', () => {
   // MiniMax exposes only `promptOptimizer` — no audio switch. Sending one would be
   // a 400, so the adapter must send NOTHING rather than guess. Same for any model
   // family we have not verified: silence is the safe default.
+  // ── audio: true — the PAID path (2026-07-15) ────────────────────────────────
+  // The service has already validated the catalog capability and charged the
+  // with-audio price before this flag reaches the adapter; the adapter's whole
+  // job is to spell it in the family's dialect. The default stays false — the
+  // 2× leak the table above documents must never re-open by omission.
+  it('submit() enables ByteDance native audio when the service asks (and paid)', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'ocean waves',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'bytedance:seedance@1.5-pro',
+      audio: true,
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.providerSettings).toEqual({ bytedance: { audio: true } })
+  })
+
+  it('submit() enables PixVerse native audio when the service asks (and paid)', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const adapter = createRunwareVideoAdapter(rw as unknown as RunwareClient)
+
+    await adapter.submit({
+      prompt: 'ocean waves',
+      width: 1280,
+      height: 720,
+      durationSeconds: 5,
+      model: 'pixverse:1@8',
+      audio: true,
+    })
+
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.providerSettings).toEqual({ pixverse: { audio: true } })
+  })
+
   it('submit() sends no audio switch for a family that has none (MiniMax)', async () => {
     const rw = fakeRunware()
     rw.submitVideo.mockResolvedValue(undefined)

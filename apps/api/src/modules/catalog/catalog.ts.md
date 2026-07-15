@@ -38,6 +38,15 @@ flowchart LR
 
 - `supportsSafetyParam: false` also on `wan-2-7` (2026-07-09): Alibaba/Wan models reject Runware's `safety` param exactly like ByteDance — verified live when a Wan 2.7 submit 400'd. Same omitSafety flow.
 
+## Update 2026-07-15 — native generation audio
+- `creditsFor(model, duration?, withAudio = false)`: audio-on reads
+  `creditsByDurationWithAudio` on 'switchable' models (throws if the table is
+  missing — config-drift backstop; the service 400s unsupported requests before
+  pricing). Entries: seedance-1-5-pro switchable {5:70,10:140}, pixverse-v6
+  switchable {5:70,8:112} (both ~2× — ByteDance's measured with-audio rate),
+  wan-2-7 'always' (audio included in the base price, no switch exists).
+  kling/veo/minimax/seedance-2-0 carry no `nativeAudio` (no verified switch).
+
 ## Commits
 - bdc4175 feat(api): curated model catalog with credit pricing
 - 45ce33e 2026-07-11 feat: design-system v4 (Card/surfaces) + Seedance direct via ByteDance ArkC

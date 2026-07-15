@@ -44,6 +44,12 @@ flowchart TD
 - `FilmRender` has NO `costCredits`/refund — it spends our CPU, not a provider invoice. Same status
   SHAPE as a generation, different economics.
 
+## Update 2026-07-15 — native generation audio
+- `shotSchema` += `audio: boolean` (required on the wire; service defaults
+  false) — generate this shot's clip WITH the model's own soundtrack and carry
+  it into the export mix. `createShotInputSchema`/`updateShotInputSchema` +=
+  optional `audio`.
+
 ## Commits
 - _no commit yet_
 

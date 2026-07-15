@@ -35,6 +35,11 @@ flowchart LR
 - `aria-hidden` throughout — the button/label carries the accessible name.
 - Play/Pause are filled glyphs; the rest are 1.5-stroke line icons.
 
+## Update 2026-07-15 — composer icons
+- Added `PaperclipIcon` (attach a reference — the docked shot composer's cast
+  tool) and `ExpandIcon` (open the composer's full-settings drawer), same
+  24-unit grid / 1.5 stroke as the rest of the set.
+
 ## Commits
 
 - _no commit yet_

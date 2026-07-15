@@ -45,6 +45,11 @@ export const createGenerationInputSchema = z.object({
   promptPreset: promptPresetSchema.optional(),
   // TTS voice id (audio models only). Ignored by image/video/music paths.
   voice: z.string().max(80).optional(),
+  // Native generation audio (video models only). true = ask the model for its
+  // own soundtrack. Only honoured when the catalog model declares `nativeAudio`
+  // — the service refuses it otherwise (and prices it from the with-audio table
+  // on 'switchable' models, because providers bill sound separately).
+  audio: z.boolean().optional(),
 })
 export type CreateGenerationInput = z.infer<typeof createGenerationInputSchema>
 
@@ -54,6 +59,12 @@ export const generationParamsSchema = z.object({
   aspectRatio: aspectRatioSchema.optional(),
   duration: z.number().int().optional(),
   seed: z.number().optional(),
+  // PROVENANCE: this clip carries a native soundtrack. Stamped true when the
+  // request asked for audio on a 'switchable' model OR the model is 'always'
+  // (Wan 2.7 ships audio in every clip). The film render trusts THIS — it maps
+  // a clip's audio stream into the export only when the row says one exists,
+  // so it never has to probe files.
+  audio: z.boolean().optional(),
 })
 
 export const generationSchema = z.object({
