@@ -1,5 +1,9 @@
 # modelPresentation.ts — AI component doc
 
+> MOVED 2026-07-15: modules/Generator/model → shared/libs. Cinema's ModelPickerModal
+> needs the same logos/descriptions and modules must not import each other; a static
+> presentation lookup carries no business logic, so shared/libs is its home.
+
 > AI-facing sidecar for `modelPresentation.ts`. Created 2026-07-08. Keep this in sync with the code on every change.
 
 ## Purpose

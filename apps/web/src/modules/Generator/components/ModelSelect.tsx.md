@@ -34,5 +34,10 @@ flowchart TD
 - Selecting a video model while type='image' is fine — the store's `setModel`/`normalizeFor` switches type and resets duration.
 - Hooks (`useModelListbox`, `useState`, `useEffect`) run BEFORE the four-state early returns (Rules of Hooks).
 
+## Update 2026-07-15 — presentation sources moved to shared
+- `presentationFor`/`tariffFor` now import from `shared/libs/modelPresentation`,
+  `ProviderMark` from `shared/ui` — moved so CinemaStudio's ModelPickerModal can
+  reuse them (modules must not import each other). Behaviour unchanged.
+
 ## Commits
 - _no commit yet_

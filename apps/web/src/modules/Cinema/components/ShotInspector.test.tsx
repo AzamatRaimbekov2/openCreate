@@ -7,7 +7,7 @@
 //     small toggles that reveal a drawer — nothing is lost, just folded;
 //   * Generate never fires on an empty prompt.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CatalogAudioModel, CatalogVideoModel, Shot } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
@@ -137,10 +137,37 @@ describe('ShotInspector (docked composer)', () => {
     })
   })
 
-  it('keeps the duration and model pickers in the toolbar', () => {
+  it('keeps the duration slider and the model trigger in the toolbar', () => {
     renderComposer(makeShot())
-    expect(screen.getByRole('button', { name: /duration/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /model/i })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: /duration/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^model$/i })).toBeInTheDocument()
+  })
+
+  it('picks a model from the model dialog', async () => {
+    renderComposer(makeShot(), { models: [videoModel, silentModel] })
+
+    await userEvent.click(screen.getByRole('button', { name: /^model$/i }))
+    const dialog = screen.getByRole('dialog', { name: /^model$/i })
+    // Rich rows: name + honest provider label + description travel together
+    expect(within(dialog).getByText('Alibaba')).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /motion/i }))
+    // Picking closes the dialog and the trigger now wears the picked model
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^model$/i })).toHaveTextContent('Motion')
+  })
+
+  it('saves the duration picked on the slider', async () => {
+    apiMock.mockResolvedValue(makeShot())
+    renderComposer(makeShot()) // 5000ms → the 5s stop
+
+    const slider = screen.getByRole('slider', { name: /duration/i })
+    // Stops are [2, 3, 5, 8, 10] — index 4 is the 10s stop
+    fireEvent.change(slider, { target: { value: '4' } })
+
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    const [, init] = apiMock.mock.calls[0] ?? []
+    expect(JSON.parse(String(init?.body))).toMatchObject({ durationMs: 10_000 })
   })
 
   it('reveals the cast panel from its toolbar toggle', async () => {

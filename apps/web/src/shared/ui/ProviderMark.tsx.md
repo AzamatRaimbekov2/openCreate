@@ -1,5 +1,8 @@
 # ProviderMark.tsx — AI component doc
 
+> MOVED 2026-07-15: modules/Generator/components → shared/ui (exported from the kit
+> index). Shared by the Generator select and CinemaStudio's ModelPickerModal.
+
 > AI-facing sidecar for `ProviderMark.tsx`. Created 2026-07-08. Keep this in sync with the code on every change.
 
 ## Purpose

@@ -1,4 +1,6 @@
-// apps/web/src/modules/Generator/components/ProviderMark.tsx
+// apps/web/src/shared/ui/ProviderMark.tsx
+// (moved from modules/Generator/components — shared by the Generator select
+// and CinemaStudio's model picker modal; a brand glyph is kit material)
 // Inline SVG provider logo marks for the model select. One crisp monoline glyph
 // per brand — self-contained (no external image URLs, so nothing to load and
 // nothing for a CSP to block) and drawn in `currentColor` so the surrounding
@@ -8,7 +10,7 @@
 // glyph geometry carries the identity. Decorative → aria-hidden; the model's
 // brand name is always shown as text beside the mark.
 import type { ReactNode } from 'react'
-import type { ProviderId } from '../model/modelPresentation'
+import type { ProviderId } from 'shared/libs/modelPresentation'
 
 export type ProviderMarkProps = {
   // Which brand mark to draw

@@ -56,8 +56,10 @@ react-hook-form + zod, i18next.
   that opens an actions `Modal`; per-thumb move/delete is a hover/focus overlay
   on the tile (live clip status from the shared `['generation', id]` cache) —
   above the full-width stage. The shot editor is a COMPOSER DOCK fixed to the
-  viewport bottom (v6): auto-growing/resizable prompt, toolbar with compact
-  model+duration pickers, a generation-audio speaker toggle (amber = the clip
+  viewport bottom (v6): auto-growing/resizable iOS-glass prompt plate, a
+  label-less toolbar — model trigger chip opening the big `ModelPickerModal`
+  (brand logos, tiers, honest provider labels, descriptions, tariffs) and a
+  stepped duration range slider — a generation-audio speaker toggle (amber = the clip
   generates WITH the model's soundtrack; label carries the ×2 price on
   switchable models, disabled where the catalog has no `nativeAudio`) and
   icon-toggled drawers (cast · spoken line · expand),

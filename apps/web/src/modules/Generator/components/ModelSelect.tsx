@@ -18,8 +18,8 @@ import type { CatalogModel } from '@opencreate/contracts'
 import { Select, Skeleton } from 'shared/ui'
 import type { SelectOption } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
-import { presentationFor, tariffFor } from '../model/modelPresentation'
-import { ProviderMark } from './ProviderMark'
+import { presentationFor, tariffFor } from 'shared/libs/modelPresentation'
+import { ProviderMark } from 'shared/ui'
 
 export type ModelSelectProps = {
   // The selected catalog model id (generatorStore.modelId); null before a pick

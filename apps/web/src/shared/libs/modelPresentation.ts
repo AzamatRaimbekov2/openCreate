@@ -1,4 +1,7 @@
-// apps/web/src/modules/Generator/model/modelPresentation.ts
+// apps/web/src/shared/libs/modelPresentation.ts
+// (moved from modules/Generator/model — Cinema's model picker needs the same
+// logos/descriptions, and modules must not import each other; a static
+// presentation lookup carries no business logic, so shared/libs is its home)
 // Client-side PRESENTATION metadata for catalog models — NOT part of the API
 // contract. It maps each model id to its provider brand (which inline logo mark
 // to draw) and its i18n description key, and derives the display tariff. Pricing

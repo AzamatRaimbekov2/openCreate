@@ -7,7 +7,10 @@
 The selected shot's editor, v6: a COMPOSER DOCK fixed to the bottom of the
 viewport (`fixed inset-x-0 bottom-0 z-30`, opaque steel sheet, max-w-4xl). Its
 face is an auto-growing, hand-resizable prompt textarea; a toolbar carries the
-everyday dials (model + duration pickers) and three icon toggles — cast
+everyday dials — a label-less model TRIGGER CHIP (brand mark + current name,
+opens the big `ModelPickerModal`) and a label-less stepped duration RANGE
+slider over the editorial stops — and four icon toggles (speaker = generation
+audio state) — cast
 (paperclip), spoken line (mic), expand — each opening a DRAWER above the prompt
 with the folded controls (cast field / voice field / look presets + transition +
 title card + "model will see" hint). Save / Generate sit on the toolbar's right.
@@ -115,6 +118,22 @@ error surfacing, money-path guards) unchanged.
   `nativeAudio`. Draft state `audioOn` (init from `shot.audio`) rides
   `buildPatch()` AND the Generate draftShot (composeShotClipInput reads
   shot.audio — generating from the pre-edit value would bill the wrong price).
+
+## Update 2026-07-15 — v6.1: glass prompt, model modal, duration slider
+- The prompt textarea is an iOS-GLASS plate (`GLASS_SURFACE` from the kit:
+  translucent wash + backdrop blur/saturate + bright specular TOP edge — the
+  no-gradient "reflection" — + inner ring), floating `mx-2 mt-2` inside the
+  steel dock. One material recipe with Card/Modal, so nothing drifts.
+- The toolbar lost its visible labels (owner request): the model control is a
+  chip showing the CURRENT model (ProviderMark + name + ▾, `aria-label`
+  "Model") that opens `ModelPickerModal` — a purchase deserves the full table
+  (logo/tier/provider/description/tariff), not a rail Select; duration is a
+  stepped `<input type=range>` whose VALUE IS THE INDEX into
+  `SHOT_DURATIONS_SECONDS` (every notch a real, priceable stop),
+  `aria-valuetext` speaks the seconds, a chip beside shows them.
+- `presentationFor` + `ProviderMark` now come from shared (moved out of
+  Generator for exactly this cross-module reuse). Transition Selects in the ⛶
+  drawer are unchanged.
 
 ## Commits
 

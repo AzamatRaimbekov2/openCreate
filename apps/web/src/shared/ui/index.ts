@@ -49,5 +49,7 @@ export type { ProgressProps } from './Progress'
 // Specimen art + the kind list so consumers can lay out the whole grid
 export { SPECIMEN_KINDS, SpecimenTile } from './SpecimenTile'
 export type { SpecimenKind, SpecimenTileProps } from './SpecimenTile'
+export { ProviderMark } from './ProviderMark'
+export type { ProviderMarkProps } from './ProviderMark'
 export { Skeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'

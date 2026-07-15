@@ -38,7 +38,8 @@ import { STYLE_PRESETS, applyPromptPreset, transitionSchema } from '@opencreate/
 import { ApiClientError } from 'shared/libs/apiClient'
 import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from 'shared/libs/mentions'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
-import { Button, Select } from 'shared/ui'
+import { presentationFor } from 'shared/libs/modelPresentation'
+import { Button, GLASS_SURFACE, ProviderMark, Select } from 'shared/ui'
 import { useUpdateShot } from '../model/shotsApi'
 import { useGenerateShotClip, useShotGeneration } from '../model/shotGeneration'
 import { useGenerateVoiceover } from '../model/voiceoverApi'
@@ -47,6 +48,7 @@ import type { PresetDraft } from '../model/presetOptions'
 import type { CastableEntity } from './ShotCastField'
 import { ShotCastField } from './ShotCastField'
 import { InspectorSection } from './InspectorSection'
+import { ModelPickerModal } from './ModelPickerModal'
 import { PresetPickers } from './PresetPickers'
 import { ShotClipStatus } from './ShotClipStatus'
 import { ShotTitleField } from './ShotTitleField'
@@ -130,6 +132,7 @@ export function ShotInspector({
 
   const voices = ttsModel?.voices ?? []
   const [openPanel, setOpenPanel] = useState<DockPanel | null>(null)
+  const [isModelOpen, setIsModelOpen] = useState(false)
   const [prompt, setPrompt] = useState(shot.prompt)
   const [preset, setPreset] = useState<PresetDraft>(presetToDraft(shot.promptPreset))
   const [modelId, setModelId] = useState(() => initialModelId(shot, videoModels))
@@ -364,16 +367,21 @@ export function ShotInspector({
           </div>
         ) : null}
 
-        {/* The prompt — the dock's whole face. field-sizing-content grows it
-            with the text; resize-y hands the user the same edge the timeline
-            has; the 30svh cap keeps a pasted novella from eating the stage. */}
+        {/* The prompt — the dock's whole face, as an iOS-glass plate (owner
+            request 2026-07-15): the kit's GLASS_SURFACE gives the translucent
+            white wash, the backdrop blur/saturate, the bright specular TOP edge
+            (the no-gradient "reflection") and the inner glass ring — one recipe
+            with Card/Modal, so the materials cannot drift. field-sizing-content
+            grows it with the text; resize-y hands the user the same edge the
+            timeline has; the 30svh cap keeps a pasted novella from eating the
+            stage. mx/mt margins float the plate inside the steel dock. */}
         <textarea
           rows={1}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           placeholder={t('cinema.inspector.promptPlaceholder')}
           aria-label={t('cinema.inspector.prompt')}
-          className="field-sizing-content max-h-[30svh] min-h-10 w-full resize-y bg-transparent px-4 py-2.5 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:outline-none"
+          className={`${GLASS_SURFACE} field-sizing-content mx-2 mt-2 max-h-[30svh] min-h-10 resize-y rounded-xl border px-3 py-2.5 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
         />
 
         {/* Status strip: the clip's lifecycle + the newest action failure, keyed
@@ -393,33 +401,56 @@ export function ShotInspector({
           </div>
         ) : null}
 
-        {/* Toolbar: quick pickers + icon toggles left, actions right */}
-        <div className="flex flex-wrap items-end justify-between gap-2 border-t border-white/10 px-3 py-2">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="w-44">
-              <Select
-                label={t('cinema.inspector.model')}
-                placeholder={t('cinema.inspector.noModel')}
-                options={videoModels.map((m) => ({
-                  value: m.id,
-                  label: m.name,
-                  caption: m.providerLabel,
-                }))}
-                value={modelId}
-                onChange={setModelId}
-                panelWidth="wide"
+        {/* Toolbar: quick pickers + icon toggles left, actions right. Label-less
+            since the v6.1 pass (owner request): the model chip and the slider
+            carry aria-labels for AT, but the visible captions are gone — the
+            controls explain themselves and the row stays one line tall. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Model trigger: a chip wearing the CURRENT choice (brand mark +
+                name); the real decision surface is the big ModelPickerModal —
+                a model is a purchase, and a purchase deserves the full table
+                (logo, tier, provider, description, tariff), not a rail Select. */}
+            <button
+              type="button"
+              aria-label={t('cinema.inspector.model')}
+              onClick={() => setIsModelOpen(true)}
+              className="flex min-h-8 max-w-44 items-center gap-2 rounded-full border border-white/10 bg-steel px-2.5 text-left text-xs text-mist transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            >
+              <span className="grid size-4 shrink-0 place-items-center text-mist">
+                <ProviderMark provider={presentationFor(modelId).provider} className="size-4" />
+              </span>
+              <span className="min-w-0 truncate">
+                {model ? model.name : t('cinema.inspector.noModel')}
+              </span>
+              {/* Decorative chevron — same voice as the account menu trigger */}
+              <span aria-hidden="true" className="text-[10px] text-mist-dim">
+                ▾
+              </span>
+            </button>
+
+            {/* Duration: a stepped range over the editorial stops (2/3/5/8/10s),
+                not an option menu (owner request). The INDEX is the slider value
+                so every notch is a real, priceable stop; aria-valuetext speaks
+                the seconds, the chip beside it shows them. */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="range"
+                min={0}
+                max={SHOT_DURATIONS_SECONDS.length - 1}
+                step={1}
+                value={Math.max(0, SHOT_DURATIONS_SECONDS.findIndex((s) => String(s) === seconds))}
+                onChange={(event) => {
+                  const stop = SHOT_DURATIONS_SECONDS[Number(event.target.value)]
+                  if (stop !== undefined) setSeconds(String(stop))
+                }}
+                aria-label={t('cinema.inspector.duration')}
+                aria-valuetext={t('cinema.shot.seconds', { count: Number(seconds) })}
+                className="w-24 accent-glow-amber"
               />
-            </div>
-            <div className="w-24">
-              <Select
-                label={t('cinema.inspector.duration')}
-                options={SHOT_DURATIONS_SECONDS.map((s) => ({
-                  value: String(s),
-                  label: t('cinema.shot.seconds', { count: s }),
-                }))}
-                value={seconds}
-                onChange={setSeconds}
-              />
+              <span className="w-8 shrink-0 text-xs text-mist">
+                {t('cinema.shot.seconds', { count: Number(seconds) })}
+              </span>
             </div>
 
             {/* Native generation audio — a STATE toggle, not a drawer opener:
@@ -493,6 +524,15 @@ export function ShotInspector({
             </Button>
           </div>
         </div>
+
+        {/* The big model picker behind the trigger chip above */}
+        <ModelPickerModal
+          isOpen={isModelOpen}
+          onClose={() => setIsModelOpen(false)}
+          models={videoModels}
+          value={modelId}
+          onChange={setModelId}
+        />
       </section>
     </div>
   )
