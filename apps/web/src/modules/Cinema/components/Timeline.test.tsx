@@ -10,7 +10,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { FilmDetail, Shot } from '@opencreate/contracts'
+import type { CatalogAudioModel, FilmAudio, FilmDetail, Shot } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
 import { Timeline } from './Timeline'
 import 'shared/config/i18n'
@@ -45,7 +45,7 @@ function makeShot(overrides: Partial<Shot>): Shot {
   }
 }
 
-function makeFilm(shots: Shot[]): FilmDetail {
+function makeFilm(shots: Shot[], audio: FilmAudio[] = []): FilmDetail {
   return {
     film: {
       id: 'film1',
@@ -57,18 +57,49 @@ function makeFilm(shots: Shot[]): FilmDetail {
       updatedAt: '2026-07-09T10:00:00.000Z',
     },
     shots,
-    audio: [],
+    audio,
   }
 }
 
-function renderTimeline(shots: Shot[]) {
+const musicModel: CatalogAudioModel = {
+  id: 'minimax-music',
+  name: 'Score',
+  providerLabel: 'MiniMax',
+  air: 'minimax:music@2.6',
+  tier: 'standard',
+  type: 'audio',
+  supportsImageInput: false,
+  aspectRatios: ['1:1'],
+  credits: 15,
+  audioKind: 'music',
+}
+
+function makeTrack(overrides: Partial<FilmAudio>): FilmAudio {
+  return {
+    id: 'a1',
+    filmId: 'film1',
+    kind: 'music',
+    generationId: 'gen-audio',
+    shotId: null,
+    startMs: 0,
+    gainDb: 0,
+    ...overrides,
+  }
+}
+
+function renderTimeline(
+  shots: Shot[],
+  options: { audio?: FilmAudio[]; audioModels?: CatalogAudioModel[] } = {},
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const onSelectShot = vi.fn()
   const onOpenStoryboard = vi.fn()
   render(
     <QueryClientProvider client={queryClient}>
       <Timeline
-        film={makeFilm(shots)}
+        film={makeFilm(shots, options.audio ?? [])}
+        audioModels={options.audioModels ?? []}
+        musicPrompt={null}
         selectedShotId={null}
         onSelectShot={onSelectShot}
         onOpenStoryboard={onOpenStoryboard}
@@ -157,6 +188,50 @@ describe('Timeline', () => {
 
     expect(onOpenStoryboard).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  // The audio lane is the v7 point: sound is a TRACK under the footage, on the
+  // same clock, deletable in place — not a sidebar list.
+  it('renders the audio lane with named tracks and deletes one in place', async () => {
+    apiMock.mockResolvedValue(undefined)
+    renderTimeline([makeShot({ id: 'a', durationMs: 5000 })], {
+      audio: [
+        makeTrack({ id: 'm1', kind: 'music' }),
+        makeTrack({ id: 'v1', kind: 'voiceover', shotId: 'a', startMs: 0 }),
+      ],
+    })
+
+    // The music bed and the beat-named voiceover are both on the lane
+    expect(screen.getByText(/music|музык/i)).toBeInTheDocument()
+    expect(screen.getByText(/beat 1|бит 1/i)).toBeInTheDocument()
+
+    const removeButtons = screen.getAllByRole('button', { name: /remove|убрать/i })
+    await userEvent.click(removeButtons[0]!)
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/films/film1/audio/m1',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
+
+  it('adds a music bed through the "+" dialog form', async () => {
+    apiMock.mockResolvedValue({ id: 'gen1' })
+    renderTimeline([], { audioModels: [musicModel] })
+
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    const dialog = screen.getByRole('dialog', { name: /^add$/i })
+    await userEvent.click(within(dialog).getByRole('button', { name: /add music/i }))
+
+    // The dialog switched to the mini-form instead of closing
+    const prompt = within(dialog).getByRole('textbox')
+    await userEvent.type(prompt, 'slow heavy strings')
+    await userEvent.click(within(dialog).getByRole('button', { name: /voice it|generate|озвучить|сгенерир/i }))
+
+    // One charged action: the audio generation first, then the track link
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/generations',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('resizes via the size preset select', async () => {

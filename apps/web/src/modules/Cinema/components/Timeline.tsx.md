@@ -4,74 +4,82 @@
 
 ## Purpose
 
-The film strip: a compact, RESIZABLE band between the title row and the
-workspace. A minimal chrome row (strip name · size `Select` · one "+" trigger)
-over a recessed RAIL of ordered `ShotThumb`s, with a drag/keyboard resize
-separator on the rail's bottom edge. Authoring actions live in a dialog behind
-the "+" trigger, not in standing chrome.
+The TRACKS panel (v7): a real edit-bay timeline at the bottom of the editor.
+Three horizontal layers share ONE time scale (`PX_PER_SEC = 24`) inside one
+horizontally-scrolling well: a RULER (second ticks, labels every 5s), the VIDEO
+LANE (shot tiles as wide as their duration), and the AUDIO LANE (music beds as
+bars to the film's end, voiceovers as chips at their exact start offset,
+hover-delete). Authoring — footage, title card, storyboard, and now MUSIC and
+VOICEOVER — lives behind one "+" dialog. Strip height is user-controlled
+(size Select + drag separator).
 
 ## What it does (for an AI reader)
 
-- Responsibilities: own the strip layout, the strip HEIGHT (one value driving a
-  CSS custom property), the "+" actions dialog, and shot CRUD/reorder; lift
+- Responsibilities: own the tracks layout + time scale, the strip HEIGHT
+  (`--tl-h`), the "+" dialog (incl. the audio mini-forms ported from the
+  retired `AudioTracks` card), shot CRUD/reorder, audio track add/delete; lift
   selection to the editor.
-- Public API / exports: `Timeline`, `TimelineProps`
-  (`film`, `selectedShotId`, `onSelectShot`, `onOpenStoryboard`).
-- Inputs → Outputs: `FilmDetail` → the strip; dialog actions → shot mutations;
-  size Select / separator drag / arrow keys → `--tl-h` custom property on the
-  rail `<ul>` (read by `ShotThumb` as `h-[var(--tl-h)]`).
-- Side effects: `useAddShot`, `useDeleteShot`, `useReorderShots`. Local UI
-  state only for `isAddOpen`, `tileHeight`, and the drag origin.
+- Public API / exports: `Timeline`, `TimelineProps` (`film: FilmDetail` —
+  shots AND audio, `audioModels: CatalogAudioModel[]`, `musicPrompt?`,
+  `selectedShotId`, `onSelectShot`, `onOpenStoryboard`).
+- Inputs → Outputs: `FilmDetail` → ruler + lanes on one clock; dialog actions →
+  shot mutations / `useAddAudioTrack` (generation POST + track link, one
+  charged action); lane hover-delete → `useDeleteAudio`.
+- CSS contract: the scroll body publishes `--tl-h` (tile height) and `--tl-w`
+  (total width = totalSec × PX_PER_SEC); each shot `<li>` carries `--shot-w`
+  (duration-proportional, min 56px). ShotThumb fills its slot (`w-full`).
+- Side effects: `useAddShot`, `useDeleteShot`, `useReorderShots`,
+  `useAddAudioTrack`, `useDeleteAudio`. Local UI state: `isAddOpen`,
+  `addView: 'menu' | 'music' | 'voiceover'`, audio form fields, `tileHeight`,
+  drag origin.
 
 ## Dependencies
 
-- Imports: `react`, `react-i18next`, `Button` + `Card` + `Modal` + `Select`
-  from `shared/ui`, shot mutations, `ShotThumb`, icons.
-- Used by: `FilmEditor`.
-- Tested by: `Timeline.test.tsx` (dialog flow, rail purity, resize via select +
-  keyboard, storyboard handoff).
+- Imports: `react`, `react-i18next`, contracts (`AudioKind`,
+  `CatalogAudioModel`, `FilmDetail`, `StyleId`), `shared/ui` (`Button`, `Card`,
+  `Modal`, `Select`), `../model/audioApi`, `../model/shotsApi`, `ShotThumb`,
+  icons (`MicIcon`, `MusicIcon`, `PlusIcon`, `StoryboardIcon`, `TextCardIcon`,
+  `TrashIcon`).
+- Used by: `FilmEditor` (bottom workbench, under the composer).
+- Tested by: `Timeline.test.tsx` (dialog flow incl. the music form → POST,
+  rail purity, audio lane render + delete, resize via select + keyboard,
+  storyboard handoff).
 
 ## Diagram
 
 ```mermaid
 flowchart TD
-  FILM[FilmDetail.shots] --> T[Timeline]
-  T --> H["chrome row: size Select · '+' trigger"]
-  H -->|"+"| DLG["Modal: add shot · title card · storyboard"]
-  DLG -->|add / add-title| ADD[useAddShot → select new]
-  DLG -->|storyboard| SB[onOpenStoryboard]
-  T --> R["rail: Card surface=well → ul.style --tl-h → ShotThumbs"]
-  T --> SEP["separator (drag + arrows) → tileHeight state"]
-  SEP --> R
-  R -->|move / delete via ShotThumb hover overlay| MUT[useReorderShots / useDeleteShot]
+  FILM[FilmDetail: shots + audio] --> T[Timeline]
+  T --> H["chrome row: size Select · '+'"]
+  H -->|"+"| DLG["Modal: shot · title · storyboard · music · voiceover"]
+  DLG -->|music/voice| FORM["mini-form → useAddAudioTrack (POST /generations → POST /audio)"]
+  T --> WELL["well: one horizontal scroll, one time scale"]
+  WELL --> RULER["ruler: ticks/s, labels /5s (w = --tl-w)"]
+  WELL --> VLANE["video lane: li w = --shot-w ∝ durationMs → ShotThumb"]
+  WELL --> ALANE["audio lane: music bar (start→end) · voiceover chips @startMs · hover 🗑 → useDeleteAudio"]
+  T --> SEP["height separator (drag + arrows) → --tl-h"]
 ```
 
 ## Key decisions / gotchas
 
-- **v6: authoring collapsed into ONE "+" dialog.** Three always-visible pills
-  claimed a chrome row for actions used a few times per film; the dialog costs
-  one click and zero standing pixels. `Timeline.test.tsx` asserts the actions
-  are NOT on screen collapsed, ARE all present in the dialog, and that choosing
-  one closes it (feedback must not appear behind a stale sheet).
-- **v6: the height is one value, two dials.** The `Select` (S/M/L → 48/64/88px)
-  and the bottom-edge separator (pointer drag with `setPointerCapture`, or
-  ArrowUp/ArrowDown ±8px, clamped 40–120) both set `tileHeight`; the rail
-  publishes it as `--tl-h` so resizing re-renders only this component. A dragged
-  in-between value matches no preset and the Select shows the "custom"
-  placeholder. The separator is a REAL `role="separator"` with
-  `aria-valuemin/max/now` — tests read the accessible value, not pixels.
-- The rail is a `<ul>`/`<li>` list — real list semantics, and the `<li>` (the flex
-  child) carries `shrink-0`, not the thumb.
-- Reorder swaps two ids and POSTs the FULL order — the client never computes
-  `orderIndex`; the server owns it and the returned list is patched into cache.
-- Deleting the selected shot clears the selection so the inspector never dangles.
-- `RailStyle`/`isPreset`: typed CSSProperties extension + a key-list type guard,
-  so neither the CSS variable nor the Select round-trip needs an `as` cast.
-
-## Update 2026-07-15 — v5 compact strip
-- The strip became a compact band between the title row and the workspace
-  (placement owned by FilmEditor); superseded by v6 above on the same day.
+- **Proportional width is what makes it a timeline:** a 10s beat visibly costs
+  twice a 5s one. The three layers share one scroll container and one scale so
+  they can never drift apart.
+- **Sound is a track, not a sidebar (v7):** the «Звук» card is gone; the audio
+  lane sits directly beneath the footage on the same clock. A music bed's real
+  length lives in the media (unknown client-side) → its bar runs to the film's
+  end; voiceover chips sit at the offset they will actually play. Deleting is
+  in place (hover/focus reveal, same pointer-events contract as the thumbs).
+- **The "+" dialog's audio rows switch to a mini-form** instead of closing —
+  Generate is ONE charged action (audio generation + track link,
+  `useAddAudioTrack`). Reopening always starts at the menu (`closeAdd` resets).
+- The total is a SIMPLE duration sum — crossfade overlap is a render subtlety,
+  not a lane concern; min 8s keeps the ruler visible on an empty film.
+- Reorder still swaps ids and POSTs the full order; the audio lane is NOT
+  inside the shots `<ul>` (rail purity tests hold).
+- NOT YET: dragging tracks horizontally (audio `startMs` has no PATCH endpoint)
+  — the next honest step for "переставь звук мышкой".
 
 ## Commits
 
-- _no commit yet_
+- _no commit yet (v7 rework)_

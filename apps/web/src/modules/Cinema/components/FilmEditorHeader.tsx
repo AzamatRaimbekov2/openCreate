@@ -15,9 +15,16 @@ import { ChevronLeftIcon } from './icons'
 
 export type FilmEditorHeaderProps = {
   film: Film
+  // Kick off the mp4 export (owned by FilmEditor — the status strip and this
+  // menu must read one state). Lives in the ⋯ menu since v7: a once-per-film
+  // action does not earn a standing card on the stage.
+  onExport: () => void
+  // False = hide the export item entirely (no shots, or one already in flight).
+  // Menu law: unavailable actions are REMOVED, never disabled-and-mysterious.
+  canExport: boolean
 }
 
-export function FilmEditorHeader({ film }: FilmEditorHeaderProps) {
+export function FilmEditorHeader({ film, onExport, canExport }: FilmEditorHeaderProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const deleteFilm = useDeleteFilm()
@@ -52,6 +59,14 @@ export function FilmEditorHeader({ film }: FilmEditorHeaderProps) {
       <Menu
         label={t('cinema.editor.filmMenu')}
         items={[
+          // Export first — it is the film's PRIMARY outcome; hidden (not
+          // disabled) while a render runs or the timeline is empty
+          {
+            id: 'export',
+            label: t('cinema.render.cta'),
+            onSelect: onExport,
+            isAvailable: canExport,
+          },
           { id: 'rename', label: t('cinema.editor.rename'), onSelect: () => setIsRenameOpen(true) },
           {
             id: 'delete',

@@ -1,68 +1,55 @@
 // apps/web/src/modules/Cinema/components/RenderBar.tsx
-// The export control: POST a render (202 processing), poll it to a terminal
-// state, then show a Download link (succeeded) or a calm retry (failed). Owns
-// the active render id locally — the editor does not need to know it. The button
-// is disabled while a render is in flight (the API also caps concurrency, but a
-// disabled button is the honest client-side mirror of that limit).
+// The export STATUS STRIP (v7). The standing "Экспорт · Собрать mp4" card is
+// gone — the trigger moved into the film header's ⋯ menu (owner request), and
+// this component now renders NOTHING until an export is actually happening.
+// A block that exists to hold one button is chrome; a strip that appears with
+// the work and carries its progress/result is information.
 //
-// v4 hierarchy: this is an ACTION BAR, not a panel. It renders as a single glass
-// row — caption on the left, the one green pill on the right — and only grows
-// when a render is actually running (progress) or has finished (download/retry).
-// A titled card here would have given the export button the same visual weight
-// as the video you are watching, which is the confusion v4 set out to fix.
-import { useState } from 'react'
+// PURE PRESENTATION since v7: the render row arrives as a prop (FilmEditor owns
+// the kick-off mutation and the poll — the header menu needs the same state to
+// hide "Собрать mp4" while one is in flight, so the state had to live above
+// both). Four things it can show:
+//   starting  → the kick-off POST is in flight (no row yet)
+//   processing → determinate progress + percent
+//   succeeded  → the green Download link (a served /media/<id>.mp4)
+//   failed / kick-off failed → a CALM localized retry (never raw ffmpeg text)
 import { useTranslation } from 'react-i18next'
-import { Button, Card, ErrorState, Progress } from 'shared/ui'
-import { useCreateRender, useRender } from '../model/rendersApi'
+import type { FilmRender } from '@opencreate/contracts'
+import { Card, ErrorState, Progress } from 'shared/ui'
 import { DownloadIcon } from './icons'
 
 export type RenderBarProps = {
-  filmId: string
-  // False when the film has no shots — nothing to render yet
-  canRender: boolean
+  // The tracked render row (the poll result). undefined = none yet.
+  render: FilmRender | undefined
+  // True while the kick-off POST is in flight (menu item fired, no row yet)
+  isStarting: boolean
+  // The kick-off POST itself failed before any render row existed
+  hasStartError: boolean
+  // Re-fire the export — retry after a failed render or a failed kick-off
+  onRetry: () => void
 }
 
-export function RenderBar({ filmId, canRender }: RenderBarProps) {
+export function RenderBar({ render, isStarting, hasStartError, onRetry }: RenderBarProps) {
   const { t } = useTranslation()
-  const createRender = useCreateRender()
-  const [renderId, setRenderId] = useState<string | null>(null)
-  const render = useRender(filmId, renderId).data
 
-  const isProcessing = createRender.isPending || render?.status === 'processing'
-
-  const start = () =>
-    createRender.mutate(filmId, {
-      // Track the new render so useRender begins polling it
-      onSuccess: (created) => setRenderId(created.id),
-    })
+  // Idle: no strip at all — the export lives in the header menu until it runs
+  if (!render && !isStarting && !hasStartError) return null
 
   return (
-    // Glass, because the bar floats over the stage's dark well and the specular
-    // top edge is what separates the two. No title prop: the caption below is
-    // inline chrome, and a heading row would re-introduce panel weight.
+    // Glass, because the strip floats over the stage's dark well and the
+    // specular top edge is what separates the two.
     <Card>
       <section aria-label={t('cinema.render.title')} className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-mist-dim">{t('cinema.render.title')}</span>
-          {/* size="sm" — editor tool chrome (v5 compact pass), same scale as the
-              timeline's authoring buttons */}
-          <Button
-            size="sm"
-            onClick={start}
-            isLoading={isProcessing}
-            disabled={!canRender || isProcessing}
-          >
-            {t('cinema.render.cta')}
-          </Button>
-        </div>
+        <span className="text-xs text-mist-dim">{t('cinema.render.title')}</span>
 
-        {/* Processing — a determinate bar + percent (progress may be null early) */}
-        {render?.status === 'processing' ? (
+        {/* Kick-off in flight or processing — a determinate bar + percent
+            (progress may be null early; the bar shows 0 until the first poll) */}
+        {isStarting || render?.status === 'processing' ? (
           <div className="flex flex-col gap-1.5">
-            <Progress value={render.progress ?? 0} label={t('cinema.render.processing')} />
+            <Progress value={render?.progress ?? 0} label={t('cinema.render.processing')} />
             <p role="status" className="text-xs text-glow-amber">
               {t('cinema.render.processing')}
-              {render.progress !== null ? ` · ${render.progress}%` : ''}
+              {render?.progress != null ? ` · ${render.progress}%` : ''}
             </p>
           </div>
         ) : null}
@@ -79,16 +66,11 @@ export function RenderBar({ filmId, canRender }: RenderBarProps) {
           </a>
         ) : null}
 
-        {/* Failed — never the raw server errorMessage; a calm localized retry */}
-        {render?.status === 'failed' ? (
-          <ErrorState message={t('cinema.render.failed')} onRetry={start} />
-        ) : null}
-
-        {/* The kick-off itself failed (rate limit / conflict) before any render row */}
-        {createRender.isError && !render ? (
-          <p role="alert" className="text-xs text-glow-red">
-            {t('errors.actionFailed')}
-          </p>
+        {/* Failed render OR failed kick-off — never the raw server text; one
+            calm localized retry re-fires the export through the same path the
+            menu item uses */}
+        {render?.status === 'failed' || hasStartError ? (
+          <ErrorState message={t('cinema.render.failed')} onRetry={onRetry} />
         ) : null}
       </section>
     </Card>

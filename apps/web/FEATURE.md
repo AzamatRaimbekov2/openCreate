@@ -47,32 +47,24 @@ react-hook-form + zod, i18next.
 - **CinemaStudio (`/cinema`, `/cinema/$filmId`, guarded)** — compose films on top
   of the generation lifecycle. The library lists film cards (canvas-shaped abyss
   plates, `Link` into the editor) with a green "New film" modal (title + aspect
-  `PillGroup` + default-style `Select`). The editor (v5 COMPACT: dense route
-  canvas, `size="sm"` tool buttons, `text-xs` captions) is a header (rename/
-  delete-confirm) + a horizontal RESIZABLE `Timeline` DIRECTLY UNDER THE TITLE —
-  always on screen, never below the fold: a size `Select` (S/M/L) plus a
-  keyboard-operable drag separator drive one `--tl-h` var the `ShotThumb`s read;
-  authoring (add shot / title card / storyboard) lives behind ONE "+" trigger
-  that opens an actions `Modal`; per-thumb move/delete is a hover/focus overlay
-  on the tile (live clip status from the shared `['generation', id]` cache) —
-  above the full-width stage. The shot editor is a COMPOSER DOCK fixed to the
-  viewport bottom (v6): auto-growing iOS-glass prompt plate (manual resize via a TOP-edge grip: drag UP = grow — the dock is bottom-pinned), a
-  label-less toolbar — model trigger chip opening the big `ModelPickerModal`
-  (brand logos, tiers, honest provider labels, descriptions, tariffs) and a
-  stepped duration range slider — a generation-audio speaker toggle (amber = the clip
-  generates WITH the model's soundtrack; label carries the ×2 price on
-  switchable models, disabled where the catalog has no `nativeAudio`) and
-  icon-toggled drawers (cast · spoken line · expand),
-  a slim hint bar when nothing is selected — the dock version of the
-  `ShotInspector` (prompt + style/framing/motion/
-  quality `Select`s built FROM the contract preset tables + a video-model picker +
-  duration/transition/title; Generate composes a **structured** `promptPreset`,
-  POSTs `/api/generations`, links it to the shot, then polls). A `PreviewPlayer`
-  plays the shots back-to-back in the DOM (an honest "approximation" — the server
-  render is authoritative); `RenderBar` POSTs an ffmpeg render, polls to a green
-  Download `/media/<id>.mp4` (calm retry on failure, never the raw ffmpeg text);
-  `AudioTracks` generates+links music/voiceover; `StoryboardModal` turns a script
-  into draft shots (key-gated — an unset LLM key surfaces as a calm inline notice).
+  `PillGroup` + default-style `Select`). The editor (v7) is a real
+  NLE WORKBENCH: one viewport-height column, no page scroll — the STAGE
+  (header · transient render status strip · `PreviewPlayer`) scrolls inside
+  itself, and the bottom WORKBENCH holds the composer dock (auto-growing
+  iOS-glass prompt with a TOP-edge resize grip, label-less model chip opening
+  the big `ModelPickerModal`, stepped duration slider, generation-audio speaker
+  toggle, icon-toggled drawers: cast · spoken line · expand) above the TRACKS
+  panel: a second-ruler, the VIDEO lane (shot tiles as wide as their duration,
+  one `PX_PER_SEC` scale, live clip status from the shared `['generation', id]`
+  cache, hover move/delete) and the AUDIO lane directly beneath (music beds as
+  bars, voiceovers as chips at their exact startMs, hover delete). Export lives
+  in the header's ⋯ menu («Собрать mp4», hidden while a render runs); `RenderBar`
+  is a transient status strip (progress → green Download `/media/<id>.mp4` →
+  calm retry, never raw ffmpeg text). The «+» dialog adds shot / title card /
+  storyboard / music / voiceover (audio rows switch to a mini-form —
+  one charged action generates the clip AND files the track; the «Звук» card is
+  retired). Shot generation composes a **structured** `promptPreset`, POSTs
+  `/api/generations`, links the clip, then polls.
   The module has NO cross-module imports: the catalog is read at the route (the
   seam) and decoupling from Gallery/Generator is through the shared query cache.
 - **AI Soul Studio (`/soul`, `/soul/$entityId`, guarded)** — build a CHARACTER from a

@@ -5,18 +5,21 @@
 // arrive from the route (the cross-module seam), split here into the video/audio
 // lists the child surfaces need.
 //
-// v6 LAYOUT — why it is shaped like this:
-//   * v5 put the timeline ABOVE the workspace, right under the title row (at
-//     the bottom it lived below the fold, and selecting a beat meant scrolling
-//     twice per edit). That stands.
-//   * v6 retired the 360px side rail: the shot editor became a COMPOSER DOCK
-//     fixed to the bottom of the viewport (ShotInspector renders the fixed
-//     shell itself). The rail was the one column fighting the preview for
-//     width, and a long prompt lived in a cramped corner box; a bottom dock is
-//     the shape prompt-first tools train users on — type below, result above.
-//   * The stage (preview · export · audio) now spans the full width. The editor
-//     body carries pb-36 so the docked composer never hides the audio card;
-//     with no shot selected a slim hint dock stands in for the composer.
+// v7 LAYOUT — a real NLE workbench (owner request 2026-07-16):
+//   * The editor is ONE viewport-height column with NO page scroll: a STAGE on
+//     top (title row · export status strip · preview) that scrolls internally,
+//     and a WORKBENCH pinned at the bottom — the composer (selected shot) above
+//     the TRACKS panel (video lane + audio lane), the way every real edit bay
+//     stacks it: picture up top, tracks under your hands.
+//   * The timeline moved back DOWN, but as tracks, not a strip: shot tiles are
+//     laid out proportionally to their duration and the film's audio (music
+//     beds, voiceovers) renders as a lane directly beneath the footage — see
+//     Timeline.tsx. The standalone «Звук» card is gone; adding music/voice
+//     lives in the timeline's «+» dialog.
+//   * Export lives in the header's ⋯ menu; RenderBar is a transient status
+//     strip on the stage that exists only while a render is starting/running/
+//     finished. FilmEditor owns the kick-off + poll because the menu (hide
+//     while in flight) and the strip must read ONE state.
 // Panels are `Card` (design.md v4); the module no longer hand-rolls a PANEL
 // class string, which is what made the player, the export button and the track
 // list read with identical weight.
@@ -30,12 +33,12 @@ import type {
 } from '@opencreate/contracts'
 import { ErrorState, Skeleton } from 'shared/ui'
 import { useFilm } from '../model/filmsApi'
+import { useCreateRender, useRender } from '../model/rendersApi'
 import { shotStartMs } from '../model/voiceoverApi'
 import { FilmEditorHeader } from './FilmEditorHeader'
 import { Timeline } from './Timeline'
 import { PreviewPlayer } from './PreviewPlayer'
 import { RenderBar } from './RenderBar'
-import { AudioTracks } from './AudioTracks'
 import type { CastableEntity } from './ShotCastField'
 import { ShotInspector } from './ShotInspector'
 import { StoryboardModal } from './StoryboardModal'
@@ -64,9 +67,10 @@ export type FilmEditorProps = {
   entities?: CastableEntity[]
 }
 
-// The floating dock shell shared by the composer's stand-in hint (the composer
-// itself renders the same shell inside ShotInspector)
-const DOCK = 'fixed inset-x-0 bottom-0 z-30 px-4 pb-3'
+// The editor column fills the viewport under the 44px app bar + the route's
+// 16px paddings — NO page scroll: the stage scrolls inside itself and the
+// workbench stays under the user's hands, like a real edit bay.
+const EDITOR_COLUMN = 'flex h-[calc(100svh-76px)] min-h-0 flex-col gap-3'
 
 export function FilmEditor({ filmId, models, templates = [], entities = [] }: FilmEditorProps) {
   const { t } = useTranslation()
@@ -74,17 +78,28 @@ export function FilmEditor({ filmId, models, templates = [], entities = [] }: Fi
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null)
   const [isStoryboardOpen, setIsStoryboardOpen] = useState(false)
 
-  // Loading: the silhouette of the layout above — header, stage column (hero +
-  // action bar + audio), inspector rail, then the strip. Nothing jumps in.
+  // Export state lives HERE (v7): the header's ⋯ menu item (hidden while a
+  // render is in flight) and the transient RenderBar status strip must read
+  // one truth, and neither owns the other.
+  const createRender = useCreateRender()
+  const [renderId, setRenderId] = useState<string | null>(null)
+  const activeRender = useRender(filmId, renderId).data
+  const startExport = () =>
+    createRender.mutate(filmId, { onSuccess: (created) => setRenderId(created.id) })
+  const isExporting = createRender.isPending || activeRender?.status === 'processing'
+
+  // Loading: the silhouette of the v7 column — title row + preview up top,
+  // composer + tracks at the bottom. Nothing jumps in.
   if (isPending) {
     return (
-      <div className="flex flex-col gap-4 pb-36">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-28 w-full" />
-        <div className="flex min-w-0 flex-col gap-4">
+      <div className={EDITOR_COLUMN}>
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <Skeleton className="h-8 w-64" />
           <Skeleton className="aspect-video max-h-[42svh] w-full" />
-          <Skeleton className="h-14 w-full" />
+        </div>
+        <div className="flex shrink-0 flex-col gap-2">
           <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
         </div>
       </div>
     )
@@ -111,56 +126,57 @@ export function FilmEditor({ filmId, models, templates = [], entities = [] }: Fi
     templates.find((template) => template.id === data.film.templateId)?.musicPrompt ?? null
 
   return (
-    // pb-36 clears the fixed composer dock — the audio card must stay reachable
-    // with the dock floating over the page bottom
-    <div className="flex flex-col gap-4 pb-36">
-      <FilmEditorHeader film={data.film} />
-
-      {/* The film strip: the table of contents, right under the title — always
-          on screen next to the stage it indexes (v5; see the layout note above) */}
-      <Timeline
-        film={data}
-        selectedShotId={selectedShotId}
-        onSelectShot={setSelectedShotId}
-        onOpenStoryboard={() => setIsStoryboardOpen(true)}
-      />
-
-      {/* Stage: what you look at, then what you do with it, then the extras —
-          full width since v6 (the shot editor docked to the viewport bottom) */}
-      <div className="flex min-w-0 flex-col gap-4">
-        <PreviewPlayer shots={data.shots} filmAspect={filmAspect} />
-        <RenderBar filmId={filmId} canRender={data.shots.length > 0} />
-        <AudioTracks
-          filmId={filmId}
-          audio={data.audio}
-          audioModels={audioModels}
-          musicPrompt={musicPrompt}
-          shotIds={data.shots.map((shot) => shot.id)}
+    <div className={EDITOR_COLUMN}>
+      {/* STAGE — scrolls inside itself: title row, the transient export status
+          strip, then the preview. The workbench below never moves. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
+        <FilmEditorHeader
+          film={data.film}
+          onExport={startExport}
+          canExport={data.shots.length > 0 && !isExporting}
         />
+        <RenderBar
+          render={activeRender}
+          isStarting={createRender.isPending}
+          hasStartError={createRender.isError && !activeRender}
+          onRetry={startExport}
+        />
+        <PreviewPlayer shots={data.shots} filmAspect={filmAspect} />
       </div>
 
-      {/* The composer dock. Keyed by shot.id so a new selection re-inits the
-          draft. With nothing selected, a slim hint bar holds the dock's place
-          so the layout (and the pb-36 clearance) never jumps. */}
-      {selectedShot ? (
-        <ShotInspector
-          key={selectedShot.id}
-          filmId={filmId}
-          shot={selectedShot}
-          filmAspect={filmAspect}
-          videoModels={videoModels}
-          ttsModel={ttsModel}
-          entities={entities}
-          startMs={selectedStartMs}
-          isVoiced={isSelectedVoiced}
-        />
-      ) : (
-        <div className={DOCK}>
-          <p className="mx-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-steel px-4 py-3 text-xs text-mist-dim shadow-2xl shadow-black/50">
+      {/* WORKBENCH — the edit bay under the user's hands: the composer for the
+          selected shot (a slim hint row when nothing is), then the TRACKS. */}
+      <div className="flex shrink-0 flex-col gap-2">
+        {selectedShot ? (
+          // Keyed by shot.id so a new selection re-inits the draft
+          <ShotInspector
+            key={selectedShot.id}
+            filmId={filmId}
+            shot={selectedShot}
+            filmAspect={filmAspect}
+            videoModels={videoModels}
+            ttsModel={ttsModel}
+            entities={entities}
+            startMs={selectedStartMs}
+            isVoiced={isSelectedVoiced}
+          />
+        ) : (
+          <p className="rounded-2xl border border-white/10 bg-steel px-4 py-2.5 text-xs text-mist-dim">
             {t('cinema.inspector.selectHint')}
           </p>
-        </div>
-      )}
+        )}
+
+        {/* The tracks: video lane (duration-proportional tiles) with the film's
+            audio lane directly beneath — see Timeline.tsx (v7) */}
+        <Timeline
+          film={data}
+          audioModels={audioModels}
+          musicPrompt={musicPrompt}
+          selectedShotId={selectedShotId}
+          onSelectShot={setSelectedShotId}
+          onOpenStoryboard={() => setIsStoryboardOpen(true)}
+        />
+      </div>
 
       <StoryboardModal
         filmId={filmId}

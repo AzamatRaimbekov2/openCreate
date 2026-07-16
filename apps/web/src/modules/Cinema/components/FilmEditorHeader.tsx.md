@@ -41,6 +41,12 @@ flowchart TD
   the title is a label on a workbench, not a page hero. Modals untouched (overlays keep
   the full-size controls).
 
+## Update 2026-07-16 — export in the ⋯ menu
+- Props += `onExport`, `canExport`. The ⋯ menu now leads with «Собрать mp4»
+  (`isAvailable: canExport` — hidden, never disabled-and-mysterious, per the
+  Menu law) before rename/delete. A once-per-film action does not earn a
+  standing card on the stage.
+
 ## Commits
 
 - _no commit yet_

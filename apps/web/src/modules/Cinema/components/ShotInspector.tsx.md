@@ -149,6 +149,11 @@ error surfacing, money-path guards) unchanged.
   first drag starts from the element's LIVE height (`offsetHeight`), so the
   grip picks up exactly what the user sees.
 
+## Update 2026-07-16 — v7: plain flow element
+- The fixed bottom shell is GONE: the composer is a plain section inside
+  FilmEditor's bottom workbench (above the tracks); the editor column owns the
+  viewport pinning now, so the z-index/clearance games died with it.
+
 ## Commits
 
 - _no commit yet_

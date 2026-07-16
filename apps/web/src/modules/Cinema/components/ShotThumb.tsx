@@ -66,16 +66,18 @@ export function ShotThumb({
 
   return (
     // `group` scopes the hover/focus reveal; `relative` anchors the overlay.
-    // Height comes from the rail's --tl-h (fallback = the M preset), width
-    // follows via aspect-video — the strip resizes by repainting one variable.
-    <div className="group relative h-[var(--tl-h,64px)] shrink-0">
+    // Height comes from the rail's --tl-h (fallback = the M preset). Width is
+    // the PARENT SLOT's (v7): on the tracks timeline a slot is as wide as its
+    // clip is long, so the tile fills it and the media crops (object-cover) —
+    // a timeline tile is a strip of footage, not a framed thumbnail.
+    <div className="group relative h-[var(--tl-h,64px)] w-full shrink-0">
       {/* The tile — the select target. Amber ring when selected (kit convention) */}
       <button
         type="button"
         onClick={onSelect}
         aria-pressed={isSelected}
         aria-label={t('cinema.shot.select', { index })}
-        className={`relative aspect-video h-full overflow-hidden rounded-lg border bg-abyss transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
+        className={`relative h-full w-full overflow-hidden rounded-lg border bg-abyss transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none ${
           isSelected ? 'border-glow-amber ring-1 ring-glow-amber/60' : 'border-white/10'
         }`}
       >

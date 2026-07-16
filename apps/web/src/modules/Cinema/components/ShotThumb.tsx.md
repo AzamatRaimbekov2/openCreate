@@ -67,6 +67,12 @@ flowchart TD
   Found live: the revealed bar swallowed clicks aimed at the tile's bottom
   third, so selecting a shot by its lower half silently did nothing.
 
+## Update 2026-07-16 — v7 proportional slot
+- Width now comes from the PARENT SLOT (`w-full`): on the tracks timeline a
+  slot is as wide as its clip is long, so the tile fills it and the media
+  crops (object-cover) — a timeline tile is a strip of footage, not a framed
+  thumbnail. The aspect-video derivation is gone.
+
 ## Commits
 
 - _no commit yet_

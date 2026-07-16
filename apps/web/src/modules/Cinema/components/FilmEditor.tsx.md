@@ -107,6 +107,16 @@ flowchart TD
   grid constants replaced by the single `DOCK` shell class. Loading skeleton is
   single-column.
 
+## Update 2026-07-16 — v7: NLE workbench + export in the ⋯ menu
+- The editor is ONE viewport-height column (`h-[calc(100svh-76px)]`, no page
+  scroll): a STAGE (title row · transient RenderBar strip · preview) scrolling
+  inside itself, and a WORKBENCH pinned at the bottom — the composer above the
+  TRACKS panel, like a real edit bay.
+- Export state lives HERE: `useCreateRender` + tracked `renderId` +
+  `useRender` poll — the header's ⋯ menu (hides «Собрать mp4» while one runs)
+  and the status strip must read one truth. `AudioTracks` card deleted; sound
+  became a timeline lane (Timeline v7 absorbs add-music/voice).
+
 ## Commits
 
 - _no commit yet_

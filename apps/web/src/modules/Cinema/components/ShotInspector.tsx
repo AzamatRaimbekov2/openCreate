@@ -311,16 +311,14 @@ export function ShotInspector({
   }
 
   return (
-    // The dock: fixed to the viewport bottom, floating over the page (the editor
-    // body keeps a matching bottom padding so nothing hides beneath it). z-30 —
-    // under Modal sheets, over page content.
-    <div className="fixed inset-x-0 bottom-0 z-30 px-4 pb-3">
-      <section
-        aria-label={t('cinema.inspector.title')}
-        // Opaque steel, not glass: the stage scrolls BEHIND this surface and the
-        // prompt must stay readable over moving media.
-        className="mx-auto flex w-full max-w-4xl flex-col rounded-2xl border border-white/10 bg-steel shadow-2xl shadow-black/50"
-      >
+    // The composer: since v7 it is a plain flow element inside FilmEditor's
+    // bottom WORKBENCH (composer above the tracks) — the editor column owns the
+    // viewport pinning now, so the fixed shell and its z/clearance games are
+    // gone. Opaque steel: the prompt must stay readable over anything.
+    <section
+      aria-label={t('cinema.inspector.title')}
+      className="flex w-full flex-col rounded-2xl border border-white/10 bg-steel"
+    >
         {/* Drawer — one panel at a time above the prompt, scrolling inside
             itself past 40svh so the dock never swallows the stage */}
         {openPanel !== null ? (
@@ -614,7 +612,6 @@ export function ShotInspector({
           value={modelId}
           onChange={setModelId}
         />
-      </section>
-    </div>
+    </section>
   )
 }

@@ -25,7 +25,7 @@ import { useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatResolution, resolutionFor } from '@opencreate/contracts'
-import { Button, EmptyState, ErrorState, GLASS_FLOATING, Select, Skeleton } from 'shared/ui'
+import { Button, EmptyState, ErrorState, Select, Skeleton } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
 import { useCreateGeneration } from '../model/createGeneration'
 import {
@@ -42,26 +42,16 @@ import { ModelSelect } from './ModelSelect'
 import { deriveEntityRefs } from '../model/mentions'
 import { SubmitErrorBanner } from './SubmitErrorBanner'
 
-// The capsule: a floating pill of frosted glass the media scrolls beneath.
+// The capsule: a fully TRANSPARENT pill — no fill, no blur, no shadow — so the
+// media feed shows through the whole docked block, not just the textarea
+// (owner call, 2026-07-15; it previously wore GLASS_FLOATING). The inner
+// controls (Selects, ModelSelect, the submit pill) keep their own surfaces and
+// carry legibility over busy media themselves.
 //
-// The material (opaque baseline + the supports-[backdrop-filter] upgrade, the
-// saturate/brightness pair, the specular top border, the inner ring) is NOT
-// written here: it is `GLASS_FLOATING` in shared/ui/surfaces.ts, the one place
-// that owns the recipe. This file used to carry a hand-copy of it, which had
-// already drifted (bg-ridge baseline, a fainter fill, a bespoke shadow) — the
-// exact failure a single source exists to prevent.
-//
-// FLOATING, not the resting card elevation: the capsule hovers over a scrolling
-// feed and needs the longer shadow throw to separate from it.
-//
-// Only the capsule's own geometry stays local — the pill radius (larger than a
-// card's), the padding, and pointer-events-auto, which re-enables the clicks the
-// route's click-through wrapper disabled so the feed stays scrollable under the
-// capsule's margins.
-const CAPSULE_CLASS = [
-  'pointer-events-auto w-full max-w-3xl rounded-[1.75rem] border px-4 py-3',
-  GLASS_FLOATING,
-].join(' ')
+// Only the capsule's geometry remains — the pill radius, the padding, and
+// pointer-events-auto, which re-enables the clicks the route's click-through
+// wrapper disabled so the feed stays scrollable under the capsule's margins.
+const CAPSULE_CLASS = 'pointer-events-auto w-full max-w-3xl rounded-[1.75rem] px-4 py-3'
 
 export type ChatComposerProps = {
   // Entities the user can tag, injected by the route (Generator must not import
