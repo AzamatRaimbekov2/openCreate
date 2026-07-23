@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // noEmit: vite does the bundling; tsc here is TYPECHECK-ONLY. Pinned so a bare
+    // `tsc` (an agent forgetting --noEmit) can never again emit compiled .js next
+    // to every source file and poison lint/route-gen (2026-07-23 recurring mess).
+    "noEmit": true,
     "jsx": "react-jsx",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "resolveJsonModule": true,
