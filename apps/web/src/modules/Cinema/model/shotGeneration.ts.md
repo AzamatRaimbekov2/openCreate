@@ -13,10 +13,15 @@ the shared query cache — never through an import.
 - Responsibilities:
   - `useGenerateShotClip()`: POST `/api/generations` (body from
     `composeShotClipInput`) → PATCH `…/shots/:id` with the new `generationId`.
+    RETRIES the submit on transient failures only (`shouldRetrySubmit`).
   - `useShotGeneration(generationId | null)`: poll GET `/api/generations/:id`
     every 4s while `processing`.
+  - `shouldRetrySubmit(failureCount, error)`: pure retry predicate — true for the
+    transient allowlist (`rate_limited`/`provider_error`/`internal_error`), any
+    5xx, and non-envelope network throws; false for the four actionable/terminal
+    codes and after `MAX_SUBMIT_RETRIES` (2).
 - Public API / exports: `useGenerateShotClip`, `useShotGeneration`,
-  `GenerateShotClipVars` type.
+  `useShotGenerations`, `shouldRetrySubmit`, `GenerateShotClipVars` type.
 - Inputs → Outputs: mutation vars `{filmId, shot, model, filmAspect}` → `Generation`.
 - Side effects: network; on success seeds `['generation', id]`, prepends to the
   shared `['generations']` infinite list, invalidates `['film', id]` and `['me']`
@@ -45,6 +50,11 @@ flowchart TD
   the shot's clip also shows up in the create/library feed, with zero imports.
 - Poll stops on terminal state and on a first-poll error (no data) — a stuck/failed
   endpoint is not hammered.
+- Retry is SUBMIT-only and ALLOWLIST-based: a settled `failed` generation is
+  never re-run here (that is the poll's terminal state, surfaced by
+  `useShotFailureToast`, not a mutation). content_blocked etc. never retry — a
+  retry would re-cost or is pointless. `shouldRetrySubmit` is exported and unit-
+  tested directly, so the policy is pinned without driving a real mutation.
 
 ## Commits
 

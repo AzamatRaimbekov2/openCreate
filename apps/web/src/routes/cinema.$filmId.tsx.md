@@ -1,67 +1,64 @@
-# _shell.cinema.$filmId.tsx — AI component doc
+# cinema.$filmId.tsx — AI component doc
 
-> AI-facing sidecar for `_shell.cinema.$filmId.tsx`. Created 2026-07-09. Keep this in sync with the code on every change.
+> AI-facing sidecar for `cinema.$filmId.tsx`. Created 2026-07-09. Keep this in sync with the code on every change.
 
 ## Purpose
 
-The `/cinema/:filmId` editor route — auth-guarded, composition + TWO cross-module
-SEAMS: it reads the catalog via the Generator's public `useCatalog` and the template
-list via the Templates module's public `useTemplates`, and passes both into
-`FilmEditor` as `models` and `templates`.
+The `/cinema/:filmId` editor route — auth-guarded. Since 2026-07-23 it lives OUTSIDE the
+global `_shell` AppShell (owner: "раздел кино совершенно другой должен быть, свой хедер"):
+the editor renders its OWN full-bleed top bar (`CinemaEditorHeader`, via `FilmEditor`)
+instead of the app-wide nav. The route does two composition jobs: (1) THREE cross-module
+SEAMS — `useCatalog`, `useTemplates`, `useEntities` read here and handed to `FilmEditor`;
+(2) the GLOBAL CHROME (balance · lang · account) the editor bar needs, composed here and
+passed as the `chrome` slot (this screen has no AppShell to supply it).
 
 ## What it does (for an AI reader)
 
-- Responsibilities: route wiring, read the `filmId` param, feed the catalog and the
-  template list in.
-- Public API / exports: `Route` (TanStack file route `/_shell/cinema/$filmId`).
-- Inputs → Outputs: `filmId` param + catalog + templates → the editor page.
-- Side effects: `beforeLoad: requireSession()`; `useCatalog` and `useTemplates`
-  queries (both shared cache entries — neither costs a fetch if another screen
-  already loaded it).
+- Responsibilities: route wiring, read the `filmId` param, feed catalog/templates/entities,
+  and compose the balance·lang·account chrome node.
+- Public API / exports: `Route` (TanStack file route `/cinema/$filmId` — a TOP-LEVEL route,
+  no longer nested under `_shell`).
+- Inputs → Outputs: `filmId` param + catalog + templates + entities + session → the editor
+  page with its own chrome.
+- Side effects: `beforeLoad: requireSession()`; `useCatalog`/`useTemplates`/`useEntities`
+  queries (shared cache entries); on sign-out `queryClient.clear()` + navigate `/`.
 
 ## Dependencies
 
-- Imports: `@tanstack/react-router` (`createFileRoute`), `requireSession` from
-  `modules/Auth`, `FilmEditor` from `modules/Cinema`, `useCatalog` from
-  `modules/Generator`, `useTemplates` from `modules/Templates`.
-- Used by: the generated route tree (FilmCard `Link`, create-film navigate, and the
-  navigate at the end of a template instantiation).
+- Imports: `@tanstack/react-router` (`createFileRoute`, `useNavigate`),
+  `@tanstack/react-query` (`useQueryClient`), `modules/Auth` (`requireSession`, `signOut`,
+  `useAuthSession`), `modules/Cinema` (`FilmEditor`), `modules/Credits` (`BalanceChip`),
+  `modules/Entities` (`useEntities`), `modules/Generator` (`useCatalog`),
+  `modules/Templates` (`useTemplates`), `shared/ui` (`AccountMenu`, `LangSwitch`).
+- Used by: the generated route tree (FilmCard `Link`, create-film navigate, template
+  instantiation navigate).
 
 ## Diagram
 
 ```mermaid
 flowchart LR
-  URL["/cinema/:filmId"] --> G[requireSession]
-  G --> CAT["useCatalog → ['catalog']"]
-  G --> TPL["useTemplates → ['templates']"]
-  CAT --> FE["FilmEditor(filmId, models, templates)"]
-  TPL --> FE
+  URL["/cinema/:filmId (no _shell)"] --> G[requireSession]
+  G --> CAT["useCatalog / useTemplates / useEntities"]
+  G --> CHR["chrome: BalanceChip + LangSwitch + AccountMenu"]
+  CAT --> FE["FilmEditor(filmId, models, templates, entities, chrome)"]
+  CHR --> FE
+  FE --> HDR[CinemaEditorHeader]
 ```
 
 ## Key decisions / gotchas
 
-- The Cinema module must NOT import Generator; the route is the seam that reads
-  `useCatalog` and passes `models` down — exactly like /create feeds Gallery/Generator.
-- Same `['catalog']` cache entry the composer uses — one fetch per session.
-
-## Key decisions (2026-07-11) — template catalog
-
-- **`useTemplates()` is the SECOND seam, and it has exactly the same shape as the
-  first.** A film made from a template carries its `templateId`, and the template
-  knows what music the format wants — which pre-fills the audio panel. Cinema must not
-  import Templates, so the list is read HERE and handed down.
-- **`FilmEditor` does the lookup, not this route**, because the route does not load
-  the film — the editor does. So the route passes the whole list, not a resolved
-  template.
-- `['templates']` is `staleTime: Infinity` and shared with `/templates`, so this costs
-  nothing on a second visit, and `templates.data?.items ?? []` means an in-flight query
-  simply reads as "no template" (the audio panel opens empty, exactly as it did before
-  templates existed).
+- Cinema/shared-ui must NOT import Generator/Templates/Entities/Auth/Credits; the ROUTE is
+  the seam that reads them and passes `models`/`templates`/`entities`/`chrome` down.
+- Breaking out of `_shell` is what lets the editor own the whole top bar. `/cinema` (the
+  library index) STAYS under `_shell` — only the editor screen is standalone.
+- The chrome composition mirrors `routes/_shell.tsx` exactly (normalize name, clear cache +
+  navigate home on sign-out), so the account affordance behaves identically to every other
+  screen.
 
 ## Update 2026-07-15 — v5 compact canvas
-- Route canvas gap-8 px-6 py-8 xl:px-10 → gap-4 px-4 py-4 xl:px-6: the editor is a
-  workbench; its chrome budget goes to the timeline + stage. Browsing screens keep the
-  roomier canvas.
+- Route canvas gap-8 px-6 py-8 → gap-4 px-4 py-4 xl:px-6: the editor is a workbench. Since
+  2026-07-23 that padding lives INSIDE `FilmEditor`'s `<main>` (the route hands it the full
+  width so the top bar can be full-bleed).
 
 ## Commits
 

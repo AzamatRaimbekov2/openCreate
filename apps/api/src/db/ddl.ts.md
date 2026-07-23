@@ -31,6 +31,43 @@ flowchart LR
 - FILM_DDL `shot` table += `audio INTEGER NOT NULL DEFAULT 0` (native generation
   audio; default keeps legacy rows silent).
 
+## Key decisions (2026-07-16) — user.role (dev super-admin)
+- `user` CREATE TABLE gains `role TEXT NOT NULL DEFAULT 'user'` (mirrors `schema.ts`; `client.ts`
+  carries the guarded ALTER for existing db files). Added for the dev-only seeded super-admin
+  (`modules/auth/dev-admin.ts`); `'user'` is the default so every existing and future signup is a
+  plain user — only the dev seed writes `'super_admin'`, and better-auth exposes the field
+  `input:false` so a client can never self-assign a role at signup.
+
+## Key decisions (2026-07-18) — Modular 3D Assets (ADR modular-3d-assets)
+New `ASSET3D_DDL` export (to be exec'd with the main DDL in `client.ts`, same idempotent
+`CREATE ... IF NOT EXISTS` contract). Two brand-new tables, `asset3d` + `asset3d_part`, mirroring
+`schema.ts` column-for-column. Because both tables are NEW, only the `CREATE TABLE IF NOT EXISTS`
+exec is needed — there is **no `client.ts` ALTER micro-migration** (that guard exists only to add a
+column to a table an older db already has).
+
+- **`asset3d`** — `id`, `user_id` (REFERENCES `user`, cascade), `title`, `concept_image_path`,
+  `created_at`. `concept_image_path` holds the full `/media/<uuid>.<ext>` path `saveDataUri` returns,
+  verbatim — the extension is load-bearing for `readAsDataUri`'s mime resolution. Backed by
+  `idx_asset3d_user_created(user_id, created_at DESC)` for the asset-list endpoint.
+- **`asset3d_part`** — `id`, `asset_id` (REFERENCES `asset3d`, cascade), `name`,
+  `description NOT NULL DEFAULT ''`, `sort_order REAL` (spaced reorder, the `shot.order_index`
+  precedent), `image_generation_id`, `mesh_generation_id`, `transform_json`, `created_at`. Backed by
+  `idx_asset3d_part_asset(asset_id, sort_order)` for the ordered per-asset read.
+- **`image_generation_id` / `mesh_generation_id` are CITATIONS: plain TEXT, NO `REFERENCES` clause.**
+  Same rule as `shot.generation_id` — a gallery-deleted generation must leave an orphaned ref, never
+  cascade the part away. The ONLY cascading edges are `asset3d.user_id` and `asset3d_part.asset_id`.
+- **No status column** — part state (`draft|extracting|extracted|meshing|ready`) is DERIVED at read
+  time from the cited generations' statuses (the films/shots two-sources-of-truth lesson). Nothing in
+  this DDL persists it.
+- `test/db-ddl.test.ts` pins the column shape AND asserts the citation-not-FK rule
+  (`foreign_key_list(asset3d_part)` contains `asset3d`, not `generation`).
+
+## Update 2026-07-21 — shot.reference_images_json
+- `FILM_DDL` shot table += `reference_images_json TEXT` (nullable) — arbitrary images attached
+  to a shot as references, a JSON array of `{ id, path }`, parallel to `entity_refs_json`.
+  Needs the matching guarded `ALTER TABLE shot ADD COLUMN` micro-migration in `client.ts`
+  (CREATE IF NOT EXISTS never alters an existing shot table).
+
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

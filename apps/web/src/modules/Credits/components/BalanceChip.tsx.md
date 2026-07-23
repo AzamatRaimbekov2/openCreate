@@ -65,6 +65,12 @@ flowchart LR
   chrome gives its pixels back to the editor canvas. Anatomy (amber tint,
   hairline, glow bolt) unchanged.
 
+## Update 2026-07-23 — compact number (design.md §13.5)
+- The visible numeral is now `Intl.NumberFormat(lng, { notation: 'compact', maximumFractionDigits: 1 })`
+  (→ "1B" / "1 млрд"); the EXACT grouped value moves to `aria-label` (`{balance}: {exact}`) + `title`.
+  Fixes the header eyesore where a billion-credit dev account rendered "1000000000" and blew out the
+  chip. Small counts (165) are unchanged, so `BalanceChip.test` stays green. Uses `i18n.language`.
+
 ## Commits
 
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal

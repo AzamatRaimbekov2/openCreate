@@ -16,6 +16,11 @@ export const user = sqliteTable('user', {
   // Denormalized credit balance — mutated ONLY inside the same transaction as a
   // credit_transaction ledger row (see modules/credits/ledger.ts invariants).
   creditsBalance: integer('credits_balance').notNull().default(0),
+  // 'user' | 'super_admin'. TEXT with a TS-level enum (the generation.type
+  // pattern): no CHECK constraint to migrate when roles grow. Only the dev-only
+  // seed (modules/auth/dev-admin.ts) ever writes 'super_admin' — better-auth
+  // exposes the field input:false, so no client can self-assign a role.
+  role: text('role').notNull().default('user'),
 })
 
 export const session = sqliteTable('session', {
@@ -225,6 +230,15 @@ export const shot = sqliteTable('shot', {
   // each character's name into the prompt AND attaches her photo as a reference,
   // so shot 2 shows the same fox as shot 1. Per-shot because a cast is per-beat.
   entityRefsJson: text('entity_refs_json'),
+  // Arbitrary images the user ATTACHED to this shot as generation references —
+  // not tagged entities, just "make it look like these". Stored as a JSON array of
+  // { id, path } (path = the '/media/<uuid>.<ext>' saveDataUri returned), exactly
+  // parallel to entity_refs_json. NULL = nothing attached. It lives on the SHOT so
+  // an attachment PERSISTS: a re-generate re-reads it into the closed referenceImages
+  // channel, whereas a one-off upload on the generation request would vanish the
+  // moment the clip was remade. No new table — the refs are shot-owned and go away
+  // with the shot (the film→shot cascade already covers deletion).
+  referenceImagesJson: text('reference_images_json'),
   // The catalog model this shot generates with; NULL = no opinion (fall back to
   // the style's recommendation, then the first video model). Before this column
   // the model was transient inspector state — re-selecting a shot forgot which
@@ -340,5 +354,40 @@ export const modelShare = sqliteTable('model_share', {
   generationId: text('generation_id').notNull(),
   // The render to show on the public page; NULL = show the interactive model only.
   renderId: text('render_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+// ── Modular 3D Assets (ADR modular-3d-assets) ────────────────────────────────
+// asset3d cites generations by id; it owns no media. The ONLY cascading FKs are
+// asset3d.userId → user and asset3d_part.assetId → asset3d. imageGenerationId /
+// meshGenerationId are CITATIONS (bare text, no .references()) — deleting a
+// generation from the library must leave an orphaned ref, never delete the part.
+export const asset3d = sqliteTable('asset3d', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  // The FULL public path saveDataUri returns for the concept image, verbatim —
+  // '/media/<uuid>.<ext>'. NOT a bare key: readAsDataUri needs the extension to
+  // resolve the mime, and you cannot rebuild it from a bare uuid. Not a provider URL.
+  conceptImagePath: text('concept_image_path').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+export const asset3dPart = sqliteTable('asset3d_part', {
+  id: text('id').primaryKey(),
+  assetId: text('asset_id')
+    .notNull()
+    .references(() => asset3d.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  // REAL so reorder/midpoint-insert spaces values without a whole-list renumber.
+  sortOrder: real('sort_order').notNull(),
+  // Citations — NO .references(): the part outlives a deleted generation.
+  imageGenerationId: text('image_generation_id'),
+  meshGenerationId: text('mesh_generation_id'),
+  // Assembly transform (client-set via PATCH), stringified JSON; null until placed.
+  transformJson: text('transform_json'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })

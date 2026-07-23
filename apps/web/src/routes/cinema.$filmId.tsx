@@ -1,17 +1,30 @@
-// apps/web/src/routes/_shell.cinema.$filmId.tsx
-// CinemaStudio editor screen ('/cinema/:filmId'). Auth-guarded. Composition +
-// the cross-module SEAM: the Cinema module must not import Generator, so the
-// catalog (needed for the shot's video-model picker and the audio-track models)
-// is read HERE via the Generator's public useCatalog and passed into FilmEditor
-// as `models` — exactly the pattern /create uses to feed Gallery/Generator.
-import { createFileRoute } from '@tanstack/react-router'
-import { requireSession } from 'modules/Auth'
+// apps/web/src/routes/cinema.$filmId.tsx
+// CinemaStudio editor screen ('/cinema/:filmId'). Auth-guarded. This route lives
+// OUTSIDE the global `_shell` AppShell (owner request 2026-07-23: "раздел кино
+// совершенно другой должен быть, пусть тут свой хедер будет"): the editor renders
+// its OWN full-bleed top bar (modules/Cinema/CinemaEditorHeader, via FilmEditor)
+// INSTEAD of the app-wide nav. Two jobs live here, both the composition seam a
+// route is allowed to be:
+//   1. Cross-module SEAMS — Cinema must not import Generator/Templates/Entities,
+//      so the catalog (video/audio model pickers), the template list (the music
+//      bed a format wants) and the character library (cast tags) are read HERE
+//      and handed to FilmEditor. Unchanged from when this route sat under _shell.
+//   2. GLOBAL CHROME — because this screen dropped AppShell, the balance · lang ·
+//      account cluster the editor bar needs is composed here (routes MAY import
+//      modules/Auth + modules/Credits; shared/ui and modules/Cinema may NOT) and
+//      passed to FilmEditor as the `chrome` slot — the exact injection pattern
+//      routes/_shell.tsx used to feed AppShell.
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { requireSession, signOut, useAuthSession } from 'modules/Auth'
 import { FilmEditor } from 'modules/Cinema'
+import { BalanceChip } from 'modules/Credits'
 import { useEntities } from 'modules/Entities'
 import { useCatalog } from 'modules/Generator'
 import { useTemplates } from 'modules/Templates'
+import { AccountMenu, LangSwitch } from 'shared/ui'
 
-export const Route = createFileRoute('/_shell/cinema/$filmId')({
+export const Route = createFileRoute('/cinema/$filmId')({
   beforeLoad: () => requireSession(),
   component: FilmEditorPage,
 })
@@ -19,34 +32,52 @@ export const Route = createFileRoute('/_shell/cinema/$filmId')({
 function FilmEditorPage() {
   const { filmId } = Route.useParams()
   // Same ['catalog'] cache entry the composer uses — one fetch per session.
-  // Empty until it lands; the model pickers then show a placeholder + disabled
-  // Generate, and fill in when the catalog resolves.
   const catalog = useCatalog()
-  // The SECOND cross-module seam, same shape as the first. A film made from a
-  // template carries its templateId, and the template knows what music the format
-  // wants — which pre-fills the audio panel. Cinema must not import Templates, so
-  // the list is read here and handed down; FilmEditor does the lookup because it
-  // is the one that loads the film. Cached with staleTime: Infinity, so this is
-  // shared with /templates and costs nothing on a second visit.
+  // A film made from a template carries its templateId; the template knows the
+  // music the format wants, which pre-fills the audio panel. Cached staleTime:
+  // Infinity, so this is shared with /templates and costs nothing on revisit.
   const templates = useTemplates()
-  // The THIRD seam, same shape as the other two. A shot's CAST is what makes a
-  // film hold together — tag a character and shot 2 shows the same one — but
-  // Cinema must not import Entities, so the list is read here and handed down.
-  // Only id+name travel: the inspector shows a name and sends an id; the photo is
-  // the server's business (it resolves and attaches it as a reference).
+  // A shot's CAST is what makes a film hold together; only id+name travel — the
+  // inspector shows a name and sends an id, the photo is the server's business.
   const entities = useEntities()
   const castableEntities = (entities.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
 
+  // GLOBAL CHROME — composed here because the editor dropped AppShell. Mirrors
+  // routes/_shell.tsx: normalize better-auth's optional name to the shell's null
+  // contract, drop the whole personal cache on sign-out (me/generations/txns must
+  // not outlive the account), then land on the public home.
+  const session = useAuthSession()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const user = session.data
+    ? { name: session.data.user.name ?? null, email: session.data.user.email }
+    : null
+  const handleSignOut = () => {
+    void signOut().then(() => {
+      queryClient.clear()
+      void navigate({ to: '/' })
+    })
+  }
+  const chrome = (
+    <>
+      {/* No chip when signed out — avoids a guaranteed-401 /api/me request */}
+      {user ? <BalanceChip /> : null}
+      <LangSwitch />
+      <AccountMenu user={user} isSessionPending={session.isPending} onSignOut={handleSignOut} />
+    </>
+  )
+
   return (
-    // Tighter canvas than the browsing screens (v5 compact pass): this is a
-    // workbench, and its chrome budget goes to the timeline + stage
-    <main className="flex w-full flex-col gap-4 px-4 py-4 xl:px-6">
+    // The editor's OWN full-height column on the void: the top bar + the
+    // workbench fill it exactly (no page scroll — FilmEditor owns the math).
+    <div className="flex min-h-svh flex-col bg-void">
       <FilmEditor
         filmId={filmId}
         models={catalog.data?.models ?? []}
         templates={templates.data?.items ?? []}
         entities={castableEntities}
+        chrome={chrome}
       />
-    </main>
+    </div>
   )
 }

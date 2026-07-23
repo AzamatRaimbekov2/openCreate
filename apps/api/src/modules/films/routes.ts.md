@@ -17,15 +17,36 @@ domain errors to status codes. Every route requires a session. ADR: `docs/wiki/d
   - `POST /api/films/:id/shots` (201) → Shot
   - `POST /api/films/:id/shots/reorder` → `{ items: Shot[] }` (registered before :shotId so 'reorder' isn't captured as an id)
   - `PATCH /api/films/:id/shots/:shotId` → Shot; `DELETE …/:shotId` → 204
+  - `POST /api/films/:id/shots/:shotId/split` → FilmDetail — split a shot at `atMs` (the NLE's
+    split-at-playhead). Registered only when a `ShotSplitService` is wired. The `/split` sub-path
+    carries an extra segment past `:shotId`, so it never collides with the parameterized shot routes.
+  - `POST /api/films/:id/shots/:shotId/references` (201) → Shot — attach an image (shot references)
+  - `DELETE /api/films/:id/shots/:shotId/references/:refId` (200) → Shot — detach an image
+  - `POST /api/films/:id/shots/:shotId/clip` (201 image / 202 video, rate-limited 20/min) → Generation —
+    the delivery seam: server sources the shot's attached images into the closed `referenceImages`
+    channel and calls `generations.create()`. Registered only when a `ShotReferenceService` is wired.
   - `POST /api/films/:id/audio` (201) → FilmAudio; `DELETE …/audio/:audioId` → 204
   - `POST /api/films/:id/renders` (202, rate-limited 10/min) → FilmRender; `GET …/renders/:renderId` → FilmRender (poll)
 - Inputs → Outputs: JSON body validated by contracts zod → service call → DTO; 400 envelope on parse failure.
 - Side effects: none directly (the render spawn happens inside the service).
 
 ## Dependencies
-- Imports / depends on: `fastify` types, `@opencreate/contracts` (input schemas), `./service`
-  (FilmService + error classes).
-- Used by: `app.ts` (`registerFilmRoutes(app, filmService)`).
+- Imports / depends on: `fastify` types, `@opencreate/contracts` (input schemas incl.
+  `addShotReferenceInputSchema` / `generateShotClipInputSchema` / `splitShotInputSchema`), `./service`
+  (FilmService + error classes), `./shot-references` (ShotReferenceService type), `./shot-split`
+  (ShotSplitService type).
+- Used by: `app.ts`
+  (`registerFilmRoutes(app, filmService, storyboardService, shotReferenceService, shotSplitService)`).
+
+## Update 2026-07-21 — shot reference images (attach any image to a shot)
+- 4th param `shotRefs?: ShotReferenceService`; when present, three routes are registered:
+  `POST/DELETE …/shots/:shotId/references` (attach/detach, return the updated shot) and
+  `POST …/shots/:shotId/clip` (the delivery seam). The `references`/`clip` sub-paths carry an
+  extra segment past `:shotId`, so they never collide with the parameterized shot routes.
+- The clip route is wrapped in the SAME `guard` as the rest: a foreign shot 404s inside the service
+  BEFORE `create()` runs (provider never called), while `create()`'s own domain errors
+  (validation/provider/content) fall through to the central handler (like assets3d extract/mesh).
+  It gets the strict 20/min bucket because it spends provider money.
 
 ## Diagram
 ```mermaid
@@ -43,8 +64,34 @@ flowchart LR
 - Render POST is rate-limited (10/min) because it spawns an ffmpeg process; reads keep the global limit.
 - `guard` rethrows unmapped errors so real faults still reach the central 500 handler (never flatten a bug to 400).
 
+## Update 2026-07-21 (later) — refusal detail rides the envelope
+
+`mapDomainError` now returns `reason`/`subjectKind`/`subjectId` when a `FilmValidationError`
+carries them (every `buildPlan` export refusal does), and `guard` spreads the mapped result
+into the envelope's `error` object instead of hand-picking `{code, message}`.
+
+That spread is the whole mechanism: fields present on the refusal travel, fields absent are
+simply not there, and consumers reading only `{code, message}` are unaffected.
+
+**All ten export refusals leave through THIS file, not `app.ts`'s central handler.**
+`guard` catches, `mapDomainError` recognises `FilmValidationError`, and the reply is sent
+here; `app.ts` is reached only when `mapDomainError` returns null (`throw error`). Verified
+before building — if it had been otherwise, the reasons would have been silently dropped.
+
+## Update 2026-07-22 — split a shot at a point
+- 5th param `split?: ShotSplitService`; when present, registers
+  `POST /api/films/:id/shots/:shotId/split` → the updated `FilmDetail`. Body is `splitShotInputSchema`
+  (`{ atMs }`). The `/split` sub-path carries an extra segment past `:shotId`, so — like
+  `references`/`clip` — it never collides with the parameterized shot routes above.
+- Wrapped in the SAME `guard`: a foreign film/shot 404s (FilmNotFoundError), an out-of-range `atMs`
+  400s (FilmValidationError). No new rate-limit bucket — a split is a cheap metadata write that
+  spawns no process and spends no credits, so the global limit is right.
+
 ## Commits
 - _no commit yet_
 
 ## Update 2026-07-09 — storyboard route
 - `registerFilmRoutes(app, service, storyboard?)` now takes an optional `StoryboardService`. When present, registers `POST /api/films/:id/storyboard` (rate-limited 10/min) → `{ items: Shot[] }` (draft shots). `StoryboardUnavailableError` maps to 502 `provider_error`.
+
+## Update 2026-07-21 — 409 for a concurrent render
+`mapDomainError` maps `FilmRenderInProgressError` → 409 `conflict`. `POST /api/films/:id/renders` now answers 409 when the film already has a `processing` render, instead of starting a second ffmpeg job. The SPA branches on the code to say "already exporting" rather than showing it as a failure.

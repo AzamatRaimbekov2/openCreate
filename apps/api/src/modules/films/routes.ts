@@ -6,23 +6,44 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import {
   addFilmAudioInputSchema,
+  addShotReferenceInputSchema,
   createFilmInputSchema,
   createShotInputSchema,
   createStoryboardInputSchema,
+  generateShotClipInputSchema,
   reorderShotsInputSchema,
+  splitShotInputSchema,
   updateFilmInputSchema,
   updateShotInputSchema,
 } from '@opencreate/contracts'
-import { FilmNotFoundError, FilmValidationError } from './service'
+import { FilmNotFoundError, FilmRenderInProgressError, FilmValidationError } from './service'
 import type { FilmService } from './service'
 import { StoryboardUnavailableError } from './storyboard'
 import type { StoryboardService } from './storyboard'
+import type { ShotReferenceService } from './shot-references'
+import type { ShotSplitService } from './shot-split'
 
 function mapDomainError(error: unknown) {
   if (error instanceof FilmNotFoundError)
     return { status: 404 as const, code: 'not_found' as const, message: 'Film not found' }
+  // The reason/subject ride along when the refusal carries them (every buildPlan
+  // export refusal does). They are what let the SPA say WHICH shot or track is
+  // blocking the export and give the one action that helps, instead of a single
+  // "something on the timeline isn't ready" for ten different causes.
   if (error instanceof FilmValidationError)
-    return { status: 400 as const, code: 'validation_failed' as const, message: error.message }
+    return {
+      status: 400 as const,
+      code: 'validation_failed' as const,
+      message: error.message,
+      ...(error.reason ? { reason: error.reason } : {}),
+      ...(error.subjectKind ? { subjectKind: error.subjectKind } : {}),
+      ...(error.subjectId ? { subjectId: error.subjectId } : {}),
+    }
+  // Already exporting → 409 conflict, not 400: the request is valid, the film's
+  // current state is what forbids it. The SPA branches on this code to say
+  // "already running" instead of showing it as a failure.
+  if (error instanceof FilmRenderInProgressError)
+    return { status: 409 as const, code: 'conflict' as const, message: error.message }
   // Storyboard provider unavailable (no ANTHROPIC_API_KEY, or a bad completion)
   // → 502 provider_error, the same envelope the generation path uses.
   if (error instanceof StoryboardUnavailableError)
@@ -39,10 +60,15 @@ const STORYBOARD_RATE_LIMIT = { max: 10, timeWindow: '1 minute' }
 // `storyboard` is optional: the route is only registered when a service is
 // wired (it always is in buildApp — the service itself gates on the missing key
 // and returns a 502, so the endpoint exists but answers provider_error).
+// `shotRefs` is optional in the SIGNATURE only so a caller that never needs the
+// reference routes can omit it; buildApp always wires it. When present it enables
+// three routes: attach/detach an image on a shot, and the clip delivery seam.
 export function registerFilmRoutes(
   app: FastifyInstance,
   service: FilmService,
   storyboard?: StoryboardService,
+  shotRefs?: ShotReferenceService,
+  split?: ShotSplitService,
 ) {
   async function guard<T>(reply: FastifyReply, fn: () => T | Promise<T>) {
     try {
@@ -50,7 +76,12 @@ export function registerFilmRoutes(
     } catch (error) {
       const mapped = mapDomainError(error)
       if (!mapped) throw error
-      return reply.status(mapped.status).send({ error: { code: mapped.code, message: mapped.message } })
+      // `status` is the HTTP code; everything else IS the envelope's error object,
+      // so spreading carries `reason`/`subjectKind`/`subjectId` through when the
+      // refusal has them and omits them when it does not. Consumers that only read
+      // `{code, message}` are unaffected — the extra keys are additive.
+      const { status, ...body } = mapped
+      return reply.status(status).send({ error: body })
     }
   }
 
@@ -129,6 +160,89 @@ export function registerFilmRoutes(
       })
     },
   )
+
+  // ── Split a shot at a point (the NLE's split-at-playhead) ─────────────────
+  // Registered only when a split service is wired (buildApp always does). The
+  // `/split` sub-path carries an extra segment past `:shotId`, so — like the
+  // `references`/`clip` routes below — it never collides with the parameterized
+  // shot routes above. Returns the updated FilmDetail (same shape as
+  // GET /api/films/:id) so the client replaces its film cache in ONE write; the
+  // split is a pure timeline edit that creates no generation and charges nothing.
+  // guard() maps FilmNotFoundError → 404 (foreign film/shot) and the out-of-range
+  // FilmValidationError → 400, exactly like every other shot route.
+  if (split) {
+    app.post<{ Params: { id: string; shotId: string } }>(
+      '/api/films/:id/shots/:shotId/split',
+      async (req, reply) => {
+        const user = await app.requireUser(req)
+        const parsed = splitShotInputSchema.safeParse(req.body)
+        if (!parsed.success) return badInput(reply, parsed.error.issues[0]?.message ?? 'invalid input')
+        return guard(reply, () =>
+          split.splitShot(user.id, req.params.id, req.params.shotId, parsed.data.atMs),
+        )
+      },
+    )
+  }
+
+  // ── Shot references (attach arbitrary images to a shot) ───────────────────
+  // Registered only when a shot-reference service is wired (buildApp always does).
+  // The `references` and `clip` sub-paths carry an extra segment past `:shotId`, so
+  // they never collide with the parameterized shot routes above.
+  if (shotRefs) {
+    // Attach an image → 201 with the UPDATED shot (its new referenceImages array
+    // and the shared budget it now occupies). The service enforces the budget and
+    // rejects a non-image/svg/oversize payload BEFORE storing.
+    app.post<{ Params: { id: string; shotId: string } }>(
+      '/api/films/:id/shots/:shotId/references',
+      async (req, reply) => {
+        const user = await app.requireUser(req)
+        const parsed = addShotReferenceInputSchema.safeParse(req.body)
+        if (!parsed.success) return badInput(reply, parsed.error.issues[0]?.message ?? 'invalid input')
+        return guard(reply, async () =>
+          reply
+            .status(201)
+            .send(await shotRefs.addReference(user.id, req.params.id, req.params.shotId, parsed.data.dataUri)),
+        )
+      },
+    )
+    // Detach an image → 200 with the updated shot (a body, so not 204).
+    app.delete<{ Params: { id: string; shotId: string; refId: string } }>(
+      '/api/films/:id/shots/:shotId/references/:refId',
+      async (req, reply) => {
+        const user = await app.requireUser(req)
+        return guard(reply, () =>
+          shotRefs.removeReference(user.id, req.params.id, req.params.shotId, req.params.refId),
+        )
+      },
+    )
+    // The DELIVERY SEAM: generate the shot's clip. The server reads the shot's
+    // attached images into the server-only referenceImages channel and calls the
+    // generation service — so a client can never inject reference-image bytes. It
+    // spends provider money (create()), so it gets the SAME strict bucket as
+    // POST /api/generations; 201 = image finished sync, 202 = video accepted async.
+    // Wrapped in guard() so a foreign shot 404s (and create() is never reached);
+    // create()'s own domain errors (validation/provider/content) fall through to
+    // the central handler, exactly like the assets3d extract/mesh routes.
+    app.post<{ Params: { id: string; shotId: string } }>(
+      '/api/films/:id/shots/:shotId/clip',
+      { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+      async (req, reply) => {
+        const user = await app.requireUser(req)
+        const parsed = generateShotClipInputSchema.safeParse(req.body)
+        if (!parsed.success) return badInput(reply, parsed.error.issues[0]?.message ?? 'invalid input')
+        return guard(reply, async () => {
+          const { dto, created } = await shotRefs.createClip(
+            user.id,
+            req.params.id,
+            req.params.shotId,
+            parsed.data,
+            req.log,
+          )
+          return reply.status(created ? 201 : 202).send(dto)
+        })
+      },
+    )
+  }
 
   // ── Audio ───────────────────────────────────────────────────────────────
   app.post<{ Params: { id: string } }>('/api/films/:id/audio', async (req, reply) => {

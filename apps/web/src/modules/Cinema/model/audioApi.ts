@@ -4,10 +4,50 @@
 // invalidate the film's ['film', id] detail so the track list stays truthful.
 // The audio GENERATION itself is created through the ordinary generation
 // lifecycle (POST /api/generations, type 'audio') — this only links the result.
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
 import type { AddFilmAudioInput, AudioKind, FilmAudio, Generation } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
 import { filmKey } from './filmsApi'
+
+// Poll cadence for a track whose clip is still rendering upstream — 4s, the same
+// as the shot/gallery views, since they share the ['generation', id] key.
+const AUDIO_POLL_MS = 4000
+
+// Live status of every audio track on the timeline, keyed by generation id over
+// the SHARED ['generation', id] cache.
+//
+// WHY THIS EXISTS (2026-07-20): a track may now be attached while its generation
+// is still processing — `films/service.ts addAudio` deliberately no longer gates
+// on status, because audio is async and the old gate made attachment impossible.
+// The safety that gate used to provide is replaced by MAKING PENDING VISIBLE, and
+// this hook is what supplies the truth to do that.
+//
+// It carries a refetchInterval, unlike `useShotGenerations` (shotGeneration.ts),
+// which deliberately does not: there, the mounted ShotThumbs own the polling and
+// the batch only reads the fresher answer. On the audio lane there is no second
+// poller — this IS the only one — so a processing track would otherwise never be
+// seen to finish. The interval stops on any terminal state, and stops on a
+// first-poll error rather than hammering a failing endpoint every 4s.
+export function useAudioGenerations(generationIds: string[]): Record<string, Generation> {
+  const results = useQueries({
+    queries: generationIds.map((id) => ({
+      queryKey: ['generation', id],
+      queryFn: () => api<Generation>(`/api/generations/${id}`),
+      refetchInterval: (query: {
+        state: { status: string; data: Generation | undefined }
+      }): number | false => {
+        if (query.state.status === 'error' && query.state.data === undefined) return false
+        return query.state.data?.status === 'processing' ? AUDIO_POLL_MS : false
+      },
+    })),
+  })
+  const byId: Record<string, Generation> = {}
+  results.forEach((result, index) => {
+    const id = generationIds[index]
+    if (id && result.data) byId[id] = result.data
+  })
+  return byId
+}
 
 export function useAddAudio() {
   const queryClient = useQueryClient()

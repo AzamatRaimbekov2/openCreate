@@ -46,6 +46,22 @@ flowchart LR
 - The 2xx body is cast to `T` (trust boundary: our own API is typed by contracts);
   responses are not re-validated client-side.
 
+## Update 2026-07-21 — `ApiClientError.detail`
+
+`ApiClientError` gained a 4th constructor argument, `detail: ApiErrorDetail`
+(`{reason?, subjectKind?, subjectId?}`), defaulting to `{}`.
+
+**It must stay optional.** A required 4th argument would break every existing construction —
+`apiClient` itself plus a dozen test call sites across Cinema, Gallery, Assets3D and
+Generator — and most failures have no subject to point at.
+
+`reason` is a loose `string` here on purpose: this layer is domain-agnostic. The owning
+module narrows it against its own enum (`renderBlockCopy.ts` does this for Cinema), so an
+unrecognized future reason degrades to generic copy instead of throwing.
+
+The decode only sets keys that actually arrived, so an envelope without domain detail yields
+an empty object rather than a bag of `undefined`s.
+
 ## Commits
 
 - 1ecb2f7 2026-07-06 feat(web): api client + auth module (email/password, optional google)

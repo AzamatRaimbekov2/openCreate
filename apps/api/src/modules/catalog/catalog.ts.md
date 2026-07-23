@@ -59,3 +59,23 @@ flowchart LR
 - Three `type: 'model3d'` models added, ladder-priced ~2x provider cost like every other tier: `trellis-2` ("Sketch", `microsoft:trellis-2@4b`, fast, 6 cr, $0.0256 raw — MIT-licensed and an order of magnitude cheaper, the tier that makes 3D feel free to play with), `hunyuan-3d-rapid` ("Solid", `tencent:hunyuan-3d@3.1-rapid`, standard, 45 cr, $0.225 raw), `tripo-3d` ("Sculpt", `tripo:v3.1@0`, quality, 80 cr, $0.40 raw). All three: `supportsImageInput: true` (photo → mesh is the entire product), `pbr: true`, no `provider` field (implicitly Runware — routes.ts only gates on `type === 'video'`, so these are never hidden by the optional-backend filter), throwaway `aspectRatios: ['1:1']` since 3D has no aspect ratio and `resolutionFor` is never called for it.
 - `creditsFor`'s signature changed from `(model, duration: number | undefined)` to `(model, duration?: number)` — model3d joined the flat-priced guard alongside image/audio, and made `duration` optional so callers pricing a flat model don't have to pass `undefined` explicitly. This also fixed the pre-existing typecheck error at the old line 299 (`model.creditsByDuration` didn't exist on the narrowed type once `model3d` fell through to the video branch).
 - Prices are LIST prices seeding this credit table, not the ledger — Runware's 3dInference response `cost` field scales with quality settings and is what generations/service.ts will actually bill against (Task 7).
+
+## Key decisions (2026-07-22) — video durations actualized to provider limits
+- The old `[5,8]` / `[5,10]` `durationOptions` were OUR conservative config, NOT a
+  provider limit. Verified against provider docs + the live Higgsfield model
+  catalog: wan 2.7 (Alibaba) **2–15s**, Seedance 1.5 Pro (Runware) **4–12s**,
+  Seedance 2.0 (DeepInfra) **4–15s**, Kling 3.0 (Runware) **up to 15s**, PixVerse V6
+  (Runware) **1–15s**, Veo 3.1 (Runware) **4/6/8s** (8 is its real ceiling). The
+  dashscope/Runware adapters pass `duration` straight through with no clamp — the
+  only things that ever capped us at 10s were these tables and the web slider
+  `SHOT_DURATIONS_SECONDS`.
+- New `durationOptions` + `creditsByDuration` (each model keeps its measured
+  per-second rate; existing entries UNCHANGED, longer ones ADDED so every prior
+  price test still holds): wan `[5,8,10,15]` (17/s → 10:170, 15:255) · seedance-1-5
+  `[5,8,10,12]` (7/s; with-audio 2×) · seedance-2-0 `[5,10,15]` (26/s → 15:390) ·
+  kling-3-pro `[5,10,15]` (16/s → 15:240) · veo-3-1-fast `[4,6,8]` (17.5/s →
+  4:70, 6:105) · pixverse-v6 `[5,8,10,15]` (7/s; with-audio 2×). MiniMax `[6,10]`
+  and wan-2-2 `[5]` (self-host) left as-is.
+- An over-long timeline strip snaps down to the model's own max at generation
+  (`composeShotClipInput.nearestDuration`), so 15 on the slider is honest for every
+  model. Exact per-channel max is re-verified live before it can 400.

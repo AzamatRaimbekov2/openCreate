@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { Button, Input } from 'shared/ui'
 import { signIn, signUp } from '../model/authClient'
+import { useAuthConfig } from '../model/authConfig'
 
 type AuthMode = 'login' | 'register'
 
@@ -23,13 +24,19 @@ const loginSchema = z.object({
   // Present in both modes so the inferred type is identical; login ignores it
   name: z.string(),
   email: z.email('auth.errors.email'),
-  // Mirrors the API's better-auth minimum (8 chars)
-  password: z.string().min(8, 'auth.errors.password'),
+  // Login only requires SOMETHING typed: the server verifies against the
+  // stored hash, and better-auth enforces its 8-char minimum on sign-UP, not
+  // sign-in. Mirroring min(8) here was stricter than the API and locked out
+  // any credential that legitimately predates/bypasses the signup rule — the
+  // dev-only admin@dev.local/"admin" being the live case.
+  password: z.string().min(1, 'auth.errors.password'),
 })
 
 // Register additionally requires a display name (better-auth signUp needs it)
+// and the real 8-char password minimum (mirrors better-auth's sign-up rule).
 const registerSchema = loginSchema.extend({
   name: z.string().trim().min(1, 'auth.errors.name'),
+  password: z.string().min(8, 'auth.errors.password'),
 })
 
 type AuthFormValues = z.infer<typeof loginSchema>
@@ -116,6 +123,10 @@ export function AuthForm() {
 function AuthFields({ mode, onSwitchToLogin }: { mode: AuthMode; onSwitchToLogin: () => void }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  // Whether to offer Google sign-in — the SERVER's real config, not a build flag,
+  // so the button and the backend provider can never disagree (ADR google-oauth).
+  // `data` is undefined while loading → the button stays hidden until confirmed.
+  const { data: authConfig } = useAuthConfig()
   // Server-side failure (null = no error). Carries the localized key AND whether
   // to offer the switch-to-login shortcut, so the banner needs no re-derivation.
   const [serverError, setServerError] = useState<ServerError | null>(null)
@@ -215,8 +226,10 @@ function AuthFields({ mode, onSwitchToLogin }: { mode: AuthMode; onSwitchToLogin
       >
         {t(mode === 'login' ? 'auth.signIn' : 'auth.signUp')}
       </Button>
-      {/* Optional Google OAuth — rendered only when the deploy enables it */}
-      {import.meta.env.VITE_GOOGLE_AUTH === '1' ? (
+      {/* Optional Google OAuth — rendered only when the SERVER reports it enabled
+          (GET /api/auth/config). Runtime-driven so it can never drift from the
+          backend provider (ADR google-oauth). */}
+      {authConfig?.googleEnabled ? (
         <Button variant="ghost" onClick={handleGoogleSignIn}>
           {t('auth.google')}
         </Button>

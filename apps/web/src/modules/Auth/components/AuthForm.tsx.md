@@ -43,7 +43,7 @@ flowchart LR
   MAP --> AL[role=alert localized banner]
   AL -->|email taken| SW[Sign in link] -->|onSwitchToLogin| LM[login mode remount]
   SI & SU -->|success| INV[invalidate 'me'] --> RT[login route redirects]
-  G[Google button VITE_GOOGLE_AUTH=1] --> SO[signIn.social]
+  G[Google button — authConfig.googleEnabled] --> SO[signIn.social]
 ```
 
 ## Key decisions / gotchas
@@ -89,3 +89,9 @@ flowchart LR
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
 - e5888a4 2026-07-07 restyle(web): terminal app shell, auth, generator, gallery, credits
 - 0a5d252 2026-07-07 fix(web): actionable localized auth error messages
+
+## Update 2026-07-16 — login/register password validation split
+- `loginSchema.password` is now `min(1)` (just "typed something"): the server verifies against the stored hash, and better-auth enforces its 8-char minimum on sign-UP only. The old `min(8)` on login was stricter than the API and locked out credentials that legitimately bypass the signup rule — the dev-only `admin@dev.local`/`admin` seed being the live case. `registerSchema` keeps the real `min(8)` (mirrors better-auth sign-up).
+
+## Update 2026-07-23 — Google button is RUNTIME-gated (ADR google-oauth)
+- The Google button visibility moved from the build-time `import.meta.env.VITE_GOOGLE_AUTH === '1'` flag to `useAuthConfig().data?.googleEnabled` — the SERVER's real config via `GET /api/auth/config` (`modules/Auth/model/authConfig.ts`). This kills the drift where the button could appear without the backend provider wired (or vice-versa). While the query is loading (`data === undefined`) the button stays hidden. `handleGoogleSignIn` (`signIn.social({ provider: 'google', callbackURL: '/create' })`) is unchanged. The orphaned `VITE_GOOGLE_AUTH` ambient type was removed from `@types/global.d.ts`. Tests mock `../model/authConfig` instead of stubbing the env flag.

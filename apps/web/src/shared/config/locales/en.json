@@ -9,7 +9,8 @@
     "entities": "Entities",
     "cinema": "Cinema",
     "templates": "Templates",
-    "soul": "Souls"
+    "soul": "Souls",
+    "assets": "Assets"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -383,6 +384,18 @@
       "unknown": "Something went wrong. Please try again."
     }
   },
+  "toasts": {
+    "region": "Notifications",
+    "shot": {
+      "failedTitle": "The clip could not be generated"
+    },
+    "contentBlocked": {
+      "title": "The safety filter blocked this prompt",
+      "description": "It rejects violence, adult (18+) content, real public figures, and politics. Rephrase it more gently, or remove real faces from the reference.",
+      "soften": "Soften and retry",
+      "manual": "Automatic softening is unavailable — edit the prompt yourself and try again."
+    }
+  },
   "entities": {
     "title": "Entities",
     "noPhoto": "No photo",
@@ -471,7 +484,13 @@
       "sizeM": "Medium",
       "sizeL": "Large",
       "sizeCustom": "Custom",
-      "resize": "Strip height"
+      "resize": "Strip height",
+      "scrub": "Seek timeline",
+      "zoom": "Zoom",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit to window",
+      "split": "Split at playhead"
     },
     "storyboard": {
       "cta": "Storyboard",
@@ -489,6 +508,9 @@
       "moveLeft": "Move earlier",
       "moveRight": "Move later",
       "delete": "Delete shot",
+      "trimStart": "Trim in-point of shot {{index}}",
+      "trimEnd": "Trim out-point of shot {{index}}",
+      "reorder": "Drag to reorder shot {{index}}",
       "failed": "Generation failed",
       "generating": "Generating",
       "ready": "Ready",
@@ -550,7 +572,28 @@
       "cta": "Render mp4",
       "processing": "Rendering",
       "download": "Download mp4",
-      "failed": "The render didn't finish. Please try again."
+      "failed": "The export didn't finish. Please try again.",
+      "blocked": "The export can't start yet — something on the timeline isn't ready.",
+      "alreadyRunning": "This film is already being exported.",
+      "lost": "We've lost track of this export. It may still be running.",
+      "refresh": "Check again",
+      "showSubject": "Show me",
+      "exporting": "Exporting",
+      "cancel": "Cancel",
+      "done": "Export complete — the mp4 was saved.",
+      "unsupported": "This browser can't export video here. Try the latest Chrome or Edge (Safari and Firefox export shorter films only).",
+      "blockedReason": {
+        "shot_clip_processing": "Shot {{subject}} is still generating. Wait for it to finish, then export.",
+        "shot_clip_failed": "Shot {{subject}} failed to generate. Regenerate it, then export.",
+        "shot_clip_missing": "Shot {{subject}} points at a clip that no longer exists. Regenerate it.",
+        "shot_media_missing": "Shot {{subject}}'s video file is gone. Regenerate it.",
+        "shot_clip_is_audio": "Shot {{subject}} holds an audio clip. Replace it with video, or delete the shot.",
+        "film_no_shots": "This film has nothing to export yet. Add a clip or a title card.",
+        "audio_processing": "The {{subject}} track is still rendering. Wait for it to finish, then export.",
+        "audio_failed": "The {{subject}} track failed. Remove it from the timeline, then export.",
+        "audio_generation_missing": "The {{subject}} track's audio no longer exists. Remove it and add it again.",
+        "audio_media_missing": "The {{subject}} track's audio file is gone. Remove it and add it again."
+      }
     },
     "audio": {
       "title": "Audio",
@@ -567,10 +610,21 @@
         "music": "Music",
         "voiceover": "Voiceover"
       },
-      "shotLine": "Line · beat {{beat}}"
+      "shotLine": "Line · beat {{beat}}",
+      "status": {
+        "processing": "rendering",
+        "failed": "failed",
+        "pendingHint": "Still rendering — the export waits for it.",
+        "failedHint": "This track failed. Remove it, or the export will stop."
+      }
+    },
+    "header": {
+      "shots_one": "{{count}} shot",
+      "shots_other": "{{count}} shots"
     },
     "editor": {
       "back": "All films",
+      "titleLabel": "Film title",
       "filmMenu": "Film actions",
       "rename": "Film settings",
       "deleteFilm": "Delete film",
@@ -634,6 +688,14 @@
       "empty": "No characters yet — add one in Entities.",
       "unsupported": "This model cannot hold a character.",
       "unsupportedWarning": "The chosen model ignores references — pick Cinema (Wan 2.7) or the character will not carry over."
+    },
+    "shotRef": {
+      "title": "Reference images",
+      "add": "Attach image",
+      "hint": "Click, drop, or paste an image (up to 10MB).",
+      "remove": "Remove reference image",
+      "previewAlt": "Attached reference image",
+      "modelHint": "This model doesn't use reference images — switch to Wan 2.7 \"Cinema\" to use them."
     }
   },
   "templates": {
@@ -644,6 +706,7 @@
       "description": "The catalog is empty — that looks like a server-side fault."
     },
     "category": {
+      "format": "Formats",
       "brainrot": "Brainrot",
       "animation": "Animation"
     },
@@ -686,6 +749,25 @@
       "submit": "Create character",
       "save": "Save",
       "free": "Creating a character is free — portraits are priced separately."
+    },
+    "rail": {
+      "createNew": "New character"
+    },
+    "stage": {
+      "title": "Preview",
+      "unnamed": "Unnamed character",
+      "empty": {
+        "title": "Build your character",
+        "description": "Pick an archetype and a style on the right to start — you will see exactly what the model reads here."
+      }
+    },
+    "builder": {
+      "title": "Builder",
+      "preset": "Start from a preset"
+    },
+    "composer": {
+      "title": "Create a character",
+      "shuffle": "Shuffle"
     },
     "field": {
       "any": "Any",
@@ -761,6 +843,177 @@
     "errors": {
       "notFound": "This character does not exist, or is not yours.",
       "notSoul": "This entity was not built in Soul Studio — open it in the library."
+    }
+  },
+  "assets3d": {
+    "title": "Modular assets",
+    "price": "{{credits}} cr",
+    "free": "free",
+    "library": {
+      "new": "New asset",
+      "conceptAlt": "Concept image for {{title}}",
+      "created": "created {{date}}",
+      "empty": {
+        "title": "No assets yet",
+        "description": "Drop a concept image and the wizard splits it into parts you can mesh and assemble."
+      }
+    },
+    "create": {
+      "title": "New modular asset",
+      "name": "Title",
+      "namePlaceholder": "Iron Captain",
+      "concept": "Concept image",
+      "conceptHint": "png, jpeg or webp — one clear view of the whole subject",
+      "conceptAlt": "Chosen concept image",
+      "replace": "Replace image",
+      "submit": "Create asset",
+      "free": "Creating an asset is free — parts are priced separately.",
+      "errors": {
+        "title": "Give the asset a title.",
+        "concept": "Choose a concept image.",
+        "type": "png, jpeg or webp only — svg is not accepted.",
+        "read": "That file could not be read. Try another one."
+      }
+    },
+    "wizard": {
+      "back": "All assets",
+      "notFound": "This asset does not exist, or is not yours.",
+      "conceptAlt": "Concept image for {{title}}",
+      "soon": "This stage lands in the next build.",
+      "loading": "Loading the viewer…"
+    },
+    "stage": {
+      "upload": "Concept",
+      "parts": "Parts",
+      "extract": "Extraction",
+      "mesh": "Meshes",
+      "assembly": "Assembly",
+      "nav": "Wizard stages",
+      "step": "Step {{index}} of {{total}}"
+    },
+    "upload": {
+      "title": "Concept",
+      "description": "The image every part is extracted from."
+    },
+    "parts": {
+      "title": "Parts",
+      "description": "Name what the asset is made of. Analysis is free; extraction is priced per part.",
+      "analyze": "Suggest parts",
+      "analyzeAgain": "Suggest again",
+      "analyzeFree": "Reading the concept costs nothing.",
+      "analyzeUnavailable": "Automatic analysis is not configured here. Add the parts by hand — the rest of the wizard works exactly the same.",
+      "add": "Add part",
+      "nameLabel": "Part name",
+      "namePlaceholder": "Left pauldron",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "How this part should look on its own",
+      "save": "Save",
+      "editLabel": "Edit {{name}}",
+      "removeLabel": "Remove {{name}}",
+      "count": "{{total}} of {{max}} parts",
+      "capped": "Twelve parts is the ceiling — a heavier assembly will not load.",
+      "extractionPrice": "Extraction, per part",
+      "next": "Go to extraction",
+      "empty": {
+        "title": "No parts yet",
+        "description": "Let the concept be read for you, or add the first part by hand."
+      }
+    },
+    "extract": {
+      "title": "Extraction",
+      "description": "Each part is redrawn on its own, isolated on a neutral background.",
+      "one": "Extract",
+      "reroll": "Extract again",
+      "all": "Extract all",
+      "pending": "Not extracted yet",
+      "processing": "Extracting…",
+      "ready": "extracted",
+      "posterAlt": "Extraction of {{name}}",
+      "refunded": "credits refunded",
+      "pollFailed": "This part's status could not be checked.",
+      "done": "Every part has been extracted.",
+      "next": "Go to meshes",
+      "confirm": {
+        "title": "Extract these parts?",
+        "description": "{{parts}} parts will be extracted for {{credits}} credits in total. A part that fails is refunded automatically.",
+        "submit": "Extract · {{credits}} cr"
+      },
+      "empty": {
+        "title": "Nothing to extract",
+        "description": "Go back to Parts and name what the asset is made of."
+      }
+    },
+    "mesh": {
+      "title": "Meshes",
+      "description": "Turn each extracted part into a 3D mesh. Pick a tier per part.",
+      "one": "Create mesh",
+      "reroll": "Mesh again",
+      "tier": "Mesh tier",
+      "noTiers": "No mesh tiers are available right now.",
+      "blocked": "Extract this part first.",
+      "pending": "No mesh yet",
+      "processing": "Meshing…",
+      "ready": "meshed",
+      "posterAlt": "Mesh preview of {{name}}",
+      "refunded": "credits refunded",
+      "pollFailed": "This part's status could not be checked.",
+      "done": "Every part has a mesh.",
+      "next": "Go to assembly",
+      "confirm": {
+        "title": "Create this mesh?",
+        "description": "{{name}} will be meshed on {{tier}} for {{credits}} credits. A mesh that fails is refunded automatically.",
+        "submit": "Create mesh · {{credits}} cr"
+      },
+      "empty": {
+        "title": "Nothing to mesh",
+        "description": "Extract at least one part and it appears here."
+      }
+    },
+    "assembly": {
+      "title": "Assembly",
+      "description": "Place the parts, then export one merged GLB.",
+      "empty": {
+        "title": "Nothing to assemble yet",
+        "description": "Mesh at least one part and it appears here, ready to place."
+      },
+      "noMesh": "None of these parts has a mesh yet, so there is nothing to place.",
+      "noneReady": "No part mesh finished, so the assembly is empty. Re-run a mesh from the previous stage.",
+      "loading": "Resolving part meshes…",
+      "viewer": "Assembled parts",
+      "loaded": "{{ready}} of {{total}} parts loaded",
+      "partLoading": "Loading {{name}}…",
+      "partFailed": "{{name}} could not be loaded.",
+      "select": "Select {{name}}",
+      "posterAlt": "Extraction of {{name}}",
+      "noPoster": "No preview",
+      "fallback": {
+        "title": "3D preview unavailable",
+        "description": "This browser cannot open a 3D canvas, so the extracted parts are shown instead. Export still works."
+      },
+      "export": "Export GLB",
+      "exporting": "Exporting…",
+      "exportFailed": "The export could not be written. Try again.",
+      "gizmo": {
+        "label": "Gizmo",
+        "translate": "Move",
+        "rotate": "Rotate",
+        "scale": "Scale"
+      }
+    },
+    "empty": {
+      "title": "Nothing here yet",
+      "description": "Finish the previous stage and this one fills in."
+    }
+  },
+  "enhance": {
+    "button": "Enhance prompt",
+    "undo": "Undo",
+    "nudge": "Turn this into a cinematic prompt in one click",
+    "nudgeDismiss": "Dismiss hint",
+    "error": {
+      "unavailable": "AI enhancement is unavailable right now",
+      "rateLimited": "Too many requests — try again in a minute",
+      "generic": "Couldn't enhance the prompt"
     }
   }
 }

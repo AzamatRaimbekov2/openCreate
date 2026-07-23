@@ -70,3 +70,15 @@ flowchart LR
   every suite that never touches 3D is byte-for-byte unaffected.
 - `fakeRunware()` already carried `submit3d` (added with the client task), so the `RunwareClient` type is
   satisfied for suites that exercise the derived adapter rather than injecting a fake provider.
+
+## Update 2026-07-16 — db override
+- `TestAppOverrides.db`: share one drizzle db across two `buildTestApp` calls. Exists for the single shape per-app `:memory:` isolation cannot express — booting the SAME database twice (dev-admin seed idempotence in `test/dev-admin.test.ts`). Default unchanged: fresh isolated `:memory:` per app.
+
+## Update 2026-07-18 — anthropicApiKey override (Modular 3D Assets)
+- `TestAppOverrides.anthropicApiKey?: string | null` threads into `config.anthropicApiKey` (was hard-coded `null`). Default stays `null`, so both storyboard and the assets3d `/analyze` route answer **502 provider_error** unchanged — which is exactly what `test/assets3d.test.ts` pins ("wizard still usable by hand"). Analyze SUCCESS is NOT exercised over HTTP (there is no Anthropic HTTP fake — a live-key HTTP call would hit the real API); success stays a service-level test that injects `complete`.
+
+## Update 2026-07-22 — groqApiKey override (prompt enhancer fallback)
+- `TestAppOverrides.groqApiKey?: string | null` threads into `config.groqApiKey` (default `null`). With both `deepinfraToken` and `groqApiKey` null (the defaults), `POST /api/prompt/enhance` answers **502 provider_error** — which is what `test/prompt-enhance.test.ts` pins over HTTP (plus a balance-unchanged assertion). Enhancer SUCCESS and provider-fallthrough are NOT exercised over HTTP (there is no LLM HTTP fake — a live-key call would hit the real API); they stay service-level tests that inject `completers` (or a real adapter over a mocked `fetch`).
+
+## Update 2026-07-23 — googleClientId / googleClientSecret overrides (Google OAuth, ADR google-oauth)
+- `TestAppOverrides.googleClientId?` / `googleClientSecret?` thread into `config` (were hard-coded `null`). Both default `null` → Google provider disabled and `GET /api/auth/config` reports `{ googleEnabled: false }`. Setting **BOTH** enables the better-auth Google provider and flips the flag to `true` (config gates on the pair). Used by `test/auth-config.test.ts`. The actual OAuth round-trip is NOT exercised over HTTP (it redirects to Google) — the flag endpoint + provider enablement is what the suite pins.

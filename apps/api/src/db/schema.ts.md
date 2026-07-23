@@ -35,6 +35,13 @@ erDiagram
 - `shot` += `audio integer(boolean) NOT NULL DEFAULT false` — native generation
   audio intent. DEFAULT 0 backfills legacy rows silent (what those clips are).
 
+## Update 2026-07-21 — shot.referenceImagesJson
+- `shot` += `referenceImagesJson text('reference_images_json')` (nullable) — arbitrary
+  images ATTACHED to a shot as generation references, stored as a JSON array of
+  `{ id, path }`, parallel to `entity_refs_json`. On the shot (not the generation) so an
+  attachment survives a re-generate. Mirror in `ddl.ts` + a guarded `ALTER TABLE shot ADD
+  COLUMN reference_images_json TEXT` micro-migration in `client.ts` (post-ship column).
+
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
@@ -112,3 +119,33 @@ character **is** an `entity`, so it inherits ownership, soft delete and `[[e1]]`
   same write.
 - **`entityImage.source`** gained `'generated'` — a TS-level widening only. The column is plain TEXT, so
   there is no DDL to change, exactly as when `generation.type` gained `'model3d'`.
+
+## Key decisions (2026-07-16) — user.role (dev super-admin)
+- `user` gains `role: text NOT NULL DEFAULT 'user'` — TEXT with a TS-level enum (`user | super_admin`), the `generation.type` pattern: no CHECK constraint to migrate when roles grow. Mirrored in `ddl.ts` CREATE TABLE + a guarded ALTER micro-migration in `client.ts`. Written as `super_admin` ONLY by the dev-only seed (`modules/auth/dev-admin.ts`); better-auth exposes it `input:false` so clients cannot self-assign.
+
+## Key decisions (2026-07-18) — Modular 3D Assets (ADR modular-3d-assets)
+Two new tables, `asset3d` and `asset3dPart`. Like `film`/`shot`, an asset is an
+aggregate that **cites generations by id** — it owns no media. Mirror both tables
+into `ddl.ts` (`ASSET3D_DDL`); they are brand-new, so `CREATE TABLE IF NOT EXISTS`
+alone suffices — **no `client.ts` ALTER micro-migration** (that guard is only for
+adding a column to a table that already ships).
+
+- **`asset3d`** — `id`, `userId` (→ `user`, cascade), `title`, `conceptImagePath`,
+  `createdAt`. `conceptImagePath` stores the FULL public path `saveDataUri`
+  returns (`/media/<uuid>.<ext>`) verbatim, NOT a bare key: `readAsDataUri` needs
+  the extension to resolve the mime, and it cannot be rebuilt from a bare uuid.
+  It is our stored path, never a provider URL (those expire after 7 days).
+- **`asset3dPart`** — `id`, `assetId` (→ `asset3d`, cascade), `name`,
+  `description` (default `''`), `sortOrder` (**`real()`**, the `shot.orderIndex`
+  precedent: a reorder/midpoint-insert spaces values without a whole-list
+  renumber), `imageGenerationId`, `meshGenerationId`, `transformJson`, `createdAt`.
+- **Citations are BARE `text()` — NO `.references()`** on `imageGenerationId` /
+  `meshGenerationId`, exactly like `shot.generationId`: deleting a generation from
+  the library must leave an orphaned ref, never cascade the part away. The ONLY
+  cascading edges are the owner edges (`asset3d.userId`, `asset3dPart.assetId`).
+- **Part status is NOT a column.** The `draft|extracting|extracted|meshing|ready`
+  state is DERIVED at read time from the cited generations' live statuses (the
+  films/shots lesson: a persisted status is a second source of truth). Nothing
+  here stores it.
+- `test/db-ddl.test.ts` pins the shape AND the citation-not-FK rule
+  (`foreign_key_list(asset3d_part)` contains `asset3d`, not `generation`).

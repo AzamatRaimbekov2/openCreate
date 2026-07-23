@@ -11,19 +11,23 @@ It is where MAX_TRAITS is enforced on the client — as data, not as an onClick.
 
 - Responsibilities: define the draft shape; provide the empty draft; rebuild a
   draft from an existing entity; add/remove a trait under the cap; report whether
-  a trait chip must be disabled.
+  a trait chip must be disabled; report whether a draft is READY to create and
+  whether it is still PRISTINE (untouched).
 - Public API / exports: type `SoulDraft`, `EMPTY_SOUL`, `EMPTY_DRAFT`,
-  `draftFromEntity(entity)`, `toggleTrait(traits, id)`, `isTraitDisabled(traits, id)`.
-- Inputs → Outputs: a draft + a trait id → a new trait array (or the same array,
-  when the cap refuses).
+  `draftFromEntity(entity)`, `toggleTrait(traits, id)`, `isTraitDisabled(traits, id)`,
+  `isDraftReady(draft)`, `isDraftPristine(draft)`.
+- Inputs → Outputs: a draft (or draft + trait id) → a boolean predicate, or a new
+  trait array (or the same array, when the cap refuses).
 - Side effects: none.
 
 ## Dependencies
 
 - Imports: `@opencreate/contracts` (`MAX_TRAITS`; types `Entity`, `Soul`, `TraitId`).
-- Used by: `components/SoulConstructor.tsx`, `components/TraitPicker.tsx`,
-  `components/SoulStudio.tsx` (create draft), `components/SoulEditModal.tsx`
-  (edit draft), `components/PromptLibrary.tsx` (open-in-constructor).
+- Used by: `components/SoulAxes.tsx` (shared axis body), `components/TraitPicker.tsx`,
+  `components/SoulConstructor.tsx` + `components/SoulEditModal.tsx` (edit modal),
+  `components/SoulStudio.tsx` (owns the create draft; reads `isDraftReady`),
+  `components/SoulStage.tsx` (reads `isDraftPristine`), `model/randomizeDraft.ts`
+  (`EMPTY_DRAFT`), `components/PromptLibrary.tsx` (open-in-constructor).
 
 ## Diagram
 
@@ -53,6 +57,13 @@ flowchart LR
   `description` instead of replacing it.
 - `EMPTY_SOUL` sets only the two required axes. An unset axis contributes nothing
   to the prompt, so the live preview starts short and honest.
+- `isDraftPristine` is a FIELD-BY-FIELD compare against `EMPTY_SOUL`, not a
+  `JSON.stringify` equality (which would depend on key order and on `undefined`
+  axes being omitted). It drives the center stage's empty placeholder, so it must
+  flip to `false` the instant the user changes any axis, trait, note or the name.
+- `isDraftReady` is the create gate — in practice "has the user named it yet",
+  since the required axes are always present. Kept as its own predicate so the
+  composer reads intent, not a raw `name.trim()` check.
 
 ## Commits
 

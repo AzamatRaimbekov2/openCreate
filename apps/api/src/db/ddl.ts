@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS user (
   image TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  credits_balance INTEGER NOT NULL DEFAULT 0
+  credits_balance INTEGER NOT NULL DEFAULT 0,
+  role TEXT NOT NULL DEFAULT 'user'
 );
 CREATE TABLE IF NOT EXISTS session (
   id TEXT PRIMARY KEY,
@@ -189,6 +190,12 @@ CREATE TABLE IF NOT EXISTS shot (
   -- NULL / absent reads as "nobody tagged", which is exactly what every film that
   -- predates this column means.
   entity_refs_json TEXT,
+  -- Arbitrary images ATTACHED to this shot as references (not tagged entities):
+  -- a JSON array of { id, path } where path is the '/media/<uuid>.<ext>' the upload
+  -- returned. Parallel to entity_refs_json. NULL = nothing attached. On the shot,
+  -- not the generation, so an attachment survives a re-generate — the server re-reads
+  -- it into the closed referenceImages channel each time.
+  reference_images_json TEXT,
   -- The catalog model this shot generates with; NULL = no opinion. Persisting it
   -- is what lets a template pin its price/quality tier onto every shot.
   model_id TEXT,
@@ -287,4 +294,31 @@ CREATE TABLE IF NOT EXISTS model_share (
 -- One live token per model. Without this, "Share" clicked twice mints a second
 -- token and revoke (a DELETE) kills only one — leaving the model quietly public.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_model_share_gen ON model_share(generation_id);
+`
+
+// Modular 3D Assets (ADR modular-3d-assets). Mirrors schema.ts column-for-column.
+// image_generation_id / mesh_generation_id are CITATIONS: plain TEXT with NO
+// REFERENCES clause, so deleting a generation never cascades a part away. The
+// only cascading edges are asset3d.user_id and asset3d_part.asset_id.
+export const ASSET3D_DDL = `
+CREATE TABLE IF NOT EXISTS asset3d (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  concept_image_path TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_asset3d_user_created ON asset3d(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS asset3d_part (
+  id TEXT PRIMARY KEY,
+  asset_id TEXT NOT NULL REFERENCES asset3d(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  sort_order REAL NOT NULL,
+  image_generation_id TEXT,
+  mesh_generation_id TEXT,
+  transform_json TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_asset3d_part_asset ON asset3d_part(asset_id, sort_order);
 `

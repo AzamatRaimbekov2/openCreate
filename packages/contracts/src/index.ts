@@ -26,9 +26,19 @@ export * from './film'
 export * from './templates'
 export * from './credits'
 export * from './user'
+// Public auth provider flags (GET /api/auth/config) — drives runtime rendering
+// of optional sign-in buttons (Google) without client/server drift.
+export * from './auth-config'
 // The portable Studio3D scene preset (lighting/camera/tonemap) — one JSON read
 // by both the three.js viewer and any future server-side renderer.
 export * from './scene3d'
 // Studio3D render (video-from-model, no credit ledger — a render is not a
 // generation) + the public revocable model share.
 export * from './model-render'
+// Modular 3D Assets (ADR modular-3d-assets): an aggregate that cites generations
+// by id (like film). Exported after generation because parts cite generations.
+export * from './asset3d'
+// Prompt enhancer — a generic, free, stateless text transform (rough idea → one
+// cinematic Wan prompt), plus its 'soften' variant for content_blocked retries.
+// No dependencies on the above; ordering is immaterial.
+export * from './prompt'

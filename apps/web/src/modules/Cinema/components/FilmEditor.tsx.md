@@ -20,13 +20,21 @@ rail, and the full-width timeline strip below them.
 
 ## Dependencies
 
-- Imports: `react` (`useState`), `react-i18next`, contract catalog types +
-  `TemplateSummary`, `shared/ui` (`EmptyState`, `ErrorState`, `Skeleton`),
-  `useFilm`, `shotStartMs` (from `../model/voiceoverApi`), and every editor child
-  (`FilmEditorHeader`, `Timeline`, `PreviewPlayer`, `RenderBar`, `AudioTracks`,
-  `ShotInspector`, `StoryboardModal`).
-- Used by: `routes/_shell.cinema.$filmId.tsx` (via `modules/Cinema`) — which is
-  also where BOTH `models` and `templates` come from.
+- Imports: `react` (`useEffect`, `useState`), `react-i18next`, contract catalog
+  types + `TemplateSummary`, `shared/ui` (`ErrorState`, `Skeleton`), `useFilm`,
+  `useExportController` (the CLIENT export cutover — 2026-07-23, replaces
+  `useCreateRender`/`useRender`/`renderBlockCopy`), `useTimelineClock` (`reset` on
+  film change), `totalDurationMs`, `useTimelineKeys` (editor keyboard shortcuts —
+  Phase 4), `shotStartMs` (from `../model/voiceoverApi`), and every editor child
+  (`CinemaEditorHeader` — the
+  editor's OWN full-bleed top bar, rendered in every state; `Timeline`,
+  `PreviewPlayer`, `RenderBar`, `AudioTracks`, `ShotInspector`, `StoryboardModal`).
+  Takes a `chrome?: ReactNode` prop (balance·lang·account) and passes it straight
+  through to the header — FilmEditor imports no Auth/Credits. Also computes and
+  passes the header's META (`shotCount` = `data.shots.length`, `durationMs` =
+  `totalDurationMs(data.shots)` from `../model/timelineGeometry`).
+- Used by: `routes/cinema.$filmId.tsx` (via `modules/Cinema`) — a STANDALONE route
+  (no `_shell`) which also supplies `models`, `templates`, `entities` and `chrome`.
 
 ## Diagram
 
@@ -117,6 +125,179 @@ flowchart TD
   and the status strip must read one truth. `AudioTracks` card deleted; sound
   became a timeline lane (Timeline v7 absorbs add-music/voice).
 
+## Update 2026-07-17 — default-select the first shot
+- **The FIRST shot is selected by default** (owner report: «куда чат пропал» —
+  with nothing selected the workbench showed only the slim hint row, and users
+  read the missing composer as a broken page). The selection is DERIVED, not an
+  effect: `selectedShot = shots.find(s => s.id === selectedShotId) ?? shots[0]`.
+- An explicit tile click still wins (it sets `selectedShotId`); deleting the
+  selected shot falls back to the first shot instead of an empty dock; a film
+  with zero shots keeps the hint row.
+- Downstream reads use the EFFECTIVE selection: `isSelectedVoiced` compares
+  against `selectedShot?.id`, and `Timeline` receives `selectedShot?.id ?? null`
+  so the highlighted tile always matches the shot the composer is editing.
+- Covered by `FilmEditor.test.tsx`: composer opens with shot 1's draft without
+  a click; zero shots → hint row.
+
+## Update 2026-07-17 — composer is a position:fixed DOCK
+- **The composer left the column flow entirely** (owner directives, same day,
+  two steps: «поле промпта — fixed снизу», then «чтобы он размеры экрана не
+  занимал»): it renders after the column in a
+  `pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4 xl:px-6`
+  click-through wrapper (inner div re-enables pointer events). z-40 floats over
+  the workbench, under Modal's z-50. Horizontal padding mirrors the route
+  canvas so the dock stays aligned with the column edges.
+- **Why fixed, not last-in-flow:** in flow, dock GROWTH (drawers, prompt
+  resize) squeezed the stage and the tracks. Fixed, growth extends UPWARD and
+  OVERLAYS them — the column reserves only the collapsed height (`pb-28` on
+  `EDITOR_COLUMN`; the column doesn't scroll, so without that clearance the
+  tracks would sit under the dock forever).
+- The hint row (zero shots) lives in the same dock; loading skeleton reserves
+  nothing for the composer (tracks silhouette only).
+- Covered by `FilmEditor.test.tsx`: composer `region` follows the timeline in
+  DOM order AND sits inside a `.fixed` wrapper.
+
+## Update 2026-07-21 — a render survives the tab that started it
+
+The bug: `renderId` was `useState`, and the film detail carried nothing about
+renders. A reload therefore lost a running export entirely — the strip vanished,
+the ⋯ menu re-offered Export (starting a SECOND ffmpeg job on the same film), and
+a finished mp4 became unreachable from the UI even though the file was on disk.
+
+- **The film is now the authority.** `filmDetailSchema` carries
+  `latestRender: FilmRender | null`, so `useFilm` already answers "what happened
+  to my export?" on every mount. Resolution order:
+  `renderId = startedId ?? data?.latestRender?.id ?? null`, where `startedId` is
+  only an optimistic override covering the gap between this tab's kick-off and
+  the detail refetch. Both are read BEFORE the pending/error guards so the render
+  query is called unconditionally (stable hook order).
+- **The strip paints from the film, then the poll.**
+  `activeRender = renderQuery.data ?? latestRender ?? undefined` — no cache
+  seeding games, and no empty flash on a cold load.
+- **`isExporting` is SERVER truth now.** It was a tab-local flag, so a second tab
+  (or this one after a reload) would happily start a competing encode. The API
+  refuses a concurrent render outright (409 `conflict`, `FilmRenderInProgressError`);
+  this keeps the UI from offering an action it knows will be refused.
+- **`isPollFailed`** = `renderId !== null && renderQuery.isError && failureCount > 0`,
+  handed to `RenderBar` so a render we can no longer see stops rendering a
+  progress bar and offers `onRefreshStatus` (a status re-check — never a second
+  export).
+- **`blockedMessage`** turns the kick-off's machine code into our own copy:
+  `validation_failed` → «экспорт пока не может начаться» (the timeline isn't
+  ready — ffmpeg never ran, so the old "the render didn't finish" was false),
+  `conflict` → «уже собирается», anything else → `errorCodeMessageKey`. Raw
+  server prose is never rendered.
+- Covered by `FilmEditor.test.tsx`: a finished render offers its download on a
+  cold load; a running one repaints AND resumes its poll; Export is hidden while
+  the server says one is running and returns once it settles.
+
+### SEAM — per-reason refusal copy (plan option A) — **CLOSED 2026-07-21**
+
+_Historical note, kept because the sequencing reasoning is still worth having._
+This seam was deliberately deferred while `assembly-models` moved audio readiness
+into `buildPlan`: an enum defined over a still-growing refusal set arrives
+incomplete, and its failure mode is silent fall-through to the generic string —
+the exact bug it exists to fix. It was defined once the set stopped moving.
+
+**It has now landed.** Two things about it differ from the sketch above, so read
+the code rather than this paragraph:
+
+- The refusal set is **TEN**, not seven. Two throw sites were SPLIT
+  (`shot_clip_processing`/`shot_clip_failed`, and the audio branch into four),
+  because a still-processing subject and a failed one need opposite instructions
+  and had been sharing one hedging sentence.
+- Copy keys are **`cinema.render.blockedReason.*`**, not `cinema.render.reason.*`,
+  and the lookup is an exhaustive `Record<RenderBlockReason, string>` in
+  `model/renderBlockCopy.ts` rather than an interpolated template key. That is the
+  point: a template key cannot be checked, so a missing member would render a raw
+  key at runtime; the Record makes it a TYPECHECK error instead.
+
+The prediction that this is a **widening, not a rewrite**, held exactly — the
+`validation_failed` branch grew, the `conflict` and default branches were left
+untouched, and `RenderBar` needed no restructuring (it gained one optional
+`onShowSubject` prop for the jump affordance and nothing else).
+
+The in-code SEAM block was **removed** once this landed: it described the work in
+the future tense four lines above the code that already did it, and a comment
+that contradicts the code beneath it is how the next reader gets misled. Its one
+still-load-bearing warning was kept and moved into the code instead — **do not
+fold the `conflict` branch into the reason path.** A 409 carries no reason, so
+narrowing the ternary to `validation_failed` alone drops it to `null`, RenderBar
+early-returns, and a duplicate-export click renders nothing at all — a dead click
+that passes typecheck, lint and every other test in the file. It is pinned by two
+409 cases in `FilmEditor.test.tsx`, verified by deliberately re-introducing the
+narrowing and confirming that ONLY those two went red (the other 14 passed
+straight through it, which is why the hole was invisible before).
+
+## Update 2026-07-21 — the refusal says WHICH and WHAT TO DO
+
+`blockedMessage` is no longer one string for every `validation_failed`. The kick-off
+error's `detail` (`reason` + subject) goes through `model/renderBlockCopy.ts`, which
+returns copy naming the blocker and giving exactly one action — wait, regenerate, or
+remove. An absent or unrecognized reason falls back to the previous generic sentence,
+so an older server (or a future reason) degrades calmly.
+
+When the blocker is a SHOT, `onShowSubject` is wired to `setSelectedShotId`. That is a
+one-liner only because selection already lives in this component and already drives both
+the composer and the tile highlight. Audio tracks and the film itself get no jump —
+selection is shot-level here.
+
+Scroll-into-view is NOT implemented: `Timeline`'s horizontal scroll container exposes no
+imperative handle. A decision, not an oversight — see `renderBlockCopy.ts.md`.
+
+### The `conflict` branch is load-bearing — do not fold it into the reason path
+
+A 409 is the one export refusal that is **not** `validation_failed`, so it rides
+its own branch of the `blockedMessage` ternary. Narrowing that ternary to handle
+only `validation_failed + reason` yields `blockedMessage = null` for a 409, and
+when the film has no render row to fall back on, `RenderBar` hits its early
+return and paints **nothing** — the user clicks Export and literally nothing
+happens, with typecheck, lint and the rest of the suite still green.
+
+Pinned by two tests in `FilmEditor.test.tsx` that assert the STRIP, not the
+string: a 409 must render a visible `role="alert"` saying "already being
+exported", and must offer no retry pill. Verified as a real pin by deleting the
+`conflict` branch and watching exactly those two tests — and only those two —
+go red with `Unable to find role="alert"`.
+
+### 2026-07-22 — v8 NLE Phase 1: it owns the clock lifecycle
+The editor gained ONE coupling to the new timeline clock: a `useEffect` keyed on
+`filmId` that `reset()`s `useTimelineClock` on open and on leave. The clock is a
+singleton shared by `Timeline` and `PreviewPlayer` (that is how selection and the
+playhead stay unified without prop-drilling), so without this reset a stale
+playhead would carry across films. All actual seeking lives in the timeline
+surfaces — the editor only zeroes the position on a film change.
+
+### 2026-07-22 — v8 NLE Phase 4: editor keyboard shortcuts
+Mounts `useTimelineKeys(filmId, data?.shots ?? [])` at the editor root — one
+`keydown` listener for Space/←→/Shift+←→/Home/End/S (split), gated off text fields
+so the composer keeps its typing. Mounted HERE (not Timeline) because the shortcuts
+are editor-wide; `?? []` keeps the hook order stable through the loading state.
+
+### 2026-07-23 — CLIENT-side export cutover (SUPERSEDES the server-render sections above)
+The ~70-line server-render block (`useCreateRender` + `useRender` poll +
+`latestRender` + `renderBlockCopy` derivation + the 409/reload handling) is REPLACED
+by a single `const exp = useExportController(data)`. The export now runs in the
+BROWSER (streaming WebCodecs); `render.ts` + the render routes stay in the repo,
+dormant, un-invoked from this path. The header CTA reads `exp.onExport/canExport/
+isStarting`; the RenderBar reads `exp.state/progress/blockedMessage/onShowSubject/
+unsupportedMessage/onCancel/onRetry`. The VALUABLE server validation was preserved,
+not deleted — `computeExportBlock` (inside the controller) refuses a not-ready film
+(a clip generating/failed, no shots) with the SAME named `renderBlockCopy` reasons,
+computed from the generation cache. DROPPED (server-only, no client equivalent):
+reload-recovery of a running render, the 409 concurrency guard, poll-wedge handling.
+FilmEditor shrank 362→294 lines. The `SEAM` + server-render decision sections above
+are retained for provenance but describe the retired path. Tests: the server-render
+cases in `FilmEditor.test.tsx` were rewritten to client-export cases (the pipeline
+hook mocked, the block real).
+
 ## Commits
 
-- _no commit yet_
+- a978142 2026-07-16 feat(cinema): редактор v7 — монтажный верстак с дорожками, экспорт в меню «⋯»
+
+## Update 2026-07-22 — tightened the tracks↔composer gap
+`EDITOR_COLUMN` bottom clearance `pb-28` → `pb-24` (owner: visible empty band
+between the tracks and the fixed composer dock). The clearance must equal the
+COLLAPSED dock height; the old 28 (112px) exceeded it, leaving a gap. If the
+tracks ever tuck under the collapsed dock, step it back up (pb-24→pb-26/pb-28).
+Blind-tuned (no browser session) — verify visually.

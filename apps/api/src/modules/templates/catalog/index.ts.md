@@ -44,7 +44,9 @@ flowchart LR
   one line here — never an edit to a shared blob.
 - **Array order IS gallery order — and SHELF order.** `TemplateCatalog` groups by category in
   first-seen order, so the first entry also decides which shelf leads. It is curated:
-  `buran` (Анимация) leads because it is the one template here that is not disposable — the
+  the FORMAT shelf (`film`, `serial`, `anime` — Фильм · Сериал · Аниме, owner request 2026-07-18)
+  leads: a format is the widest door into CinemaStudio, a starting grid the user rewrites.
+  `buran` (Анимация) keeps second place for the reason it used to lead — the
   brainrot dramas are picked to be *posted*, «Буран» is picked to be *worked on*. Then the
   dramas, because they are why anyone opens the page; the cheap, simple `talking-food` is last.
 

@@ -50,3 +50,6 @@ flowchart LR
 
 ## Key decisions (2026-07-09) — CinemaStudio
 - `ANTHROPIC_API_KEY` (optional string) → `config.anthropicApiKey` (`string | null`, `|| null` so empty = unconfigured). Powers ONLY the CinemaStudio script→storyboard feature; unset keeps boot healthy and that endpoint returns a clean `provider_error`. Same optional-secret pattern as `COMFY_BASE_URL` and Google OAuth. Every other CinemaStudio feature (timeline, render, generate) works without it.
+
+## Update 2026-07-22 — GROQ_API_KEY (prompt enhancer fallback)
+- `GROQ_API_KEY` (optional string) → `config.groqApiKey` (`string | null`, `|| null` so empty = unconfigured). Same optional-secret pattern as the others. It is the FREE fallback LLM (`llama-3.3-70b-versatile`) for `POST /api/prompt/enhance`, tried after DeepInfra (`DEEPINFRA_TOKEN` → `deepinfraToken`, now ALSO the enhancer's primary LLM `deepseek-ai/DeepSeek-V3-0324`). EITHER key alone makes the endpoint work; NEITHER → it answers `provider_error` (boot healthy). No asset host to fold in (Groq is not an asset source), so `assetHostAllowlist` is untouched. Consumed by `app.ts` → `createPromptEnhanceService({ deepinfraToken, groqApiKey, log })`.

@@ -113,3 +113,67 @@ portraitService)`. It depends on both; **neither depends on it**, which is what
 keeps the graph acyclic — the generation service already depends on the entity
 service (it resolves `[[e1]]` mentions through `loadForMentions`), so the sheet
 logic could not have lived inside either one without closing a cycle.
+
+## Update 2026-07-16 — dev super-admin seed
+- After `registerAuth`, gated on `nodeEnv === 'development'` EXACTLY: `await seedDevAdmin(db, auth, signupBonusCredits, app.log)`. The gate lives at the composition root (one auditable line answers "can this reach production?"); `test` builds opt in per-test via buildTestApp overrides, `production` can never match. See `modules/auth/dev-admin.ts(.md)`.
+
+## Update 2026-07-18 — Modular 3D Assets (ADR: `docs/wiki/decisions/modular-3d-assets.md`)
+- Wires the assets3d module right after `registerTemplateRoutes`, once `generationService` exists:
+  `createAsset3dService({ db: deps.db, storage: deps.storage, generations: generationService })` (the
+  generation service is passed WHOLE but the service TYPE narrows it to `Pick<…,'create'|'get'>`, so
+  the module cannot grow its own money code), then
+  `createAnalyzeService({ anthropicApiKey: config.anthropicApiKey, assets: asset3dService })` (gates on
+  the optional key exactly like storyboard — unset → the `/analyze` route answers provider_error, boot
+  stays healthy), then `registerAsset3dRoutes(app, asset3dService, analyzeService)`.
+- No new env var, no new provider, no ledger: extract/mesh ride `generationService.create()` on the
+  UNCHANGED money path; the concept image reaches the extractor via the server-only `referenceImages`
+  channel added to `create()` in the same build (see `modules/generations/service.ts(.md)`).
+
+## Update 2026-07-21 — shot reference images
+- Wires `createShotReferenceService({ db, storage, generations: generationService })` next to the
+  film service and passes it as the 4th arg to `registerFilmRoutes`. Same pattern as assets3d: it
+  spends no credits of its own — the clip route reads a shot's stored images into the server-only
+  `referenceImages` channel and calls the ONE `generationService.create()` money path. No new env,
+  no new provider, no ledger.
+
+## Update 2026-07-22 — split a shot at a point (the NLE)
+- Wires `createShotSplitService({ db: deps.db, films: filmService })` next to the film/shot-reference
+  services and passes it as the 5th arg to `registerFilmRoutes` (which registers
+  `POST /api/films/:id/shots/:shotId/split`). The service TYPE narrows `filmService` to
+  `Pick<FilmService, 'getFilm'>` — it needs the film service ONLY for the FilmDetail read shape it
+  returns; it reimplements its own ownership gate and does the split in one transaction.
+- No new env, no new provider, NO ledger: a split cites the SAME generation (it never creates one),
+  so it structurally cannot charge — an HTTP test asserts the caller's credit balance is unchanged
+  across a split. See `modules/films/shot-split.ts(.md)`.
+
+## Update 2026-07-21 — prompt enhancer (POST /api/prompt/enhance)
+- Wires `createPromptEnhanceService({ deepinfraToken: config.deepinfraToken })` after the assets3d
+  routes, then `registerPromptRoutes(app, promptEnhanceService)`. A generic, FREE, stateless text
+  transform: rough shot idea → one cinematic Wan prompt (DeepSeek-V3 via DeepInfra's OpenAI-compatible
+  chat endpoint), plus a `soften` mode for `content_blocked` retries.
+- Gated on the OPTIONAL `DEEPINFRA_TOKEN` exactly like storyboard gates on `ANTHROPIC_API_KEY`: unset →
+  the endpoint answers `provider_error` (502), boot stays healthy. The route is ALWAYS registered (no
+  `configuredProviders` gate) so the SPA gets one consistent message rather than a 404.
+- It spends NO credits of its own — it only improves the text of a paid generation — so it takes neither
+  the db nor the generation service and structurally cannot charge. An HTTP test asserts the caller's
+  credit balance is unchanged after a call. Session-guarded (`requireUser`) but NOT film/ownership scoped.
+  Strict per-route rate limit 20/min (a free endpoint that still spends LLM tokens). See
+  `modules/prompt/enhance.ts(.md)` + `modules/prompt/routes.ts(.md)`.
+
+## Update 2026-07-22 — prompt enhancer provider fallback (Groq)
+- `createPromptEnhanceService(...)` now also receives `groqApiKey: config.groqApiKey` and `log: app.log`.
+  The service runs an ORDERED provider chain: DeepInfra (DeepSeek-V3) primary → Groq (llama-3.3-70b) FREE
+  fallback, failing over on any provider error (no-balance, 5xx, network, malformed answer). Motivation:
+  DeepInfra ran out of balance ("You need positive balance to do inference") and the enhancer went dark.
+- EITHER key alone makes the endpoint work; with NEITHER it still answers `provider_error` (boot healthy),
+  so the wiring keeps the same optional-secret discipline — no new `configuredProviders` gate, route always
+  registered. `app.log` now carries the per-provider failover warn lines (`event: prompt.provider_failed`),
+  and the provider chain construction lives in `modules/prompt/enhance.ts` (`buildEnhanceChain`), not here.
+
+## Update 2026-07-23 — public auth-provider flags (ADR: `docs/wiki/decisions/google-oauth.md`)
+- Immediately after `registerAuth`, a PUBLIC `GET /api/auth/config` route returns
+  `{ googleEnabled: config.googleClientId !== null && config.googleClientSecret !== null }` — the runtime
+  source of truth the SPA reads to render the Google button, derived from the SAME creds pair that gates the
+  better-auth Google provider (so no client/server drift; supersedes the old `VITE_GOOGLE_AUTH` build flag).
+  No `requireUser` — it must render on the pre-sign-in screen. Registered as a STATIC route so find-my-way
+  matches it ahead of better-auth's `/api/auth/*` wildcard. Pinned by `test/auth-config.test.ts`.

@@ -108,11 +108,20 @@ const envSchema = z.object({
   // half-working provider.
   DASHSCOPE_API_KEY: z.string().optional(),
   DASHSCOPE_WORKSPACE_ID: z.string().optional(),
-  // DeepInfra bearer token — Seedance 2.0 WITHOUT ByteDance's resource-pack wall.
+  // DeepInfra bearer token — Seedance 2.0 WITHOUT ByteDance's resource-pack wall,
+  // AND the primary LLM for the prompt enhancer (deepseek-ai/DeepSeek-V3-0324).
   // Same treatment as the other optional providers: unset keeps boot healthy and
   // hides its models from /api/catalog, so nobody can select a model whose backend
   // cannot run. `|| null` normalizes '' → null (not configured) below.
   DEEPINFRA_TOKEN: z.string().optional(),
+  // Groq API key — the FREE fallback LLM for the prompt enhancer
+  // (llama-3.3-70b-versatile), tried when DeepInfra is absent or out of balance.
+  // OPTIONAL, same treatment as DEEPINFRA_TOKEN: unset simply drops Groq from the
+  // enhancer's provider chain (boot stays healthy). Either key alone is enough for
+  // POST /api/prompt/enhance to work; both unset → that endpoint answers
+  // provider_error. `|| null` normalizes '' → null (not configured) below. A free
+  // key comes from console.groq.com.
+  GROQ_API_KEY: z.string().optional(),
   // Anthropic API key for the CinemaStudio script→storyboard feature. OPTIONAL,
   // same treatment as COMFY_BASE_URL / Google OAuth: unset keeps boot healthy —
   // the /storyboard endpoint then returns a clean provider_error instead of
@@ -164,9 +173,13 @@ export type AppConfig = {
   // disabled, its catalog models hidden, boot stays healthy).
   dashscopeApiKey: string | null
   dashscopeWorkspaceId: string | null
-  // DeepInfra bearer token for the pack-free Seedance 2.0 channel; null when unset
-  // (provider disabled, its catalog models hidden, boot stays healthy).
+  // DeepInfra bearer token for the pack-free Seedance 2.0 channel AND the prompt
+  // enhancer's primary LLM; null when unset (provider disabled, its catalog models
+  // hidden, boot stays healthy).
   deepinfraToken: string | null
+  // Groq API key — the prompt enhancer's FREE fallback LLM; null when unset (Groq is
+  // simply dropped from the enhancer's provider chain, boot stays healthy).
+  groqApiKey: string | null
   // Anthropic key for the storyboard feature; null when unset (feature disabled,
   // boot stays healthy).
   anthropicApiKey: string | null
@@ -212,6 +225,9 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
   // list the Wan models in the catalog and then fail every submit — the exact
   // trap the provider-gating exists to prevent.
   const deepinfraToken = e.DEEPINFRA_TOKEN || null
+  // `|| null`: an empty string in .env means "not configured", so Groq stays out of
+  // the enhancer chain rather than joining it with a blank key.
+  const groqApiKey = e.GROQ_API_KEY || null
   const dashscopeConfigured = Boolean(e.DASHSCOPE_API_KEY && e.DASHSCOPE_WORKSPACE_ID)
   const dashscopeApiKey = dashscopeConfigured ? (e.DASHSCOPE_API_KEY ?? null) : null
   const dashscopeWorkspaceId = dashscopeConfigured ? (e.DASHSCOPE_WORKSPACE_ID ?? null) : null
@@ -270,6 +286,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     dashscopeApiKey,
     dashscopeWorkspaceId,
     deepinfraToken,
+    groqApiKey,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.
     anthropicApiKey: e.ANTHROPIC_API_KEY || null,

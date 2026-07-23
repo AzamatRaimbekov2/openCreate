@@ -4,35 +4,43 @@
 
 ## Purpose
 
-A simple, robust sequential DOM player (NOT an encoder): plays the shots' media
-back-to-back on one canvas — video advances on `ended`, an image/title slate on a
-`durationMs` timer. An APPROXIMATION; the server render is authoritative.
-
-It is also the editor's STAGE — the hero surface of `/cinema/$filmId`.
+The editor's STAGE — a PLAYHEAD-DRIVEN preview (NLE Phase 1). It reads the ONE
+timeline clock, resolves which clip the playhead sits on (`clipAtMs`), mounts that
+clip's `<video>/<img>/slate`, and seeks the video to the offset within it —
+frame-accurate, so clicking a tile or scrubbing the ruler makes the picture jump.
+An APPROXIMATION; the server ffmpeg render is authoritative (the caveat line says
+so). NOT the old sequential index player.
 
 ## What it does (for an AI reader)
 
-- Responsibilities: build a playlist from shots + their generations; play it.
-- Public API / exports: `PreviewPlayer`, `PreviewPlayerProps = { shots, filmAspect }`.
-- Inputs → Outputs: `Shot[]` → a playing `<video>/<img>/slate` sequence.
-- Side effects: `useShotGenerations` (read cache); `setTimeout` per non-video step;
-  imperative `video.play()/pause()`.
+- Responsibilities: read the clock → resolve the current clip → seek/play it.
+- Public API / exports: `PreviewPlayer`, `PreviewPlayerProps = { shots }`
+  (the `filmAspect` prop was removed in v7.1; there is NO local `index`/`isPlaying`
+  state any more — the clock owns both).
+- Inputs → Outputs: `Shot[]` + `useTimelineClock.playheadMs` → the clip at that
+  time, seeked to its offset.
+- Side effects: `useShotGenerations` (read cache); a `requestAnimationFrame`
+  PLAY loop that advances `playheadMs` (cancelled on pause/unmount); imperative
+  `video.currentTime`/`play()`/`pause()`.
 
 ## Dependencies
 
-- Imports: `react` (`useEffect/useMemo/useRef/useState`), `react-i18next`,
-  `Card` from `shared/ui`, `useShotGenerations`, `PlayIcon`/`PauseIcon`.
-- Used by: `FilmEditor` (the stage column).
+- Imports: `react` (`useEffect/useMemo/useRef`), `react-i18next`, `Card` from
+  `shared/ui`, `useShotGenerations`, `useTimelineClock`, `clipAtMs`/
+  `totalDurationMs` from `../model/timelineGeometry`, `PlayIcon`/`PauseIcon`.
+- Used by: `FilmEditor` (the stage column). Shares the clock with `Timeline`.
 
 ## Diagram
 
 ```mermaid
 flowchart TD
-  SHOTS[Shot[]] --> PL[playlist: media | slate]
-  PL --> CUR[current step]
-  CUR -->|video ended| NEXT[goNext]
-  CUR -->|timer durationMs| NEXT
-  NEXT -->|past end| STOP[stop + rewind]
+  CLOCK[useTimelineClock playheadMs] --> AT[clipAtMs → shotId, offsetMs, index]
+  AT --> STEP[resolve clip: video | image | slate]
+  STEP -->|seek, not playing| CT[video.currentTime = offsetMs/1000]
+  PLAY[isPlaying] --> RAF[rAF loop advances playheadMs]
+  RAF -->|boundary| AT
+  RAF -->|film end| PARK[seek end + pause]
+  RAF -->|cleanup| CANCEL[cancelAnimationFrame on pause/unmount]
 ```
 
 ## Key decisions / gotchas
@@ -55,4 +63,41 @@ flowchart TD
 
 ## Commits
 
-- _no commit yet_
+- be4b490 2026-07-15 feat(cinema): плотный редактор — компактный шелл, таймлайн v6, композер-док, звук генерации
+
+## Update 2026-07-22 — sound on play (NLE Phase 2)
+The current clip is now AUDIBLE while playing: the play/pause effect sets
+`video.muted = !isPlaying` imperatively (not a JSX `muted` prop, which React would
+re-assert over the per-frame re-renders), so a wan/Seedance clip plays its own
+soundtrack while playing and stays silent while paused/scrubbing. The user's play
+gesture is the activation that lets unmuted playback start. Pinned by a test
+(`video.muted` toggles false on play, true on pause). CORNER CASE (documented, not
+papered over): when a clip SWAPS mid-play at a boundary, the fresh `<video>` calls
+`play()` unmuted relying on the page's existing user activation — if activation has
+expired the browser may keep it muted; the clip still plays (silently), never
+crashes. Full film-audio-track mixing (music/voiceover lanes synced to the
+playhead) is a documented Phase-2b seam, NOT this change.
+
+## Update 2026-07-22 — playhead-driven (NLE Phase 1, v8)
+The sequential auto-player is GONE. The component no longer holds its own `index`
+or `isPlaying`; it reads `useTimelineClock` and resolves the current clip via
+`clipAtMs(shots, playheadMs)`. Fixes two live bugs: (1) clicking a shot tile now
+jumps the preview (the preview follows the shared playhead, not a private index);
+(2) scrubbing/seeking is possible at all. On a SEEK (playhead moved while paused)
+the `<video>.currentTime` is pulled to `offsetMs/1000` (frame-accurate); PLAY is a
+`requestAnimationFrame` loop advancing `playheadMs` by real elapsed time, swapping
+the `<video key>` at each clip boundary and parking+pausing at the film end. The
+rAF is cancelled on pause AND unmount (the tested no-leak contract). Images/slates
+"play" for free — the rAF walks the playhead through their duration and `clipAtMs`
+moves on. Dropped `onEnded`/`setTimeout` (the rAF is the master clock, faithful to
+each shot's `durationMs`, which the render uses). Tests: `PreviewPlayer.test.tsx`.
+
+## Update 2026-07-22 — preview FILLS the stage (v7.1)
+The `max-h-[42svh]` cap on the canvas box left a dead black band between a small
+preview and the tracks (owner report). The canvas box is now `flex-1 min-h-0` and
+the Card/section are flex columns, so the preview grows to whatever height the
+stage column leaves after the header + render bar; `object-contain` letterboxes
+the film's real aspect inside. Consequences: `ASPECT_CLASS` and the `filmAspect`
+prop are REMOVED (the box is aspect-agnostic now — the media keeps its own ratio),
+and `FilmEditor` no longer passes `filmAspect` to `<PreviewPlayer>`. Verified live
+in-browser: no gap between preview and timeline.

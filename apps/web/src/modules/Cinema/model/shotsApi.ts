@@ -68,3 +68,22 @@ export function useReorderShots() {
     },
   })
 }
+
+// Split a shot at `atMs` (offset from the shot's OWN start, 0 < atMs < durationMs).
+// The server does the real work — cut the trim window into two shots citing the
+// same generation, re-space orderIndex — and returns the WHOLE updated FilmDetail,
+// which we write straight into the cache (like reorder) so the strip re-splits
+// instantly. NLE Phase 4; contract: POST /api/films/:id/shots/:shotId/split.
+export function useSplitShot() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ filmId, shotId, atMs }: { filmId: string; shotId: string; atMs: number }) =>
+      api<FilmDetail>(`/api/films/${filmId}/shots/${shotId}/split`, {
+        method: 'POST',
+        body: JSON.stringify({ atMs }),
+      }),
+    onSuccess: (detail, { filmId }) => {
+      queryClient.setQueryData<FilmDetail>(filmKey(filmId), detail)
+    },
+  })
+}

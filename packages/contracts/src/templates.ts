@@ -33,7 +33,13 @@ import { aspectRatioSchema } from './catalog'
 // than being filed under brainrot because the two want different things from the
 // user — a brainrot template is picked to be posted, an animation template is
 // picked to be *edited*.
-export const templateCategorySchema = z.enum(['brainrot', 'animation'])
+//
+// 'format' (2026-07-18, owner request) is the third shelf: LOOK/GENRE scaffolds
+// — «Фильм», «Сериал», «Аниме» — a ready beat structure in a format's visual
+// language that the user re-aims with a couple of knobs and then edits. Unlike
+// a brainrot template (a finished joke) a format template is a starting grid:
+// picked to be *rewritten*, beat by beat, in the Cinema editor.
+export const templateCategorySchema = z.enum(['format', 'brainrot', 'animation'])
 export type TemplateCategory = z.infer<typeof templateCategorySchema>
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -65,26 +65,86 @@ function seedAudioGeneration(
 }
 
 describe('film audio integrity', () => {
-  it('refuses to attach an audio generation that has not succeeded yet', () => {
+  // REPLACES the previous "refuses to attach a not-succeeded generation" test
+  // (owner-approved 2026-07-20). That guard was the SECOND of two, and it is the
+  // one that broke the client: audio generations are async (they return 202
+  // `processing`), so the UI's create-then-attach flow could never satisfy it and
+  // voiceover/music attachment failed 100% of the time AFTER charging the user.
+  //
+  // Attaching a still-processing track is now legal and matches how SHOTS already
+  // work (a shot cites a processing generation and shows live status). The
+  // property that actually matters — audio must never be silently missing from an
+  // export — is held by buildPlan, exercised by the three tests below.
+  it('attaches an audio generation that is still processing', () => {
     const { db, svc } = service()
     const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedAudioGeneration(db, 'gen-processing', 'processing')
 
-    // This is the window the UI walked through: TTS still rendering, user clicks
-    // "Add voiceover", track lands on the timeline, export runs muted.
-    expect(() =>
-      svc.addAudio(USER, film.id, { kind: 'voiceover', generationId: 'gen-processing' }),
-    ).toThrow(/not ready/i)
+    const track = svc.addAudio(USER, film.id, {
+      kind: 'voiceover',
+      generationId: 'gen-processing',
+    })
+
+    expect(track.generationId).toBe('gen-processing')
   })
 
-  it('refuses to attach a failed audio generation', () => {
+  it('still refuses to attach a generation that is not audio', () => {
+    // The type + ownership checks are NOT relaxed — mixing a video file as an
+    // audio track would break the mux, and that has nothing to do with timing.
     const { db, svc } = service()
     const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
-    seedAudioGeneration(db, 'gen-failed', 'failed')
+    db.insert(generation)
+      .values({
+        id: 'gen-video',
+        userId: USER,
+        type: 'video',
+        mode: 'text',
+        status: 'succeeded',
+        prompt: 'a clip',
+        modelId: 'wan-2-7',
+        paramsJson: '{}',
+        costCredits: 40,
+        mediaJson: JSON.stringify(['/media/gen-video.mp4']),
+        createdAt: new Date(),
+      })
+      .run()
 
     expect(() =>
-      svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-failed' }),
-    ).toThrow(/not ready/i)
+      svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-video' }),
+    ).toThrow(/not an audio generation/i)
+  })
+
+  it('refuses to RENDER while an attached track is still processing', () => {
+    // buildPlan is now the SINGLE enforcement point. A pending track may sit on
+    // the timeline, but it may never reach a finished mp4 as silence — the export
+    // stops with a message the user can act on.
+    const { db, svc } = service()
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
+    seedAudioGeneration(db, 'gen-pending', 'processing')
+    svc.addAudio(USER, film.id, { kind: 'voiceover', generationId: 'gen-pending' })
+
+    // Asserted on the REASON, not the prose: the message is user-facing copy and
+    // is allowed to be rewritten, but the machine-readable cause is the contract.
+    // (It said "not ready" until 2026-07-21, when the vague single sentence was
+    // split into one instruction per cause — see films-render-reasons.test.ts.)
+    expect(() => svc.createRender(USER, film.id)).toThrow(
+      expect.objectContaining({ reason: 'audio_processing' }),
+    )
+  })
+
+  it('refuses to RENDER when an attached track failed', () => {
+    const { db, svc } = service()
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
+    seedAudioGeneration(db, 'gen-failed', 'failed')
+    svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-failed' })
+
+    // A DIFFERENT reason from the processing case above — that separation is the
+    // whole point: "wait" and "remove" cannot be the same sentence.
+    expect(() => svc.createRender(USER, film.id)).toThrow(
+      expect.objectContaining({ reason: 'audio_failed' }),
+    )
   })
 
   it('attaches a succeeded audio generation', () => {

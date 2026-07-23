@@ -17,13 +17,13 @@ Internal `model/` and `components/` files are private.
 ## Dependencies
 
 - Imports: `./components/CinemaLibrary`, `./components/FilmEditor`.
-- Used by: `routes/_shell.cinema.index.tsx`, `routes/_shell.cinema.$filmId.tsx`.
+- Used by: `routes/_shell.cinema.index.tsx`, `routes/cinema.$filmId.tsx` (standalone, no `_shell`).
 
 ## Diagram
 
 ```mermaid
 flowchart LR
-  C[components/*] --> IDX[index.ts] --> R[routes/_shell.cinema.*]
+  C[components/*] --> IDX[index.ts] --> R[routes/_shell.cinema.index + routes/cinema.$filmId]
 ```
 
 ## Key decisions / gotchas

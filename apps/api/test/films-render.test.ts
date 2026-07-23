@@ -4,7 +4,12 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { createDb } from '../src/db/client'
 import { createLocalStorage } from '../src/storage/local'
-import { createFilmService, settleStaleRenders, STALE_RENDER_MS } from '../src/modules/films/service'
+import {
+  createFilmService,
+  FilmRenderInProgressError,
+  settleStaleRenders,
+  STALE_RENDER_MS,
+} from '../src/modules/films/service'
 import { filmRender, user } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
 
@@ -80,5 +85,84 @@ describe('film render lifecycle', () => {
     const failed = settleStaleRenders(db, Date.now())
     expect(failed).toBe(1)
     expect(svc.getRender(USER, film.id, render.id).status).toBe('failed')
+  })
+})
+
+// A render used to be visible ONLY to the tab that started it: the id lived in
+// React state and the detail DTO carried nothing, so a reload lost the job — the
+// strip vanished, Export was offered again (starting a SECOND ffmpeg run), and a
+// finished mp4 became unreachable from the UI. The film's own detail now carries
+// its latest render, which is what makes recovery possible at all.
+describe('film detail carries the latest render', () => {
+  it('is null for a film that has never been exported', () => {
+    const { svc } = service()
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    expect(svc.getFilm(USER, film.id).latestRender).toBeNull()
+  })
+
+  it('exposes a finished render — the mp4 stays reachable after a reload', async () => {
+    const { svc } = service(vi.fn(async () => ({ ok: true as const })))
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
+    const render = svc.createRender(USER, film.id)
+    await waitTerminal(svc, USER, film.id, render.id)
+
+    // A fresh load of the film — the only thing a reloaded editor gets
+    const latest = svc.getFilm(USER, film.id).latestRender
+    expect(latest?.id).toBe(render.id)
+    expect(latest?.status).toBe('succeeded')
+    expect(latest?.mediaUrl).toMatch(/^\/media\/.+\.mp4$/)
+  })
+
+  it('reports the NEWEST render when a film has been exported more than once', async () => {
+    const { svc } = service(vi.fn(async () => ({ ok: true as const })))
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
+
+    const first = svc.createRender(USER, film.id)
+    await waitTerminal(svc, USER, film.id, first.id)
+    const second = svc.createRender(USER, film.id)
+    await waitTerminal(svc, USER, film.id, second.id)
+
+    expect(svc.getFilm(USER, film.id).latestRender?.id).toBe(second.id)
+  })
+
+  it('does not leak another user’s render onto a film', () => {
+    const { db, svc } = service()
+    const now = new Date()
+    db.insert(user)
+      .values({ id: 'user-2', email: 'b@t.co', emailVerified: false, createdAt: now, updatedAt: now })
+      .run()
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    expect(() => svc.getFilm('user-2', film.id)).toThrow()
+  })
+})
+
+// One film, one ffmpeg job. The old UI gate (`isExporting`) only knew about the
+// current TAB, so two tabs — or a reload mid-render — could put two encodes of
+// the same film on the CPU at once. The refusal has to live on the server.
+describe('concurrent renders are refused', () => {
+  it('refuses a second render while one is still processing', async () => {
+    const hang = vi.fn(() => new Promise<{ ok: true } | { ok: false; error: string }>(() => {}))
+    const { svc } = service(hang)
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
+
+    svc.createRender(USER, film.id)
+    expect(() => svc.createRender(USER, film.id)).toThrow(FilmRenderInProgressError)
+    // And only ONE ffmpeg job was ever started. The runner is reached through an
+    // async semaphore acquire, so this has to wait for the job to actually start
+    // rather than assert on the same tick as the refusal.
+    await vi.waitFor(() => expect(hang).toHaveBeenCalledOnce())
+  })
+
+  it('allows a new render once the previous one has settled', async () => {
+    const { svc } = service(vi.fn(async () => ({ ok: true as const })))
+    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
+
+    const first = svc.createRender(USER, film.id)
+    await waitTerminal(svc, USER, film.id, first.id)
+    expect(() => svc.createRender(USER, film.id)).not.toThrow()
   })
 })

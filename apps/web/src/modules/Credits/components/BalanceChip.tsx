@@ -13,7 +13,7 @@ import { useBalance } from '../model/creditsApi'
 import { TransactionsList } from './TransactionsList'
 
 export function BalanceChip() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const { data, error, isPending, isError, refetch } = useBalance()
 
@@ -41,6 +41,18 @@ export function BalanceChip() {
     )
   }
 
+  // Number-format LAW (design.md §13): a raw balance renders as "1000000000",
+  // which is unreadable and blows out the chip width. Show a COMPACT numeral
+  // ("1B" / "1 млрд" — locale-aware) and carry the EXACT grouped value in the
+  // aria-label + title, so scanning is easy and the precise figure is one hover
+  // (or one screen-reader pass) away. Compact leaves small counts untouched
+  // (165 → "165"), so only the eye-watering numbers change.
+  const compact = new Intl.NumberFormat(i18n.language, {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(data.creditsBalance)
+  const exact = new Intl.NumberFormat(i18n.language).format(data.creditsBalance)
+
   return (
     <>
       {/* The AMBER SPECIMEN PILL (stage 3): /20 amber tint + white/10 hairline
@@ -52,7 +64,8 @@ export function BalanceChip() {
       <button
         type="button"
         onClick={() => setIsHistoryOpen(true)}
-        aria-label={t('credits.balance')}
+        aria-label={`${t('credits.balance')}: ${exact}`}
+        title={exact}
         className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/10 bg-specimen-amber/20 px-3 py-1 text-lumen-amber shadow-pill transition-colors duration-200 hover:bg-specimen-amber/35 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
       >
         {/* Decorative bolt — the aria-label already names the control.
@@ -73,8 +86,9 @@ export function BalanceChip() {
           <path d="M13 2 4.5 13.5H11L9.5 22 19.5 9.5H12.5L13 2Z" />
         </svg>
         {/* Mono numeral at the 500 weight ceiling — the same numeral voice as
-            the price index, scaled for the 32px control */}
-        <span className="text-sm leading-none font-medium">{data.creditsBalance}</span>
+            the price index, scaled for the 32px control. Compact notation keeps
+            the chip a fixed, scannable width no matter how large the balance. */}
+        <span className="text-sm leading-none font-medium tabular-nums">{compact}</span>
       </button>
       <TransactionsList isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </>

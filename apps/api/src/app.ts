@@ -20,6 +20,7 @@ import type { VideoProvider, VideoProviderId } from './integrations/video-provid
 import type { Mesh3dProvider } from './integrations/mesh-provider'
 import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
+import { seedDevAdmin } from './modules/auth/dev-admin'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
@@ -30,9 +31,16 @@ import { createGenerationService, settleStaleGenerations } from './modules/gener
 import { registerGenerationRoutes } from './modules/generations/routes'
 import { createFilmService, settleStaleRenders } from './modules/films/service'
 import { registerFilmRoutes } from './modules/films/routes'
+import { createShotReferenceService } from './modules/films/shot-references'
+import { createShotSplitService } from './modules/films/shot-split'
 import { createStoryboardService } from './modules/films/storyboard'
 import { assertTemplatesValid, createTemplateService } from './modules/templates/service'
 import { registerTemplateRoutes } from './modules/templates/routes'
+import { createAsset3dService } from './modules/assets3d/service'
+import { createAnalyzeService } from './modules/assets3d/analyze'
+import { registerAsset3dRoutes } from './modules/assets3d/routes'
+import { createPromptEnhanceService } from './modules/prompt/enhance'
+import { registerPromptRoutes } from './modules/prompt/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -178,6 +186,22 @@ export async function buildApp(deps: AppDeps) {
   // no request context) still emits a structured ledger entry.
   const auth = createAuth(deps.db, deps.config, app.log)
   await registerAuth(app, auth)
+  // Public runtime auth-provider flags (ADR google-oauth). The SPA reads this to
+  // decide whether to render the Google button — a SINGLE source of truth derived
+  // from the SAME creds pair that gates the better-auth Google provider, so the
+  // button can never drift from what the server actually has wired. No requireUser:
+  // it must render on the pre-sign-in auth screen. Registered as a static route,
+  // so find-my-way matches it ahead of better-auth's `/api/auth/*` wildcard.
+  app.get('/api/auth/config', async () => ({
+    googleEnabled: deps.config.googleClientId !== null && deps.config.googleClientSecret !== null,
+  }))
+  // Dev-only super-admin (admin@dev.local / admin). The env gate is HERE, at
+  // the composition root, not inside the seed — one obvious line to audit for
+  // "can this reach production?". 'development' exactly: 'test' builds opt in
+  // per-test, and 'production' can never match.
+  if (deps.config.nodeEnv === 'development') {
+    await seedDevAdmin(deps.db, auth, deps.config.signupBonusCredits, app.log)
+  }
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)
   // Which video backends this deployment can actually reach. Runware is always
@@ -299,11 +323,28 @@ export async function buildApp(deps: AppDeps) {
   // the optional ANTHROPIC_API_KEY (unset → the endpoint answers provider_error,
   // boot stays healthy). Both scope every query by the caller's id.
   const filmService = createFilmService({ db: deps.db, storage: deps.storage })
+  // Shot reference images (attach arbitrary images to a shot). A thin sibling of
+  // the film service — kept out of the already-oversized films/service.ts — that
+  // owns the attach/detach + the clip DELIVERY SEAM. It depends on THIS generation
+  // service instance (the single money path): the clip route reads a shot's stored
+  // images into the server-only referenceImages channel and calls create(). It
+  // spends no credits of its own.
+  const shotReferenceService = createShotReferenceService({
+    db: deps.db,
+    storage: deps.storage,
+    generations: generationService,
+  })
+  // Split-at-playhead (the NLE): a tiny sibling of the film service — kept out of
+  // the already-oversized films/service.ts — that re-slices one shot into two in a
+  // single transaction. It depends on THIS film service only for its read shape
+  // (getFilm returns the FilmDetail the split hands back) and spends no credits of
+  // its own: a split cites the same generation, it never creates one.
+  const shotSplitService = createShotSplitService({ db: deps.db, films: filmService })
   const storyboardService = createStoryboardService({
     anthropicApiKey: deps.config.anthropicApiKey,
     films: filmService,
   })
-  registerFilmRoutes(app, filmService, storyboardService)
+  registerFilmRoutes(app, filmService, storyboardService, shotReferenceService, shotSplitService)
   // Template catalog (ADR template-catalog): the /templates gallery and the
   // one-call "instantiate a whole film from this template" endpoint. It writes
   // through the film service (same ownership rules, one transaction) and charges
@@ -315,6 +356,39 @@ export async function buildApp(deps: AppDeps) {
   // value). That has to be a failed boot, not a surprise on someone's invoice.
   assertTemplatesValid()
   registerTemplateRoutes(app, createTemplateService({ films: filmService }))
+  // Modular 3D Assets (ADR modular-3d-assets): an aggregate that cites generations.
+  // It spends NO credits of its own — extract/mesh call generationService.create()
+  // (narrowed to create+get), so the one money path does the only thing it does.
+  // The concept image is redrawn per part via the server-only referenceImages
+  // channel on create(); analyze gates on the optional ANTHROPIC_API_KEY exactly
+  // like storyboard (unset → the endpoint answers provider_error, boot stays healthy).
+  const asset3dService = createAsset3dService({
+    db: deps.db,
+    storage: deps.storage,
+    generations: generationService,
+  })
+  const analyzeService = createAnalyzeService({
+    anthropicApiKey: deps.config.anthropicApiKey,
+    assets: asset3dService,
+  })
+  registerAsset3dRoutes(app, asset3dService, analyzeService)
+  // Prompt enhancer (POST /api/prompt/enhance): a generic, FREE, stateless text
+  // transform — rough shot idea → one cinematic Wan prompt, plus a 'soften' mode for
+  // content_blocked retries. It runs an ORDERED PROVIDER CHAIN: DeepInfra
+  // (DeepSeek-V3) primary → Groq (llama-3.3-70b) free fallback, tried in order and
+  // failing over on any provider error (no-balance, 5xx, network, malformed answer).
+  // Each provider is included only if its key is set; EITHER key alone is enough, and
+  // with NEITHER the endpoint answers provider_error (boot stays healthy — same
+  // optional-secret discipline as storyboard). It spends NO credits of its own (it
+  // only improves the text of a paid generation), so it takes neither the db nor the
+  // generation service — it structurally cannot charge. `app.log` carries the
+  // per-provider failover warn lines (event: prompt.provider_failed).
+  const promptEnhanceService = createPromptEnhanceService({
+    deepinfraToken: deps.config.deepinfraToken,
+    groqApiKey: deps.config.groqApiKey,
+    log: app.log,
+  })
+  registerPromptRoutes(app, promptEnhanceService)
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.

@@ -43,6 +43,10 @@ export const fakeMeshProvider = () => ({
 })
 
 export type TestAppOverrides = {
+  // Share one db across two buildTestApp calls — the dev-admin idempotence test
+  // boots "the same database" twice, which a fresh :memory: per app can't model.
+  // Default: a fresh isolated :memory: db, as always.
+  db?: ReturnType<typeof createDb>['db']
   // Task 9: point /media serving at a caller-owned temp dir so tests can put
   // files in it / assert on it. Default: a fresh mkdtemp per app.
   storageDir?: string
@@ -96,15 +100,32 @@ export type TestAppOverrides = {
   dashscopeWorkspaceId?: string | null
   // DeepInfra on/off: default null (off), same contract as the others — the
   // catalog hides seedance-2-0 until a token exists, so a test that wants it must
-  // say so.
+  // say so. Also the prompt enhancer's PRIMARY LLM.
   deepinfraToken?: string | null
+  // Groq on/off: default null (off). The prompt enhancer's FREE fallback LLM; the
+  // enhancer HTTP tests keep both this and deepinfraToken null so the endpoint
+  // answers provider_error (success is a service-level test with an injected chain).
+  groqApiKey?: string | null
+  // Modular 3D Assets analyze (ADR modular-3d-assets): the Claude-vision part
+  // suggestion gates on this key exactly like storyboard. Default null → the
+  // /analyze route answers 502 provider_error (the wizard still works by hand),
+  // which is what the HTTP suite pins. A future test can flip it, but analyze
+  // SUCCESS stays a service-level test (there is no Anthropic HTTP fake).
+  anthropicApiKey?: string | null
+  // Google OAuth on/off (ADR google-oauth): both default null → provider
+  // disabled, and GET /api/auth/config reports googleEnabled:false. Setting BOTH
+  // enables the better-auth Google provider and flips the public config flag.
+  googleClientId?: string | null
+  googleClientSecret?: string | null
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
   const storageDir = overrides.storageDir ?? mkdtempSync(join(tmpdir(), 'oc-test-media-'))
   return buildApp({
     // Fresh in-memory db per app: tests are fully isolated from each other.
-    db: createDb(':memory:').db,
+    // The db override exists for the one shape isolation can't express —
+    // asserting a SECOND boot over the SAME db (dev-admin seed idempotence).
+    db: overrides.db ?? createDb(':memory:').db,
     storage: createLocalStorage(storageDir, overrides.assetHostAllowlist ?? ['runware.ai']),
     runware: overrides.runware ?? (fakeRunware() as unknown as RunwareClient),
     ...(overrides.videoProviders ? { videoProviders: overrides.videoProviders } : {}),
@@ -121,15 +142,20 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       dashscopeApiKey: overrides.dashscopeApiKey ?? null,
       dashscopeWorkspaceId: overrides.dashscopeWorkspaceId ?? null,
       deepinfraToken: overrides.deepinfraToken ?? null,
-      // CinemaStudio config (parallel feature): null → no LLM-backed features in tests
-      anthropicApiKey: null,
+      // Prompt enhancer's free fallback LLM; null → dropped from the chain.
+      groqApiKey: overrides.groqApiKey ?? null,
+      // CinemaStudio + Modular 3D Assets config: null → no LLM-backed features in
+      // tests (storyboard AND assets3d analyze both answer 502 provider_error).
+      anthropicApiKey: overrides.anthropicApiKey ?? null,
       betterAuthSecret: 'test-secret-test-secret-test-secret',
       betterAuthUrl: 'http://localhost:8787',
       webOrigin: 'http://localhost:5173',
       signupBonusCredits: overrides.signupBonusCredits ?? 200,
       port: 0,
-      googleClientId: null,
-      googleClientSecret: null,
+      // Google OAuth: both default null (disabled). A suite that exercises the
+      // provider or the /api/auth/config flag sets BOTH (config gates on the pair).
+      googleClientId: overrides.googleClientId ?? null,
+      googleClientSecret: overrides.googleClientSecret ?? null,
       logLevel: overrides.logLevel ?? 'silent',
       // Matches the storage default; wan-runpod routing tests widen it to the
       // pod /view host (see the assetHostAllowlist override above).

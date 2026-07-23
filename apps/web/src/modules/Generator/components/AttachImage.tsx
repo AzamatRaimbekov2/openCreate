@@ -9,11 +9,12 @@
 // with the image and a remove ✕ — the same silhouette Higgsfield uses.
 //
 // Validation is NOT reimplemented: readImageFile is the one gate (see its
-// header for why that matters on the wire).
+// header for why that matters on the wire). It now lives in shared/ so Cinema's
+// shot references share the exact same caps without a cross-module import.
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { readImageFile } from '../model/readImageFile'
+import { readImageFile } from 'shared/libs/readImageFile'
 
 export type AttachImageProps = {
   // Current data URI from the store; null = no image chosen

@@ -24,7 +24,10 @@ import type {
   FilmDetail,
   FilmRender,
   PromptPreset,
+  RenderBlockReason,
+  RenderBlockSubject,
   Shot,
+  ShotReferenceImage,
   ShotTitle,
   ShotVoiceover,
   UpdateFilmInput,
@@ -57,6 +60,45 @@ export class FilmNotFoundError extends Error {
 export class FilmValidationError extends Error {
   statusCode = 400
   apiCode = 'validation_failed'
+  // WHY the export was refused, machine-readable, plus WHAT it was about.
+  //
+  // The message alone was never enough: ten distinct refusals all arrived as
+  // `validation_failed` with English developer prose, so the client could only
+  // render one generic sentence. These fields let it name the subject and give
+  // the ONE action that helps — wait, regenerate, or remove.
+  //
+  // Optional because most FilmValidationErrors are ordinary input rejections
+  // (a bad reorder payload, a non-audio generation) with no subject to point at.
+  readonly reason?: RenderBlockReason
+  readonly subjectKind?: RenderBlockSubject
+  readonly subjectId?: string
+
+  constructor(
+    message: string,
+    detail?: { reason: RenderBlockReason; subjectKind: RenderBlockSubject; subjectId?: string },
+  ) {
+    super(message)
+    if (detail) {
+      this.reason = detail.reason
+      this.subjectKind = detail.subjectKind
+      if (detail.subjectId !== undefined) this.subjectId = detail.subjectId
+    }
+  }
+}
+
+// One film, one ffmpeg job. 409 (not 400) because the request is perfectly
+// valid — it is the film's CURRENT STATE that forbids it, which is exactly what
+// `conflict` is documented for in the error taxonomy. The UI used to gate this
+// with a local `isExporting` flag, which only knew about the tab it lived in:
+// two tabs, or a reload mid-render, could put two encodes of the same film on
+// the CPU at once. A rule about a shared resource has to be enforced where the
+// resource is.
+export class FilmRenderInProgressError extends Error {
+  statusCode = 409
+  apiCode = 'conflict'
+  constructor() {
+    super('this film is already being exported')
+  }
 }
 
 // Order-index spacing: new shots append at (max + STEP); a reorder reassigns
@@ -84,6 +126,43 @@ type Deps = {
   >
 }
 
+// Shot row → wire DTO. LIFTED to module scope (it was a closure inside
+// createFilmService) and EXPORTED so the shot-references sibling — which returns
+// the updated shot after an attach/detach — maps rows through the exact same
+// function. One mapper, one source of truth for the Shot shape; a second copy
+// would be one edit away from disagreeing about, say, whether referenceImages is
+// null or []. Pure (row in, DTO out), so hoisting it changes nothing at the call sites.
+export function toShotDto(row: typeof shot.$inferSelect): Shot {
+  return {
+    id: row.id,
+    filmId: row.filmId,
+    orderIndex: row.orderIndex,
+    generationId: row.generationId,
+    prompt: row.prompt,
+    promptPreset: row.promptPresetJson ? (JSON.parse(row.promptPresetJson) as PromptPreset) : null,
+    // Never null on the wire: the contract promises an ARRAY, and a client that
+    // has to null-check a cast before mapping it is a client that will forget to.
+    // A shot from before this column simply has nobody in it.
+    entityRefs: row.entityRefsJson ? (JSON.parse(row.entityRefsJson) as EntityRef[]) : [],
+    // Same array-never-null discipline as entityRefs: images the user attached to
+    // this shot as references. NULL column → []. The stored shape is { id, path }
+    // (server media paths), which is exactly the read DTO — the bytes are re-sourced
+    // only at generation time (see shot-references.ts createClip).
+    referenceImages: row.referenceImagesJson
+      ? (JSON.parse(row.referenceImagesJson) as ShotReferenceImage[])
+      : [],
+    modelId: row.modelId,
+    durationMs: row.durationMs,
+    trimStartMs: row.trimStartMs,
+    transition: row.transition,
+    transitionMs: row.transitionMs,
+    title: row.titleJson ? (JSON.parse(row.titleJson) as ShotTitle) : null,
+    voiceover: row.voiceoverJson ? (JSON.parse(row.voiceoverJson) as ShotVoiceover) : null,
+    audio: row.audio,
+    createdAt: new Date(row.createdAt).toISOString(),
+  }
+}
+
 export type FilmService = ReturnType<typeof createFilmService>
 
 export function createFilmService({ db, storage, runRender }: Deps) {
@@ -100,29 +179,6 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       templateId: row.templateId,
       createdAt: new Date(row.createdAt).toISOString(),
       updatedAt: new Date(row.updatedAt).toISOString(),
-    }
-  }
-  function toShotDto(row: typeof shot.$inferSelect): Shot {
-    return {
-      id: row.id,
-      filmId: row.filmId,
-      orderIndex: row.orderIndex,
-      generationId: row.generationId,
-      prompt: row.prompt,
-      promptPreset: row.promptPresetJson ? (JSON.parse(row.promptPresetJson) as PromptPreset) : null,
-      // Never null on the wire: the contract promises an ARRAY, and a client that
-      // has to null-check a cast before mapping it is a client that will forget to.
-      // A shot from before this column simply has nobody in it.
-      entityRefs: row.entityRefsJson ? (JSON.parse(row.entityRefsJson) as EntityRef[]) : [],
-      modelId: row.modelId,
-      durationMs: row.durationMs,
-      trimStartMs: row.trimStartMs,
-      transition: row.transition,
-      transitionMs: row.transitionMs,
-      title: row.titleJson ? (JSON.parse(row.titleJson) as ShotTitle) : null,
-      voiceover: row.voiceoverJson ? (JSON.parse(row.voiceoverJson) as ShotVoiceover) : null,
-      audio: row.audio,
-      createdAt: new Date(row.createdAt).toISOString(),
     }
   }
   function toAudioDto(row: typeof filmAudio.$inferSelect): FilmAudio {
@@ -268,7 +324,23 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       .all()
       .map(toShotDto)
     const audio = db.select().from(filmAudio).where(eq(filmAudio.filmId, filmId)).all().map(toAudioDto)
-    return { film: toFilmDto(row), shots, audio }
+    return { film: toFilmDto(row), shots, audio, latestRender: latestRenderOf(filmId) }
+  }
+
+  // The film's newest export row, or null. Ordered by createdAt DESC so the one
+  // the user last asked for is the one they get back — a still-processing render
+  // resumes its poll, a succeeded one hands back its download link, a failed one
+  // explains itself. `requireFilm` has already proven ownership by the time this
+  // runs, so filtering by filmId alone is sound.
+  function latestRenderOf(filmId: string): FilmRender | null {
+    const row = db
+      .select()
+      .from(filmRender)
+      .where(eq(filmRender.filmId, filmId))
+      .orderBy(desc(filmRender.createdAt))
+      .limit(1)
+      .get()
+    return row ? toRenderDto(row) : null
   }
 
   function updateFilm(userId: string, filmId: string, input: UpdateFilmInput): Film {
@@ -408,13 +480,20 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       .where(and(eq(generation.id, input.generationId), eq(generation.userId, userId)))
       .get()
     if (!gen || gen.type !== 'audio') throw new FilmValidationError('not an audio generation')
-    // The status check the comment above always PROMISED but never performed.
-    // Without it a still-processing voiceover could be attached: the Audio panel
-    // showed the track at once, and a render started before the mp3 landed on
-    // disk mixed nothing and still reported success — a silent film the user had
-    // already paid for. Attaching is only legal once the asset actually exists.
-    if (gen.status !== 'succeeded')
-      throw new FilmValidationError('audio generation is not ready yet')
+    // NO STATUS CHECK HERE, deliberately (2026-07-20, owner-approved).
+    //
+    // An audio generation is ASYNC: POST /api/generations returns 202 `processing`
+    // and the row only settles when someone polls GET /api/generations/:id. A
+    // status gate here therefore made the client's create-then-attach flow
+    // impossible to satisfy — voiceover and music attachment failed 100% of the
+    // time, AFTER the user had already been charged at submit.
+    //
+    // Attaching a pending track is legal and matches how SHOTS already behave: a
+    // shot cites a still-processing generation and the timeline shows its live
+    // status. The property that actually matters — audio must never be silently
+    // MISSING from a finished export — is enforced in buildPlan, which refuses to
+    // render any track that is not succeeded with a file on disk. One enforcement
+    // point, at the moment it can be checked meaningfully.
     // A shot-attached track REPLACES whatever already voices that shot. Appending
     // would mean a second click on "voice this shot" leaves two lines playing over
     // each other — and the user paid twice to make it worse. The shot must be this
@@ -480,13 +559,38 @@ export function createFilmService({ db, storage, runRender }: Deps) {
           .from(generation)
           .where(and(eq(generation.id, s.generationId), eq(generation.userId, userId)))
           .get()
-        if (!gen) throw new FilmValidationError('a shot references a clip that no longer exists')
+        const at = { subjectKind: 'shot', subjectId: s.id } as const
+        if (!gen)
+          throw new FilmValidationError('a shot references a clip that no longer exists', {
+            reason: 'shot_clip_missing',
+            ...at,
+          })
+        // SPLIT (2026-07-21): these two shared one `status !== 'succeeded'` branch
+        // and one sentence. They need OPPOSITE instructions — a processing clip
+        // resolves itself, so wait; a failed one never will, so regenerate. Telling
+        // someone to wait for something that already failed is the bug.
+        if (gen.status === 'processing')
+          throw new FilmValidationError('a shot’s clip is not ready yet — wait for it to finish', {
+            reason: 'shot_clip_processing',
+            ...at,
+          })
         if (gen.status !== 'succeeded')
-          throw new FilmValidationError('a shot’s clip is not ready yet — wait for it to finish')
-        if (gen.type === 'audio') throw new FilmValidationError('audio cannot be used as a shot')
+          throw new FilmValidationError('a shot’s clip failed — regenerate it', {
+            reason: 'shot_clip_failed',
+            ...at,
+          })
+        if (gen.type === 'audio')
+          throw new FilmValidationError('audio cannot be used as a shot', {
+            reason: 'shot_clip_is_audio',
+            ...at,
+          })
         const ext = gen.type === 'video' ? 'mp4' : 'webp'
         const file = storage.localPath(gen.id, ext)
-        if (!existsSync(file)) throw new FilmValidationError('a shot’s media file is missing')
+        if (!existsSync(file))
+          throw new FilmValidationError('a shot’s media file is missing', {
+            reason: 'shot_media_missing',
+            ...at,
+          })
         // Native audio reaches the mix only when BOTH halves agree: the shot asks
         // for it (user intent) AND the generation row says a soundtrack exists
         // (params.audio provenance, stamped at submit). Trusting the shot alone
@@ -511,7 +615,11 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     }
 
     if (segments.length === 0)
-      throw new FilmValidationError('film has no renderable shots — add a clip or a title')
+      throw new FilmValidationError('film has no renderable shots — add a clip or a title', {
+        reason: 'film_no_shots',
+        subjectKind: 'film',
+        subjectId: filmRow.id,
+      })
 
     const audio: RenderAudio[] = []
     const tracks = db.select().from(filmAudio).where(eq(filmAudio.filmId, filmRow.id)).all()
@@ -521,18 +629,47 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         .from(generation)
         .where(and(eq(generation.id, a.generationId), eq(generation.userId, userId)))
         .get()
-      // A track the user attached and PAID for must reach the mux or stop the
-      // export. The previous `if (existsSync) push` silently skipped anything
-      // missing and let the render settle as 'succeeded' — the single worst
-      // outcome, because a muted mp4 looks finished. addAudio now refuses any
-      // non-succeeded generation, so reaching this branch means the row is fine
-      // but the ASSET is gone (pruned, expired, or a lost save). That is a real
-      // failure and says so: a 400 the user can act on, not a quiet downgrade.
-      if (!gen || gen.type !== 'audio' || gen.status !== 'succeeded')
-        throw new FilmValidationError('an audio track is not ready — remove it or wait for it')
+      // THIS IS THE SINGLE ENFORCEMENT POINT for "a track the user attached and
+      // PAID for must reach the mux, or stop the export". Do not remove it, and
+      // do not assume addAudio has already filtered anything: since 2026-07-20 it
+      // deliberately does NOT check status (audio is async — see the comment
+      // there), so this branch is reached by BOTH of the ways a track can be
+      // unusable:
+      //   · the generation is still processing or failed — the user attached it
+      //     while the TTS/music job was in flight, which is legal and normal;
+      //   · the generation succeeded but the ASSET is gone (pruned, expired, or a
+      //     lost save).
+      // The original bug was the opposite of a throw: `if (existsSync) push`
+      // silently SKIPPED anything missing and let the render settle as
+      // 'succeeded' — the worst outcome, because a muted mp4 looks finished. A
+      // 400 the user can act on is the correct answer to every case above.
+      //
+      // SPLIT (2026-07-21): the three ways this fires used to share one sentence
+      // that hedged — "remove it or wait for it" — because it could not tell them
+      // apart. Now each carries its own reason, so the client gives exactly one
+      // instruction. Same shape as the shot-side split above.
+      const at = { subjectKind: 'audio', subjectId: a.id } as const
+      if (!gen || gen.type !== 'audio')
+        throw new FilmValidationError('an audio track’s generation no longer exists', {
+          reason: 'audio_generation_missing',
+          ...at,
+        })
+      if (gen.status === 'processing')
+        throw new FilmValidationError('an audio track is still rendering — wait for it', {
+          reason: 'audio_processing',
+          ...at,
+        })
+      if (gen.status !== 'succeeded')
+        throw new FilmValidationError('an audio track failed — remove it', {
+          reason: 'audio_failed',
+          ...at,
+        })
       const file = storage.localPath(gen.id, 'mp3')
       if (!existsSync(file))
-        throw new FilmValidationError('an audio track has no media file — remove it and re-add')
+        throw new FilmValidationError('an audio track has no media file — remove it and re-add', {
+          reason: 'audio_media_missing',
+          ...at,
+        })
       audio.push({ file, startSec: a.startMs / 1000, gainDb: a.gainDb })
     }
 
@@ -595,6 +732,18 @@ export function createFilmService({ db, storage, runRender }: Deps) {
   // 202-shaped state immediately.
   function createRender(userId: string, filmId: string): FilmRender {
     const filmRow = requireFilm(userId, filmId)
+    // Refuse before doing ANY work if this film is already encoding. Checked
+    // ahead of buildPlan so a duplicate click gets the precise "already running"
+    // answer rather than whatever the plan happens to complain about first.
+    // The stale reaper is what guarantees this can never wedge permanently: a
+    // render whose process died is failed by settleStaleRenders, which releases
+    // the lock.
+    const running = db
+      .select({ id: filmRender.id })
+      .from(filmRender)
+      .where(and(eq(filmRender.filmId, filmId), eq(filmRender.status, 'processing')))
+      .get()
+    if (running) throw new FilmRenderInProgressError()
     const planBase = buildPlan(userId, filmRow) // throws 400 before any row is written
     const id = randomUUID()
     const outputPath = storage.localPath(id, 'mp4')

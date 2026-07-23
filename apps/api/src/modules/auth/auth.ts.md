@@ -37,3 +37,6 @@ flowchart LR
 - 808e8e7 feat(api): better-auth (email+google) with signup bonus + /api/me
 - 5e8de3d feat(api): native env loading + structured logging — signup bonus log via base logger
 - b21a116 feat(api): production single-origin serving — trustedOrigins from config, explicit disableOriginCheck: false
+
+## Update 2026-07-16 — role additionalField
+- `user.additionalFields.role` (`string`, default `'user'`, `input:false`): surfaces `role` on session/user objects for the SPA and future admin gates. `input:false` is the wall — a signup payload can never name its own role; the only `super_admin` writer is the dev-only seed `dev-admin.ts`.

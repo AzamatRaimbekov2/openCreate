@@ -88,6 +88,23 @@ flowchart TD
   Wan 2.7 direct) — the film render maps clip audio off this flag, never probes.
 - Submit: `audio: true` forwarded to the VideoProvider seam.
 
+## Update 2026-07-18 — server-only direct reference channel (ADR modular-3d-assets, Task 4)
+- New exported type `CreateGenerationServiceInput = CreateGenerationInput & { referenceImages?: string[] }`;
+  `create()` now takes it instead of `CreateGenerationInput`. The wire contract
+  `createGenerationInputSchema` is UNCHANGED — the field exists only on the
+  service-level input an in-process orchestrator builds directly. The generation
+  route zod-parses the body, so zod strips this unknown key: no client can inject
+  a reference; only `assets3d.extract` (which hands create() the concept image as
+  a raw data-URI) can set it.
+- Resolution block: a `directRefs = input.referenceImages ?? []` is computed and,
+  when present, gated UNCONDITIONALLY (not nested under the `entityRefs` block) on
+  `model.referenceMode` + `maxReferenceImages` against the TOTAL ref count, BEFORE
+  the charge — a concept-only extraction (zero entityRefs) is still validated. The
+  direct refs are then folded into `referenceImages` after any entity-derived ones.
+- LEDGER UNTOUCHED: charge/refund/settle paths, the transaction, and the wire
+  contract are byte-for-byte unchanged; a call without `referenceImages` behaves
+  exactly as before.
+
 ## Commits
 - 681e20f feat(api): generation lifecycle — charge, runware, store, poll, refund
 - 138ab61 fix(api): close create/poll race — rows are not pollable until the provider call completes

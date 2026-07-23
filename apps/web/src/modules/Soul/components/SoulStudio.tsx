@@ -1,16 +1,29 @@
 // apps/web/src/modules/Soul/components/SoulStudio.tsx
-// The /soul page body: build a character (constructor) · start from a ready-made
-// one (prompt library) · open one you already made (characters).
+// The /soul page body: a 3-ZONE STUDIO (2026-07-21 recomposition, owner-approved)
+// mirroring an "AI Influencer Studio" — a viewport-height WORKBENCH like the
+// cinema editor, not a form-first vertical stack:
 //
-// IT OWNS THE DRAFT, and that is the whole reason this component exists rather
-// than the route composing three siblings: "open in constructor" is a write from
-// the library INTO the constructor, so exactly one component must hold the state
-// both of them touch.
+//   LEFT RAIL   — a "＋ new character" reset + the user's characters as a compact
+//                 rail (SoulCharacters variant="rail", 4 states). Each is a Link
+//                 into /soul/$entityId, where the PAID portrait sheet lives — the
+//                 studio never inlines minting.
+//   CENTER STAGE— the live draft (SoulStage): a "start building" placeholder while
+//                 pristine, then the composed "what the model will see" + the
+//                 picked axis/trait chips. The honest analog of a center preview
+//                 for a character whose face is minted LATER, for credits.
+//   RIGHT BUILDER— the character builder (SoulBuilder): the required + optional
+//                 axes and traits, plus a "start from a preset" shortcut folding
+//                 in the old PromptLibrary.
+//   BOTTOM DOCK — the ONE create action (SoulComposer), position:fixed like the
+//                 cinema dock: the name field, a shuffle dice, the single green
+//                 "Create character" pill.
 //
-// Creating a character spends NO credits — there is no generation here. The
-// portraits (2 credits, then 8 each) live on the soul card, behind their own
-// priced, confirmed buttons. Keeping the free act and the paid act on different
-// screens is the cheapest possible protection against a 26-credit accident.
+// IT STILL OWNS THE DRAFT — the whole reason this is one component and not four
+// route siblings. A preset write, a shuffle, a reset and a name keystroke all
+// mutate the ONE draft the stage, the builder and the composer read. Creating a
+// character spends NO credits; the priced portraits live on the soul card behind
+// their own confirmed buttons — keeping the free act and the paid act on
+// different screens is the cheapest protection against a 26-credit accident.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
@@ -18,11 +31,26 @@ import type { Soul } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { useCreateSoul } from '../model/soulApi'
-import { EMPTY_DRAFT } from '../model/soulDraft'
+import { EMPTY_DRAFT, isDraftReady } from '../model/soulDraft'
 import type { SoulDraft } from '../model/soulDraft'
-import { PromptLibrary } from './PromptLibrary'
+import { randomizeDraft } from '../model/randomizeDraft'
+import { SoulBuilder } from './SoulBuilder'
 import { SoulCharacters } from './SoulCharacters'
-import { SoulConstructor } from './SoulConstructor'
+import { SoulComposer } from './SoulComposer'
+import { SoulStage } from './SoulStage'
+
+// The workbench fills the viewport under the 44px app bar + the route's 16px
+// paddings — no page scroll on DESKTOP: each zone scrolls inside itself and the
+// composer is a fixed dock (pb-28 leaves exactly its collapsed clearance). Below
+// `lg` the zones STACK and the page scrolls normally — a viewport-locked 3-column
+// grid is unusable at 390px, so the workbench posture is desktop-first.
+const STUDIO_LAYOUT = 'flex flex-col gap-3 pb-28 lg:h-[calc(100svh-76px)] lg:min-h-0 lg:flex-row'
+
+// Mobile order is rail → builder → stage (build first, preview last); desktop
+// re-slots the stage into the middle: rail | stage | builder.
+const RAIL_ZONE = 'order-1 flex w-full flex-col gap-3 lg:w-60 lg:shrink-0 lg:overflow-y-auto'
+const STAGE_ZONE = 'order-3 min-w-0 lg:order-2 lg:flex-1 lg:overflow-y-auto'
+const BUILDER_ZONE = 'order-2 w-full lg:order-3 lg:w-[22rem] lg:shrink-0 lg:overflow-y-auto'
 
 export function SoulStudio() {
   const { t } = useTranslation()
@@ -30,15 +58,15 @@ export function SoulStudio() {
   const [draft, setDraft] = useState<SoulDraft>(EMPTY_DRAFT)
   const createMutation = useCreateSoul()
 
-  // A library entry lands in the draft WHOLE — soul and a suggested name. The
-  // user is then free to edit every axis of it, which is the point of shipping
-  // structure instead of a string.
-  const openInConstructor = (soul: Soul, name: string) => {
-    setDraft({ name, soul })
-    // The constructor is above the library on mobile and beside it on desktop;
-    // scrolling to the top is the honest "your draft changed" signal in both
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  // A preset (or a "create new" reset) REPLACES the whole draft — the reason this
+  // component owns it: the builder and the composer both edit what a preset write
+  // lands here.
+  const openPreset = (soul: Soul, name: string) => setDraft({ name, soul })
+  const resetDraft = () => setDraft(EMPTY_DRAFT)
+
+  // Shuffle randomizes the LOOK but keeps the name the user already typed — a
+  // dice press should not wipe a name (randomizeDraft returns an empty one).
+  const handleShuffle = () => setDraft((prev) => ({ ...randomizeDraft(), name: prev.name }))
 
   const handleCreate = () => {
     createMutation.mutate(
@@ -61,30 +89,59 @@ export function SoulStudio() {
         : null
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-normal text-white">{t('soul.title')}</h1>
-        <p className="max-w-2xl text-sm text-mist-dim">{t('soul.subtitle')}</p>
-      </header>
+    <>
+      <div className={STUDIO_LAYOUT}>
+        {/* LEFT RAIL — reset + the character rail */}
+        <aside className={RAIL_ZONE}>
+          <button
+            type="button"
+            onClick={resetDraft}
+            className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-mist transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+          >
+            {/* Decorative plus — a typographic glyph, not an emoji */}
+            <span aria-hidden="true" className="text-lg leading-none text-portal">
+              +
+            </span>
+            {t('soul.rail.createNew')}
+          </button>
 
-      {/* Constructor first, library beside it: the library is a starting point, not
-          the main act, so it takes the narrow rail */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <SoulConstructor
-          draft={draft}
-          onChange={setDraft}
-          onSubmit={handleCreate}
-          submitLabel={t('soul.constructor.submit')}
-          isSubmitting={createMutation.isPending}
-          error={createError}
-        />
-        <PromptLibrary onOpen={openInConstructor} />
+          <h2 className="px-1 text-xs text-mist-dim">{t('soul.characters.title')}</h2>
+          <SoulCharacters variant="rail" />
+        </aside>
+
+        {/* CENTER STAGE — the live draft */}
+        <section className={STAGE_ZONE} aria-label={t('soul.stage.title')}>
+          <SoulStage draft={draft} />
+        </section>
+
+        {/* RIGHT BUILDER — the axes + preset shortcut */}
+        <aside className={BUILDER_ZONE}>
+          <SoulBuilder
+            soul={draft.soul}
+            onChange={(soul) => setDraft((prev) => ({ ...prev, soul }))}
+            onPreset={openPreset}
+          />
+        </aside>
       </div>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-normal text-white">{t('soul.characters.title')}</h2>
-        <SoulCharacters />
-      </section>
-    </div>
+      {/* THE DOCK — position:fixed to the viewport bottom, mirroring the cinema
+          editor: the create action must not consume workbench height, so it
+          floats. The wrapper is click-through with the route's horizontal padding
+          so the capsule stays aligned to the column edges; z-40 floats over the
+          workbench but under Modal's z-50 (the preset sheet). */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4 xl:px-6">
+        <div className="pointer-events-auto">
+          <SoulComposer
+            name={draft.name}
+            onNameChange={(name) => setDraft((prev) => ({ ...prev, name }))}
+            onShuffle={handleShuffle}
+            onCreate={handleCreate}
+            isCreating={createMutation.isPending}
+            canCreate={isDraftReady(draft)}
+            error={createError}
+          />
+        </div>
+      </div>
+    </>
   )
 }

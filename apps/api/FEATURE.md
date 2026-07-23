@@ -122,13 +122,40 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
   **Storyboard**: `POST /api/films/:id/storyboard` sends a script to
   Claude (`claude-opus-4-8`, optional `ANTHROPIC_API_KEY`) → draft shots (nothing charged until
   the user generates each). Charge/refund/stale-sweep and the VideoProvider seam are UNCHANGED.
+  **Shot reference images** (2026-07-21, `films/shot-references.ts`): attach ARBITRARY images to a
+  shot (not just tagged Entities), stored as `shot.reference_images_json` (`{id,path}[]`) so they
+  SURVIVE a re-generate. `POST/DELETE …/shots/:shotId/references` (budget-checked at upload:
+  entity tags + images ≤ `MAX_SHOT_REFERENCE_IMAGES`=5, svg/oversize rejected at the boundary). The
+  clip DELIVERY SEAM `POST …/shots/:shotId/clip` reads those stored images back into the
+  server-only `referenceImages` channel and calls `generations.create()` — the wire contract has
+  no `referenceImages` field, so a client can never inject reference-image bytes. Money path UNCHANGED.
+- **Prompt enhancer** (2026-07-21, `modules/prompt/`) — `POST /api/prompt/enhance`: a generic, FREE,
+  stateless text transform that rewrites a user's rough, messy shot idea (any language) into ONE vivid,
+  concrete ENGLISH cinematic prompt for the Wan text-to-video model. Two modes: `enhance` (default) and
+  `soften` — the latter additionally rewrites AWAY content a provider safety filter would block
+  (violence/gore, explicit content, named public figures, politics) while preserving the scene, which is
+  what the Cinema "Смягчить и повторить" button calls after a `content_blocked` generation. Cast tokens
+  (`[[eN]]`) are copied VERBATIM in BOTH modes. **Provider fallback chain** (2026-07-22): it runs an ORDERED
+  chain of OpenAI-compatible LLMs — **DeepInfra `deepseek-ai/DeepSeek-V3-0324`** primary → **Groq
+  `llama-3.3-70b-versatile`** FREE fallback — trying each in order and failing over on ANY provider error
+  (no-balance, 4xx/5xx, network, malformed answer); the first configured-and-succeeding provider wins.
+  Motivation: a paid DeepInfra balance runs dry ("You need positive balance to do inference") and a
+  single-provider enhancer is then simply down. EITHER `DEEPINFRA_TOKEN` **or** `GROQ_API_KEY` alone makes
+  it work; with NEITHER it answers 502 `provider_error` (boot healthy — same optional-secret discipline as
+  storyboard). A provider's response body (e.g. the no-balance text) is NEVER read into the error, so it
+  cannot leak in the failover log OR the client envelope; per-provider failures log at `warn`
+  (`event: prompt.provider_failed`). The JSON completion is parsed+validated ourselves (fence-strip + zod)
+  INSIDE each attempt, so a malformed answer also falls through. Session-guarded (`requireUser`), NOT
+  film-scoped, and it **charges nothing** — it takes neither the db nor the generation service, so it
+  structurally cannot touch the ledger (an HTTP test pins balance-unchanged).
 
 ## HTTP surface
 
 | Method | Path | Auth | Notes |
 | --- | --- | --- | --- |
 | GET | `/health` | – | `{ ok: true }` |
-| * | `/api/auth/*` | – | better-auth handler (sign-up/sign-in/session…) |
+| * | `/api/auth/*` | – | better-auth handler (sign-up/sign-in/session, `sign-in/social` + `callback/google` when Google is configured). Dev only (`NODE_ENV=development`): boot seeds super-admin `admin@dev.local` / `admin` (`user.role='super_admin'`, standard signup bonus; `modules/auth/dev-admin.ts`) — never exists in test/production |
+| GET | `/api/auth/config` | – | Public runtime auth-provider flags `{ googleEnabled }` (true iff both Google creds set). SPA reads it to render the Google button without build/server drift (ADR google-oauth). Static route — matched ahead of the `/api/auth/*` wildcard |
 | GET | `/api/me` | ✓ | `{ id, email, name, creditsBalance }` (ledger-accurate) |
 | GET | `/api/credits/transactions` | ✓ | last 100 ledger rows, newest first |
 | GET | `/api/catalog` | – | `{ models: CatalogModel[] }` |
@@ -139,10 +166,14 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | GET/POST | `/api/films` | ✓ | CinemaStudio: list / create film |
 | GET/PATCH/DELETE | `/api/films/:id` | ✓ | film detail (film+shots+audio) / update / delete |
 | POST/PATCH/DELETE | `/api/films/:id/shots[...]` | ✓ | add / update / delete a shot; `POST …/shots/reorder` |
+| POST | `/api/films/:id/shots/:shotId/split` | ✓ | split a shot at `atMs` (from the shot's own start, `0 < atMs < durationMs`) → updated FilmDetail; one transaction (truncate A + insert B citing the same generation with a shifted trim), charges nothing (the NLE's split-at-playhead) |
+| POST/DELETE | `/api/films/:id/shots/:shotId/references[...]` | ✓ | attach / detach an arbitrary reference image on a shot → updated Shot; upload budget-checked (entity+image ≤ 5), svg/oversize rejected |
+| POST | `/api/films/:id/shots/:shotId/clip` | ✓ | generate a shot's clip (201 image / 202 video, 20/min); server sources the shot's attached images into the server-only `referenceImages` channel then calls `generations.create()` |
 | POST/DELETE | `/api/films/:id/audio[...]` | ✓ | add / remove an audio track (cites an audio generation) |
 | POST | `/api/films/:id/renders` | ✓ | 202; ffmpeg export job (rate-limited 10/min) |
 | GET | `/api/films/:id/renders/:renderId` | ✓ | render poll (progress → succeeded/failed) |
 | POST | `/api/films/:id/storyboard` | ✓ | Claude script→draft shots; 502 `provider_error` if `ANTHROPIC_API_KEY` unset |
+| POST | `/api/prompt/enhance` | ✓ | body `{ text: string(1..2000), mode?: 'enhance'\|'soften' }` → `{ prompt }`; rewrites a rough idea into one cinematic Wan prompt (`soften` also strips filter-triggering content) via a DeepInfra DeepSeek-V3 → Groq llama-3.3-70b fallback chain. FREE (no credits), 20/min; 502 `provider_error` only if BOTH `DEEPINFRA_TOKEN` and `GROQ_API_KEY` are unset/failing |
 | GET | `/media/:file` | – | stored generation assets AND rendered films |
 | GET | `/*` | – | production only: built SPA + index.html fallback |
 
@@ -161,7 +192,8 @@ src/
 │   ├── catalog/                # CATALOG (+audio models) + creditsFor/resolutionFor + route
 │   ├── generations/            # lifecycle service + thin routes (the core; audio + preset composition)
 │   ├── entities/               # reusable character/object/place library + reference tagging
-│   └── films/                  # CinemaStudio: service (CRUD+render) + routes + render.ts (ffmpeg) + storyboard.ts (Claude)
+│   ├── films/                  # CinemaStudio: service (CRUD+render) + routes + render.ts (ffmpeg) + storyboard.ts (Claude) + shot-references.ts (attach images + clip seam) + shot-split.ts (atomic split-at-playhead)
+│   └── prompt/                 # prompt enhancer: enhance.ts (DeepSeek-V3 rewrite, enhance/soften) + routes (POST /api/prompt/enhance) — FREE, stateless
 ├── integrations/
 │   ├── video-provider.ts       # VideoProvider seam: neutral submit/poll types
 │   ├── audio-provider.ts       # AudioProvider seam (submit only; polls via the video registry)
@@ -200,7 +232,11 @@ attribution, default off), `COMFY_BASE_URL` (optional; pod ComfyUI base URL for 
 clean `provider_error`), `ARK_API_KEY` (optional; BytePlus ModelArk bearer token for the
 direct `bytedance` provider — `tos-ap-southeast-1.volces.com` is auto-added to
 `ASSET_HOST_ALLOWLIST` **only when it is set**; unset **hides** the `seedance-2-0` model),
-`ENV_FILE` optional.
+`DEEPINFRA_TOKEN` (optional; DeepInfra bearer — the pack-free Seedance 2.0 channel AND the prompt
+enhancer's primary LLM), `GROQ_API_KEY` (optional; the prompt enhancer's FREE fallback LLM,
+`llama-3.3-70b-versatile` — either it or `DEEPINFRA_TOKEN` alone makes `POST /api/prompt/enhance`
+work, both unset → that endpoint returns `provider_error`), `ANTHROPIC_API_KEY` (optional; Claude for
+the storyboard + assets3d analyze endpoints), `ENV_FILE` optional.
 The nearest `.env` (repo root) is loaded natively at boot via Node 22
 `process.loadEnvFile` — no manual sourcing; real env vars always win. In prod,
 `BETTER_AUTH_URL` must be the public https origin. Tests never need env — they
@@ -238,6 +274,13 @@ Runbook (env table, first run, TLS/reverse proxy, backup/restore): `PROD.md`.
 
 Pre-authored viral formats that instantiate into a whole film. ADR:
 `docs/wiki/decisions/template-catalog.md`.
+
+Three shelves (`TemplateCategory`): **`format`** — «Фильм» (trailer grammar),
+«Сериал» (prime-time episode with recap + cliffhanger cards), «Аниме» (shōnen
+battle cold-open, styleId 'anime') — LOOK/GENRE scaffolds the user rewrites,
+all 16:9 · 8s beats · wan-2-7 as the standard tier (its r2v references keep a
+tagged hero consistent across beats); **`animation`** («Буран»); **`brainrot`**
+(the viral dramas).
 
 - `modules/templates/catalog/*.ts` — the templates, **one file per template**. This is where the
   prompts live and they never leave the server: `GET /api/templates` returns a `TemplateSummary`

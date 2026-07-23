@@ -41,6 +41,12 @@ export function createAuth(db: Db, config: AppConfig, log?: MoneyLog) {
       // clients from setting it at signup — only the ledger mutates it.
       additionalFields: {
         creditsBalance: { type: 'number', defaultValue: 0, input: false },
+        // 'user' | 'super_admin'. input:false is the security wall: a signup
+        // payload can never name its own role. The only writer of
+        // 'super_admin' is the dev-only seed (dev-admin.ts); declaring the
+        // field here is what surfaces it on session/user objects so the SPA
+        // and future admin gates can read it.
+        role: { type: 'string', defaultValue: 'user', input: false },
       },
     },
     databaseHooks: {

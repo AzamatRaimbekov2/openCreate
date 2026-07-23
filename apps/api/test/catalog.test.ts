@@ -51,6 +51,51 @@ describe('catalog', () => {
   })
 })
 
+// Durations actualized to the real per-provider limits (research 2026-07-22):
+// wan 2.7 (Alibaba) 2–15s, Seedance 1.5 Pro (Runware) 4–12s, Seedance 2.0
+// (DeepInfra) 4–15s, Kling 3.0 (Runware) up to 15s, PixVerse V6 (Runware) 1–15s,
+// Veo 3.1 (Runware) 4/6/8s. The old [5,8]/[5,10] caps were our own conservative
+// config, never a provider limit. Pricing keeps each model's existing per-second
+// rate; existing durations/prices are unchanged, longer ones are ADDED.
+describe('video durations actualized to provider limits', () => {
+  it('wan 2.7 offers up to 15s at ~17 credits/s', () => {
+    const m = getModel('wan-2-7')!
+    expect(m.type === 'video' && m.durationOptions).toContain(15)
+    expect(creditsFor(m, 5)).toBe(85) // unchanged
+    expect(creditsFor(m, 10)).toBe(170)
+    expect(creditsFor(m, 15)).toBe(255)
+  })
+  it('Seedance 1.5 Pro offers up to 12s (silent + with-audio 2×)', () => {
+    const m = getModel('seedance-1-5-pro')!
+    expect(m.type === 'video' && m.durationOptions).toContain(12)
+    expect(creditsFor(m, 12)).toBe(84)
+    expect(creditsFor(m, 12, true)).toBe(168)
+  })
+  it('Seedance 2.0 offers up to 15s at 26 credits/s', () => {
+    const m = getModel('seedance-2-0')!
+    expect(m.type === 'video' && m.durationOptions).toContain(15)
+    expect(creditsFor(m, 15)).toBe(390)
+  })
+  it('Kling 3.0 offers up to 15s at 16 credits/s', () => {
+    const m = getModel('kling-3-pro')!
+    expect(m.type === 'video' && m.durationOptions).toContain(15)
+    expect(creditsFor(m, 15)).toBe(240)
+  })
+  it('Veo 3.1 offers 4/6/8s (8s is the provider ceiling)', () => {
+    const m = getModel('veo-3-1-fast')!
+    expect(m.type === 'video' && m.durationOptions).toEqual([4, 6, 8])
+    expect(creditsFor(m, 4)).toBe(70)
+    expect(creditsFor(m, 6)).toBe(105)
+    expect(creditsFor(m, 8)).toBe(140) // unchanged
+  })
+  it('PixVerse V6 offers up to 15s (silent + with-audio 2×)', () => {
+    const m = getModel('pixverse-v6')!
+    expect(m.type === 'video' && m.durationOptions).toContain(15)
+    expect(creditsFor(m, 15)).toBe(105)
+    expect(creditsFor(m, 15, true)).toBe(210)
+  })
+})
+
 describe('GET /api/catalog', () => {
   // The rule the route implements: a video model is listed only when the backend
   // that runs it is configured. Runware is always on; wan-runpod needs

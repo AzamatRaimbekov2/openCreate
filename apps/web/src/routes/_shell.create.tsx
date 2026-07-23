@@ -93,10 +93,15 @@ function CreatePage() {
         />
       </section>
 
-      {/* The floating composer. The wrapper spans the page but is click-through
-          (pointer-events-none) so the feed stays scrollable to its very edges;
-          the capsule itself re-enables pointer events. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pb-5">
+      {/* The floating composer. FIXED to the viewport, not absolute-in-main
+          (owner call, 2026-07-16): absolute only pins while main's
+          h-[calc(100dvh-4rem)] exactly matches the viewport remainder, and any
+          drift (mobile dvh churn, shell header changes) sent the capsule
+          scrolling away with the page. The shell has no sidebar, so viewport
+          centering stays aligned with the feed column. The wrapper is still
+          click-through (pointer-events-none) so the feed scrolls to its very
+          edges; the capsule itself re-enables pointer events. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center px-4 pb-5">
         <ChatComposer taggableEntities={taggableEntities} />
       </div>
     </main>

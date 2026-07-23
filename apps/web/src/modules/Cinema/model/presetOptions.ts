@@ -96,4 +96,8 @@ export function qualityOptions(t: Translate): SelectOption<Quality>[] {
 // Timeline display lengths in seconds (stored as durationMs). Model-independent:
 // a video shot's *generation* duration is snapped separately to the model's own
 // options (composeShotClipInput), but the strip length is a free editorial choice.
-export const SHOT_DURATIONS_SECONDS = [2, 3, 5, 8, 10] as const
+// Extended to 15s (2026-07-22): the catalog now offers up to 15s on wan 2.7 /
+// Seedance 2.0 / Kling / PixVerse, so the slider must reach there or the user can
+// never ask for a clip longer than 10s. Values beyond a model's own max snap down
+// at generation (nearestDuration), so 15 on the strip is honest for every model.
+export const SHOT_DURATIONS_SECONDS = [2, 3, 5, 8, 10, 12, 15] as const

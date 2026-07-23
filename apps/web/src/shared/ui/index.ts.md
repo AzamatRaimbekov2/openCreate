@@ -7,7 +7,7 @@ Public API of the v3 "Bioluminescent Terminal" design-system kit (`shared/ui`). 
 
 ## What it does (for an AI reader)
 - Responsibilities: re-export every kit component and its prop types; nothing else (no logic, no side effects).
-- Public API / exports / props / endpoints: `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `AsciiSphere`(+`AsciiSphereProps`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `SpecimenTile`(+`SpecimenTileProps`,`SpecimenKind`,`SPECIMEN_KINDS`), `Skeleton`(+`SkeletonProps`).
+- Public API / exports / props / endpoints: `AccountMenu`(+`AccountMenuProps`,`AccountUser`), `AppErrorBoundary`, `AppShell`(+`AppShellProps`,`AppShellUser`), `AsciiSphere`(+`AsciiSphereProps`), `Badge`(+`BadgeProps`,`BadgeVariant`), `Button`(+`ButtonProps`,`ButtonSize`,`ButtonVariant`), `EmptyState`(+`EmptyStateProps`), `EnhanceButton`(+`EnhanceButtonProps`,`ENHANCE_NUDGE_IDLE_MS`,`MIN_ENHANCE_LENGTH`), `ErrorState`(+`ErrorStateProps`), `Input`(+`InputProps`), `LangSwitch`, `Modal`(+`ModalProps`), `NotFoundPage`, `OfflineOverlay`, `PillGroup`(+`PillGroupProps`,`PillOption`), `Progress`(+`ProgressProps`), `SpecimenTile`(+`SpecimenTileProps`,`SpecimenKind`,`SPECIMEN_KINDS`), `Skeleton`(+`SkeletonProps`).
 - Inputs → Outputs: import from `'shared/ui'` → any kit component.
 - Side effects (I/O, network, state): none.
 
@@ -27,7 +27,8 @@ flowchart LR
 - New shared components must be added here AND to design.md §6 in the same task.
 - `SPECIMEN_KINDS` (a value, not just a type) is exported so the landing can iterate the whole grid without hardcoding specimen names.
 - Stage 2 (2026-07-07): `ShowcasePoster`/`SHOWCASE_PALETTES`/`showcasePosterArt` were RETIRED and replaced by `SpecimenTile`/`SPECIMEN_KINDS`/`specimenTileArt` (v3 duotone specimen art); `AsciiSphere` joined the kit as the hero visual.
-- Dead-code cleanup (2026-07-07 QA): `Select` (+`SelectProps`,`SelectOption`) was DELETED — grep confirmed zero consumers anywhere in src/e2e (the generator uses `PillGroup` pills, not native selects). Revive it from git history only when a real product need appears (design.md §10: 2+ modules).
+- Dead-code cleanup (2026-07-07 QA): `Select` (+`SelectProps`,`SelectOption`) was DELETED — grep confirmed zero consumers anywhere in src/e2e (the generator uses `PillGroup` pills, not native selects). Revive it from git history only when a real product need appears (design.md §10: 2+ modules). (`Select` was later revived 2026-07-07 for the composer strip.)
+- Enhance affordance (2026-07-21): `EnhanceButton` joined the kit — the first `shared/ui` component that drives a `shared/model` hook (`useEnhancePrompt`), because 2+ modules (Generator composer + Cinema shot prompt) needed the same prompt-enhance behaviour. Presentational-only purity bends here by design: the whole point is one shared behaviour, not one shared shape.
 
 ## Commits
 - 51d80a6 2026-07-06 feat(web): paper&ink design system, shared ui kit, error-ux surfaces

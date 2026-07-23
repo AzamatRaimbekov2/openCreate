@@ -117,6 +117,18 @@ export const CATALOG: CatalogModel[] = [
     maxReferenceImages: 14,
     resolutionProfile: 'nanobanana',
   },
+  // ── VIDEO DURATIONS ACTUALIZED (research 2026-07-22) ────────────────────────
+  // The old [5,8] / [5,10] caps were OUR conservative config, NOT a provider
+  // limit — verified against provider docs + the live Higgsfield model catalog:
+  // wan 2.7 (Alibaba) 2–15s, Seedance 1.5 Pro (Runware) 4–12s, Seedance 2.0
+  // (DeepInfra) 4–15s, Kling 3.0 (Runware) up to 15s, PixVerse V6 (Runware) 1–15s,
+  // Veo 3.1 (Runware) 4/6/8s (8 is its real ceiling). The dashscope/Runware
+  // adapters pass `duration` straight through with no clamp, so the only thing that
+  // ever limited us to 10s was these tables + the web slider (SHOT_DURATIONS_SECONDS).
+  // Each model keeps its measured per-second rate; existing durations/prices are
+  // UNCHANGED, longer ones are ADDED (so every prior price test still holds). The
+  // exact provider max is re-verified live before it can 400 — the composer snaps
+  // an over-long strip down to the model's own max (nearestDuration).
   {
     id: 'pixverse-v6',
     type: 'video',
@@ -126,14 +138,14 @@ export const CATALOG: CatalogModel[] = [
     tier: 'standard',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    durationOptions: [5, 8],
-    creditsByDuration: { '5': 35, '8': 56 },
+    durationOptions: [5, 8, 10, 15],
+    creditsByDuration: { '5': 35, '8': 56, '10': 70, '15': 105 },
     // providerSettings.pixverse.audio exists (enumerated from Runware's own
     // allowedValues — see runware/video-adapter.ts) and the with-audio rate is
     // ~2× the silent one, so audio-on is priced at 2× (owner decision
     // 2026-07-15: honest margin over a flat price).
     nativeAudio: 'switchable',
-    creditsByDurationWithAudio: { '5': 70, '8': 112 },
+    creditsByDurationWithAudio: { '5': 70, '8': 112, '10': 140, '15': 210 },
   },
   {
     id: 'minimax-hailuo',
@@ -157,14 +169,14 @@ export const CATALOG: CatalogModel[] = [
     tier: 'standard',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    durationOptions: [5, 10],
-    creditsByDuration: { '5': 35, '10': 70 },
+    durationOptions: [5, 8, 10, 12],
+    creditsByDuration: { '5': 35, '8': 56, '10': 70, '12': 84 },
     // ByteDance bills Seedance at EXACTLY 2× with audio ($0.0024/1k vs
     // $0.0012/1k — measured, see runware/video-adapter.ts header), so audio-on
     // carries the 2× price (owner decision 2026-07-15). The silent table above
     // keeps the margin the audio-off economics pass restored.
     nativeAudio: 'switchable',
-    creditsByDurationWithAudio: { '5': 70, '10': 140 },
+    creditsByDurationWithAudio: { '5': 70, '8': 112, '10': 140, '12': 168 },
     // ByteDance models reject Runware's `safety` param (unsupportedParameter,
     // verified live 2026-07-08) — flag off so the client omits it. Moderation
     // still applies via the NSFWContent flag on results.
@@ -206,8 +218,8 @@ export const CATALOG: CatalogModel[] = [
     tier: 'plus',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    durationOptions: [5, 8],
-    creditsByDuration: { '5': 85, '8': 135 },
+    durationOptions: [5, 8, 10, 15],
+    creditsByDuration: { '5': 85, '8': 135, '10': 170, '15': 255 },
     provider: 'alibaba',
     // The direct Alibaba channel has NO audio switch — every clip ships with the
     // model's soundtrack and the $0.10/s list price already includes it, so the
@@ -240,8 +252,8 @@ export const CATALOG: CatalogModel[] = [
     tier: 'pro',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    durationOptions: [5, 10],
-    creditsByDuration: { '5': 80, '10': 160 },
+    durationOptions: [5, 10, 15],
+    creditsByDuration: { '5': 80, '10': 160, '15': 240 },
   },
   {
     id: 'veo-3-1-fast',
@@ -252,8 +264,8 @@ export const CATALOG: CatalogModel[] = [
     tier: 'premium',
     supportsImageInput: true,
     aspectRatios: ['16:9', '9:16'],
-    durationOptions: [8],
-    creditsByDuration: { '8': 140 },
+    durationOptions: [4, 6, 8],
+    creditsByDuration: { '4': 70, '6': 105, '8': 140 },
   },
   {
     // Self-hosted Wan 2.2 on our own RunPod GPU (ADR: wan-selfhost-video-
@@ -338,8 +350,8 @@ export const CATALOG: CatalogModel[] = [
     tier: 'premium',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    durationOptions: [5, 10],
-    creditsByDuration: { '5': 130, '10': 260 },
+    durationOptions: [5, 10, 15],
+    creditsByDuration: { '5': 130, '10': 260, '15': 390 },
     resolutionProfile: 'hd',
     provider: 'deepinfra',
   },

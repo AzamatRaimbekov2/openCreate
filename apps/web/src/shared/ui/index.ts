@@ -2,6 +2,8 @@
 // Public API of the v3 "Bioluminescent Terminal" design-system kit. Modules and
 // routes import ONLY from 'shared/ui' — never from the individual component
 // files. Component inventory + variants: docs/frontend/design.md §6.
+export { AccountMenu } from './AccountMenu'
+export type { AccountMenuProps, AccountUser } from './AccountMenu'
 export { AppErrorBoundary } from './AppErrorBoundary'
 export { AppShell } from './AppShell'
 export type { AppShellProps, AppShellUser } from './AppShell'
@@ -22,6 +24,11 @@ export type { CardPadding, CardProps, CardSurface } from './Card'
 export { GLASS_FLOATING, GLASS_SURFACE, STEEL_SURFACE, WELL_SURFACE } from './surfaces'
 export { EmptyState } from './EmptyState'
 export type { EmptyStateProps } from './EmptyState'
+// The prompt-enhancer affordance: a sparkle icon inside a prompt field (enhance +
+// undo + calm error notice + once-per-session idle nudge). Shared by the /create
+// composer and the Cinema shot prompt over the shared/model enhance layer.
+export { EnhanceButton, ENHANCE_NUDGE_IDLE_MS, MIN_ENHANCE_LENGTH } from './EnhanceButton'
+export type { EnhanceButtonProps } from './EnhanceButton'
 export { ErrorState } from './ErrorState'
 export type { ErrorStateProps } from './ErrorState'
 export { Input } from './Input'
@@ -53,3 +60,10 @@ export { ProviderMark } from './ProviderMark'
 export type { ProviderMarkProps } from './ProviderMark'
 export { Skeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'
+// Toast system: the imperative `toast` API + the <Toaster> portal (mounted once
+// in the shell root). Any module notifies through `toast`; the store is exported
+// for tests and the rare consumer that needs to read the live stack directly.
+export { Toaster } from './Toaster'
+export { toast } from './toast'
+export { useToastStore } from './toastStore'
+export type { Toast, ToastAction, ToastInput, ToastVariant } from './toastStore'

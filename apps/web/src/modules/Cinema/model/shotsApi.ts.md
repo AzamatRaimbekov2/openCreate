@@ -15,15 +15,21 @@ each keeping the film's `['film', id]` detail cache truthful.
   - `useUpdateShot()` → PATCH `…/shots/:shotId` (`UpdateShotInput` → `Shot`)
   - `useDeleteShot()` → DELETE `…/shots/:shotId`
   - `useReorderShots()` → POST `…/shots/reorder` (`{shotIds}` → `{items: Shot[]}`)
-- Inputs → Outputs: variables carry `filmId` (+ `shotId`/`input`/`shotIds`).
-- Side effects: network; invalidate `['film', filmId]` — except reorder, which
-  `setQueryData`-patches the detail's `shots` with the server's re-spaced list.
+  - `useSplitShot()` → POST `…/shots/:shotId/split` (`{atMs}` → `FilmDetail`)
+    — Phase 4; `atMs` is the offset from the shot's OWN start
+- Inputs → Outputs: variables carry `filmId` (+ `shotId`/`input`/`shotIds`/`atMs`).
+- Side effects: network; invalidate `['film', filmId]` — except reorder (which
+  `setQueryData`-patches the detail's `shots` with the server's re-spaced list) and
+  split (which `setQueryData`-REPLACES the whole detail with the returned
+  `FilmDetail`).
 
 ## Dependencies
 
 - Imports: `@tanstack/react-query`, contract types, `shared/libs/apiClient`,
   `filmKey` from `./filmsApi`.
-- Used by: `Timeline` (add/delete/reorder/title card), `ShotInspector` (update).
+- Used by: `Timeline` (add/delete/reorder/title card/split-button), `ShotInspector`
+  (update), `useShotDrag` (update on trim, reorder on drag), `useTimelineKeys`
+  (split on the S key).
 
 ## Diagram
 

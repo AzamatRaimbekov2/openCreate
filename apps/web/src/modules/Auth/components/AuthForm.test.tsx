@@ -12,15 +12,22 @@ import { AuthForm } from './AuthForm'
 import 'shared/config/i18n'
 
 // Auth actions are module-mocked: no real better-auth client, no network
-const { signInEmail, signInSocial, signUpEmail } = vi.hoisted(() => ({
+const { signInEmail, signInSocial, signUpEmail, useAuthConfigMock } = vi.hoisted(() => ({
   signInEmail: vi.fn(),
   signInSocial: vi.fn(),
   signUpEmail: vi.fn(),
+  // Runtime provider flags: the Google button now follows the SERVER's config
+  // (GET /api/auth/config) via useAuthConfig — not a build-time env flag.
+  useAuthConfigMock: vi.fn(),
 }))
 
 vi.mock('../model/authClient', () => ({
   signIn: { email: signInEmail, social: signInSocial },
   signUp: { email: signUpEmail },
+}))
+
+vi.mock('../model/authConfig', () => ({
+  useAuthConfig: useAuthConfigMock,
 }))
 
 // Fresh QueryClient per render — AuthForm invalidates ['me'] after success
@@ -36,6 +43,8 @@ beforeEach(() => {
   signInEmail.mockReset().mockResolvedValue({ data: null, error: null })
   signUpEmail.mockReset().mockResolvedValue({ data: null, error: null })
   signInSocial.mockReset()
+  // Default: Google disabled (server hasn't wired creds) → no button.
+  useAuthConfigMock.mockReset().mockReturnValue({ data: { googleEnabled: false } })
 })
 
 afterEach(() => {
@@ -195,13 +204,20 @@ describe('AuthForm', () => {
     )
   })
 
-  it('hides the Google button unless VITE_GOOGLE_AUTH is "1"', () => {
+  it('hides the Google button when the server has Google disabled', () => {
+    useAuthConfigMock.mockReturnValue({ data: { googleEnabled: false } })
     renderForm()
     expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument()
   })
 
-  it('shows the Google button when VITE_GOOGLE_AUTH is "1"', async () => {
-    vi.stubEnv('VITE_GOOGLE_AUTH', '1')
+  it('hides the Google button while the config is still loading', () => {
+    useAuthConfigMock.mockReturnValue({ data: undefined })
+    renderForm()
+    expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the Google button when the server has Google enabled', async () => {
+    useAuthConfigMock.mockReturnValue({ data: { googleEnabled: true } })
     renderForm()
     await userEvent.click(screen.getByRole('button', { name: /google/i }))
     expect(signInSocial).toHaveBeenCalledWith(expect.objectContaining({ provider: 'google' }))

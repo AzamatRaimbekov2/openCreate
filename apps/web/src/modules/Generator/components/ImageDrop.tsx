@@ -7,7 +7,7 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from 'shared/ui'
-import { readImageFile } from '../model/readImageFile'
+import { readImageFile } from 'shared/libs/readImageFile'
 
 export type ImageDropProps = {
   // Current data URI from the store; null = no image chosen
@@ -22,7 +22,7 @@ export function ImageDrop({ value, onChange }: ImageDropProps) {
   // Store the error as an i18n KEY so a language switch re-localizes it
   const [errorKey, setErrorKey] = useState<string | null>(null)
 
-  // Validation + data-URI read live in model/readImageFile — the composer's
+  // Validation + data-URI read live in shared/libs/readImageFile — the composer's
   // AttachImage shares them, so the 10MB cap can never drift between the two
   const readFile = (file: File) => {
     void readImageFile(file).then((result) => {

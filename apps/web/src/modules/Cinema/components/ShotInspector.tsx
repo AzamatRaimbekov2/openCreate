@@ -40,14 +40,17 @@ import { ApiClientError } from 'shared/libs/apiClient'
 import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from 'shared/libs/mentions'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { presentationFor } from 'shared/libs/modelPresentation'
-import { Button, GLASS_SURFACE, ProviderMark, Select } from 'shared/ui'
+import { Button, EnhanceButton, GLASS_SURFACE, ProviderMark, Select } from 'shared/ui'
 import { useUpdateShot } from '../model/shotsApi'
 import { useGenerateShotClip, useShotGeneration } from '../model/shotGeneration'
+import { useShotFailureToast } from '../model/shotFailureToast'
+import { createSoftenRetry } from '../model/softenRetry'
 import { useGenerateVoiceover } from '../model/voiceoverApi'
 import { SHOT_DURATIONS_SECONDS, draftToPreset, hasAnyPreset, presetToDraft } from '../model/presetOptions'
 import type { PresetDraft } from '../model/presetOptions'
 import type { CastableEntity } from './ShotCastField'
 import { ShotCastField } from './ShotCastField'
+import { ShotReferenceImages } from './ShotReferenceImages'
 import { InspectorSection } from './InspectorSection'
 import { ModelPickerModal } from './ModelPickerModal'
 import { PresetPickers } from './PresetPickers'
@@ -226,11 +229,13 @@ export function ShotInspector({
   const buildVoiceover = () =>
     hasVoice && voiceText.trim() && voiceId ? { text: voiceText.trim(), voice: voiceId } : null
 
-  const buildPatch = (): UpdateShotInput => ({
-    prompt: prompt.trim(),
+  // Defaults to the composer's live prompt; the SOFTENED text is passed in when
+  // the content_blocked retry regenerates against a rewrite (see generateWithPrompt).
+  const buildPatch = (promptText: string = prompt): UpdateShotInput => ({
+    prompt: promptText.trim(),
     promptPreset: hasAnyPreset(preset) ? draftToPreset(preset) : null,
     // Only the LIVE cast: derived from the text, one source of truth.
-    entityRefs: deriveEntityRefs(prompt, cast),
+    entityRefs: deriveEntityRefs(promptText, cast),
     modelId: modelId || null,
     durationMs: Number(seconds) * 1000,
     transition,
@@ -275,20 +280,22 @@ export function ShotInspector({
   }
 
   // Save first (so prompt/preset are persisted), then generate against the
-  // freshly-saved draft; generate's own PATCH only sets generationId.
-  const handleGenerate = () => {
+  // freshly-saved draft; generate's own PATCH only sets generationId. Takes an
+  // explicit prompt so the soften/retry path can regenerate against the REWRITE
+  // rather than the (still-blocked) composer text.
+  const generateWithPrompt = (promptText: string) => {
     if (!model) return
     update.mutate(
-      { filmId, shotId: shot.id, input: buildPatch() },
+      { filmId, shotId: shot.id, input: buildPatch(promptText) },
       {
         onSuccess: () => {
           const draftShot: Shot = {
             ...shot,
-            prompt: prompt.trim(),
+            prompt: promptText.trim(),
             promptPreset: hasAnyPreset(preset) ? draftToPreset(preset) : null,
             // The LIVE cast — same derivation as buildPatch. Without this the
             // clip would generate against the shot as it was BEFORE this edit.
-            entityRefs: deriveEntityRefs(prompt, cast),
+            entityRefs: deriveEntityRefs(promptText, cast),
             durationMs: Number(seconds) * 1000,
             // The audio draft too: composeShotClipInput reads shot.audio, and
             // generating from the pre-edit value would bill the wrong price.
@@ -299,6 +306,26 @@ export function ShotInspector({
       },
     )
   }
+
+  const handleGenerate = () => generateWithPrompt(prompt)
+
+  // The content_blocked recovery, fed to the failure toast's action: soften the
+  // blocked prompt, mirror it back into the composer, then regenerate against
+  // the rewrite. Degrades to a manual-edit toast if the enhance endpoint is
+  // absent — never a dead click, never a raw error, never a surprise charge.
+  const handleSoftenRetry = createSoftenRetry({
+    text: prompt,
+    t,
+    onSoftened: (softened) => {
+      setPrompt(softened)
+      generateWithPrompt(softened)
+    },
+  })
+
+  // Raise a toast the FIRST time this shot's polled clip is seen `failed` — the
+  // attention-grabber the quiet inline ShotClipStatus line (below) cannot be.
+  // content_blocked carries the soften action; dedupe guarantees ONE per clip.
+  useShotFailureToast({ generation: clip.data, onSoften: handleSoftenRetry })
 
   const togglePanel = (panel: DockPanel) => setOpenPanel((prev) => (prev === panel ? null : panel))
 
@@ -323,17 +350,34 @@ export function ShotInspector({
             itself past 40svh so the dock never swallows the stage */}
         {openPanel !== null ? (
           <div className="max-h-[40svh] overflow-y-auto border-b border-white/10 p-3">
+            {/* The attach drawer holds BOTH reference affordances, sharing the
+                budget of 5: ShotCastField TAGS a known character; below it
+                ShotReferenceImages attaches an ARBITRARY picture (click / drop /
+                paste). entityRefCount is the LIVE tag count (derived from the
+                prompt, same as ShotCastField shows), so the two controls agree on
+                how much of the budget is spent. */}
             {openPanel === 'cast' ? (
-              <InspectorSection legend={t('cinema.cast.title')}>
-                <ShotCastField
-                  entities={entities}
-                  prompt={prompt}
-                  cast={cast}
-                  onAdd={addCharacter}
-                  onRemove={removeCharacter}
-                  modelSupportsReferences={Boolean(model?.referenceMode)}
-                />
-              </InspectorSection>
+              <div className="flex flex-col gap-4">
+                <InspectorSection legend={t('cinema.cast.title')}>
+                  <ShotCastField
+                    entities={entities}
+                    prompt={prompt}
+                    cast={cast}
+                    onAdd={addCharacter}
+                    onRemove={removeCharacter}
+                    modelSupportsReferences={Boolean(model?.referenceMode)}
+                  />
+                </InspectorSection>
+                <InspectorSection legend={t('cinema.shotRef.title')}>
+                  <ShotReferenceImages
+                    filmId={filmId}
+                    shotId={shot.id}
+                    references={shot.referenceImages}
+                    entityRefCount={deriveEntityRefs(prompt, cast).length}
+                    modelSupportsReferences={Boolean(model?.referenceMode)}
+                  />
+                </InspectorSection>
+              </div>
             ) : null}
 
             {openPanel === 'voice' && ttsModel ? (
@@ -450,18 +494,28 @@ export function ShotInspector({
             (field-sizing-content follows the text, capped 30svh) until the user
             takes over via the grip above — then the explicit height wins and
             the auto classes step aside so they cannot fight it. */}
-        <textarea
-          rows={1}
-          ref={promptRef}
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          placeholder={t('cinema.inspector.promptPlaceholder')}
-          aria-label={t('cinema.inspector.prompt')}
-          style={promptHeight !== null ? { height: `${promptHeight}px` } : undefined}
-          className={`${GLASS_SURFACE} ${
-            promptHeight === null ? 'field-sizing-content max-h-[30svh]' : 'resize-none'
-          } mx-2 min-h-10 rounded-xl border px-3 py-2.5 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
-        />
+        {/* The field is `relative` so the AI-enhance affordance can dock in its
+            bottom-right corner (Higgsfield's arrangement). pr-12 reserves the
+            corner so a long prompt never runs under the icon; the enhance/undo
+            is just another setPrompt, so the resize grip and cast tokens are
+            untouched. */}
+        <div className="relative mx-2">
+          <textarea
+            rows={1}
+            ref={promptRef}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder={t('cinema.inspector.promptPlaceholder')}
+            aria-label={t('cinema.inspector.prompt')}
+            style={promptHeight !== null ? { height: `${promptHeight}px` } : undefined}
+            className={`${GLASS_SURFACE} ${
+              promptHeight === null ? 'field-sizing-content max-h-[30svh]' : 'resize-none'
+            } w-full min-h-10 rounded-xl border px-3 py-2.5 pr-12 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
+          />
+          <div className="absolute bottom-2 right-2">
+            <EnhanceButton value={prompt} onEnhanced={setPrompt} />
+          </div>
+        </div>
 
         {/* Status strip: the clip's lifecycle + the newest action failure, keyed
             off the machine code — never raw server text (design.md §9) */}

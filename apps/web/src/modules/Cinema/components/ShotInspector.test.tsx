@@ -31,6 +31,7 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     prompt: 'a lighthouse in a storm',
     promptPreset: null,
     entityRefs: [],
+    referenceImages: [],
     modelId: null,
     durationMs: 5000,
     trimStartMs: 0,

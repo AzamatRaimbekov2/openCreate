@@ -12,7 +12,10 @@ create/update/reorder inputs. The composition layer that sits over generations. 
 - Public API / exports:
   - `filmSchema`/`Film`, `createFilmInputSchema`, `updateFilmInputSchema`.
   - `shotSchema`/`Shot`, `createShotInputSchema`, `updateShotInputSchema`, `reorderShotsInputSchema`,
-    plus `transitionSchema`, `titlePositionSchema`, `shotTitleSchema`.
+    `splitShotInputSchema`/`SplitShotInput`, plus `transitionSchema`, `titlePositionSchema`, `shotTitleSchema`.
+  - Shot references (attach arbitrary images to a shot): `MAX_SHOT_REFERENCE_IMAGES`,
+    `shotReferenceImageSchema`/`ShotReferenceImage`, `addShotReferenceInputSchema`/`AddShotReferenceInput`,
+    `generateShotClipInputSchema`/`GenerateShotClipInput`.
   - `filmAudioSchema`/`FilmAudio`, `audioKindSchema`, `addFilmAudioInputSchema`.
   - `filmRenderSchema`/`FilmRender`, `renderStatusSchema`.
   - Composite reads: `filmDetailSchema` (film + ordered shots + audio), `filmListSchema`.
@@ -20,7 +23,9 @@ create/update/reorder inputs. The composition layer that sits over generations. 
 - Side effects: none.
 
 ## Dependencies
-- Imports / depends on: `zod`, `./catalog` (aspectRatioSchema), `./presets` (promptPresetSchema, styleIdSchema).
+- Imports / depends on: `zod`, `./catalog` (aspectRatioSchema), `./entity` (entityRefSchema),
+  `./generation` (createGenerationInputSchema — the clip input extends it), `./presets`
+  (promptPresetSchema, styleIdSchema, cameraShotSchema, cameraMotionSchema).
 - Used by (planned): `index.ts` re-export; API `modules/films/*` (service + routes + render);
   web `modules/Cinema/*`.
 
@@ -49,6 +54,72 @@ flowchart TD
   false) — generate this shot's clip WITH the model's own soundtrack and carry
   it into the export mix. `createShotInputSchema`/`updateShotInputSchema` +=
   optional `audio`.
+
+## Update 2026-07-21 (later) — render block reasons
+
+`renderBlockReasonSchema` (10 members) + `renderBlockSubjectSchema` (`shot|audio|film`)
+say WHY an export was refused before ffmpeg ran, and about what.
+
+A refusal is not a failed render: nothing was encoded, so "the render didn't finish, try
+again" describes something that never began. The ten causes reduce to three user actions —
+WAIT (still generating), REGENERATE (failed / media gone), REMOVE (can never work) — and
+one code per cause is what lets the client say which.
+
+**Why here and not `errors.ts`:** `apiErrorCodeSchema` is the app-wide HTTP taxonomy.
+Widening it with Cinema domain detail would force every app's exhaustive code→copy map
+(`shared/libs/errorCopy.ts`) to carry a render string.
+
+**Two members per throw site are SPLITS.** `shot_clip_processing`/`shot_clip_failed` and
+`audio_processing`/`audio_failed` used to share one `status !== 'succeeded'` branch and one
+hedging sentence ("remove it or wait for it"). Telling a user to wait for something that
+already failed is the bug those splits fix.
+
+## Update 2026-07-21 — shot reference images (attach any image to a shot)
+
+The owner wants to attach arbitrary images (not only tagged Entities) directly to a shot's
+prompt area, and have them SURVIVE a re-generate. Three additions:
+
+- **`shotSchema.referenceImages: ShotReferenceImage[]`** — the attached images, as
+  `{ id, path }` server media paths (NEVER data URIs on the read DTO — handing bytes back
+  inline would bloat every film-detail payload and re-open a channel the wire does not
+  carry). Required array, never null, exactly like `entityRefs`. This is what makes an
+  attachment PERSIST: it lives on the shot, so a re-generate re-sends it.
+- **`addShotReferenceInputSchema`** (`{ dataUri }`) — the upload boundary. `data:image/*`,
+  cap 14MB (mirrors the entity image cap), and svg REJECTED (script carrier → stored XSS).
+  The storage layer (`parseImageDataUri`) re-rejects svg on the disk side; this rejects it
+  first so a bad upload is a clean 400.
+- **`generateShotClipInputSchema`** — the delivery seam's body: `createGenerationInputSchema`
+  with `entityRefs` widened to `MAX_SHOT_REFERENCE_IMAGES` (the wire /generations schema caps
+  at 1; a shot's cast is up to 5). A client-supplied `referenceImages` key is STRIPPED — the
+  raw reference-image data-URI channel stays server-only. The server reads the shot's ATTACHED
+  images from storage and folds them into that closed channel at generation time.
+- **`MAX_SHOT_REFERENCE_IMAGES = 5`** — the shared budget (entity tags + attached images) any
+  reference-capable video model accepts (Wan 2.7 r2v). The upload route enforces it so the
+  composer's "5/5" counter is truth; the per-generation gate does the model-specific final check.
+  `createShotInputSchema.entityRefs` now caps on this constant instead of a bare `5`.
+
+## Update 2026-07-22 — split a shot at a point (`splitShotInputSchema`)
+
+`splitShotInputSchema` (`{ atMs: number().int().positive() }`) is the body of
+`POST /api/films/:id/shots/:shotId/split` — the NLE's split-at-playhead.
+
+**The endpoint exists because the operation, while composable client-side, is not
+atomic.** Splitting is three writes — shorten shot A, add shot B citing the same
+generation with a shifted trim window, reorder B after A — and a mid-sequence
+failure leaves a half-split film. One server call in one db transaction makes it
+whole-or-nothing.
+
+**Why the schema only checks the LOWER bound.** `atMs` is the split offset from the
+shot's OWN start, and the real invariant is `0 < atMs < durationMs`. The schema can
+enforce `> 0` (a positive integer millisecond) but NOT `< durationMs` — it has no
+access to the shot being split. The upper bound is a service rule
+(`films/shot-split.ts`), which throws `FilmValidationError` → the same 400
+`validation_failed` the wire lower bound produces. One invariant, checked at the two
+layers that can each see half of it.
+
+Consumers: `films/routes.ts` (parses the body on the split route), `films/shot-split.ts`
+(the service that enforces the upper bound and performs the transactional split and
+returns the updated `FilmDetail`).
 
 ## Commits
 - _no commit yet_
@@ -89,3 +160,27 @@ Four additive fields, all nullable, all readable as "the same wire as before" by
   quietly add a second overlapping track — and charge for it again. With it the action is a REPLACE,
   the button can honestly read "Re-voice", and the track list can say WHICH beat a line belongs to.
   Also added to `addFilmAudioInputSchema`.
+
+## Update 2026-07-21 — `filmDetailSchema.latestRender`
+
+`filmDetailSchema` gains `latestRender: filmRenderSchema.nullable()` — the film's
+most recent export, or `null` if it has never been exported.
+
+**Why on the DETAIL rather than a list route.** It answers exactly one question
+the editor asks on every mount: "what happened to my export?". A list route would
+be more surface (a second query, its own four UI states) for less — the editor
+wants the current/last render, not history.
+
+**The bug it closes.** The render id previously lived only in React state, and
+nothing on the wire carried it. So a reload lost a running export outright: the
+status strip vanished, the ⋯ menu re-offered Export (starting a SECOND ffmpeg job
+on the same film), and a finished mp4 became unreachable from the UI even though
+the file was sitting on disk. A render outlives the tab that started it, so its
+handle has to come back with the film.
+
+**Nullable, not optional.** "Never exported" is a real first-class state the UI
+renders differently from "not loaded yet"; an optional field would blur the two.
+
+Consumers: `getFilm` (API) fills it from the newest `film_render` row by
+`createdAt`; `FilmEditor` (web) resolves `startedId ?? latestRender?.id` as the
+render to poll and to gate the Export menu item on.

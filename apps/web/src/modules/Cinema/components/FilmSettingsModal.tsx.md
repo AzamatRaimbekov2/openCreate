@@ -21,7 +21,7 @@ navigates straight into the new film's editor.
 - Imports: `@tanstack/react-router` (`useNavigate`), `react-i18next`,
   `aspectRatioSchema`, `shared/ui` (`Button`, `Input`, `Modal`, `PillGroup`,
   `Select`), `useCreateFilm`/`useUpdateFilm`, `STYLE_OPTIONS`.
-- Used by: `CinemaLibrary` (create), `FilmEditorHeader` (edit/rename).
+- Used by: `CinemaLibrary` (create), `CinemaEditorHeader` (edit — the ⋯ "Film settings" item, for the style default now that title/aspect are inline).
 
 ## Diagram
 

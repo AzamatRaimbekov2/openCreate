@@ -6,17 +6,36 @@ import { apiErrorSchema, type ApiErrorCode } from '@opencreate/contracts'
 
 // Thrown for every non-2xx API response — carries the machine-readable code so
 // callers can branch (e.g. insufficient_credits → pricing link, unauthorized → hide)
+// Optional domain detail some failures carry (contracts apiErrorSchema). A code
+// says what KIND of failure; these say what it was ABOUT — e.g. which shot is
+// blocking an export. Kept as a loose string here on purpose: this layer is
+// domain-agnostic, and the owning module narrows `reason` against its own enum so
+// an unrecognized future value degrades to generic copy instead of throwing.
+export type ApiErrorDetail = {
+  reason?: string
+  subjectKind?: 'shot' | 'audio' | 'film'
+  subjectId?: string
+}
+
+// Thrown for every non-2xx API response — carries the machine-readable code so
+// callers can branch (e.g. insufficient_credits → pricing link, unauthorized → hide)
 export class ApiClientError extends Error {
   // Error code from the envelope (contracts apiErrorCodeSchema)
   readonly code: ApiErrorCode
   // HTTP status of the failed response
   readonly status: number
+  // Domain detail, when the failure carries any. OPTIONAL — and it must stay
+  // optional: a required 4th argument would break every existing construction
+  // (apiClient itself plus a dozen test call sites), and most failures have no
+  // subject to point at.
+  readonly detail: ApiErrorDetail
 
-  constructor(code: ApiErrorCode, message: string, status: number) {
+  constructor(code: ApiErrorCode, message: string, status: number, detail: ApiErrorDetail = {}) {
     super(message)
     this.name = 'ApiClientError'
     this.code = code
     this.status = status
+    this.detail = detail
   }
 }
 
@@ -48,7 +67,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const parsed = apiErrorSchema.safeParse(body)
     if (parsed.success) {
-      throw new ApiClientError(parsed.data.error.code, parsed.data.error.message, res.status)
+      const { code, message, reason, subjectKind, subjectId } = parsed.data.error
+      throw new ApiClientError(code, message, res.status, {
+        // Only set what actually arrived — an envelope without domain detail
+        // yields an empty object, not a bag of undefineds.
+        ...(reason !== undefined ? { reason } : {}),
+        ...(subjectKind !== undefined ? { subjectKind } : {}),
+        ...(subjectId !== undefined ? { subjectId } : {}),
+      })
     }
     throw new ApiClientError('internal_error', `Request failed (${res.status})`, res.status)
   }

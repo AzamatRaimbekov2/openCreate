@@ -57,3 +57,38 @@ export function toggleTrait(traits: TraitId[], traitId: TraitId): TraitId[] {
 export function isTraitDisabled(traits: TraitId[], traitId: TraitId): boolean {
   return !traits.includes(traitId) && traits.length >= MAX_TRAITS
 }
+
+// The create gate: a character needs a NAME (the one field the entity keeps
+// verbatim). The two required axes are guaranteed by the type — they are checked
+// too so the predicate reads as "is this a real, buildable character" rather than
+// leaning on a type invariant a future refactor could weaken. The studio's
+// composer Create pill reads this, and it is the whole reason creating cannot
+// fire on an untouched form.
+export function isDraftReady(draft: SoulDraft): boolean {
+  return (
+    draft.name.trim().length > 0 && Boolean(draft.soul.archetype) && Boolean(draft.soul.styleId)
+  )
+}
+
+// An UNTOUCHED draft: still every default, no name, no traits, no optional axis
+// set. The studio's center stage shows its "start building" placeholder for
+// exactly this state and switches to the live preview the moment ANYTHING
+// changes — so the preview never shows a character the user did not build.
+export function isDraftPristine(draft: SoulDraft): boolean {
+  const { soul } = draft
+  return (
+    draft.name.trim() === '' &&
+    soul.archetype === EMPTY_SOUL.archetype &&
+    soul.styleId === EMPTY_SOUL.styleId &&
+    soul.traits.length === 0 &&
+    soul.notes.trim() === '' &&
+    soul.age === undefined &&
+    soul.build === undefined &&
+    soul.hairColor === undefined &&
+    soul.hairStyle === undefined &&
+    soul.eyeColor === undefined &&
+    soul.skin === undefined &&
+    soul.outfit === undefined &&
+    soul.vibe === undefined
+  )
+}

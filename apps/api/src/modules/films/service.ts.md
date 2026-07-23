@@ -57,6 +57,35 @@ flowchart TD
   (provenance). Shot alone would map [i:a] on a silent mp4 and kill the render;
   row alone would force sound on users who turned it off after the fact.
 
+## Update 2026-07-21 — `toShotDto` lifted + exported; `Shot.referenceImages`
+- `toShotDto` moved from a closure inside `createFilmService` to a module-level
+  `export function toShotDto(row)` so the `shot-references.ts` sibling maps rows through the
+  exact same function (one source of truth for the Shot shape). Pure, so call sites are unchanged.
+- It now populates `referenceImages` from `shot.reference_images_json` (NULL → `[]`, the same
+  array-never-null discipline as `entityRefs`). Attaching/detaching images and the clip delivery
+  seam live in `shot-references.ts`, NOT here — this file is already over the 500-line guideline.
+
+## Update 2026-07-21 — `FilmValidationError` carries a reason and a subject
+
+Every `buildPlan` export refusal now names its CAUSE (`RenderBlockReason`) and the SHOT,
+TRACK or FILM it is about. Ten refusals previously arrived at the client as one
+`validation_failed` with English developer prose, so the UI could only render one generic
+sentence for all of them.
+
+Two throw sites were SPLIT because they conflated opposite instructions:
+- the shot-side `status !== 'succeeded'` branch → `shot_clip_processing` (wait, it resolves
+  itself) vs `shot_clip_failed` (regenerate, it never will);
+- the audio-side check → `audio_generation_missing` / `audio_processing` / `audio_failed` /
+  `audio_media_missing`, replacing one sentence that hedged with "remove it or wait for it"
+  precisely because it could not tell them apart.
+
+The fields are OPTIONAL on the class: most `FilmValidationError`s are ordinary input
+rejections (a bad reorder payload, a non-audio generation) with no subject to point at.
+
+**Known debt, deliberately untouched:** this file is now 801 lines, over the 500 rule. It was
+667 before this pass and already over. Splitting it is a separate single-owner job and was
+kept out of a behaviour change on purpose.
+
 ## Commits
 - _no commit yet_
 
@@ -116,3 +145,64 @@ Net rule: **a track the user attached and paid for either reaches the mux or
 stops the export.** Never a quiet downgrade.
 
 Covered by `test/films-audio-integrity.test.ts`.
+
+### 2026-07-20 — guard 1 REVERTED; `buildPlan` is the single enforcement point
+The 2026-07-12 `addAudio` status gate (defect 1 above) **broke the client
+outright** and is removed (owner-approved).
+
+Audio generations are **async**: `POST /api/generations` returns 202 `processing`,
+and a row only settles when someone polls `GET /api/generations/:id`
+(`generations/service.ts:621,734,745`); nothing polls on a timer. The web flow
+creates the generation and attaches it in two back-to-back calls
+(`Cinema/model/voiceoverApi.ts`, `audioApi.ts`), so the cited row was ALWAYS
+`processing` at attach time. Voiceover and music attachment therefore failed
+100% of the time — **after** charge-at-submit had already taken the credits.
+
+What changed:
+- `addAudio` no longer checks `status`. It still checks **ownership** and
+  `type === 'audio'` (mixing a video file as an audio track breaks the mux and is
+  not a timing question).
+- Attaching a pending track is now legal and matches how **shots** already behave:
+  a shot cites a still-processing generation and the timeline renders its live
+  status. Audio was the odd one out.
+- `buildPlan` is unchanged in behaviour but is now load-bearing ON PURPOSE: it is
+  reached by both "still processing / failed" and "succeeded but asset gone", and
+  refuses the render for either. Its comment says so explicitly, because a comment
+  that mis-states why a guard exists is how the next person deletes it.
+
+The property from 2026-07-12 still holds — audio is never silently missing from an
+export — because it was always guard 2 that held it. Guard 1 was belt-and-braces.
+
+Tests: the old "refuses to attach a not-succeeded generation" case is replaced by
+"attaches an audio generation that is still processing", plus two new cases
+pinning that the RENDER refuses a processing/failed track. The
+succeeded-but-no-file cases are untouched — they are the evidence this is safe.
+
+## Update 2026-07-21 — render persistence + one render per film
+
+Two render-side changes, both about a render outliving the tab that started it.
+
+**`getFilm` now returns `latestRender`.** New private `latestRenderOf(filmId)`
+selects the newest `film_render` row by `createdAt DESC LIMIT 1` and maps it
+through `toRenderDto`, or returns `null`. `requireFilm` has already proven
+ownership by the time it runs, so filtering by `filmId` alone is sound. This is
+what makes a reloaded editor able to resume a running export, hand back a
+finished mp4's download link, or explain a failed one — none of which was
+possible when the render id lived only in the browser's memory.
+
+**`createRender` refuses a concurrent render** with the new
+`FilmRenderInProgressError` (409 / `conflict`). Checked BEFORE `buildPlan` so a
+duplicate click gets the precise "already exporting" answer rather than whatever
+the plan happens to complain about first. 409 rather than 400 because the request
+is perfectly valid — it is the film's CURRENT STATE that forbids it, which is
+what `conflict` is documented for in the error taxonomy.
+
+The UI used to gate this with a local `isExporting` flag that only knew about the
+tab it lived in: two tabs, or one tab after a reload, could put two encodes of
+the same film on the CPU at once. A rule about a shared resource has to be
+enforced where the resource is. `settleStaleRenders` is what guarantees the lock
+can never wedge permanently — a render whose process died is failed by the
+reaper, which releases it.
+
+Tests: `films-render.test.ts` covers `latestRender` null/newest/succeeded and
+ownership, plus refusal-while-processing and release-after-settle.

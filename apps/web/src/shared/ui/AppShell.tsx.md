@@ -10,22 +10,22 @@ credits balance slot, EN/RU LangSwitch, account area. Presentational by design s
 `shared/ui` never imports `modules/*`.
 
 ## What it does (for an AI reader)
-- Responsibilities: render the sticky steel header row and the `bg-void` page canvas;
-  decide between three account-area states (session pending → pill `Skeleton`,
-  signed out → RED specimen-pill Sign in `Link` (reference taxonomy: auth = red tint),
-  signed in → `UserMenu` with a Sign out `menuitem` in a ridge surface panel).
+- Responsibilities: render the sticky steel header row and the `bg-void` page canvas.
+  The three account-area states now live in the shared `AccountMenu` component — this
+  file just renders `<AccountMenu ... />` in the right cluster.
 - Public API / exports / props / endpoints: `AppShell`, `AppShellProps`,
-  `AppShellUser`. Props: `user: AppShellUser | null`, `isSessionPending?`,
-  `onSignOut: () => void`, `balanceSlot?: ReactNode`, `children`.
+  `AppShellUser` (re-exported alias of `AccountMenu`'s `AccountUser`). Props:
+  `user: AppShellUser | null`, `isSessionPending?`, `onSignOut: () => void`,
+  `balanceSlot?: ReactNode`, `children`.
 - Inputs → Outputs: injected session snapshot + slots → header chrome around
   `children`. Nav uses TanStack `Link` with color ONLY in
   `activeProps`/`inactiveProps` (avoids dueling `text-*` utilities).
-- Side effects (I/O, network, state): none — only local `isOpen` state for the
-  disclosure menu (Escape + click-away close, same pattern as `Modal`).
+- Side effects (I/O, network, state): none. The disclosure-menu state now lives in
+  `AccountMenu`, so this file holds no local state.
 
 ## Dependencies
 - Imports / depends on: `@tanstack/react-router` (`Link`), `react-i18next`,
-  `shared/ui/LangSwitch`, `shared/ui/Skeleton`.
+  `shared/ui/LangSwitch`, `shared/ui/AccountMenu` (`AccountMenu` + `AccountUser`).
 - Used by: `routes/_shell.tsx` (the pathless layout route that injects session
   state from `modules/Auth` and `BalanceChip` from `modules/Credits`).
 
@@ -35,10 +35,7 @@ flowchart LR
   ShellRoute[routes/_shell.tsx] -- "user / onSignOut / balanceSlot" --> AppShell[AppShell.tsx]
   AppShell --> Nav[Links: create · library · pricing]
   AppShell --> LS[LangSwitch]
-  AppShell --> Acct{account area}
-  Acct -- pending --> Sk[Skeleton]
-  Acct -- signed out --> SignIn[Sign in Link → /login]
-  Acct -- signed in --> Menu[UserMenu → onSignOut]
+  AppShell --> Acct[AccountMenu → onSignOut]
   AppShell --> Content[children (Outlet)]
 ```
 
@@ -83,6 +80,29 @@ flowchart LR
   vertical-space-hungry; the header is pure chrome, so every pixel it gives up goes
   to the canvas. `BalanceChip` (modules/Credits) mirrors the same 32px control scale.
 - Roles, labels and states untouched — behavior tests unaffected.
+
+## Update 2026-07-20 — Modular 3D Assets entry
+- Nav gains ONE `/assets` typed `Link` (`t('nav.assets')`), identical
+  `className={navLinkClass}` + `activeProps`/`inactiveProps` to every sibling. Nav
+  order is now create · library · cinema · **assets** · templates · souls · entities · pricing.
+- **Placed beside Cinema, before Templates**: both `/cinema` and `/assets` are
+  multi-step WORKBENCHES you enter from a library (film editor / asset wizard),
+  not one-shot generations like `/create`. The adjacency is the mental model —
+  a user who understands "the film library opens an editor" reads the asset
+  library the same way. Anything closer to Create would imply a single click buys
+  a finished thing; the wizard is five priced stages.
+- The whole change is the one `<Link>` — `AppShell` stays presentational and still
+  imports nothing from `modules/*`; the route (`_shell.assets.index.tsx`) does the
+  auth guard and the module composition. Roles/labels unchanged, so
+  `AppShell.test.tsx` (queries by role/name) is unaffected.
+
+## Update 2026-07-23 — account slot extracted to AccountMenu
+- The private `AccountArea`/`UserMenu` moved to `shared/ui/AccountMenu.tsx` so the
+  CinemaStudio editor's own top bar (`modules/Cinema/CinemaEditorHeader`) can render the
+  IDENTICAL account affordance without importing across `modules/*`. `AppShell` now renders
+  `<AccountMenu ... />` and imports its `AccountUser` type (re-exported as `AppShellUser`).
+- `AppShell` lost its `useState`/`Skeleton` usage (they went with the menu). Nav, wordmark,
+  balance and lang are untouched — roles/labels unchanged, so `AppShell.test.tsx` is unaffected.
 
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch

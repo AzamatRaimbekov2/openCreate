@@ -6,13 +6,13 @@
 Public API barrel of `@opencreate/contracts` — the only import path (`package.json` `exports` maps `.` → this file) for both apps.
 
 ## What it does (for an AI reader)
-- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `scene3d`, `model-render`.
+- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `auth-config`, `scene3d`, `model-render`, `asset3d`, `prompt`.
 - Public API / exports: the union of all modules' exports (schemas + inferred types).
 - Inputs → Outputs: none at runtime beyond module re-export.
 - Side effects: none.
 
 ## Dependencies
-- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./templates`, `./credits`, `./user`, `./scene3d`, `./model-render`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
+- Imports / depends on: `./errors`, `./catalog`, `./resolution`, `./entity`, `./presets`, `./generation`, `./film`, `./templates`, `./credits`, `./user`, `./scene3d`, `./model-render`, `./asset3d`. Note `presets` is re-exported BEFORE `generation` because `generation.ts` imports `promptPresetSchema` from it.
 - Used by: `apps/api` and `apps/web` via `import { ... } from '@opencreate/contracts'`.
 
 ## Diagram
@@ -30,6 +30,7 @@ flowchart LR
   T[templates.ts] --> IDX
   S3[scene3d.ts] --> IDX
   MR[model-render.ts] --> IDX
+  A3[asset3d.ts] --> IDX
   IDX --> API[apps/api]
   IDX --> WEB[apps/web]
 ```
@@ -74,3 +75,31 @@ flowchart LR
   Chromium or Blender) can read, so the preview the user tweaks matches the rendered turntable
   video byte-for-byte in intent. Putting it in the shared barrel — not apps/web-only — is what makes
   that guarantee possible.
+
+## Update 2026-07-18 — Modular 3D Assets contracts (Task 1)
+- Now also re-exports `./asset3d` (ADR modular-3d-assets): `MAX_PARTS`, `partStatusSchema`/`PartStatus`,
+  `partTransformSchema`/`PartTransform`, `asset3dSchema`/`Asset3d`, `asset3dPartSchema`/`Asset3dPart`,
+  `createAsset3dInputSchema`/`CreateAsset3dInput`, `updateAsset3dInputSchema`/`UpdateAsset3dInput`,
+  `createAsset3dPartInputSchema`/`CreateAsset3dPartInput`,
+  `updateAsset3dPartInputSchema`/`UpdateAsset3dPartInput`, `meshPartInputSchema`/`MeshPartInput`,
+  `asset3dDetailSchema`/`Asset3dDetail`, `asset3dListSchema`/`Asset3dList`, `analyzePartSchema`/`AnalyzePart`,
+  `analyzeResponseSchema`/`AnalyzeResponse`.
+- Exported AFTER `./generation` (in reader order, after `./model-render`) because a part CITES a
+  generation by id — the same "export the dependency-in-concept first" ordering note as
+  `presets`→`generation` and `film`→`templates`, though `asset3d.ts` imports only `zod` (no code edge).
+- Why this file exists: an `asset3d` is an aggregate that cites generations instead of owning media
+  (the Film/Shot pattern). Part status is DERIVED from the cited generations at read time and lives on
+  the read DTO only — never a stored column, never on any input — so the contract encodes the
+  no-second-source-of-truth rule the films/shots work taught. No new `apiErrorCode`: analyze reuses the
+  existing `provider_error` (502) when `ANTHROPIC_API_KEY` is unset, like storyboard.
+
+## Update 2026-07-21 — prompt enhancer contracts
+- Now also re-exports `./prompt`: `promptEnhanceModeSchema`/`PromptEnhanceMode`,
+  `promptEnhanceInputSchema`/`PromptEnhanceInput`, `promptEnhanceResultSchema`/`PromptEnhanceResult`.
+- Exported LAST (after `./asset3d`) — it imports only `zod` and nothing else in the barrel depends on
+  it, so ordering is immaterial (unlike `presets`→`generation` or `film`→`templates`).
+- Why this file exists: `POST /api/prompt/enhance` is a generic, FREE, stateless text transform (rough
+  idea → one cinematic Wan prompt) serving both the Cinema composer and the "soften & retry" a
+  `content_blocked` generation offers. Prompt text DOES travel on the wire here (unlike templates/presets,
+  which keep prompts server-side) because handing the improved text back IS the feature. No new
+  `apiErrorCode`: it reuses `provider_error` (502) when `DEEPINFRA_TOKEN` is unset, exactly like storyboard.

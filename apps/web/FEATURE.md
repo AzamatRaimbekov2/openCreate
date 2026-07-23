@@ -25,8 +25,10 @@ react-hook-form + zod, i18next.
   steel fields, zod validation, actionable localized server-error mapping (by
   better-auth code + HTTP status: wrong credentials, password-too-short, and a
   sign-up email conflict that offers an inline switch-to-login shortcut),
-  optional Google button; the submit pill is red for log-in and green for
-  sign-up (reference taxonomy).
+  and a Google OAuth button gated at RUNTIME by `useAuthConfig()` (GET
+  `/api/auth/config` → `googleEnabled`) — shown only when the server actually has
+  Google wired, so button and backend never drift (ADR google-oauth); the submit
+  pill is red for log-in and green for sign-up (reference taxonomy).
 - **Create (`/create`, guarded)** — the generator as a "commission sheet"
   (numbered hairline field groups: type → steel model tiles with provider labels,
   prices and an amber selection ring → prompt → aspect/duration → optional i2v
@@ -36,7 +38,14 @@ react-hook-form + zod, i18next.
   bounded by a 20-minute budget since `createdAt` — past it the card shows an
   amber "taking longer than usual" note with a one-shot Refresh pill, and a
   status poll that fails before delivering data shows an error state with retry
-  (never a frozen "Generating N%").
+  (never a frozen "Generating N%"). The composer's prompt carries an AI
+  **enhance** sparkle (`POST /api/prompt/enhance`): one click rewrites a rough
+  draft into a detailed cinematic prompt in place, with one-click Undo, a calm
+  "unavailable" notice when the key-gated feature is off, and an occasional
+  once-per-session nudge — the same affordance rides the Cinema shot prompt.
+  For image-capable models the composer takes a reference image three ways —
+  the paperclip (click), a **drag-drop** onto the capsule, and a screenshot
+  **paste** (Cmd/Ctrl+V) — all through the one shared `readImageFile` gate.
 - **Library (`/library`, guarded)** — infinite gallery of figure cards
   (SQUARE abyss media tiles + mono prompt captions; 24/page, "Load more"),
   client-side type filter chips, per-card portal download + glow-red icon delete
@@ -50,33 +59,107 @@ react-hook-form + zod, i18next.
   `PillGroup` + default-style `Select`). The editor (v7) is a real
   NLE WORKBENCH: one viewport-height column, no page scroll — the STAGE
   (header · transient render status strip · `PreviewPlayer`) scrolls inside
-  itself, and the bottom WORKBENCH holds the composer dock (auto-growing
-  iOS-glass prompt with a TOP-edge resize grip, label-less model chip opening
-  the big `ModelPickerModal`, stepped duration slider, generation-audio speaker
-  toggle, icon-toggled drawers: cast · spoken line · expand) above the TRACKS
-  panel: a second-ruler, the VIDEO lane (shot tiles as wide as their duration,
-  one `PX_PER_SEC` scale, live clip status from the shared `['generation', id]`
-  cache, hover move/delete) and the AUDIO lane directly beneath (music beds as
-  bars, voiceovers as chips at their exact startMs, hover delete). Export lives
-  in the header's ⋯ menu («Собрать mp4», hidden while a render runs); `RenderBar`
-  is a transient status strip (progress → green Download `/media/<id>.mp4` →
-  calm retry, never raw ffmpeg text). The «+» dialog adds shot / title card /
+  itself, with the TRACKS panel pinned beneath; the composer is a
+  position:fixed DOCK on the viewport's bottom edge — out of flow, chat
+  posture, so its growth (drawers, prompt resize) overlays the workbench
+  instead of squeezing it (auto-growing prompt with a TOP-edge resize grip,
+  label-less model chip opening the big `ModelPickerModal` — a card gallery,
+  three to a row, each card led by a muted looping demo clip of that model's
+  own output from `/model-demos/<id>.mp4` (branded plate fallback when a model
+  has no demo yet), stepped duration
+  slider, generation-audio speaker toggle, icon-toggled drawers: cast · spoken
+  line · expand; the FIRST shot is selected by default, so the composer is on
+  screen the moment the editor opens — a tile click still moves the
+  selection). The TRACKS panel wears no chrome row (no title, no size select —
+  height via the drag/keyboard separator; the "+" trigger is a dashed
+  icon+label tile riding the video lane after the last shot):
+  a second-ruler that doubles as a SCRUB SLIDER, the VIDEO lane (shot tiles as
+  wide as their duration, one `PX_PER_SEC` scale, live clip status from the shared
+  `['generation', id]` cache, hover move/delete) and the AUDIO lane directly
+  beneath (music beds as bars, voiceovers as chips at their exact startMs, hover
+  delete). NLE Phase 1 (v8) added the PLAYHEAD SPINE: a singleton `useTimelineClock`
+  (`playheadMs`/`isPlaying`) is the one source of truth for position — the ruler
+  click/drag/arrows seek it, a thin portal playhead cursor rides the lanes at it, a
+  shot-tile click seeks to that shot's start as well as selecting it, and the
+  `PreviewPlayer` is now PLAYHEAD-DRIVEN (it shows the clip the playhead sits on,
+  seeks `video.currentTime` frame-accurately, and plays via a leak-free rAF loop),
+  fixing the two live bugs — clicking a tile now moves the preview, and scrubbing
+  works at all. The clip math lives in the pure `timelineGeometry`
+  (`clipAtMs`/`totalDurationMs`, unit-tested). NLE Phase 2 adds the 10-minute-film
+  ergonomics: the scale is a store-owned `zoom` (px/sec) with a zoom-in/out/
+  fit-to-window toolbar, the ruler shows m:ss timecodes at a zoom-chosen interval,
+  the tile strip scrolls horizontally and AUTO-FOLLOWS the playhead during play,
+  and the playing clip is now AUDIBLE (its own soundtrack — `video.muted =
+  !isPlaying`, silent on pause/scrub). Fit-to-window measures the strip and the
+  store computes the scale; the ruler/scroll math is pure in `timelineGeometry`
+  (`rulerTicks`, `formatTimecode`, `followScroll`). NLE Phase 3 adds ON-TIMELINE
+  EDITING through EXISTING endpoints: hover-revealed TRIM edges drag a shot's in/out
+  points (→ shot PATCH `{trimStartMs, durationMs}`, honored by the render's ffmpeg
+  trim) and a REORDER grip drags a tile to a new slot (→ the reorder POST), with a
+  green drop indicator and SNAP to clip boundaries + the playhead; the drag session
+  lives in the `useShotDrag` hook and every decision is pure in `timelineGeometry`.
+  NLE Phase 4 completes the editing polish: a SPLIT-at-playhead scissors (in the
+  timeline toolbar, enabled only when the playhead is strictly inside the selected
+  shot → `useSplitShot` POST `/shots/:id/split {atMs}`) and editor-scoped KEYBOARD
+  shortcuts (`useTimelineKeys`: Space play/pause · ←→ frame-step · Shift+←→
+  shot-boundary jump · Home/End · S split), suppressed while typing in the composer.
+  Audio-lane waveforms (heavy audio-decode) are the last deferred piece. Full
+  film-audio-track mixing on the playhead is a documented Phase-2b seam. The editor
+  has its OWN top bar (`CinemaEditorHeader`, 2026-07-23) that REPLACES the global
+  AppShell on this route: openCreate·/back-to-films escape hatches, the title as an
+  inline-editable h1, an aspect switch, a GREEN «Собрать mp4» export button (out of
+  the old ⋯ menu — disabled, not hidden, while a render runs), a ⋯ overflow for the
+  rare settings/delete, and the balance·lang·account chrome injected by the route.
+  `RenderBar` stays a transient status strip (progress → green Download
+  `/media/<id>.mp4` → calm retry, never raw ffmpeg text). CLIENT-SIDE EXPORT
+  (ADR `client-side-export`, 2026-07-23) — the final assembly is moving INTO the
+  browser (streaming WebCodecs, server ffmpeg retired from the path but kept
+  dormant). The ENGINE is built + tested at the model layer: pure `exportPlan`
+  (per-frame timeline mirroring render.ts — trim, crossfade overlap, fade alpha) +
+  `audioMixPlan` (native + film tracks), an `exportCapabilities` gate (WebCodecs +
+  File System Access), a port-injected `runFilmExport` orchestrator (progress +
+  cancel-teardown), the `useFilmExport` state-machine hook, and the browser adapter
+  (`filmExporter` via mediabunny + `filmFrameDrawer` seeked-video composite +
+  `filmExportAudio` OfflineAudioContext mix, streamed to disk via File System Access
+  with a blob fallback — in-browser-verified). WIRED (2026-07-23): the header's
+  «Собрать mp4» runs the client pipeline via `useExportController` (replacing
+  `useCreateRender`) — progress + a cancel, 4 states, a capability gate (calm
+  message where unsupported). The valuable validation moved client-side —
+  `computeExportBlock` refuses a not-ready film (a clip generating/failed, no shots)
+  with the SAME named reasons the server gave, from the generation cache. The
+  mediabunny/WebCodecs adapter is a LAZY chunk (`filmExporter`/`filmFrameDrawer`),
+  off the main bundle. Dropped as server-only: reload-recovery, the 409 concurrency
+  guard, `latestRender` polling — `render.ts` + the routes stay dormant. Remaining:
+  an in-browser smoke test of the 3 adapter files (vitest can't run WebCodecs).
+  The «+» dialog adds shot / title card /
   storyboard / music / voiceover (audio rows switch to a mini-form —
   one charged action generates the clip AND files the track; the «Звук» card is
-  retired). Shot generation composes a **structured** `promptPreset`, POSTs
-  `/api/generations`, links the clip, then polls.
+  retired). The cast drawer holds TWO reference affordances sharing the budget of
+  5: `ShotCastField` TAGS a known character, and below it `ShotReferenceImages`
+  attaches ANY picture — click / drag-drop / paste (Cmd/Ctrl+V), each through the
+  shared `readImageFile` gate → `useAddShotReference` → a `well` thumbnail grid
+  (removable by id). It never blocks attaching on a model without `referenceMode`;
+  it just shows honest "switch to Wan 2.7" copy. Shot generation composes a
+  **structured** `promptPreset`, POSTs `/api/generations`, links the clip, then
+  polls (stored references are re-sent by the server every generate).
   The module has NO cross-module imports: the catalog is read at the route (the
   seam) and decoupling from Gallery/Generator is through the shared query cache.
 - **AI Soul Studio (`/soul`, `/soul/$entityId`, guarded)** — build a CHARACTER from a
-  constructor instead of a text box, then mint photos of them. `/soul` is the
-  constructor (archetype + style pills, eight optional axes as `Select`s, the trait
-  chips — all rendered FROM the contract tables, never a hardcoded list — a capped
-  multi-select at `MAX_TRAITS` = 6 that visibly DISABLES the 7th chip, a notes escape
-  hatch, and a live "what the model will see" preview composed by the contract
-  functions), beside the prompt library (each ready-made character shows its composed
-  text with Copy **and** "open in constructor" — free, because a library entry is a
-  `Soul` literal, not a string), over a grid of the user's characters. Creating a
-  character is FREE. `/soul/$entityId` is the soul card: the four-view reference sheet,
+  constructor instead of a text box, then mint photos of them. `/soul` is a 3-ZONE
+  STUDIO (recomposed 2026-07-21, owner-approved): a viewport-height workbench mirroring
+  an "AI Influencer Studio". A LEFT RAIL ("+ new character" reset + your characters as
+  compact rows), a CENTER STAGE (the live draft — a "build your character" placeholder
+  while untouched, else the picked axis/trait chips + the composed "what the model will
+  see" prompt; no portrait, because a face is minted later on the card), a RIGHT BUILDER
+  (the shared `SoulAxes` — archetype + style pills, eight optional axes as `Select`s, the
+  trait chips capped at `MAX_TRAITS` = 6 that visibly DISABLE the 7th, a notes escape
+  hatch — all FROM the contract tables, never a hardcoded list; plus a "start from a
+  preset" modal reusing the prompt library, each entry a `Soul` literal so "open" is free
+  structure not a string), and a fixed BOTTOM COMPOSER DOCK (the name field, a shuffle
+  dice that randomizes the whole look via a pure `randomizeDraft`, and the ONE green
+  "Create character" pill). It still OWNS the one draft the stage, the builder and the
+  composer all read. Creating a character is FREE. Below `lg` the zones stack (rail →
+  builder → stage). `/soul/$entityId` is the soul card: the four-view reference sheet,
   the readable list of characteristics (picked LABELS, not the prompt), the priced mint
   actions — "First portrait · 2 cr" with no photo, "Complete the sheet · 24 cr" once one
   exists (the later views self-reference the first on `flux-kontext-pro`, which is the
@@ -86,6 +169,24 @@ react-hook-form + zod, i18next.
   repeats it; a per-view failure shows a localized reason plus the "credits refunded"
   chip. No cross-module imports: the catalog (and therefore the prices) is read at the
   route — the seam — and the entity/generation caches are shared with Gallery/Entities.
+- **Modular 3D Assets (`/assets`, `/assets/$assetId`, guarded)** — one concept image
+  becomes named parts, each part becomes its own mesh, and the parts assemble into one
+  exportable GLB. ADR: `docs/wiki/decisions/modular-3d-assets.md`. `/assets` is the
+  library (4 states; square concept plates on `well` cards linking into the wizard; a
+  green "New asset" modal whose picked file is read to a base64 data URI client-side —
+  svg refused before it is decoded, since the API takes data URIs only and an svg is a
+  script container). `/assets/$assetId` is the wizard, and it is **stage-shaped, not
+  page-shaped**: ONE route, five acts (Concept → Parts → Extraction → Meshes →
+  Assembly), and the asset's own part statuses decide which act is on screen
+  (`deriveStage`). There is no `/assets/:id/mesh` URL on purpose — a stage is how far
+  the work has got, not a place, and such a URL would render empty on reload and read
+  as a bug. The rail offers the detours instead: any stage the asset has already
+  reached is walkable-back (`stageOverride` in the module's Zustand UI store), stages
+  ahead are visibly disabled. The three.js graph lives ONLY behind
+  `React.lazy(() => import('./AssemblyStage'))`, which is what keeps it out of the main
+  chunk. Prices come from the catalog read AT THE ROUTE (the seam) — an empty catalog
+  is a first-class DISABLED state, never an error: `PriceTag` pulses and paid buttons
+  stay off rather than quote a number nothing backs. Creating an asset is FREE.
 - **Pricing (`/pricing`, public)** — the same "index" treatment: comparison table +
   full per-model credit table from the catalog query, a "200 free credits" amber
   chip by the title, and the visitor signup CTA as a steel card with a green pill.
@@ -98,7 +199,15 @@ react-hook-form + zod, i18next.
   credit history ledger modal on the steel sheet with triad-signed amounts),
   LangSwitch, red-pill Sign in / sign-out (clears personal caches).
 - **Error UX** — 404 page, crash boundary, offline blocking overlay, 4 UI states
-  (loading skeletons / empty / error+retry / data) on every data surface.
+  (loading skeletons / empty / error+retry / data) on every data surface. Plus a
+  TOAST system (`shared/ui` Zustand store + `<Toaster>` portal, mounted once in
+  `__root.tsx`) — the NON-blocking notification surface: per-item aria-live roles
+  (error=alert, info/success=status), auto-dismiss that pauses on hover/focus, an
+  async action button, a 3-deep cap, per-key dedupe. Cinema uses it to surface a
+  shot's POLLED clip failure: one toast per generation, `content_blocked` carries
+  a "смягчить и повторить" action (soften prompt via `/api/prompt/enhance` →
+  regenerate, degrading to manual-edit if absent); the submit mutation retries
+  transient codes 1–2× but never the actionable/terminal ones.
 - **Surfaces (v4)** — every panel declares its depth through the shared `Card`
   primitive instead of a hand-rolled `rounded-lg border border-white/10` string:
   `glass` (frosted chrome that floats over content — the generator sheet), `well`
@@ -116,8 +225,10 @@ src/
 ├── routes/                     # composition-only file routes
 │   ├── __root.tsx              # providers, crash boundary, offline overlay, 404
 │   ├── index.tsx  login.tsx    # standalone (no shell)
-│   └── _shell.tsx + _shell.{create,library,cinema.index,cinema.$filmId,entities,
-│                              soul.index,soul.$entityId,pricing}.tsx
+│   ├── cinema.$filmId.tsx      # standalone (no shell) — the editor has its OWN top bar
+│   └── _shell.tsx + _shell.{create,library,cinema.index,entities,
+│                              soul.index,soul.$entityId,assets.index,assets.$assetId,
+│                              pricing}.tsx
 ├── modules/
 │   ├── Auth/                   # authClient, useAuthSession/useMe, AuthForm, requireSession
 │   ├── Generator/              # generatorStore (draft), catalog query, create mutation,
@@ -130,9 +241,24 @@ src/
 │   │                           # hooks), portraitSheet (the PRICE math — pure, tested),
 │   │                           # soulPresentation (composed prompt + readable facts),
 │   │                           # soulOptions/soulDraft (pickers from the contract tables,
-│   │                           # the MAX_TRAITS cap), constructor, prompt library,
-│   │                           # reference sheet, "Оживить"
+│   │                           # the MAX_TRAITS cap, isDraftReady/Pristine), randomizeDraft
+│   │                           # (pure shuffle); the 3-zone studio (SoulRail via
+│   │                           # SoulCharacters · SoulStage · SoulBuilder+SoulAxes ·
+│   │                           # SoulComposer dock), edit-modal constructor, prompt
+│   │                           # library, reference sheet, "Оживить"
 │   │                           # (public: SoulStudio, SoulCard; catalog fed from route)
+│   ├── Assets3D/               # Modular 3D Assets: asset3dApi (aggregate + part CRUD,
+│   │                           # analyze/extract/mesh), partGeneration (id-keyed live
+│   │                           # poll over the shared ['generation', id] cache),
+│   │                           # assetPricing + wizardStage (PURE, tested), wizardStore
+│   │                           # (UI-only Zustand), library + the stage-shaped wizard;
+│   │                           # stages: PartsStage (FREE analyze + manual checklist,
+│   │                           # MAX_PARTS cap), ExtractStage (paid grid — single part
+│   │                           # click-to-spend, extract-ALL behind SpendConfirmModal),
+│   │                           # MeshStage (paid grid — per-part tier Select, EVERY mesh
+│   │                           # behind SpendConfirmModal per owner decision 2026-07-20),
+│   │                           # PartGenerationCard (shared plate, polls the CITED id)
+│   │                           # (public: AssetLibrary, AssetWizard; catalog fed from route)
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, showcase spread, section heading, price tables
 │                               # (+ TableScrollRegion overflow wrapper), how-it-works,
@@ -143,6 +269,7 @@ src/
     └── ui/                     # Button, Input, Modal, Skeleton, Badge, Progress,
                                 # PillGroup, EmptyState, ErrorState, AppShell, LangSwitch,
                                 # AppErrorBoundary, OfflineOverlay, NotFoundPage,
+                                # Toaster + toast (toastStore) — non-blocking notifications,
                                 # AsciiSphere (hero canvas), SpecimenTile (+ specimenTileArt
                                 # — 8 duotone specimen plates)
 ```

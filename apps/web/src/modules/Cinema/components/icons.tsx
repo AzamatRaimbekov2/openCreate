@@ -158,6 +158,41 @@ export function ExpandIcon({ className = 'size-4' }: { className?: string }) {
   )
 }
 
+// Scissors = split the shot at the playhead (timeline editing, Phase 4)
+export function ScissorsIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M20 4L8.12 15.88" />
+      <path d="M14.47 14.48L20 20" />
+      <path d="M8.12 8.12L12 12" />
+    </svg>
+  )
+}
+
+// Zoom in / out = a magnifier with a + / − (timeline scale controls, Phase 2)
+export function ZoomInIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M11 8v6" />
+      <path d="M8 11h6" />
+    </svg>
+  )
+}
+
+export function ZoomOutIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M8 11h6" />
+    </svg>
+  )
+}
+
 // Storyboard = a document with a spark, i.e. "script → shots"
 export function StoryboardIcon({ className = 'size-4' }: { className?: string }) {
   return (

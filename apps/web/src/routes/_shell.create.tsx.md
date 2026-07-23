@@ -4,25 +4,32 @@
 
 ## Purpose
 
-The `/create` route: auth-guarded generation screen composing the Generator
-panel and the live Gallery column. Lives under the pathless `_shell` layout
-since Task 18, so it renders inside the AppShell chrome (URL unchanged).
+The `/create` route: auth-guarded generation screen in the Higgsfield
+arrangement — the media feed IS the page, and the `ChatComposer` capsule is
+docked over its bottom edge. Lives under the pathless `_shell` layout, so it
+renders inside the AppShell chrome (URL unchanged).
 
 ## What it does (for an AI reader)
 
 - Responsibilities: route registration (`/_shell/create` → URL `/create`),
-  `beforeLoad` auth guard, page layout. Composition only — no business logic
-  (modular-architecture rule for routes/).
+  `beforeLoad` auth guard, page layout (filter header → scrolling feed →
+  docked composer). Composition only — no business logic (modular-architecture
+  rule for routes/).
 - Public API / exports: `Route` (TanStack file-route).
-- Inputs → Outputs: navigation to `/create` → guard check → two-column render
-  (GeneratorPanel left, live `GalleryGrid hasCreateCta=false` right; mobile stacks);
-  signed-out → thrown redirect to `/login`.
-- Side effects: `requireSession()` performs a session fetch in `beforeLoad`.
+- Inputs → Outputs: navigation to `/create` → guard check → filter header
+  (`GalleryFilterBar` + `ViewSettingsMenu`), scrolling `GalleryGrid` feed
+  (`hasCreateCta=false`, regenerate prefills the composer via
+  `usePrefillDraft`), `ChatComposer` docked over the feed with the entities the
+  user may tag; signed-out → thrown redirect to `/login`.
+- Side effects: `requireSession()` performs a session fetch in `beforeLoad`;
+  `useCatalog` powers the filter model options.
 
 ## Dependencies
 
-- Imports: `@tanstack/react-router`, `react-i18next`, `modules/Auth` (`requireSession`),
-  `modules/Generator` (`GeneratorPanel`), `modules/Gallery` (`GalleryGrid`).
+- Imports: `@tanstack/react-router`, `react-i18next`, `modules/Auth`
+  (`requireSession`), `modules/Generator` (`ChatComposer`, `useCatalog`,
+  `usePrefillDraft`), `modules/Gallery` (`GalleryGrid`, `GalleryFilterBar`,
+  `ViewSettingsMenu`), `modules/Entities` (taggable entities query).
 - Used by: `routeTree.gen.ts` (generated, as child of `_shell.tsx`), `main.tsx` router.
 
 ## Diagram
@@ -31,10 +38,11 @@ since Task 18, so it renders inside the AppShell chrome (URL unchanged).
 flowchart LR
   NAV[/create/] --> BL[beforeLoad requireSession]
   BL -->|signed in| SH[_shell AppShell chrome]
-  SH --> PG[CreatePage grid lg:26rem+1fr]
-  PG --> GEN[GeneratorPanel]
-  PG --> GAL[GalleryGrid hasCreateCta=false]
-  GEN -.submit prepends card via 'generations' cache.-> GAL
+  SH --> PG[CreatePage: header + feed + docked composer]
+  PG --> FLT[GalleryFilterBar + ViewSettingsMenu]
+  PG --> GAL[GalleryGrid feed, scrolls under the capsule]
+  PG --> CMP[ChatComposer — fixed to viewport bottom]
+  GAL -.regenerate → usePrefillDraft.-> CMP
   BL -->|signed out| RD[redirect /login]
 ```
 
@@ -42,15 +50,23 @@ flowchart LR
 
 - Guard in `beforeLoad`, not in the component: no flash of the private screen,
   no wasted catalog fetch for signed-out visitors.
-- Task 18 moved the file under the `_shell` pathless layout: the shell now owns
-  the page canvas (`bg-paper` + min-height + header), so the old
-  `min-h-screen bg-paper` wrapper was removed from this screen — keeping it
-  would double the viewport height under the header.
-
-- v3 terminal restyle: page opener obeys the heading law — `text-3xl font-normal
-  text-white` h1 (mono 30px weight 400, no upscaling); gallery h2 = mono 400 over
-  a `border-white/10` hairline. Composition/behavior untouched; the commission
-  sheet itself lives in `modules/Generator`.
+- COMPOSER WRAPPER IS `fixed`, NOT `absolute` (owner call, 2026-07-16): the old
+  `absolute inset-x-0 bottom-0` inside `main` only pinned while main's
+  `h-[calc(100dvh-4rem)]` exactly matched the viewport remainder — any drift
+  (mobile dvh churn, shell header height changes) let the capsule scroll away
+  with the page, a layout bug that kept coming back. `fixed` docks it to the
+  viewport unconditionally. The shell has no sidebar, so viewport centering
+  stays aligned with the feed column. The wrapper stays click-through
+  (`pointer-events-none`; the capsule re-enables pointer events), and the feed
+  keeps `pb-40` as the runway so the last row clears the capsule.
+- The feed section owns the scroll (`min-h-0 flex-1 overflow-y-auto`) — `min-h-0`
+  is load-bearing; without it the flex child refuses to shrink and the scroll
+  never engages.
+- Task 18 moved the file under the `_shell` pathless layout: the shell owns the
+  page canvas, so no `min-h-screen bg-paper` wrapper here.
+- v3 terminal restyle: heading law (`text-3xl font-normal text-white`), hairline
+  borders; composition/behavior untouched; the composer itself lives in
+  `modules/Generator`.
 
 ## Commits
 

@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as schema from './schema'
-import { DDL, ENTITY_DDL, FILM_DDL, MODEL3D_DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
+import { DDL, ENTITY_DDL, FILM_DDL, MODEL3D_DDL, ASSET3D_DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
 
 export type Db = ReturnType<typeof createDb>['db']
 
@@ -29,6 +29,10 @@ export function createDb(path: string) {
   // 'model3d' as a generation type needs NO DDL at all (generation.type is TEXT
   // with a TS-level enum), so these two tables are the feature's whole DB surface.
   sqlite.exec(MODEL3D_DDL)
+  // Modular 3D Assets (ADR modular-3d-assets): two brand-new tables (asset3d,
+  // asset3d_part), so only the idempotent CREATE IF NOT EXISTS exec is needed —
+  // no micro-migration guard.
+  sqlite.exec(ASSET3D_DDL)
   // Micro-migrations: CREATE TABLE IF NOT EXISTS never alters tables that
   // already exist, so columns added after a db file was first created must be
   // back-filled here (SQLite has no ADD COLUMN IF NOT EXISTS). Guarded by
@@ -58,6 +62,16 @@ export function createDb(path: string) {
   }
   if (!generationColumns.includes('prompt_preset_json')) {
     sqlite.exec('ALTER TABLE generation ADD COLUMN prompt_preset_json TEXT')
+  }
+  // user.role: 'user' | 'super_admin' (dev super-admin seed). DEFAULT 'user'
+  // backfills every pre-existing account as a plain user in one statement —
+  // which is what they all are; the only super_admin is written by the
+  // dev-only seed (modules/auth/dev-admin.ts) at boot.
+  const userColumns = (sqlite.pragma('table_info(user)') as Array<{ name: string }>).map(
+    (column) => column.name,
+  )
+  if (!userColumns.includes('role')) {
+    sqlite.exec("ALTER TABLE user ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
   }
   // Template catalog (ADR: template-catalog). Three additive, nullable columns —
   // every pre-existing film/shot reads NULL and behaves exactly as before:
@@ -89,6 +103,12 @@ export function createDb(path: string) {
   //    pre-feature shot as silent — exactly what those clips are.
   if (!shotColumns.includes('audio')) {
     sqlite.exec('ALTER TABLE shot ADD COLUMN audio INTEGER NOT NULL DEFAULT 0')
+  }
+  //  · shot.reference_images_json  arbitrary images ATTACHED to the shot as
+  //    references (JSON array of { id, path }). Additive and nullable — an existing
+  //    shot simply has nothing attached, which reads identically to the old shape.
+  if (!shotColumns.includes('reference_images_json')) {
+    sqlite.exec('ALTER TABLE shot ADD COLUMN reference_images_json TEXT')
   }
   const filmColumns = (sqlite.pragma('table_info(film)') as Array<{ name: string }>).map(
     (column) => column.name,

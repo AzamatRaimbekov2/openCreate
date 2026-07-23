@@ -18,7 +18,9 @@ that validates and converts the chosen image to a data URI for the store.
 
 ## Dependencies
 
-- Imports: `react` (`useRef`, `useState`), `react-i18next`, `shared/ui` (`Button`).
+- Imports: `react` (`useRef`, `useState`), `react-i18next`, `shared/ui` (`Button`),
+  and the shared image gate `shared/libs/readImageFile` (moved out of
+  `Generator/model` on 2026-07-22 — one gate, now shared with Cinema too).
 - Used by: `components/GeneratorPanel.tsx` (rendered ONLY when `model.supportsImageInput`).
 
 ## Diagram

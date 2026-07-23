@@ -63,3 +63,11 @@ The contract still owns the **enum and the id order** (so a new preset cannot be
 missed); the SPA owns how it is spelled to a human, under
 `cinema.preset.<axis>.<id>`. A preset added without copy now shows a visible
 missing key instead of silently flipping language.
+
+## Update 2026-07-22 — slider reaches 15s
+`SHOT_DURATIONS_SECONDS` went `[2,3,5,8,10]` → `[2,3,5,8,10,12,15]`. The catalog now
+offers up to 15s (wan 2.7 / Seedance 2.0 / Kling / PixVerse), and the strip slider
+is the gate on what the user can even ASK for — capped at 10 it made longer clips
+unreachable regardless of the catalog. Values beyond a model's own max snap down at
+generation (`composeShotClipInput.nearestDuration`), so 15 on the strip stays honest
+for every model (Veo, whose ceiling is 8, simply generates 8).

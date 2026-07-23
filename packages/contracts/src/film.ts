@@ -18,7 +18,18 @@
 import { z } from 'zod'
 import { aspectRatioSchema } from './catalog'
 import { entityRefSchema } from './entity'
+import { createGenerationInputSchema } from './generation'
 import { cameraMotionSchema, cameraShotSchema, promptPresetSchema, styleIdSchema } from './presets'
+
+// The most references a single shot may carry — entity tags AND attached images
+// together. It is the MAX over every reference-capable VIDEO model (today only
+// Wan 2.7's r2v mode, at 5), NOT any one model's limit, because a shot's model
+// can be unset when the reference is attached and can change before it is
+// generated. The upload endpoint enforces this shared budget so the composer's
+// "5/5" counter is truth; the per-generation gate then does the model-SPECIFIC
+// final check (a model that accepts fewer refuses before charging). Kept in
+// contracts so the composer renders the same ceiling the API enforces.
+export const MAX_SHOT_REFERENCE_IMAGES = 5
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Film — the top-level project. A title, a canvas aspect ratio every shot is
@@ -104,6 +115,19 @@ export const shotVoiceoverSchema = z.object({
 })
 export type ShotVoiceover = z.infer<typeof shotVoiceoverSchema>
 
+// One attached reference image on a shot. This is the READ shape: a stable
+// server media path ('/media/<uuid>.<ext>') and the id used to delete it — NEVER
+// the raw bytes. The bytes were uploaded once (addShotReferenceInputSchema) and
+// now live in our storage; handing them back inline would bloat every film-detail
+// payload and re-open a data-URI channel the wire deliberately does not carry.
+// The path is server-sourced back into a data URI only at generation time
+// (readAsDataUri), inside the closed referenceImages seam.
+export const shotReferenceImageSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+})
+export type ShotReferenceImage = z.infer<typeof shotReferenceImageSchema>
+
 export const shotSchema = z.object({
   id: z.string(),
   filmId: z.string(),
@@ -131,6 +155,15 @@ export const shotSchema = z.object({
   // Empty array = nobody tagged, which is the honest default and reads identically
   // to the old shape for every film that predates this.
   entityRefs: z.array(entityRefSchema),
+  // Arbitrary images attached DIRECTLY to this shot as generation references —
+  // not tagged Entities, just "make it look like these". Same discipline as
+  // entityRefs: an ARRAY, never null on the wire (a shot that predates this
+  // column simply has an empty one), so a client never null-checks before it
+  // maps. This is what makes an attached reference PERSIST: it is stored on the
+  // shot, so a re-generate re-sends it (the server re-reads it into the closed
+  // referenceImages seam every time), whereas a one-off upload on the generation
+  // request would vanish the moment the clip was remade.
+  referenceImages: z.array(shotReferenceImageSchema),
   // The catalog model this shot generates with. null = "no opinion", and the
   // composer falls back to the shot's style recommendation, then to the first
   // video model.
@@ -167,11 +200,11 @@ export const createShotInputSchema = z.object({
   generationId: z.string().nullable().optional(),
   prompt: z.string().max(2000).optional(),
   promptPreset: promptPresetSchema.nullable().optional(),
-  // The cast of this shot. Capped at 5 — Wan 2.7 r2v's own limit, and the only
-  // model that can honour references at all today. A longer list would be accepted
-  // here and then rejected at generate time, after the user had already arranged
-  // the shot; refusing it at the door is the kinder failure.
-  entityRefs: z.array(entityRefSchema).max(5).optional(),
+  // The cast of this shot. Capped at MAX_SHOT_REFERENCE_IMAGES — Wan 2.7 r2v's own
+  // limit, and the only model that can honour references at all today. A longer
+  // list would be accepted here and then rejected at generate time, after the user
+  // had already arranged the shot; refusing it at the door is the kinder failure.
+  entityRefs: z.array(entityRefSchema).max(MAX_SHOT_REFERENCE_IMAGES).optional(),
   // Validated against the live catalog by the service (must be a video model),
   // not by an enum here — model ids are catalog data, not wire constants.
   modelId: z.string().max(80).nullable().optional(),
@@ -189,12 +222,81 @@ export type CreateShotInput = z.infer<typeof createShotInputSchema>
 export const updateShotInputSchema = createShotInputSchema
 export type UpdateShotInput = z.infer<typeof updateShotInputSchema>
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Attaching a reference image to a shot (POST /api/films/:id/shots/:shotId/references).
+//
+// The client hands over BYTES as a data URI — the same discipline as
+// entity.ts's image upload and generation.inputImage: the API never fetches an
+// arbitrary user URL (SSRF guard), and the 14MB cap tracks the ~10MB file limit
+// after base64 inflation. Validated HERE, at the boundary, not only in the route:
+//  · `data:image/` — a raster image, never a URL and never text.
+//  · NOT svg — `image/svg+xml` is an "image" that carries <script>; served from
+//    our own origin it becomes stored XSS. The storage layer (parseImageDataUri)
+//    rejects it again on the disk side, but the boundary rejects it first so a
+//    bad upload is a clean 400, not a 500 surfaced deep in the service.
+//  · size-capped on the base64 string; the storage layer re-checks the DECODED
+//    byte count (base64 inflates ~4/3), so the real ceiling is measured, not
+//    guessed.
+export const addShotReferenceInputSchema = z.object({
+  dataUri: z
+    .string()
+    .startsWith('data:image/')
+    .max(14_000_000)
+    // svg is an image mime that carries script — reject it before it can be stored
+    // and served from our origin. Case-insensitive: `data:IMAGE/SVG+XML` is svg too.
+    .refine((v) => !/^data:image\/svg/i.test(v), 'svg images are not allowed'),
+})
+export type AddShotReferenceInput = z.infer<typeof addShotReferenceInputSchema>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Generating a shot's clip (POST /api/films/:id/shots/:shotId/clip).
+//
+// This is the server seam that keeps the reference-image data-URI channel CLOSED.
+// The wire `createGenerationInputSchema` deliberately has no `referenceImages`
+// field, so a client body can never inject reference-image bytes into a
+// generation. The shot's ATTACHED images are read server-side (from storage) and
+// folded into the closed channel only inside this route — the client sends the
+// same body it would send to POST /api/generations, and the server sources the
+// bytes it never lets the client provide.
+//
+// Two deltas from the plain generation input:
+//  · entityRefs is widened to MAX_SHOT_REFERENCE_IMAGES. The wire /generations
+//    schema caps entityRefs at 1 (the ChatComposer's single-subject case), but a
+//    shot's cast is up to 5 (Wan 2.7 r2v); a multi-character shot could not be
+//    generated through the 1-cap wire schema at all. The per-generation gate
+//    still enforces the chosen model's real limit before charging.
+//  · a stray `referenceImages` key is STRIPPED (zod objects drop unknown keys),
+//    so even a hand-rolled body cannot open the channel.
+export const generateShotClipInputSchema = createGenerationInputSchema.extend({
+  entityRefs: z.array(entityRefSchema).max(MAX_SHOT_REFERENCE_IMAGES).optional(),
+})
+export type GenerateShotClipInput = z.infer<typeof generateShotClipInputSchema>
+
 // Reorder = the full ordered list of this film's shot ids. The service reassigns
 // evenly-spaced orderIndex values; the client never touches orderIndex directly.
 export const reorderShotsInputSchema = z.object({
   shotIds: z.array(z.string().min(1)).min(1),
 })
 export type ReorderShotsInput = z.infer<typeof reorderShotsInputSchema>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Split a shot at a point (POST /api/films/:id/shots/:shotId/split).
+//
+// `atMs` is the split offset measured from the shot's OWN start: the target shot
+// is truncated to atMs, and a new shot is inserted directly after it citing the
+// same generation with its trim window shifted by atMs and the remaining duration.
+// The NLE's split-at-playhead — composable client-side (shorten A, add B, reorder)
+// but a 3-call non-atomic sequence, so it gets one atomic endpoint instead.
+//
+// The wire only enforces the LOWER bound (a positive integer millisecond). The
+// UPPER bound — atMs must fall strictly INSIDE the shot (atMs < durationMs) — is a
+// domain rule the service checks, because the schema has no access to the shot it
+// is splitting. Both a non-positive atMs (rejected here) and an out-of-range one
+// (rejected there) are a 400 validation_failed.
+export const splitShotInputSchema = z.object({
+  atMs: z.number().int().positive(),
+})
+export type SplitShotInput = z.infer<typeof splitShotInputSchema>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FilmAudio — a music bed or a voiceover track laid under the timeline. Each
@@ -256,6 +358,52 @@ export const filmRenderSchema = z.object({
 export type FilmRender = z.infer<typeof filmRenderSchema>
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Why an export was REFUSED before ffmpeg ever ran.
+//
+// A refusal is not a failed render: nothing was encoded, so "the render didn't
+// finish, try again" describes something that never began and points the user at
+// a button that cannot help. What helps is the CAUSE — and the causes demand
+// three different actions: WAIT (it is still generating), REGENERATE (it failed
+// or its media is gone), or REMOVE (it can never work). One code per cause is
+// what lets the client say which.
+//
+// This lives in film.ts, not errors.ts, on purpose: `apiErrorCodeSchema` is the
+// app-wide HTTP taxonomy, and widening it with Cinema domain detail would force
+// every app's exhaustive code→copy map to carry a render string.
+//
+// Two throw sites produce three reasons each — a still-processing subject and a
+// failed one used to share a single `status !== 'succeeded'` branch, and telling
+// a user to "wait" when the thing already failed is the exact bug this splits.
+export const renderBlockReasonSchema = z.enum([
+  // ── Shot side ──
+  // The cited generation row is gone (deleted from the library).
+  'shot_clip_missing',
+  // Still generating upstream — self-resolving, so: wait.
+  'shot_clip_processing',
+  // The generation failed — never self-resolves, so: regenerate.
+  'shot_clip_failed',
+  // An audio generation is cited as a shot's footage; the mux cannot use it.
+  'shot_clip_is_audio',
+  // Succeeded, but the file is not on disk (pruned, expired, lost save).
+  'shot_media_missing',
+  // ── Film side ──
+  // Nothing renderable at all: no clip and no title card.
+  'film_no_shots',
+  // ── Audio side (mirrors the shot side, same three timing cases) ──
+  'audio_generation_missing',
+  'audio_processing',
+  'audio_failed',
+  'audio_media_missing',
+])
+export type RenderBlockReason = z.infer<typeof renderBlockReasonSchema>
+
+// What the reason is ABOUT, so the client can name it ("Shot 4", "Music") and
+// jump to it. Without this a perfectly localized sentence still leaves the user
+// hunting through a twelve-shot timeline.
+export const renderBlockSubjectSchema = z.enum(['shot', 'audio', 'film'])
+export type RenderBlockSubject = z.infer<typeof renderBlockSubjectSchema>
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Composite read shapes — the editor loads a film with its ordered shots and
 // audio in one call; a list view needs only the films.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -263,6 +411,20 @@ export const filmDetailSchema = z.object({
   film: filmSchema,
   shots: z.array(shotSchema),
   audio: z.array(filmAudioSchema),
+  // The film's most recent export, or null if it has never been exported.
+  //
+  // It rides the DETAIL — not a separate list route — because it exists to
+  // answer exactly one question the editor asks on every mount: "what happened
+  // to my export?". Before this field the answer lived only in React state, so
+  // a reload lost a running render entirely: the status strip vanished, Export
+  // was offered again (starting a SECOND ffmpeg job on the same film), and a
+  // finished mp4 became unreachable from the UI even though the file was sitting
+  // on disk. A render outlives the tab that started it, so its handle has to
+  // come back with the film.
+  //
+  // Nullable rather than optional: "never exported" is a real, first-class state
+  // the UI renders differently from "not loaded yet".
+  latestRender: filmRenderSchema.nullable(),
 })
 export type FilmDetail = z.infer<typeof filmDetailSchema>
 

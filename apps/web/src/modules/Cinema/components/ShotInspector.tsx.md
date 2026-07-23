@@ -33,11 +33,11 @@ title card + "model will see" hint). Save / Generate sit on the toolbar's right.
 
 - Imports: `react-i18next`, `applyPromptPreset` + `STYLE_PRESETS` +
   `transitionSchema` from `@opencreate/contracts`, `shared/ui` (`Button`,
-  `Select`), model hooks (`useUpdateShot`, `useGenerateShotClip`,
+  `EnhanceButton`, `Select`), model hooks (`useUpdateShot`, `useGenerateShotClip`,
   `useShotGeneration`, `useGenerateVoiceover`), preset helpers,
-  `InspectorSection`, `PresetPickers`, `ShotCastField`, `ShotClipStatus`,
-  `ShotTitleField`, `ShotVoiceoverField`, icons (`ExpandIcon`, `MicIcon`,
-  `PaperclipIcon`, `SparkIcon`).
+  `InspectorSection`, `PresetPickers`, `ShotCastField`, `ShotReferenceImages`,
+  `ShotClipStatus`, `ShotTitleField`, `ShotVoiceoverField`, icons (`ExpandIcon`,
+  `MicIcon`, `PaperclipIcon`, `SparkIcon`).
 - Used by: `FilmEditor` (rendered with `key={shot.id}`; computes `startMs` and
   `isVoiced`; renders its own slim hint dock when no shot is selected).
 - Tested by: `ShotInspector.test.tsx` (prompt+save PATCH body, toolbar pickers,
@@ -50,7 +50,7 @@ flowchart TD
   SHOT[Shot] --> DRAFT[local draft state]
   DRAFT --> TA["prompt textarea (field-sizing-content · resize-y · max-h 30svh)"]
   DRAFT --> TB["toolbar: model Select · duration Select · 📎 cast · 🎙 voice · ⛶ more | Save · Generate"]
-  TB -->|📎| D1["drawer: ShotCastField"]
+  TB -->|📎| D1["drawer: ShotCastField (tag a character) + ShotReferenceImages (attach any image)"]
   TB -->|🎙| D2["drawer: ShotVoiceoverField (opening arms hasVoice)"]
   TB -->|⛶| D3["drawer: PresetPickers · transition Selects · ShotTitleField · willSee hint"]
   DRAFT -->|Save| U[useUpdateShot]
@@ -154,6 +154,49 @@ error surfacing, money-path guards) unchanged.
   FilmEditor's bottom workbench (above the tracks); the editor column owns the
   viewport pinning now, so the z-index/clearance games died with it.
 
-## Commits
+## Update 2026-07-21 — AI enhance in the prompt field
+- The shared `EnhanceButton` (`shared/ui`, over the `shared/model` enhance hook)
+  docks in the prompt field's BOTTOM-RIGHT corner: the textarea is wrapped in a
+  `relative` div, gains `pr-12` to keep long text out from under the icon, and
+  the button rides an `absolute bottom-2 right-2` wrapper (kept separate so the
+  button's own `relative` container still anchors its floating nudge/error).
+- Enhance/undo is just another `setPrompt`, so the cast `[[eN]]` tokens, the
+  resize grip and the save/generate money-path are untouched. Same component as
+  the /create composer — no cross-module import, no duplicate.
 
+## Update 2026-07-22 — a failed clip now raises a TOAST + soften/retry
+- `useShotFailureToast({ generation: clip.data, onSoften: handleSoftenRetry })`
+  raises ONE toast the first time the selected shot's polled clip is seen
+  `failed` (deduped per generationId). The inline `ShotClipStatus` line stays as
+  the quiet record; the toast is the attention-grabber (the user may have paid
+  for the clip then scrolled away). content_blocked gets rich copy + a soften
+  action; other codes get the mapped reason. The existing `actionErrorCode`
+  inline line (SUBMIT failure) is untouched — belt + braces.
+- `handleGenerate` now delegates to `generateWithPrompt(promptText)` (save →
+  generate against an EXPLICIT prompt). `buildPatch(promptText = prompt)` gained
+  the optional override so the soften/retry can regenerate against the REWRITE,
+  not the still-blocked composer text. The default-argument keeps `handleSave`
+  and `handleVoice` (which call `buildPatch()`) byte-for-byte unchanged.
+- `handleSoftenRetry = createSoftenRetry({ text: prompt, t, onSoftened })` where
+  `onSoftened` does `setPrompt(softened)` + `generateWithPrompt(softened)`. This
+  is a PAID regenerate on the user's click (never auto-fired); it degrades to a
+  manual-edit toast if the enhance endpoint is absent (softenRetry owns that).
+- The SUBMIT mutation (`useGenerateShotClip`) now retries transient failures
+  1–2× (rate/provider/internal/5xx/network) before the toast; the four
+  actionable/terminal codes never retry (they would re-cost or are pointless).
+
+## Update 2026-07-22 — attach ANY reference image to a shot
+- The 📎 cast drawer now holds TWO affordances sharing the budget of 5:
+  `ShotCastField` (tag a known character) and, below it, `ShotReferenceImages`
+  (attach an arbitrary picture via click / drag-drop / paste). Both wrapped in
+  their own `InspectorSection`, inside one `flex flex-col gap-4` column.
+- `ShotReferenceImages` receives `entityRefCount={deriveEntityRefs(prompt, cast).length}`
+  — the LIVE tag count — so the "N / 5" counter and the cap reflect exactly what
+  the cast field shows. `references={shot.referenceImages}` and
+  `modelSupportsReferences={Boolean(model?.referenceMode)}` (same capability flag
+  the cast field uses, but the image control shows its OWN honest copy: it does
+  NOT block attaching, just notes the model won't use them until you switch to
+  Wan 2.7). Generation is untouched — the server re-sends stored references.
+
+## Commits
 - _no commit yet_

@@ -30,6 +30,11 @@ flowchart LR
 - pragma-guarded `ALTER TABLE shot ADD COLUMN audio INTEGER NOT NULL DEFAULT 0`
   joins the shot column back-fills (model_id / voiceover_json / entity_refs_json).
 
+## Update 2026-07-21 — shot.reference_images_json micro-migration
+- pragma-guarded `ALTER TABLE shot ADD COLUMN reference_images_json TEXT` joins the same
+  shot column back-fills — a JSON array of `{ id, path }` for images attached to a shot.
+  Nullable/additive: an existing shot reads NULL (nothing attached), no backfill needed.
+
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
@@ -83,3 +88,15 @@ phase and no contract phase, and rolling the code back simply leaves two columns
 `entity_image.source` gaining `'generated'` needed **no** statement here at all — the column is plain
 TEXT and the enum lives only in TypeScript, exactly as `generation.type` did when Studio3D added
 `'model3d'`.
+
+## Update 2026-07-16 — user.role micro-migration
+- Guarded `ALTER TABLE user ADD COLUMN role TEXT NOT NULL DEFAULT 'user'` (pragma table_info check, same pattern as every other micro-migration here). DEFAULT backfills all pre-existing accounts as plain users; the only `super_admin` is written by the dev-only seed in `modules/auth/dev-admin.ts`.
+
+## Key decisions (2026-07-18) — Modular 3D Assets
+`createDb` now also execs `ASSET3D_DDL` (imported from `./ddl`, exec'd right after `MODEL3D_DDL`),
+creating `asset3d` and `asset3d_part`. Like the Studio3D tables these are brand-new, so a single
+`CREATE TABLE IF NOT EXISTS` covers a fresh db and a legacy file alike — **no** micro-migration guard
+accompanies it (there are no columns being added to a pre-existing table). The part's
+`image_generation_id` / `mesh_generation_id` are plain TEXT CITATIONS with no `REFERENCES` clause, so
+deleting a generation from the library never cascades a part away; only `asset3d.user_id` and
+`asset3d_part.asset_id` cascade. See ADR `docs/wiki/decisions/modular-3d-assets.md`.

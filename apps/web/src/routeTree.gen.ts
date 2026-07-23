@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CinemaFilmIdRouteImport } from './routes/cinema.$filmId'
 import { Route as ShellPricingRouteImport } from './routes/_shell.pricing'
 import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
 import { Route as ShellEntitiesRouteImport } from './routes/_shell.entities'
@@ -19,8 +20,9 @@ import { Route as ShellCreateRouteImport } from './routes/_shell.create'
 import { Route as ShellTemplatesIndexRouteImport } from './routes/_shell.templates.index'
 import { Route as ShellSoulIndexRouteImport } from './routes/_shell.soul.index'
 import { Route as ShellCinemaIndexRouteImport } from './routes/_shell.cinema.index'
+import { Route as ShellAssetsIndexRouteImport } from './routes/_shell.assets.index'
 import { Route as ShellSoulEntityIdRouteImport } from './routes/_shell.soul.$entityId'
-import { Route as ShellCinemaFilmIdRouteImport } from './routes/_shell.cinema.$filmId'
+import { Route as ShellAssetsAssetIdRouteImport } from './routes/_shell.assets.$assetId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -34,6 +36,11 @@ const ShellRoute = ShellRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CinemaFilmIdRoute = CinemaFilmIdRouteImport.update({
+  id: '/cinema/$filmId',
+  path: '/cinema/$filmId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellPricingRoute = ShellPricingRouteImport.update({
@@ -71,14 +78,19 @@ const ShellCinemaIndexRoute = ShellCinemaIndexRouteImport.update({
   path: '/cinema/',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellAssetsIndexRoute = ShellAssetsIndexRouteImport.update({
+  id: '/assets/',
+  path: '/assets/',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellSoulEntityIdRoute = ShellSoulEntityIdRouteImport.update({
   id: '/soul/$entityId',
   path: '/soul/$entityId',
   getParentRoute: () => ShellRoute,
 } as any)
-const ShellCinemaFilmIdRoute = ShellCinemaFilmIdRouteImport.update({
-  id: '/cinema/$filmId',
-  path: '/cinema/$filmId',
+const ShellAssetsAssetIdRoute = ShellAssetsAssetIdRouteImport.update({
+  id: '/assets/$assetId',
+  path: '/assets/$assetId',
   getParentRoute: () => ShellRoute,
 } as any)
 
@@ -89,8 +101,10 @@ export interface FileRoutesByFullPath {
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
-  '/cinema/$filmId': typeof ShellCinemaFilmIdRoute
+  '/cinema/$filmId': typeof CinemaFilmIdRoute
+  '/assets/$assetId': typeof ShellAssetsAssetIdRoute
   '/soul/$entityId': typeof ShellSoulEntityIdRoute
+  '/assets/': typeof ShellAssetsIndexRoute
   '/cinema/': typeof ShellCinemaIndexRoute
   '/soul/': typeof ShellSoulIndexRoute
   '/templates/': typeof ShellTemplatesIndexRoute
@@ -102,8 +116,10 @@ export interface FileRoutesByTo {
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
-  '/cinema/$filmId': typeof ShellCinemaFilmIdRoute
+  '/cinema/$filmId': typeof CinemaFilmIdRoute
+  '/assets/$assetId': typeof ShellAssetsAssetIdRoute
   '/soul/$entityId': typeof ShellSoulEntityIdRoute
+  '/assets': typeof ShellAssetsIndexRoute
   '/cinema': typeof ShellCinemaIndexRoute
   '/soul': typeof ShellSoulIndexRoute
   '/templates': typeof ShellTemplatesIndexRoute
@@ -117,8 +133,10 @@ export interface FileRoutesById {
   '/_shell/entities': typeof ShellEntitiesRoute
   '/_shell/library': typeof ShellLibraryRoute
   '/_shell/pricing': typeof ShellPricingRoute
-  '/_shell/cinema/$filmId': typeof ShellCinemaFilmIdRoute
+  '/cinema/$filmId': typeof CinemaFilmIdRoute
+  '/_shell/assets/$assetId': typeof ShellAssetsAssetIdRoute
   '/_shell/soul/$entityId': typeof ShellSoulEntityIdRoute
+  '/_shell/assets/': typeof ShellAssetsIndexRoute
   '/_shell/cinema/': typeof ShellCinemaIndexRoute
   '/_shell/soul/': typeof ShellSoulIndexRoute
   '/_shell/templates/': typeof ShellTemplatesIndexRoute
@@ -133,7 +151,9 @@ export interface FileRouteTypes {
     | '/library'
     | '/pricing'
     | '/cinema/$filmId'
+    | '/assets/$assetId'
     | '/soul/$entityId'
+    | '/assets/'
     | '/cinema/'
     | '/soul/'
     | '/templates/'
@@ -146,7 +166,9 @@ export interface FileRouteTypes {
     | '/library'
     | '/pricing'
     | '/cinema/$filmId'
+    | '/assets/$assetId'
     | '/soul/$entityId'
+    | '/assets'
     | '/cinema'
     | '/soul'
     | '/templates'
@@ -159,8 +181,10 @@ export interface FileRouteTypes {
     | '/_shell/entities'
     | '/_shell/library'
     | '/_shell/pricing'
-    | '/_shell/cinema/$filmId'
+    | '/cinema/$filmId'
+    | '/_shell/assets/$assetId'
     | '/_shell/soul/$entityId'
+    | '/_shell/assets/'
     | '/_shell/cinema/'
     | '/_shell/soul/'
     | '/_shell/templates/'
@@ -170,6 +194,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ShellRoute: typeof ShellRouteWithChildren
   LoginRoute: typeof LoginRoute
+  CinemaFilmIdRoute: typeof CinemaFilmIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -193,6 +218,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cinema/$filmId': {
+      id: '/cinema/$filmId'
+      path: '/cinema/$filmId'
+      fullPath: '/cinema/$filmId'
+      preLoaderRoute: typeof CinemaFilmIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/pricing': {
@@ -244,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellCinemaIndexRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/assets/': {
+      id: '/_shell/assets/'
+      path: '/assets'
+      fullPath: '/assets/'
+      preLoaderRoute: typeof ShellAssetsIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/soul/$entityId': {
       id: '/_shell/soul/$entityId'
       path: '/soul/$entityId'
@@ -251,11 +290,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellSoulEntityIdRouteImport
       parentRoute: typeof ShellRoute
     }
-    '/_shell/cinema/$filmId': {
-      id: '/_shell/cinema/$filmId'
-      path: '/cinema/$filmId'
-      fullPath: '/cinema/$filmId'
-      preLoaderRoute: typeof ShellCinemaFilmIdRouteImport
+    '/_shell/assets/$assetId': {
+      id: '/_shell/assets/$assetId'
+      path: '/assets/$assetId'
+      fullPath: '/assets/$assetId'
+      preLoaderRoute: typeof ShellAssetsAssetIdRouteImport
       parentRoute: typeof ShellRoute
     }
   }
@@ -266,8 +305,9 @@ interface ShellRouteChildren {
   ShellEntitiesRoute: typeof ShellEntitiesRoute
   ShellLibraryRoute: typeof ShellLibraryRoute
   ShellPricingRoute: typeof ShellPricingRoute
-  ShellCinemaFilmIdRoute: typeof ShellCinemaFilmIdRoute
+  ShellAssetsAssetIdRoute: typeof ShellAssetsAssetIdRoute
   ShellSoulEntityIdRoute: typeof ShellSoulEntityIdRoute
+  ShellAssetsIndexRoute: typeof ShellAssetsIndexRoute
   ShellCinemaIndexRoute: typeof ShellCinemaIndexRoute
   ShellSoulIndexRoute: typeof ShellSoulIndexRoute
   ShellTemplatesIndexRoute: typeof ShellTemplatesIndexRoute
@@ -278,8 +318,9 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellEntitiesRoute: ShellEntitiesRoute,
   ShellLibraryRoute: ShellLibraryRoute,
   ShellPricingRoute: ShellPricingRoute,
-  ShellCinemaFilmIdRoute: ShellCinemaFilmIdRoute,
+  ShellAssetsAssetIdRoute: ShellAssetsAssetIdRoute,
   ShellSoulEntityIdRoute: ShellSoulEntityIdRoute,
+  ShellAssetsIndexRoute: ShellAssetsIndexRoute,
   ShellCinemaIndexRoute: ShellCinemaIndexRoute,
   ShellSoulIndexRoute: ShellSoulIndexRoute,
   ShellTemplatesIndexRoute: ShellTemplatesIndexRoute,
@@ -291,6 +332,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ShellRoute: ShellRouteWithChildren,
   LoginRoute: LoginRoute,
+  CinemaFilmIdRoute: CinemaFilmIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

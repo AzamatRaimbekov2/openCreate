@@ -36,7 +36,7 @@ are the product, and it preserves the client-sends-ids / server-composes law fro
 
   | Export | Role |
   |---|---|
-  | `templateCategorySchema` / `TemplateCategory` | `'brainrot' \| 'animation'` — the gallery shelf. Enum so the rail's tabs stay exhaustive. A shelf needs an i18n key per locale (`templates.category.<id>`). |
+  | `templateCategorySchema` / `TemplateCategory` | `'format' \| 'brainrot' \| 'animation'` — the gallery shelf. `'format'` (2026-07-18, owner request) is the LOOK/GENRE shelf — «Фильм», «Сериал», «Аниме»: a beat scaffold picked to be rewritten, not a finished joke. Enum so the rail's tabs stay exhaustive. A shelf needs an i18n key per locale (`templates.category.<id>`). |
   | `templateTierSchema` / `TemplateTier`, `TEMPLATE_TIERS` | `'draft' \| 'standard' \| 'premium'` — the price/quality knob, and the **only** thing that selects a model. |
   | `templateVariableOptionSchema` / `TemplateVariableOption` | `{ value, label }`. The English prompt fragment is deliberately **absent** — server-side only. |
   | `templateVariableSchema` / `TemplateVariable` | One `{{placeholder}}`. `kind: 'select' \| 'text'`. |

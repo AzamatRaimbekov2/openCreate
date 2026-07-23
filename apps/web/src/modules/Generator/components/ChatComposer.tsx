@@ -21,11 +21,12 @@
 // field. The API derives resolution from (model tier × aspect) — there is no
 // wire field to carry either, and no upscale step in the pipeline. Rendering
 // them would be a lie the backend cannot honor. See resolutionFor().
-import { useEffect } from 'react'
-import type { KeyboardEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { ClipboardEvent, DragEvent, KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatResolution, resolutionFor } from '@opencreate/contracts'
-import { Button, EmptyState, ErrorState, Select, Skeleton } from 'shared/ui'
+import { readImageFile } from 'shared/libs/readImageFile'
+import { Button, EmptyState, EnhanceButton, ErrorState, GLASS_FLOATING, Select, Skeleton } from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
 import { useCreateGeneration } from '../model/createGeneration'
 import {
@@ -42,16 +43,19 @@ import { ModelSelect } from './ModelSelect'
 import { deriveEntityRefs } from '../model/mentions'
 import { SubmitErrorBanner } from './SubmitErrorBanner'
 
-// The capsule: a fully TRANSPARENT pill — no fill, no blur, no shadow — so the
-// media feed shows through the whole docked block, not just the textarea
-// (owner call, 2026-07-15; it previously wore GLASS_FLOATING). The inner
-// controls (Selects, ModelSelect, the submit pill) keep their own surfaces and
-// carry legibility over busy media themselves.
+// The capsule wears GLASS_FLOATING again (owner reversal 2026-07-17): the
+// fully-transparent experiment (2026-07-15) put the placeholder, the price and
+// the settings strip DIRECTLY over the feed's cards — unreadable the moment a
+// card scrolled underneath, and it read as "the input has no background /
+// disappeared". Frosted glass is the floating-chrome answer: the feed stays
+// visible through the blur, the text stays legible over anything.
 //
-// Only the capsule's geometry remains — the pill radius, the padding, and
-// pointer-events-auto, which re-enables the clicks the route's click-through
-// wrapper disabled so the feed stays scrollable under the capsule's margins.
-const CAPSULE_CLASS = 'pointer-events-auto w-full max-w-3xl rounded-[1.75rem] px-4 py-3'
+// pointer-events-auto re-enables the clicks the route's click-through wrapper
+// disabled so the feed stays scrollable under the capsule's margins.
+const CAPSULE_CLASS = [
+  'pointer-events-auto w-full max-w-3xl rounded-[1.75rem] border px-4 py-3',
+  GLASS_FLOATING,
+].join(' ')
 
 export type ChatComposerProps = {
   // Entities the user can tag, injected by the route (Generator must not import
@@ -71,6 +75,12 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
   useEffect(() => {
     if (catalog.data) setCatalog(catalog.data.models)
   }, [catalog.data, setCatalog])
+
+  // Paste/drop image state — declared BEFORE the early returns (hooks rule).
+  // A drop-over ring for feedback, and the shared image gate's reject KEY so a
+  // bad paste/drop says why (a language switch re-localizes it).
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
+  const [attachErrorKey, setAttachErrorKey] = useState<string | null>(null)
 
   // Loading: mirror the bar's silhouette so the feed above never jumps
   if (catalog.isPending) {
@@ -132,6 +142,47 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
     if (input) mutation.mutate(input)
   }
 
+  // Paste + drag-drop of an image onto the composer set the SAME inputImage the
+  // paperclip does — through the SAME shared readImageFile gate (one type/size
+  // check, never a second). Only where the model can actually take an image; a
+  // paste anywhere else (or a text paste) is left untouched so typing is normal.
+  const acceptImageFile = (file: File | undefined) => {
+    if (!file) return
+    void readImageFile(file).then((result) => {
+      if (result.ok) {
+        setAttachErrorKey(null)
+        state.setInputImage(result.dataUri)
+      } else {
+        setAttachErrorKey(result.errorKey)
+      }
+    })
+  }
+
+  const handlePaste = (event: ClipboardEvent<HTMLElement>) => {
+    if (!model?.supportsImageInput) return
+    // A text paste carries no FILE — fall through so the textarea types as usual
+    const file = event.clipboardData?.files?.[0]
+    if (!file) return
+    event.preventDefault()
+    acceptImageFile(file)
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    if (!model?.supportsImageInput) return
+    // preventDefault is what makes the capsule a valid drop target
+    event.preventDefault()
+    setIsDraggingImage(true)
+  }
+
+  const handleDragLeave = () => setIsDraggingImage(false)
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    if (!model?.supportsImageInput) return
+    event.preventDefault()
+    setIsDraggingImage(false)
+    acceptImageFile(event.dataTransfer.files[0])
+  }
+
   // Enter submits, Shift+Enter breaks the line — the chat contract. Without
   // this the composer looks like a chat box and behaves like a form, which is
   // the single most jarring thing a chat-shaped input can do.
@@ -143,11 +194,31 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
   }
 
   return (
-    <section aria-label={t('generator.title')} className={CAPSULE_CLASS}>
+    <section
+      aria-label={t('generator.title')}
+      // Paste/drop live on the capsule so a screenshot dropped ANYWHERE on the
+      // composer (or pasted while typing — onPaste bubbles from the textarea)
+      // attaches. React-synthetic handlers = element-scoped, so there is no
+      // document listener to leak. The portal ring is drag feedback only.
+      onPaste={handlePaste}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`${CAPSULE_CLASS} ${isDraggingImage ? 'ring-2 ring-portal' : ''}`}
+    >
       {mutation.isError ? (
         <div className="mb-2">
           <SubmitErrorBanner error={mutation.error} />
         </div>
+      ) : null}
+
+      {/* A paste/drop that failed the shared gate (wrong type / too big) — the
+          click path shows its own error inside AttachImage; this covers the
+          gestures that land on the capsule, not the button. */}
+      {attachErrorKey ? (
+        <p role="alert" className="mb-2 text-xs text-glow-red">
+          {t(attachErrorKey)}
+        </p>
       ) : null}
 
       {/* Input row FIRST — the prompt is why the capsule exists. The textarea
@@ -171,6 +242,11 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
           className="max-h-32 min-h-11 flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-base text-mist placeholder:text-mist-dim/60 focus:outline-none"
         />
         <div className="flex shrink-0 items-center gap-3">
+          {/* AI enhance: rewrites the rough draft into a cinematic prompt in place
+              (with one-click undo). Wired to the SAME store text the textarea edits,
+              so an enhance/undo is just another setPrompt — the mention tokens and
+              the submit gate keep working unchanged. */}
+          <EnhanceButton value={state.prompt} onEnhanced={state.setPrompt} />
           <CostLabel credits={cost} />
           {/* Round pill — the capsule's own radius language */}
           <Button onClick={handleSubmit} disabled={!input} isLoading={mutation.isPending}>

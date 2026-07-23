@@ -18,6 +18,9 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     // A shot always carries a cast, even an empty one — the API answers with an
     // array, never null, so a client never has to null-check before mapping it.
     entityRefs: [],
+    // Empty until the user attaches reference images to the shot — an array,
+    // never null, exactly like entityRefs above.
+    referenceImages: [],
     modelId: null,
     durationMs: 6000,
     trimStartMs: 0,

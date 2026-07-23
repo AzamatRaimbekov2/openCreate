@@ -24,6 +24,14 @@ import type { MentionEntities } from '../entities/mentions'
 import type { EntityService } from '../entities/service'
 import { creditsFor, getModel, resolutionFor } from '../catalog/catalog'
 
+// Server-only create() input (ADR modular-3d-assets, Task 4). The wire contract
+// `createGenerationInputSchema` is unchanged; this widens ONLY the service-level
+// input an in-process orchestrator may build directly, adding a raw reference
+// image data-URI channel (`referenceImages`). It is intentionally NOT on the zod
+// schema the generation route parses, so a client body can never carry it (zod
+// strips unknown keys) — only code in this process (assets3d.extract) can set it.
+export type CreateGenerationServiceInput = CreateGenerationInput & { referenceImages?: string[] }
+
 // Domain errors carry statusCode + apiCode so the central error handler in
 // app.ts maps them straight to the ApiError envelope — no per-route mapping.
 export class NotFoundError extends Error {
@@ -283,7 +291,7 @@ export function createGenerationService({
   // event of this call carries the reqId; baseLog covers non-request callers.
   async function create(
     userId: string,
-    input: CreateGenerationInput,
+    input: CreateGenerationServiceInput,
     reqLog?: MoneyLog,
   ): Promise<{ dto: Generation; created: boolean }> {
     const log = reqLog ?? baseLog
@@ -333,6 +341,29 @@ export function createGenerationService({
     let referenceImages: string[] | undefined
     let mentionEntities: MentionEntities = {}
 
+    // Server-only DIRECT reference channel (ADR modular-3d-assets, Task 4). An
+    // in-process orchestrator (assets3d.extract) may hand create() a raw reference
+    // image data URI that is NOT an entity — the concept image a part is redrawn
+    // from. It rides `input.referenceImages`, which is DELIBERATELY absent from the
+    // client-facing `createGenerationInputSchema`: the generation route zod-parses
+    // the body and zod strips unknown keys, so no client can ever inject it — only
+    // code that builds the input object directly (in this process) can set it.
+    //
+    // The capability gate below runs on the TOTAL ref count and is NOT nested under
+    // `if (refs.length > 0)`: a pure concept extraction has zero entityRefs, so a
+    // gate hidden inside the entity block would be skipped and a model without
+    // referenceMode would be charged for a job it cannot honour. Like every other
+    // guard here it runs BEFORE the charge — an impossible job costs nothing.
+    const directRefs = input.referenceImages ?? []
+    if (directRefs.length > 0) {
+      const total = refs.length + directRefs.length
+      if (!model.referenceMode) throw new ValidationError(`${model.id} cannot use reference images`)
+      if (total > (model.maxReferenceImages ?? 1))
+        throw new ValidationError(
+          `${model.id} accepts at most ${model.maxReferenceImages ?? 1} reference image(s)`,
+        )
+    }
+
     if (refs.length > 0) {
       if (!entities) throw new ValidationError('entity tagging is unavailable')
       // The client filters the model list on `referenceMode`; the API decides.
@@ -381,6 +412,13 @@ export function createGenerationService({
       }
       referenceImages = urls
     }
+
+    // Fold the server-supplied direct refs in AFTER any entity-derived ones, so a
+    // mixed call (an entity tag PLUS a concept image) delivers both. Unconditional
+    // — NOT nested under the entity block above, which a concept-only extraction
+    // never enters; without this the concept ref would be dropped silently and the
+    // extractor would redraw from the prompt alone at full price.
+    if (directRefs.length > 0) referenceImages = [...(referenceImages ?? []), ...directRefs]
 
     let cost: number
     try {
