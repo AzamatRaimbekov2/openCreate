@@ -32,6 +32,9 @@ export type NodeShellProps = {
   // Kind label in the header ("Image", "Video", …) — already localized
   title: string
   status: NodeRunStatus
+  // 0–100 while processing, null before the provider reports any (I5,
+  // ShotClipStatus precedent) — ignored for every other status.
+  progress?: number | null
   // Left port: does this kind accept an incoming wire?
   hasInput: boolean
   // Right port: can this kind feed another node? (video is terminal in MVP)
@@ -39,7 +42,14 @@ export type NodeShellProps = {
   children: ReactNode
 }
 
-export function NodeShell({ title, status, hasInput, hasOutput, children }: NodeShellProps) {
+export function NodeShell({
+  title,
+  status,
+  progress = null,
+  hasInput,
+  hasOutput,
+  children,
+}: NodeShellProps) {
   const { t } = useTranslation()
   return (
     <div className={`w-72 rounded-2xl border bg-steel p-3 shadow-glass ${STATUS_BORDER[status]}`}>
@@ -49,6 +59,7 @@ export function NodeShell({ title, status, hasInput, hasOutput, children }: Node
         {/* The WORD carries the status; the border repeats it for glanceability */}
         <span className={`shrink-0 text-[11px] ${STATUS_TEXT[status]}`}>
           {t(`canvas.status.${status}`)}
+          {status === 'processing' && progress !== null ? ` · ${progress}%` : ''}
         </span>
       </header>
       {children}

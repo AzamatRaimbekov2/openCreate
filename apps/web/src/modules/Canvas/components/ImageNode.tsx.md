@@ -6,13 +6,13 @@
 The image node AND the shared generation body both image and video nodes render. It is a mini-composer on a card: preview (4 states), version stepper, prompt, model/aspect/duration pickers, Generate. It reads its own row from the store by id, because React Flow hands a node component only `id` and `data`.
 
 ## What it does (for an AI reader)
-- Responsibilities: render the node's 4 UI states off the shown version's poll; own the composer controls; reconcile config when the model changes; submit the run.
+- Responsibilities: render the node's 4 UI states off the shown version's poll; own the composer controls; reconcile config when the model changes; submit the run; gate Generate on the wired media parent's SUCCEEDED status (C2); show progress % while processing (I5); lead a failed state with localized copy + a refunded chip, never raw provider text (C3/C4).
 - Public API / exports / props / endpoints: `ImageNode({ id, data })` (React Flow node type `image`), `GenerationNode({ id, data, kind })` (shared body, imported by `VideoNode` only), `GenerationNodeData` = `{ models: CanvasModelOption[] }`.
 - Inputs → Outputs: node id + catalog models → a composer card; edits → `updateNodeConfig`; Generate → `useRunNode.mutate(buildRunInput(...))`.
-- Side effects (I/O, network, state): store writes; the run mutation and the generation poll (both via `../model/useNodeGeneration`).
+- Side effects (I/O, network, state): store writes; the run mutation and the generation poll (both via `../model/useNodeGeneration`); a SECOND `useNodeGeneration` subscription on the wired media parent's latest generation id, purely to keep that entry fresh in the shared TanStack Query cache and to re-render this node when it changes; synchronous `queryClient.getQueryData` reads to build the status snapshot `buildRunInput` needs.
 
 ## Dependencies
-- Imports / depends on: `react`, `react-i18next`, contract types, `shared/ui` (`Button`, `Select`, `Skeleton`, `WELL_SURFACE`), `../model/types`, `../model/canvasStore`, `../model/useNodeGeneration`, `./NodeShell`, `./VersionStrip`.
+- Imports / depends on: `react`, `react-i18next`, `@tanstack/react-query` (`useQueryClient`), contract types (incl. `Generation`), `shared/ui` (`Badge`, `Button`, `Select`, `Skeleton`, `WELL_SURFACE`), `shared/libs/errorCopy` (`errorCodeMessageKey`), `../model/types`, `../model/canvasStore`, `../model/useNodeGeneration` (`buildRunInput`, `findMediaParent`, `useNodeGeneration`, `useRunNode`), `./NodeShell`, `./VersionStrip`.
 - Used by: `CanvasEditor`'s `nodeTypes` map (`image`), `VideoNode` (shared body).
 
 ## Diagram
@@ -39,6 +39,10 @@ flowchart TD
 - Uses the kit `Select`, not a native `<select>`: design.md §6 gives the app exactly one dropdown, and its rich rows (name · provider · price) are what make model choice legible in a 288px card.
 - Every control carries `nodrag` — without it React Flow starts a canvas pan/drag from the field.
 - `if (!node) return null` sits AFTER every hook call, so hook order stays stable when a node is deleted mid-render.
+- **C2 fix-wave correction.** `buildRunInput` originally cited a media parent's bare LAST history id with no status check — a child could cite a still-processing or failed run. This component now finds the media parent (`findMediaParent`), actively polls its LATEST generation id (`useNodeGeneration(parentLatestId)` — the return value is unused; the call exists purely so THIS component holds a live subscription and re-renders the instant that id's status changes, since a plain `getQueryData` read in render does not subscribe to anything), and builds a `{ id: status }` snapshot for every id in the parent's history via `queryClient.getQueryData`. That snapshot is what `buildRunInput` uses to pick the newest SUCCEEDED id (or return `null`).
+- **C3/C4 fix-wave correction.** The failed state used to render raw `generation.errorMessage` as the ONLY copy (design.md §9 violation — raw server text must never lead) and had no refund indicator despite the charge always being refunded server-side on failure. It now mirrors `GenerationCard.tsx`: primary line is `t(errorCodeMessageKey(generation?.errorCode))`; the raw `errorMessage` may follow as a quiet secondary line EXCEPT for `content_blocked` (moderation strings are not user copy); a `Badge variant="success"` says `canvas.node.refunded`. The `canvas.node.failedPreview` i18n key was removed (orphaned by this change, no other caller).
+- **I5 fix-wave addition.** `generation.progress` (0–100 while processing) is now passed down to `NodeShell`'s new `progress` prop, which appends `· {progress}%` next to the amber status word — mirrors `ShotClipStatus.tsx`. Previously the processing state was a bare `Skeleton` with no numeric feedback.
 
 ## Commits
 - f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip
+- (fix-wave) fix(canvas): C2/C3/C4/I5 — gate on succeeded parent status, localized failure copy + refunded chip, processing progress %

@@ -6,12 +6,19 @@
 // imports modules/Generator.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AspectRatio, CanvasNodeConfig } from '@opencreate/contracts'
-import { Button, Select, Skeleton, WELL_SURFACE } from 'shared/ui'
+import { useQueryClient } from '@tanstack/react-query'
+import type { AspectRatio, CanvasNodeConfig, Generation } from '@opencreate/contracts'
+import { Badge, Button, Select, Skeleton, WELL_SURFACE } from 'shared/ui'
 import type { SelectOption } from 'shared/ui'
+import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import type { CanvasModelOption, NodeRunStatus } from '../model/types'
 import { useCanvasStore } from '../model/canvasStore'
-import { buildRunInput, useNodeGeneration, useRunNode } from '../model/useNodeGeneration'
+import {
+  buildRunInput,
+  findMediaParent,
+  useNodeGeneration,
+  useRunNode,
+} from '../model/useNodeGeneration'
 import { NodeShell } from './NodeShell'
 import { VersionStrip } from './VersionStrip'
 
@@ -40,6 +47,7 @@ export function GenerationNode({
   kind: 'image' | 'video'
 }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const node = useCanvasStore((s) => s.nodes.find((n) => n.id === id))
   const nodes = useCanvasStore((s) => s.nodes)
   const edges = useCanvasStore((s) => s.edges)
@@ -56,10 +64,25 @@ export function GenerationNode({
   const poll = useNodeGeneration(shownId)
   const generation = poll.data
 
+  // C2: buildRunInput must never cite a media parent's still-processing or
+  // failed run. It needs each history id's live STATUS, which only the
+  // shared TanStack Query cache knows (['generation', id], the same key
+  // every poller in the app writes). Polling the parent's LATEST id here too
+  // (not just reading the cache) is what makes this node re-render the
+  // instant that parent finishes — a plain cache read during render has no
+  // subscription and would only see the update on some UNRELATED re-render.
+  const mediaParent = node ? findMediaParent(node.id, nodes, edges) : undefined
+  const parentLatestId = mediaParent?.generationIds[mediaParent.generationIds.length - 1] ?? null
+  useNodeGeneration(parentLatestId)
+  const generationStatus: Record<string, Generation['status'] | undefined> = {}
+  for (const gid of mediaParent?.generationIds ?? []) {
+    generationStatus[gid] = queryClient.getQueryData<Generation>(['generation', gid])?.status
+  }
+
   if (!node) return null
   const models = data.models.filter((m) => m.type === kind)
   const model = models.find((m) => m.id === node.config.modelId)
-  const runInput = buildRunInput(node, nodes, edges)
+  const runInput = buildRunInput(node, nodes, edges, generationStatus)
   const duration = node.config.duration ?? model?.durationOptions?.[0]
 
   const status: NodeRunStatus =
@@ -121,6 +144,7 @@ export function GenerationNode({
     <NodeShell
       title={t(`canvas.kind.${kind}`)}
       status={status}
+      progress={generation?.progress ?? null}
       hasInput
       // Video is terminal in the MVP: a clip cannot feed i2i or i2v.
       hasOutput={kind === 'image'}
@@ -134,7 +158,16 @@ export function GenerationNode({
           role="alert"
           className={`mb-2 flex flex-col items-start gap-2 rounded-lg border border-glow-red/40 p-2 text-[11px] text-mist ${WELL_SURFACE}`}
         >
-          <span>{generation?.errorMessage ?? t('canvas.node.failedPreview')}</span>
+          {/* PRIMARY reason is always OUR copy, keyed by errorCode (GenerationCard
+              precedent, design.md §9) — raw server text never leads (C3) */}
+          <span>{t(errorCodeMessageKey(generation?.errorCode))}</span>
+          {/* Raw provider detail may follow as a secondary line — EXCEPT safety
+              blocks, whose moderation strings are not user copy at all */}
+          {generation?.errorMessage && generation.errorCode !== 'content_blocked' ? (
+            <span className="break-words text-mist-dim">{generation.errorMessage}</span>
+          ) : null}
+          {/* The charge was refunded server-side — say so explicitly (C4) */}
+          <Badge variant="success">{t('canvas.node.refunded')}</Badge>
           {/* Calm recovery (ErrorState precedent): the amber ghost pill, not a
               red one — red stays the failure STATUS, not the way out of it. */}
           <Button variant="ghost" size="sm" className="nodrag" onClick={submit} disabled={!runInput}>

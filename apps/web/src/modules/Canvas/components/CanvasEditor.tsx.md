@@ -39,3 +39,15 @@ flowchart TD
 
 ## Commits
 - bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes
+
+## Update 2026-07-30 — per-node RF identity cache (focus-loss fix)
+
+- `rfNodes` now preserves PER-NODE object identity via a ref cache (`rfNodeCache`),
+  returning the same RF object while id/kind/position/data are unchanged; deleted
+  ids are evicted. **Load-bearing, not an optimization**: React Flow v12 treats a
+  node object with new identity as unmeasured and hides it (`visibility: hidden`)
+  for a frame until ResizeObserver answers — a focused textarea inside that node
+  loses focus to `<body>` on that frame, so naive per-render rebuilding ate every
+  keystroke after the first (found live 2026-07-30, one char landed per click).
+- Companion fix: the editor route memoizes `models` (its identity feeds the cache
+  comparison) — see `routes/canvas.$canvasId.tsx`.

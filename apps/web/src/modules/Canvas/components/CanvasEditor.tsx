@@ -4,7 +4,8 @@
 // back: position → moveNode, remove → removeNode/removeEdge, connect →
 // edgeRules → addEdge. Illegal wires are refused DURING the drag
 // (isValidConnection), so a refused connection never reaches the document.
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Background,
   BackgroundVariant,
@@ -47,6 +48,7 @@ const nodeTypes: NodeTypes = {
 const GRID_COLOR = '#314062'
 
 function EditorInner({ models }: { models: CanvasModelOption[] }) {
+  const { t } = useTranslation()
   const storeNodes = useCanvasStore((s) => s.nodes)
   const storeEdges = useCanvasStore((s) => s.edges)
   const moveNode = useCanvasStore((s) => s.moveNode)
@@ -57,18 +59,43 @@ function EditorInner({ models }: { models: CanvasModelOption[] }) {
   const setViewport = useCanvasStore((s) => s.setViewport)
   const { screenToFlowPosition } = useReactFlow()
 
-  // Derived RF objects. The store's array identity changes only on real edits,
-  // so this memo is what keeps dragging one node from rebuilding the rest.
-  const rfNodes: Node[] = useMemo(
-    () =>
-      storeNodes.map((n) => ({
-        id: n.id,
-        type: n.kind,
-        position: n.position,
-        data: { models },
-      })),
-    [storeNodes, models],
-  )
+  // Derived RF objects — with PER-NODE identity preservation, and that part is
+  // load-bearing, not an optimization. React Flow v12 treats a node object
+  // with a new identity as unmeasured and hides it (`visibility: hidden`) for
+  // a frame until its ResizeObserver answers; if the focused textarea sits
+  // inside that node, the browser drops focus to <body> on that frame. Naively
+  // rebuilding every RF object per store write therefore ate every keystroke
+  // after the first (found live 2026-07-30). The ref cache returns the SAME
+  // object while id/kind/position/data are unchanged, so a config edit —
+  // which only touches the store — causes zero RF node changes.
+  // A state-held Map (never re-set) rather than a ref: the react-hooks lint
+  // forbids ref reads during render, and this is exactly the "memoization
+  // cache" mutation React permits in render — idempotent, same inputs → same
+  // objects, StrictMode-double-render safe.
+  const [rfNodeCache] = useState(() => new Map<string, Node>())
+  const rfNodes: Node[] = useMemo(() => {
+    const cache = rfNodeCache
+    const seen = new Set<string>()
+    const mapped = storeNodes.map((n) => {
+      seen.add(n.id)
+      const prev = cache.get(n.id)
+      if (
+        prev &&
+        prev.type === n.kind &&
+        prev.position.x === n.position.x &&
+        prev.position.y === n.position.y &&
+        (prev.data as { models: CanvasModelOption[] }).models === models
+      ) {
+        return prev
+      }
+      const next: Node = { id: n.id, type: n.kind, position: n.position, data: { models } }
+      cache.set(n.id, next)
+      return next
+    })
+    // Deleted nodes must not pin their last RF object forever.
+    for (const key of cache.keys()) if (!seen.has(key)) cache.delete(key)
+    return mapped
+  }, [storeNodes, models, rfNodeCache])
   const rfEdges: Edge[] = useMemo(
     () => storeEdges.map((e) => ({ id: e.id, source: e.sourceNodeId, target: e.targetNodeId })),
     [storeEdges],
@@ -125,7 +152,7 @@ function EditorInner({ models }: { models: CanvasModelOption[] }) {
         }
       />
       <div
-        className="min-w-0 flex-1"
+        className="relative min-w-0 flex-1"
         onDragOver={(e) => {
           // Only claim the drop when the payload is OURS — otherwise a file
           // dragged onto the page would be swallowed by the canvas.
@@ -141,6 +168,25 @@ function EditorInner({ models }: { models: CanvasModelOption[] }) {
           )
         }}
       >
+        {/* I6: the 4th UI state (project 4-states law) — a loaded canvas with
+            zero nodes is otherwise a blank void, indistinguishable from a
+            still-loading or broken board. pointer-events-none so the hint
+            never steals a pan/click from React Flow underneath; it disappears
+            the instant a node exists (storeNodes drives it directly, no
+            separate "dismissed" flag to get out of sync). z-10 keeps it above
+            the dot-grid background/canvas but the palette (a sibling, not a
+            child, of this div) is never covered. */}
+        {storeNodes.length === 0 ? (
+          <div
+            role="status"
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6"
+          >
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-steel px-4 py-3 text-xs text-mist-dim">
+              <span aria-hidden="true">←</span>
+              <span>{t('canvas.board.emptyHint')}</span>
+            </div>
+          </div>
+        ) : null}
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}

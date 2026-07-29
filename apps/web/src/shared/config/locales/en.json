@@ -24,6 +24,7 @@
     },
     "cta": "Start creating",
     "secondaryCta": "See pricing",
+    "heroMascotAlt": "The openCreate mascot — a creator in neon cyberpunk techwear",
     "showcase": {
       "kicker": "sample styles",
       "title": "Selected works",
@@ -254,7 +255,9 @@
       "label": "Tag",
       "add": "Tag entity",
       "remove": "Remove {{name}}",
-      "empty": "No entities yet — create one in Library"
+      "empty": "No entities yet — create one in Library",
+      "pickerLabel": "Tag an entity",
+      "noMatches": "No matching entities"
     }
   },
   "gallery": {
@@ -685,10 +688,7 @@
     "cast": {
       "title": "Cast",
       "add": "Character",
-      "remove": "Remove {{name}}",
-      "empty": "No characters yet — add one in Entities.",
-      "unsupported": "This model cannot hold a character.",
-      "unsupportedWarning": "The chosen model ignores references — pick Cinema (Wan 2.7) or the character will not carry over."
+      "remove": "Remove {{name}}"
     },
     "shotRef": {
       "title": "Reference images",
@@ -696,7 +696,22 @@
       "hint": "Click, drop, or paste an image (up to 10MB).",
       "remove": "Remove reference image",
       "previewAlt": "Attached reference image",
-      "modelHint": "This model doesn't use reference images — switch to Wan 2.7 \"Cinema\" to use them."
+      "gallery": "Attach from gallery",
+      "galleryTitle": "Your images",
+      "galleryEmpty": "No images yet — generate one first.",
+      "galleryError": "Couldn't load your images.",
+      "galleryPick": "Attach this image",
+      "makeCharacter": "Make character",
+      "makeCharacterModalTitle": "Make a character",
+      "makeCharacterNamePlaceholder": "Character name",
+      "makeCharacterSubmit": "Create",
+      "makeCharacterDone": "Character created — you can @mention it now",
+      "makeCharacterError": "Couldn't create the character. Try again."
+    },
+    "mention": {
+      "pickerLabel": "Tag a photo",
+      "noMatches": "No matches",
+      "photo": "Photo {{n}}"
     }
   },
   "templates": {
@@ -1037,6 +1052,9 @@
     "palette": {
       "label": "Node palette"
     },
+    "board": {
+      "emptyHint": "Drag your first node from the palette"
+    },
     "kind": {
       "image": "Image",
       "video": "Video",
@@ -1059,7 +1077,7 @@
       "generating": "Generating…",
       "retry": "Retry",
       "idlePreview": "not generated yet",
-      "failedPreview": "Generation failed",
+      "refunded": "Credits refunded",
       "uploadCta": "Click to upload an image",
       "uploading": "Uploading…",
       "uploadFailed": "Upload failed — try a smaller raster image",
