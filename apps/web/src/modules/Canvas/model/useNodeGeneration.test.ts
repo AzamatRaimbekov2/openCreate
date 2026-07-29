@@ -29,9 +29,36 @@ describe('buildRunInput', () => {
       config: { prompt: 'remix', modelId: 'flux-kontext-pro', aspectRatio: '1:1' },
     }
     const edges: CanvasEdge[] = [{ id: 'e1', sourceNodeId: 'p', targetNodeId: 'n1' }]
-    const input = buildRunInput(node, [parent, node], edges)
-    // Latest history entry is the node's output
+    const statuses = { 'g-old': 'succeeded', 'g-latest': 'succeeded' } as const
+    const input = buildRunInput(node, [parent, node], edges, statuses)
+    // Latest SUCCEEDED history entry is the node's output
     expect(input?.inputGenerationId).toBe('g-latest')
+  })
+
+  it('returns null when the parent latest generation is still processing (no status map)', () => {
+    // C2: a bare id-history lookup with NO status check let a child cite a
+    // processing/failed parent. Without a status map, nothing can be assumed
+    // succeeded — the chain must refuse, not guess.
+    const parent = imageNode('p', ['g-latest'])
+    const node: CanvasNode = {
+      ...imageNode('n1'),
+      config: { prompt: 'remix', modelId: 'flux-kontext-pro', aspectRatio: '1:1' },
+    }
+    const edges: CanvasEdge[] = [{ id: 'e1', sourceNodeId: 'p', targetNodeId: 'n1' }]
+    const statuses = { 'g-latest': 'processing' } as const
+    expect(buildRunInput(node, [parent, node], edges, statuses)).toBeNull()
+  })
+
+  it('skips a failed latest generation and cites an EARLIER succeeded one', () => {
+    const parent = imageNode('p', ['g-succeeded', 'g-failed'])
+    const node: CanvasNode = {
+      ...imageNode('n1'),
+      config: { prompt: 'remix', modelId: 'flux-kontext-pro', aspectRatio: '1:1' },
+    }
+    const edges: CanvasEdge[] = [{ id: 'e1', sourceNodeId: 'p', targetNodeId: 'n1' }]
+    const statuses = { 'g-succeeded': 'succeeded', 'g-failed': 'failed' } as const
+    const input = buildRunInput(node, [parent, node], edges, statuses)
+    expect(input?.inputGenerationId).toBe('g-succeeded')
   })
 
   it('adds duration for video nodes', () => {

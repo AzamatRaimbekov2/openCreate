@@ -8,7 +8,8 @@ Turns one canvas node into a real generation: `buildRunInput` reads the node's c
 ## What it does (for an AI reader)
 - Responsibilities: compose the request, gate un-runnable nodes, submit with a transient-only retry policy, seed/refresh the shared caches, poll while processing.
 - Public API / exports / props / endpoints:
-  - `buildRunInput(node, nodes, edges) => CreateGenerationInput | null` (pure).
+  - `findMediaParent(nodeId, nodes, edges) => CanvasNode | undefined` (pure) — the shared parent-lookup, factored out so `buildRunInput` and the node components (which also poll the parent's latest id for cache freshness) can never disagree on what counts as the media parent.
+  - `buildRunInput(node, nodes, edges, generationStatus = {}) => CreateGenerationInput | null` (pure). `generationStatus` is a `Record<id, Generation['status'] | undefined>` snapshot the CALLER reads out of the shared query cache.
   - `useRunNode(nodeId)` → mutation over `POST /api/generations`.
   - `useNodeGeneration(generationId | null)` → query over `GET /api/generations/:id`, key `['generation', id]`, 4 s interval while `processing`.
 - Inputs → Outputs: a `CanvasNode` + the graph → a generation request; a generation id → its live `Generation`.
@@ -38,7 +39,8 @@ sequenceDiagram
 
 ## Key decisions / gotchas
 - The chain edge sends `inputGenerationId`, never image bytes: the SERVER resolves its own stored media. For an image model that citation is merged into the `referenceImages` channel and therefore COUNTS against the model's `referenceMode`/`maxReferenceImages` gate (image models have no `inputImage` path at all); for a video model it becomes the provider seed frame. Do not "simplify" the request shape on that assumption.
-- Only the parent's LATEST id is cited, and a parent with an empty history returns `null` — the Generate button disables rather than submitting a chain into nothing.
+- **C2 fix-wave correction.** The FIRST version cited `generationIds[length-1]` with no status check — a child could cite a still-processing or a FAILED parent, sending a broken/empty reference into the provider call. `buildRunInput` now walks the parent's history from the newest entry and picks the first id whose `generationStatus[id] === 'succeeded'`; if none is, it returns `null` (Generate stays disabled). This is why the function grew a 4th parameter instead of reaching into the query cache itself — it stays pure and unit-testable with a plain object, and the CALLER (`ImageNode.tsx`) owns the cache read.
+- A parent with no succeeded generation anywhere in its history — empty, still processing, or every attempt failed — returns `null`. The Generate button disables rather than submitting a chain into nothing.
 - Upload parents are skipped on purpose (`n.kind !== 'upload'`): an upload is a stored `/media` file, not a generation, so there is nothing to cite until phase 4's operation nodes give it one.
 - Retry is SUBMIT-only and allowlisted (5xx / rate_limited / provider_error / internal_error, max 2). A validation or insufficient-credits failure is final; retrying it would only re-cost the user. A bare network throw is NOT retried here — unlike Cinema's shot submit — because a dropped response may already have been charged.
 - The poll key is `['generation', id ?? '']`, byte-identical to Cinema's `useShotGeneration`, so a generation open in the canvas and in the Library shares one cache entry and one interval.
@@ -46,3 +48,4 @@ sequenceDiagram
 
 ## Commits
 - 5443372 2026-07-30 feat(canvas-web): node run submit + shared-cache polling
+- (fix-wave) fix(canvas): C2 — buildRunInput cites the newest SUCCEEDED parent generation, never a bare last-history id

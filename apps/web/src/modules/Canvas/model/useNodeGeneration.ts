@@ -19,13 +19,34 @@ import { MEDIA_SOURCE_KINDS } from './types'
 
 const POLL_INTERVAL_MS = 4000
 
+// Shared by buildRunInput AND the node components (which also need the
+// parent's id to keep its status fresh in the shared poll cache — see
+// ImageNode.tsx). Factored out so the two call sites can never disagree on
+// what counts as "the media parent".
+export function findMediaParent(
+  nodeId: string,
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+): CanvasNode | undefined {
+  return edges
+    .filter((e) => e.targetNodeId === nodeId)
+    .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
+    .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind) && n.kind !== 'upload')
+}
+
 // Pure: node + graph → the POST body, or null when the node isn't runnable
-// yet (missing prompt/model, or a media parent that has no output). The
-// Generate button disables on null — a click can never submit a broken chain.
+// yet (missing prompt/model, or a media parent that has no SUCCEEDED output).
+// The Generate button disables on null — a click can never submit a broken
+// chain. `generationStatus` is a snapshot the caller reads out of the shared
+// TanStack Query cache (['generation', id]) — this function stays pure and
+// synchronous rather than reaching into the cache itself. Default `{}` (no
+// known statuses) is deliberately the SAFE side: an id with no known status
+// is treated as not-succeeded, never assumed good.
 export function buildRunInput(
   node: CanvasNode,
   nodes: readonly CanvasNode[],
   edges: readonly CanvasEdge[],
+  generationStatus: Readonly<Record<string, Generation['status'] | undefined>> = {},
 ): CreateGenerationInput | null {
   const prompt = node.config.prompt?.trim()
   const modelId = node.config.modelId
@@ -40,17 +61,18 @@ export function buildRunInput(
       : {}),
   }
 
-  // Media wire: the parent's LATEST generation id becomes inputGenerationId.
-  // Upload parents are previews only in this phase — their media is a stored
-  // file, not a generation, so there is nothing to cite yet.
-  const mediaParent = edges
-    .filter((e) => e.targetNodeId === node.id)
-    .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
-    .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind) && n.kind !== 'upload')
+  // Media wire: the parent's NEWEST SUCCEEDED generation id becomes
+  // inputGenerationId — never merely the last history entry. C2 fix: the
+  // history's last id can be a still-processing or failed retry, and citing
+  // it would send a broken/empty parent into the child's provider call.
+  // Walk from the end so ties (several succeeded runs) still pick the newest.
+  const mediaParent = findMediaParent(node.id, nodes, edges)
   if (mediaParent) {
-    const latest = mediaParent.generationIds[mediaParent.generationIds.length - 1]
-    if (!latest) return null
-    input.inputGenerationId = latest
+    const succeeded = [...mediaParent.generationIds]
+      .reverse()
+      .find((gid) => generationStatus[gid] === 'succeeded')
+    if (!succeeded) return null
+    input.inputGenerationId = succeeded
   }
 
   return input
