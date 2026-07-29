@@ -165,4 +165,5 @@ Three drizzle tables mirroring `CANVAS_DDL` column-for-column (ADR `docs/wiki/de
   a JSON array, not a column) and none on the edge endpoints. The only cascading edges are the owner
   edges. A gallery delete leaves an empty version on the node; it never removes the node or canvas.
 - **No status/derived column.** A node's run state is DERIVED from the cited generations at read time
+- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
   in the SPA (the films/shots and asset3d lesson: a persisted status is a second source of truth).

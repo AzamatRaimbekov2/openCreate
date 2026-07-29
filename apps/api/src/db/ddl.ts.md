@@ -152,4 +152,5 @@ composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/
   version on the node, never cascade the canvas away. The ONLY cascading edges are the owner edges
   (`canvas.user_id`, `canvas_node.canvas_id`, `canvas_edge.canvas_id`).
 - **No cost/credit column anywhere.** A canvas composes generations; the money lives in the ledger
+- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
   the generation system already owns. Zero new money code is the ADR's D1 constraint.

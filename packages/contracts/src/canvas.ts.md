@@ -79,4 +79,4 @@ flowchart LR
 
 ## Commits
 
-- _pending — see the Task 1 commit for Canvas Mode contracts_
+- 11a0e97 feat(canvas): wire contracts for the node-graph aggregate

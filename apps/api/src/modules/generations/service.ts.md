@@ -196,6 +196,7 @@ user-addressable; it reads a file it already owns.
   model's real limit, and the provider call needs no new plumbing at all. (Image models have no
   `supportsImageInput` — they condition only through references.)
 - **video models** — it becomes the provider seed frame (the `inputImage` slot in `videoProvider.submit`).
+- 7817253 feat(generation): resolve inputGenerationId server-side — canvas chain edge
 
 `mode` is now `'image'` for a chain run too: a cited generation conditions the run exactly as much as
 an uploaded frame does.

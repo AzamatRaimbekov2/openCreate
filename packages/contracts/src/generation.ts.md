@@ -79,3 +79,4 @@ the MCP tool listing for `create_generation` is unaffected.
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - b6ab9ec feat: CinemaStudio, entity library and shared/ui listbox refactor
+- dce20de feat(generation): inputGenerationId — canvas chain edge, exclusive with inputImage

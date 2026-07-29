@@ -114,6 +114,7 @@ flowchart LR
 - Exported LAST (after `./compare`) — it imports only `zod` and nothing else in the barrel depends
   on it, so ordering is immaterial (unlike `presets`→`generation` or `film`→`templates`).
 - Why this file exists: a `canvas` is the node-graph aggregate that CITES generations (the Film/Shot
+- 11a0e97 feat(canvas): wire contracts for the node-graph aggregate
   and Asset3d pattern again) — nodes hold editor config plus an append-only `generationIds` history,
   while money, media, and provider state stay in the generation system. The distinguishing constraint
   is that PATCH carries the FULL document (debounced autosave, last-write-wins, single owner), so

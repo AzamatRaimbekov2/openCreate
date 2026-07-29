@@ -71,4 +71,4 @@ flowchart LR
 
 ## Commits
 
-- _pending — see the Task 4 commit for the canvas aggregate_
+- 4d074dd feat(canvas): aggregate CRUD — service, routes, ownership
