@@ -45,6 +45,7 @@ erDiagram
 ## Commits
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
+- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
 
 ## Key decisions (2026-07-09) — wan-runpod
 - Added `provider: text(provider).notNull().default(runware)` to `generation` (VideoProvider seam). `.default()` makes it optional in `$inferInsert` (SQLite applies the default for image/legacy rows). The neutral provider job id / cost REUSE `runwareTaskUuid` / `runwareCostUsd` (no rename — keeps money-path code byte-for-byte, instant rollback). Mirror in `ddl.ts` + `client.ts` micro-migration.
@@ -165,5 +166,8 @@ Three drizzle tables mirroring `CANVAS_DDL` column-for-column (ADR `docs/wiki/de
   a JSON array, not a column) and none on the edge endpoints. The only cascading edges are the owner
   edges. A gallery delete leaves an empty version on the node; it never removes the node or canvas.
 - **No status/derived column.** A node's run state is DERIVED from the cited generations at read time
-- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
   in the SPA (the films/shots and asset3d lesson: a persisted status is a second source of truth).
+- `test/db-ddl.test.ts` (fix-wave I2) pins the shape of all three tables, boot idempotence, and the
+  citation-not-FK rule for both `canvas_node` (`foreign_key_list` contains `canvas`, not `generation`)
+  and `canvas_edge` (contains `canvas`, not `canvas_node` or `generation` — edge endpoints are
+  validated at the SERVICE layer, `service.ts` `validateGraph`, not by a SQLite FK).
