@@ -188,3 +188,21 @@ logic could not have lived inside either one without closing a cycle.
   token → 502 `provider_error`, boot stays healthy, route always registered. Session-guarded, strict
   10/min bucket (each call spends 7.5¢ of operator DeepInfra balance, bypassing the ledger). See
   `modules/compare/routes.ts(.md)` + `integrations/deepinfra/deepinfra-image.ts(.md)`.
+
+## Update 2026-07-30 — Canvas Mode routes
+`buildApp` now also registers the canvas aggregate (ADR `docs/wiki/decisions/canvas-mode.md`),
+immediately after `registerCompareRoutes`:
+
+```ts
+registerCanvasRoutes(app, createCanvasService({ db: deps.db, storage: deps.storage }))
+```
+
+- Six routes under `/api/canvases` (list · create · read · full-document PATCH · delete ·
+  `POST /:id/uploads`). No new `AppDeps` field: the service needs only the db and the storage
+  provider that already exist for entities/films.
+- `storage` is wired for exactly ONE thing — upload-node bytes. Every other node kind produces
+  media through the normal generation path.
+- **No money wiring at all.** A node RUN is an ordinary `POST /api/generations` from the SPA, so
+  the canvas module never touches the ledger, the providers, or the settlement sweeps. That is
+  ADR D1's constraint, and the registration line is where it is visible: no runware client, no
+  video/mesh provider, no credit service passed in.

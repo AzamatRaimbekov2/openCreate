@@ -42,6 +42,8 @@ import { registerAsset3dRoutes } from './modules/assets3d/routes'
 import { createPromptEnhanceService } from './modules/prompt/enhance'
 import { registerPromptRoutes } from './modules/prompt/routes'
 import { registerCompareRoutes } from './modules/compare/routes'
+import { createCanvasService } from './modules/canvas/service'
+import { registerCanvasRoutes } from './modules/canvas/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -395,6 +397,11 @@ export async function buildApp(deps: AppDeps) {
   // header for why it is not a generation. Same optional-secret discipline as
   // the enhancer: with no token the route answers 502 provider_error.
   registerCompareRoutes(app, { deepinfraToken: deps.config.deepinfraToken })
+  // Canvas Mode (ADR canvas-mode): the node-graph aggregate that CITES
+  // generations — CRUD only, zero money code; node runs arrive as ordinary
+  // POST /api/generations from the SPA. `storage` is wired for the ONE thing
+  // this module writes bytes for: upload-node images.
+  registerCanvasRoutes(app, createCanvasService({ db: deps.db, storage: deps.storage }))
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.
