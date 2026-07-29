@@ -318,6 +318,46 @@ export function createGenerationService({
     // know cannot succeed must cost the user nothing.
     if (model.type === 'model3d' && !input.inputImage)
       throw new ValidationError(`${model.id} requires a photo`)
+    // Canvas chain edge (ADR canvas-mode D2). Capability first, resolution
+    // second — a citation the model cannot honour must cost nothing and fail
+    // with the reason, not with a confusing reference-count error.
+    if (input.inputGenerationId) {
+      if (model.type === 'image' && !model.referenceMode)
+        throw new ValidationError(`${model.id} cannot condition on a reference image`)
+      if (model.type === 'video' && !model.supportsImageInput)
+        throw new ValidationError(`${model.id} does not support image input`)
+      if (model.type !== 'image' && model.type !== 'video')
+        throw new ValidationError(`${model.id} cannot take a generation as input`)
+    }
+    // Resolve the citation to the caller's OWN stored media. Four default-deny
+    // checks share ONE error (copyGeneratedAsset precedent): a foreign id, a
+    // missing id, a failed run and a video source must all be
+    // indistinguishable — nothing about other users' rows may leak.
+    let chainImage: string | undefined
+    if (input.inputGenerationId) {
+      const cited = db
+        .select()
+        .from(generation)
+        .where(eq(generation.id, input.inputGenerationId))
+        .get()
+      const mediaUrl =
+        cited && cited.userId === userId && cited.status === 'succeeded' && cited.type === 'image'
+          ? ((JSON.parse(cited.mediaJson) as string[])[0] ?? null)
+          : null
+      if (!mediaUrl)
+        throw new ValidationError(
+          'inputGenerationId must cite your own succeeded image generation',
+        )
+      // readAsDataUri re-guards the disk read (raster-only MIME table) and
+      // hands the provider a data URI — /media is not reachable from outside.
+      chainImage = await storage.readAsDataUri(mediaUrl)
+      if (model.type === 'image') {
+        // Into the SAME server-only channel entity photos and shot references
+        // use — so the referenceMode/maxReferenceImages gates below count it,
+        // and the provider call needs no new plumbing at all.
+        input = { ...input, referenceImages: [...(input.referenceImages ?? []), chainImage] }
+      }
+    }
     // Native generation audio is a CAPABILITY (catalog `nativeAudio`), and the
     // API decides — the composer filters the toggle, but a capability the client
     // can lie about is not one (same law as referenceMode). Runs BEFORE the
@@ -458,7 +498,9 @@ export function createGenerationService({
     const id = randomUUID()
     const taskUUID = randomUUID()
     const now = new Date()
-    const mode = input.inputImage ? 'image' : 'text'
+    // A cited generation conditions the run just as much as an uploaded frame
+    // does, so a chain run is image-mode too (the gallery/DTO read it as such).
+    const mode = input.inputImage || input.inputGenerationId ? 'image' : 'text'
     // Which backend runs this job. Image is always Runware (never routed);
     // video reads the catalog `provider` (default 'runware'). Persisted on the
     // row so the poll path resolves the SAME provider it submitted to.
@@ -665,7 +707,13 @@ export function createGenerationService({
           width,
           height,
           durationSeconds: input.duration!,
-          ...(input.inputImage ? { inputImage: input.inputImage } : {}),
+          // The seed frame: the explicit data URI, or the canvas chain's
+          // resolved citation. Exclusive by contract, so at most one is set.
+          ...(input.inputImage
+            ? { inputImage: input.inputImage }
+            : chainImage
+              ? { inputImage: chainImage }
+              : {}),
           // ByteDance models 400 on Runware's `safety` param — the catalog flag
           // routes around it (Runware adapter omits it; other providers ignore it).
           ...(model.type === 'video' && model.supportsSafetyParam === false

@@ -163,3 +163,50 @@ touched. That is the whole design: a mesh is a fourth media type, not a fourth s
 - Pinned by `test/generations-3d.test.ts`: 202-not-201 + charged once, `.glb` on disk, refund on provider
   error, refund on success-with-no-asset, 400-before-charge without a photo, and **never submitted to the
   video provider**.
+
+## Update 2026-07-30 — `inputGenerationId`, the canvas chain edge (ADR canvas-mode D2)
+
+A canvas node feeds its output into the next node by CITING a generation id instead of re-uploading
+its bytes. `create()` gains three edits, all inside the "everything here runs BEFORE the charge"
+region — an impossible or unauthorized chain must cost the user nothing.
+
+**1. Capability gates** (right after the `model3d requires a photo` guard). Capability is checked
+BEFORE resolution so the refusal names the real reason instead of surfacing later as a confusing
+reference-count error:
+- `image` model without `referenceMode` → `${model.id} cannot condition on a reference image`
+- `video` model without `supportsImageInput` → `${model.id} does not support image input`
+- any other type (audio, model3d) → `${model.id} cannot take a generation as input`
+
+**2. Resolution to our OWN stored media.** A direct row read, then FOUR default-deny checks that
+share ONE error message (the `copyGeneratedAsset` precedent): the row must exist, be owned by the
+caller, be `succeeded`, and be an `image` — and have media. A foreign id, a missing id, a failed run
+and a video source are therefore indistinguishable, so nothing about another user's rows can be
+probed. The media is read back through `storage.readAsDataUri`, which re-guards the disk read with
+the raster-only MIME table.
+
+**Why a data URI and not a URL.** The same reason entity photos take this path: `/media/*` is not
+reachable from a provider (private in dev, behind a private asset host in prod). It is also what
+keeps the SSRF guard intact — `inputImage` stays data-URI-only, and the server fetches nothing
+user-addressable; it reads a file it already owns.
+
+**3. Delivery differs by model type, because the two channels are not the same channel:**
+- **image models** — the resolved data URI is merged into `input.referenceImages`, the SAME
+  server-only channel entity photos and shot references use. That placement is load-bearing: it sits
+  BEFORE the `referenceMode` / `maxReferenceImages` gate, so the chain image is COUNTED against the
+  model's real limit, and the provider call needs no new plumbing at all. (Image models have no
+  `supportsImageInput` — they condition only through references.)
+- **video models** — it becomes the provider seed frame (the `inputImage` slot in `videoProvider.submit`).
+
+`mode` is now `'image'` for a chain run too: a cited generation conditions the run exactly as much as
+an uploaded frame does.
+
+The wire contract makes `inputImage` and `inputGenerationId` mutually exclusive
+(`createGenerationInputSchema`'s `superRefine`), so at most one seed frame is ever set and the
+ternary in the submit spread cannot pick wrong.
+
+**What did NOT change:** the charge/settle/refund sequence, the transaction boundary, the poll path,
+and the NSFW gate are byte-for-byte identical. Pinned by
+`test/generations-input-generation.test.ts` (image chain reaches `referenceImages` as a data URI;
+video chain reaches the seed frame; a stranger's id, an unknown id and an incapable model each 400
+with the balance untouched) plus the unchanged money suites `generations.test.ts`,
+`generations-entity-refs.test.ts`, `generations-money-atomicity.test.ts`.
