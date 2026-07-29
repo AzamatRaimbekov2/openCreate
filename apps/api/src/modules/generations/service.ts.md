@@ -115,6 +115,7 @@ flowchart TD
 - 2859858 fix(api): forbid deleting processing generations — ConflictError 409 in remove()
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — compound (createdAt,id) cursor, per-generation lastPolledAt throttle (DEFAULT_POLL_MIN_INTERVAL_MS)
 - ecb7c7f fix(api): guard refund against succeeded race + atomic video submit failure — failGeneration check-and-set covers the refund too; video submit catch reuses it
+- 7817253 feat(generation): resolve inputGenerationId server-side — canvas chain edge
 
 ## Key decisions (2026-07-09) — CinemaStudio (audio + presets)
 - `Deps.audioProvider?: AudioProvider` added (fallback derived from `runware` via `createRunwareAudioAdapter`, mirroring the video registry fallback). Audio SUBMITS through it; it POLLS through the video registry (audio row is `provider: 'runware'`; the runware video adapter maps `audioURL` → `assetUrl`), so every money-path invariant is reused unchanged.
@@ -196,7 +197,6 @@ user-addressable; it reads a file it already owns.
   model's real limit, and the provider call needs no new plumbing at all. (Image models have no
   `supportsImageInput` — they condition only through references.)
 - **video models** — it becomes the provider seed frame (the `inputImage` slot in `videoProvider.submit`).
-- 7817253 feat(generation): resolve inputGenerationId server-side — canvas chain edge
 
 `mode` is now `'image'` for a chain run too: a cited generation conditions the run exactly as much as
 an uploaded frame does.

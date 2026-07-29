@@ -122,7 +122,7 @@ Consumers: `films/routes.ts` (parses the body on the split route), `films/shot-s
 returns the updated `FilmDetail`).
 
 ## Commits
-- _no commit yet_
+- dce20de feat(generation): inputGenerationId — canvas chain edge, exclusive with inputImage
 
 ## Update 2026-07-09 — storyboard
 - Added `createStoryboardInputSchema`/`CreateStoryboardInput` (`{ script, styleId?, shotCount? }`), and the LLM-output guards `storyboardShotSchema`/`StoryboardShot` + `storyboardResponseSchema` (`{ shots: [...] }`). Now also imports `cameraShotSchema`/`cameraMotionSchema` from presets. Storyboard shots become DRAFT shots (generationId null) — nothing is generated or charged until the user presses Generate per shot.
@@ -155,7 +155,6 @@ Four additive fields, all nullable, all readable as "the same wire as before" by
   stamps it. Two things read it back: the audio panel (to pre-fill the music prompt the template
   authored) and analytics ("which templates get finished?").
 - **`filmAudio.shotId: string | null`** — the shot this track voices; `null` = a film-wide bed (music,
-- dce20de feat(generation): inputGenerationId — canvas chain edge, exclusive with inputImage
   or a voiceover the user placed by hand). It exists to make "voice this shot" SAFE: without it the
   editor cannot tell whether a shot has already been voiced, so a second click on Generate would
   quietly add a second overlapping track — and charge for it again. With it the action is a REPLACE,

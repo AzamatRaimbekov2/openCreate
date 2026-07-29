@@ -38,7 +38,7 @@ flowchart TD
 - `video` is a legal TARGET but never a SOURCE: a clip cannot feed i2i or i2v, so video is terminal in the MVP. It is absent from `MEDIA_SOURCE_KINDS` rather than special-cased here.
 - Cycle detection walks forward from the TARGET; reaching the source means the new edge would close a loop. The tables are phase-3/4-ready (`upscale`/`remove-bg`/`character` already legal), so later phases add node behaviour, not graph law.
 - Refusals return a `reason` string. Phase 2 only reads `.ok` (the wire simply does not snap — the standard React Flow affordance); the reason exists for the tooltip/toast a later phase can add without changing this signature.
-- The DFS pops with an explicit `undefined` guard instead of `!` — the repo bans non-null assertions, and `stack.pop()` is typed optional even inside a `length > 0` loop.
+- The DFS pops with an explicit `undefined` guard instead of `!` — this avoids a non-null assertion, since `stack.pop()` is typed optional even inside a `length > 0` loop.
 
 ## Commits
 - 1779f0c 2026-07-30 feat(canvas-web): @xyflow/react + pure edge rules

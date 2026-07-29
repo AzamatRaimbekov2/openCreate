@@ -42,8 +42,11 @@ flowchart TD
 
 ## Update 2026-07-30 — per-node RF identity cache (focus-loss fix)
 
-- `rfNodes` now preserves PER-NODE object identity via a ref cache (`rfNodeCache`),
-  returning the same RF object while id/kind/position/data are unchanged; deleted
+- `rfNodes` now preserves PER-NODE object identity via a state-held Map
+  (`rfNodeCache`, seeded once with `useState(() => new Map())` and mutated
+  directly — deliberate, not a `useRef`, so the cache identity itself stays
+  stable across StrictMode's double-render), returning the same RF object
+  while id/kind/position/data are unchanged; deleted
   ids are evicted. **Load-bearing, not an optimization**: React Flow v12 treats a
   node object with new identity as unmeasured and hides it (`visibility: hidden`)
   for a frame until ResizeObserver answers — a focused textarea inside that node

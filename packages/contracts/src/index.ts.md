@@ -43,6 +43,7 @@ flowchart LR
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 789adb5 feat: template catalog — Brainrot Studio (fruit/cat drama, talking food)
 - 863a9c0 feat(contracts): portable scene preset (one JSON, N renderers)
+- 11a0e97 feat(canvas): wire contracts for the node-graph aggregate
 
 ## Update 2026-07-11 — model render + share (Task 3)
 - Now also re-exports `./model-render`: `modelRenderStatusSchema`, `createModelRenderInputSchema`/
@@ -114,7 +115,6 @@ flowchart LR
 - Exported LAST (after `./compare`) — it imports only `zod` and nothing else in the barrel depends
   on it, so ordering is immaterial (unlike `presets`→`generation` or `film`→`templates`).
 - Why this file exists: a `canvas` is the node-graph aggregate that CITES generations (the Film/Shot
-- 11a0e97 feat(canvas): wire contracts for the node-graph aggregate
   and Asset3d pattern again) — nodes hold editor config plus an append-only `generationIds` history,
   while money, media, and provider state stay in the generation system. The distinguishing constraint
   is that PATCH carries the FULL document (debounced autosave, last-write-wins, single owner), so

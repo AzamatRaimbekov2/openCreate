@@ -51,6 +51,7 @@ flowchart LR
 - b21a116 feat(api): production single-origin serving — prod SPA static + index.html fallback
 - a7e4cd9 fix(api): ssrf allowlist, cursor tiebreaker, poll throttle — pollMinIntervalMs test seam on AppDeps
 - eb17afd fix(api): trust proxy for per-client rate limits behind the documented reverse proxy — trustProxy on the Fastify constructor
+- 4d074dd feat(canvas): aggregate CRUD — service, routes, ownership
 
 ## Key decisions (2026-07-09) — video provider registry
 - `AppDeps.videoProviders?: Record<'runware'|'wan-runpod', VideoProvider>` (optional). When absent, buildApp DERIVES it: `{ runware: createRunwareVideoAdapter(deps.runware), 'wan-runpod': createComfyClient({ baseUrl: config.comfyBaseUrl }) }`. The comfy client is ALWAYS registered even when `COMFY_BASE_URL` is unset (submit then returns a clean provider_error), so `wan-2-2` is listable without a pod and boot never fails. The registry is passed to `createGenerationService`; `index.ts` is unchanged (relies on the derived default).
@@ -203,7 +204,6 @@ registerCanvasRoutes(app, createCanvasService({ db: deps.db, storage: deps.stora
 - `storage` is wired for exactly ONE thing — upload-node bytes. Every other node kind produces
   media through the normal generation path.
 - **No money wiring at all.** A node RUN is an ordinary `POST /api/generations` from the SPA, so
-- 4d074dd feat(canvas): aggregate CRUD — service, routes, ownership
   the canvas module never touches the ledger, the providers, or the settlement sweeps. That is
   ADR D1's constraint, and the registration line is where it is visible: no runware client, no
   video/mesh provider, no credit service passed in.

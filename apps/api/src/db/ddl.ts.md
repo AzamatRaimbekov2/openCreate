@@ -72,6 +72,7 @@ column to a table an older db already has).
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - de61e59 feat(api): db-level refund-once index + asset download limits — REFUND_ONCE_INDEX_DDL exported separately from the main DDL string
+- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
 
 ## Key decisions (2026-07-09) — wan-runpod
 - Added `provider TEXT NOT NULL DEFAULT 'runware'` to the `generation` CREATE TABLE (mirrors `schema.ts`). Additive; the `client.ts` guarded micro-migration ALTERs it onto pre-existing db files (SQLite has no ADD COLUMN IF NOT EXISTS).
@@ -152,5 +153,4 @@ composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/
   version on the node, never cascade the canvas away. The ONLY cascading edges are the owner edges
   (`canvas.user_id`, `canvas_node.canvas_id`, `canvas_edge.canvas_id`).
 - **No cost/credit column anywhere.** A canvas composes generations; the money lives in the ledger
-- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
   the generation system already owns. Zero new money code is the ADR's D1 constraint.

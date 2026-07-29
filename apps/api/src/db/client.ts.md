@@ -39,6 +39,7 @@ flowchart LR
 - 273e3f4 feat(api): drizzle schema + sqlite bootstrap DDL
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy
 - de61e59 feat(api): db-level refund-once index + asset download limits — guarded exec of REFUND_ONCE_INDEX_DDL (try/catch + warn, legacy dupes never brick the boot)
+- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
 
 ## Key decisions (2026-07-09) — wan-runpod
 - Added a guarded micro-migration: `if (!generationColumns.includes('provider')) ALTER TABLE generation ADD COLUMN provider TEXT NOT NULL DEFAULT 'runware'`. Legacy/image rows backfill to `runware` in one statement — the whole additive DB change for the video-provider seam.
@@ -91,7 +92,6 @@ TEXT and the enum lives only in TypeScript, exactly as `generation.type` did whe
 
 ## Update 2026-07-16 — user.role micro-migration
 - Guarded `ALTER TABLE user ADD COLUMN role TEXT NOT NULL DEFAULT 'user'` (pragma table_info check, same pattern as every other micro-migration here). DEFAULT backfills all pre-existing accounts as plain users; the only `super_admin` is written by the dev-only seed in `modules/auth/dev-admin.ts`.
-- 81c26c8 feat(canvas): canvas/canvas_node/canvas_edge tables
 
 ## Key decisions (2026-07-18) — Modular 3D Assets
 `createDb` now also execs `ASSET3D_DDL` (imported from `./ddl`, exec'd right after `MODEL3D_DDL`),
