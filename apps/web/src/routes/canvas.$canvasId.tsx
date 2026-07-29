@@ -9,7 +9,7 @@
 //      is composed here (routes MAY import modules/Credits; the module may not).
 // It also owns the per-document lifecycle: init the store when the document
 // lands, reset it on the way out.
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { requireSession } from 'modules/Auth'
@@ -24,11 +24,38 @@ import {
   type CanvasModelOption,
 } from 'modules/Canvas'
 import { ErrorState, Skeleton } from 'shared/ui'
+import type { CatalogModel } from '@opencreate/contracts'
 
 export const Route = createFileRoute('/canvas/$canvasId')({
   beforeLoad: () => requireSession(),
   component: CanvasEditorPage,
 })
+
+// Catalog rows → the node-data shape. Module scope (not inline in the
+// component) so the useMemo below is the ONLY thing deciding when a new
+// array is minted — its identity feeds the editor's per-node RF cache.
+// Video models carry the whole per-duration price table: the node prices
+// the run at the duration the user picked.
+function buildModelOptions(catalogModels: CatalogModel[] | undefined): CanvasModelOption[] {
+  return (catalogModels ?? []).flatMap((m) =>
+    m.type === 'image' || m.type === 'video'
+      ? [
+          {
+            id: m.id,
+            name: m.name,
+            providerLabel: m.providerLabel,
+            type: m.type,
+            credits:
+              m.type === 'image' ? m.credits : (Object.values(m.creditsByDuration)[0] ?? 0),
+            aspectRatios: m.aspectRatios,
+            ...(m.type === 'video'
+              ? { durationOptions: m.durationOptions, creditsByDuration: m.creditsByDuration }
+              : {}),
+          },
+        ]
+      : [],
+  )
+}
 
 function CanvasEditorPage() {
   const { t } = useTranslation()
@@ -54,23 +81,12 @@ function CanvasEditorPage() {
 
   // Catalog → node data. Video models price per duration, so the whole table
   // travels: the node prices the run at the duration the user picked.
-  const models: CanvasModelOption[] = (catalog.data?.models ?? []).flatMap((m) =>
-    m.type === 'image' || m.type === 'video'
-      ? [
-          {
-            id: m.id,
-            name: m.name,
-            providerLabel: m.providerLabel,
-            type: m.type,
-            credits:
-              m.type === 'image' ? m.credits : (Object.values(m.creditsByDuration)[0] ?? 0),
-            aspectRatios: m.aspectRatios,
-            ...(m.type === 'video'
-              ? { durationOptions: m.durationOptions, creditsByDuration: m.creditsByDuration }
-              : {}),
-          },
-        ]
-      : [],
+  // MEMOIZED on the catalog payload — this array's identity feeds the editor's
+  // per-node RF cache (CanvasEditor.tsx); a fresh array per render would void
+  // that cache and resurrect the React Flow focus-loss bug it exists to fix.
+  const models: CanvasModelOption[] = useMemo(
+    () => buildModelOptions(catalog.data?.models),
+    [catalog.data],
   )
 
   return (

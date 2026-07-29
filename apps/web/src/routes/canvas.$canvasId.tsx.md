@@ -41,3 +41,11 @@ sequenceDiagram
 
 ## Commits
 - bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes
+
+## Update 2026-07-30 — memoized model options (focus-loss fix, route side)
+
+- `models` is now built by module-scope `buildModelOptions(catalog.data?.models)`
+  inside `useMemo([catalog.data])`. Its IDENTITY is load-bearing: it feeds the
+  editor's per-node RF cache (see CanvasEditor.tsx.md, same-day update) — a fresh
+  array per render voided that cache and resurrected the React Flow v12
+  visibility-flicker focus loss (one typed char per click).
