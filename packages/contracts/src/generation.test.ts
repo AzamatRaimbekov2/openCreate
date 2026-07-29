@@ -30,6 +30,23 @@ describe('createGenerationInputSchema', () => {
   })
 })
 
+describe('inputGenerationId (canvas chain edge)', () => {
+  const BASE = { modelId: 'flux-dev', prompt: 'a fox', aspectRatio: '1:1' as const }
+  it('accepts inputGenerationId alone', () => {
+    expect(
+      createGenerationInputSchema.safeParse({ ...BASE, inputGenerationId: 'g1' }).success,
+    ).toBe(true)
+  })
+  it('rejects inputGenerationId together with inputImage (mutually exclusive)', () => {
+    const result = createGenerationInputSchema.safeParse({
+      ...BASE,
+      inputGenerationId: 'g1',
+      inputImage: 'data:image/png;base64,AAAA',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('generationSchema', () => {
   it('parses a processing video generation', () => {
     const r = generationSchema.safeParse({

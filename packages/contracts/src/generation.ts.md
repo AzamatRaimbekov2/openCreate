@@ -42,6 +42,39 @@ flowchart LR
   the clip carries a native soundtrack ('switchable'+requested, or 'always').
   The film render trusts this instead of probing files.
 
+## Update 2026-07-30 — `inputGenerationId` (Canvas Mode chain edge)
+
+The file now exports **two** schemas where it exported one:
+
+- `createGenerationInputBaseSchema` — the plain `z.object`. Exported so a
+  consumer that needs to WIDEN a field can call `.extend` on an unrefined
+  object. Today's only such consumer is `film.ts`'s `generateShotClipInputSchema`
+  (it raises the `entityRefs` cap to `MAX_SHOT_REFERENCE_IMAGES`).
+- `createGenerationInputSchema` — the base PLUS a `superRefine` that enforces
+  input-channel exclusivity. This is still the schema every route parses; the
+  inferred `CreateGenerationInput` type is unchanged in shape.
+
+New optional field: `inputGenerationId?: string (1..60)` (ADR canvas-mode D2).
+A canvas node cites an OWN succeeded image generation as the i2i/i2v input
+instead of round-tripping its bytes back through `inputImage` as a ~14MB data
+URI. The wire only carries the id; the SERVICE resolves it against its own
+storage after four default-deny checks (own row · succeeded · image type · has
+media), so nothing user-addressable is ever fetched — the SSRF guard that makes
+`inputImage` data-URI-only is preserved, not widened.
+
+**Why a refinement and not just two optional fields.** `inputImage` and
+`inputGenerationId` are the same slot expressed two ways. Accepting both would
+force the server to pick a winner silently; the refinement makes the
+contradiction a 400 at the edge with the reason attached
+(`path: ['inputGenerationId']`).
+
+**zod 4 note.** `.extend` *does* exist on a `superRefine`d object in zod 4 and
+preserves the check, so film.ts would not have broken — but it is built from the
+base deliberately: the exclusivity rule guards a field the shot-clip path can
+never carry, and inheriting a dead check would mislead the next reader.
+`z.toJSONSchema` also handles the refined schema (it ignores custom checks), so
+the MCP tool listing for `create_generation` is unaffected.
+
 ## Commits
 - 5c5d863 feat(contracts): shared zod schemas for catalog, generations, credits, user, errors
 - 3b96d8c fix(api,web,contracts): respect the NSFW flag — content_blocked failure with refund, never store flagged assets, localized safety copy

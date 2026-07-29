@@ -184,3 +184,20 @@ renders differently from "not loaded yet"; an optional field would blur the two.
 Consumers: `getFilm` (API) fills it from the newest `film_render` row by
 `createdAt`; `FilmEditor` (web) resolves `startedId ?? latestRender?.id` as the
 render to poll and to gate the Export menu item on.
+
+## Update 2026-07-30 — `generateShotClipInputSchema` builds on the generation BASE schema
+
+`generation.ts` now splits its wire input into `createGenerationInputBaseSchema`
+(the plain object) and `createGenerationInputSchema` (that object plus a
+`superRefine` enforcing `inputImage` XOR `inputGenerationId`, the Canvas Mode
+chain edge — ADR canvas-mode D2).
+
+`generateShotClipInputSchema` extends the **base**. The exclusivity rule guards
+`inputGenerationId`, which the shot-clip path can never carry: a shot's input
+images are its OWN attached references, read from storage server-side inside the
+route (that is the whole point of this schema — see the block comment above it).
+Inheriting a check that can never fire would only mislead the next reader.
+
+Nothing about the shape changed: the same fields, the same `entityRefs` widening
+to `MAX_SHOT_REFERENCE_IMAGES`, the same stripping of a hand-rolled
+`referenceImages` key.

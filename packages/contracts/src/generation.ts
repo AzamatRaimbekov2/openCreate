@@ -20,7 +20,11 @@ export const generationTypeSchema = z.enum(['image', 'video', 'audio', 'model3d'
 export const generationModeSchema = z.enum(['text', 'image'])
 export const generationStatusSchema = z.enum(['processing', 'succeeded', 'failed'])
 
-export const createGenerationInputSchema = z.object({
+// The BASE object, exported so consumers that need to widen a field can call
+// `.extend` on a plain object schema rather than on the refined export below.
+// `createGenerationInputSchema` (the wire schema every route parses) is this
+// object PLUS the input-channel exclusivity rule.
+export const createGenerationInputBaseSchema = z.object({
   modelId: z.string().min(1),
   // The prompt the CLIENT sends may contain opaque `[[e1]]` placeholders. The
   // prompt the MODEL sees is composed server-side by substituting each one with
@@ -33,6 +37,12 @@ export const createGenerationInputSchema = z.object({
   aspectRatio: aspectRatioSchema.optional(),
   duration: z.number().int().min(1).max(15).optional(),
   inputImage: z.string().startsWith('data:image/').max(14_000_000).optional(),
+  // Canvas chain edge (ADR canvas-mode D2): cite an OWN succeeded image
+  // generation as the i2i/i2v input instead of round-tripping its bytes as a
+  // 14MB data URI. Mutually exclusive with inputImage (refined below); the
+  // SERVICE additionally verifies ownership + succeeded + image output before
+  // resolving its own stored media — nothing user-addressable is fetched.
+  inputGenerationId: z.string().min(1).max(60).optional(),
   // Tagged entities. Capped at 1 because Runware accepts a single reference
   // image; the array shape is what lets that cap rise without a wire break.
   // The API re-validates model capability — a capability the client can lie
@@ -51,6 +61,20 @@ export const createGenerationInputSchema = z.object({
   // on 'switchable' models, because providers bill sound separately).
   audio: z.boolean().optional(),
 })
+
+export const createGenerationInputSchema = createGenerationInputBaseSchema.superRefine(
+  (input, ctx) => {
+    // One input channel per request: a data URI AND a cited generation is a
+    // contradiction (which one wins?) — refuse instead of guessing.
+    if (input.inputImage !== undefined && input.inputGenerationId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'inputImage and inputGenerationId are mutually exclusive',
+        path: ['inputGenerationId'],
+      })
+    }
+  },
+)
 export type CreateGenerationInput = z.infer<typeof createGenerationInputSchema>
 
 export const generationParamsSchema = z.object({

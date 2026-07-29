@@ -18,7 +18,7 @@
 import { z } from 'zod'
 import { aspectRatioSchema } from './catalog'
 import { entityRefSchema } from './entity'
-import { createGenerationInputSchema } from './generation'
+import { createGenerationInputBaseSchema } from './generation'
 import { cameraMotionSchema, cameraShotSchema, promptPresetSchema, styleIdSchema } from './presets'
 
 // The most references a single shot may carry — entity tags AND attached images
@@ -267,7 +267,12 @@ export type AddShotReferenceInput = z.infer<typeof addShotReferenceInputSchema>
 //    still enforces the chosen model's real limit before charging.
 //  · a stray `referenceImages` key is STRIPPED (zod objects drop unknown keys),
 //    so even a hand-rolled body cannot open the channel.
-export const generateShotClipInputSchema = createGenerationInputSchema.extend({
+//
+// Built from the BASE object, not the refined `createGenerationInputSchema`:
+// the exclusivity rule that wraps the wire schema guards `inputGenerationId`
+// (the canvas chain edge), and the shot-clip path never carries one — a shot's
+// input images come from its OWN attached references, sourced server-side.
+export const generateShotClipInputSchema = createGenerationInputBaseSchema.extend({
   entityRefs: z.array(entityRefSchema).max(MAX_SHOT_REFERENCE_IMAGES).optional(),
 })
 export type GenerateShotClipInput = z.infer<typeof generateShotClipInputSchema>
