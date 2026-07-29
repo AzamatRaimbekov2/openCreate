@@ -161,6 +161,105 @@ describe('canvas CRUD', () => {
     expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
   })
 
+  it('rejects a PATCH whose edges point at a missing node id (dangling edge)', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const { id } = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/canvases',
+        headers: { cookie },
+        payload: { title: 'X' },
+      })
+    ).json() as { id: string }
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: {
+        nodes: [NODE],
+        edges: [{ id: 'e1', sourceNodeId: 'n1', targetNodeId: 'ghost' }],
+      },
+    })
+    expect(res.statusCode).toBe(400)
+    expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
+  })
+
+  it('rejects a self-edge (source === target)', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const { id } = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/canvases',
+        headers: { cookie },
+        payload: { title: 'X' },
+      })
+    ).json() as { id: string }
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: {
+        nodes: [NODE],
+        edges: [{ id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n1' }],
+      },
+    })
+    expect(res.statusCode).toBe(400)
+    expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
+  })
+
+  it('rejects a cycle (a→b, b→a)', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const { id } = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/canvases',
+        headers: { cookie },
+        payload: { title: 'X' },
+      })
+    ).json() as { id: string }
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: {
+        nodes: [
+          NODE,
+          { id: 'n2', kind: 'note', position: { x: 0, y: 0 }, config: {}, generationIds: [] },
+        ],
+        edges: [
+          { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n2' },
+          { id: 'e2', sourceNodeId: 'n2', targetNodeId: 'n1' },
+        ],
+      },
+    })
+    expect(res.statusCode).toBe(400)
+    expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
+  })
+
+  it('rejects duplicate node ids in the same PATCH', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const { id } = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/canvases',
+        headers: { cookie },
+        payload: { title: 'X' },
+      })
+    ).json() as { id: string }
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: { nodes: [NODE, NODE] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
+  })
+
   it('stores an upload and returns its /media path; rejects svg', async () => {
     const app = await buildTestApp()
     const cookie = await registerAndGetCookie(app)

@@ -112,11 +112,60 @@ export function createCanvasService({ db, storage }: Deps) {
     }
   }
 
+  // Spec §5: the server, not just the client, owns document integrity. A raw
+  // PATCH must never be able to persist a dangling edge, a self-edge or a
+  // cycle — the blind delete+reinsert below has no other gate against them.
+  // Runs BEFORE the transaction so a rejected document touches no rows.
+  function validateGraph(input: UpdateCanvasInput): void {
+    if (input.nodes === undefined && input.edges === undefined) return
+    const nodeIds = new Set<string>()
+    for (const node of input.nodes ?? []) {
+      if (nodeIds.has(node.id)) throw new CanvasValidationError(`duplicate node id: ${node.id}`)
+      nodeIds.add(node.id)
+    }
+    const edges = input.edges ?? []
+    // Edge endpoints are only checkable against a node set the PATCH actually
+    // carries — a title/viewport-only save (nodes undefined) has none to check.
+    if (input.nodes !== undefined) {
+      for (const edge of edges) {
+        if (edge.sourceNodeId === edge.targetNodeId)
+          throw new CanvasValidationError(`self-edge: ${edge.id}`)
+        if (!nodeIds.has(edge.sourceNodeId) || !nodeIds.has(edge.targetNodeId))
+          throw new CanvasValidationError(`edge ${edge.id} cites a missing node`)
+      }
+    }
+    // Kahn's algorithm: repeatedly remove zero-indegree nodes. Any node left
+    // over once the queue drains sits on a cycle.
+    const indegree = new Map<string, number>()
+    const adjacency = new Map<string, string[]>()
+    for (const nid of nodeIds) {
+      indegree.set(nid, 0)
+      adjacency.set(nid, [])
+    }
+    for (const edge of edges) {
+      adjacency.get(edge.sourceNodeId)?.push(edge.targetNodeId)
+      indegree.set(edge.targetNodeId, (indegree.get(edge.targetNodeId) ?? 0) + 1)
+    }
+    const queue = [...indegree.entries()].filter(([, deg]) => deg === 0).map(([nid]) => nid)
+    let visited = 0
+    while (queue.length > 0) {
+      const current = queue.pop()!
+      visited += 1
+      for (const next of adjacency.get(current) ?? []) {
+        const deg = (indegree.get(next) ?? 0) - 1
+        indegree.set(next, deg)
+        if (deg === 0) queue.push(next)
+      }
+    }
+    if (visited !== nodeIds.size) throw new CanvasValidationError('the graph contains a cycle')
+  }
+
   // FULL-DOCUMENT autosave. Replace, not merge: the client owns the truth
   // between saves (single owner), so the stored doc must become exactly what
   // was sent. One transaction so a crash can never leave nodes without edges.
   function updateCanvas(userId: string, canvasId: string, input: UpdateCanvasInput): CanvasDetail {
     requireCanvas(userId, canvasId)
+    validateGraph(input)
     db.transaction((tx) => {
       tx.update(canvas)
         .set({

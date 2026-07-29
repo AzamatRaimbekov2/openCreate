@@ -13,7 +13,9 @@ which generations a node CITES and never touches money, providers, or the ledger
 
 - Responsibilities: ownership-scoped read/write of `canvas` / `canvas_node` /
   `canvas_edge`; JSON ↔ DTO mapping; the full-document replace that implements
-  autosave; storing an upload node's bytes.
+  autosave; storing an upload node's bytes; **server-side graph integrity**
+  (`validateGraph`) — a PATCH is rejected before any row is touched if it would
+  persist a dangling edge, a self-edge, a cycle, or duplicate node ids.
 - Public API (`createCanvasService({ db, storage })` → `CanvasService`):
   - `createCanvas(userId, { title })` → `Canvas`
   - `listCanvases(userId)` → `Canvas[]` (newest-touched first, `updatedAt DESC`)
@@ -74,6 +76,16 @@ sequenceDiagram
   through `requireCanvas`, which filters on `id AND user_id`. A foreign canvas and
   a missing one raise the SAME `CanvasNotFoundError`, so an attacker cannot probe
   which ids exist (the films precedent).
+- **The server validates the graph, not just the client.** Fix-wave finding C1:
+  the original PATCH did a blind delete+reinsert, so a raw HTTP PATCH (bypassing
+  the SPA's `edgeRules.ts` drag-time guard) could persist a dangling edge, a
+  self-edge, or a cycle with 200. `validateGraph` runs BEFORE `db.transaction`
+  and throws `CanvasValidationError` (→400) on: an edge citing a node id absent
+  from the PATCH's own `nodes` array, `sourceNodeId === targetNodeId`, a
+  duplicate node id in the payload, or a cycle (detected via Kahn's algorithm —
+  nodes left over after removing all zero-indegree nodes sit on a cycle). Edge
+  endpoints are only checked when `nodes` is present in the same PATCH — a
+  title/viewport-only save has no node set to check them against.
 - **PATCH replaces, it does not merge.** These are single-owner documents with
   debounced autosave and last-write-wins semantics, so the stored doc must become
   exactly what was sent. Merging would resurrect nodes the user deleted. The
