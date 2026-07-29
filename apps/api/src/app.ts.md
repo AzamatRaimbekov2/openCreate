@@ -177,3 +177,14 @@ logic could not have lived inside either one without closing a cycle.
   better-auth Google provider (so no client/server drift; supersedes the old `VITE_GOOGLE_AUTH` build flag).
   No `requireUser` — it must render on the pre-sign-in screen. Registered as a STATIC route so find-my-way
   matches it ahead of better-auth's `/api/auth/*` wildcard. Pinned by `test/auth-config.test.ts`.
+
+## Update 2026-07-29 — hidden /compare utility (POST /api/compare/generate)
+- Right after `registerPromptRoutes`, wires `registerCompareRoutes(app, { deepinfraToken:
+  config.deepinfraToken })` — the hidden `/compare` model-evaluation page's one endpoint: a SYNCHRONOUS
+  DeepInfra Qwen-Image-Max render proxied through the server (the token is a server secret; the SPA must
+  never hold it). Returns `{ imageUrl (data-URL png), costUsd, durationMs }` (contracts `compare.ts`).
+- Deliberately NOT a generation: no credit ledger, no gallery row, no submit/poll seam — the blocking
+  wall time IS the benchmark the page displays. Same optional-secret discipline as the enhancer: unset
+  token → 502 `provider_error`, boot stays healthy, route always registered. Session-guarded, strict
+  10/min bucket (each call spends 7.5¢ of operator DeepInfra balance, bypassing the ledger). See
+  `modules/compare/routes.ts(.md)` + `integrations/deepinfra/deepinfra-image.ts(.md)`.

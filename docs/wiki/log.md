@@ -678,3 +678,38 @@ DeepInfra ушёл в минус («You need positive balance to do inference»)
 - Слайдер → `[2,3,5,8,10,12,15]`
 
 Перелинная полоска прижимается к максимуму модели при генерации (`nearestDuration`), так что 15 на слайдере честны для всех: у Veo просто сгенерится 8. Тестами вперёд (6 RED → GREEN в catalog.test). Гейт: API **566/566**, web **495/495**, tsc/ESLint чисто, живой `/api/catalog` отдаёт `wan-2-7: [5,8,10,15]`. Точный потолок канала перепроверяю живым вызовом до зашивки, чтобы не поймать 400.
+
+## [2026-07-24] fix | Google-вход разблокирован: раздельные rate-limit вёдра на /api/auth/*
+
+**Симптом**: клик «Продолжить с Google» на /login ничего не делал. **Корень**: одно строгое ведро `10/min per IP` покрывало ВЕСЬ `/api/auth/*` — SPA опрашивает `get-session` на каждом переходе/фокусе, съедала бюджет, и `POST /sign-in/social` (и даже `GET /callback/google` от Google) получали 429. Вторая половина бага — фронт: `handleGoogleSignIn` был fire-and-forget (`void signIn.social(...)`), ошибка проглатывалась, кнопка выглядела мёртвой.
+
+**Фикс**:
+- `apps/api/src/modules/auth/plugin.ts` — роут разделён на два: `POST /api/auth/*` держит строгие `10/min` (credential stuffing), `GET /api/auth/*` — без per-route конфига, действует только глобальный `300/min` (чтение сессии без кредов + OAuth-callback).
+- `apps/web/.../AuthForm.tsx` — `handleGoogleSignIn` теперь await'ит `signIn.social` и выводит `{ error }` через тот же `mapServerError` → role="alert" баннер, что и email-вход.
+
+**Тесты вперёд (RED→GREEN)**: `rate-limit.test.ts` — 25 GET get-session подряд все 200 и не съедают POST-бюджет; `AuthForm.test.tsx` — упавший social-вход показывает локализованный alert. Гейт: API **574/574**, web **650/650**, tsc чисто. Живая проверка: `sign-in/social` → 200 c URL Google, accounts.google.com принимает redirect_uri (`http://localhost:5173/api/auth/callback/google`) — экран выбора аккаунта открывается.
+
+## [2026-07-28] fix | «Не могу войти»: ввод, а не код — плюс dev-логин `admin`/`admin`
+
+**Симптом**: вход не проходит. **Расследование показало, что бэкенд здоров**: `POST /api/auth/sign-in/email` напрямую → 200 + `set-cookie`, через Vite-прокси → 200, полный путь в браузере (форма → клик) → 200 → редирект на `/create` с загруженной сессией. Google OAuth сконфигурирован и отдаёт валидный redirect на `accounts.google.com`.
+
+**Корень**: Chrome автозаполнял поле почты сохранённым значением **`admin`** (без домена). Dev-админ — это `admin@dev.local` / `"admin"` (`modules/auth/dev-admin.ts`, `DEV_ADMIN_EMAIL` никогда не был другим — проверено по истории). Голый `admin` резался zod'ом **на клиенте**, запрос вообще не уходил: пользователь видел только «введите корректный email» и делал вывод, что вход сломан. Подтверждено: `{"email":"admin"}` → `INVALID_EMAIL`, `{"email":"admin@dev.local"}` → 200.
+
+**Сделано**:
+- `apps/web/.../AuthForm.tsx` — `loginSchema.email` стал `z.string().transform(expandDevUsername).pipe(z.email(...))`. В **dev** значение без `@` разворачивается в `<ввод>@dev.local`, так что `admin`/`admin` реально логинит. Гейт `import.meta.env.DEV` — в проде ветка мертва, голый username остаётся невалидным. transform-then-pipe (а не refine) потому, что развернуть надо ДО проверки email, а `zodResolver` отдаёт в `onSubmit` уже трансформированное значение.
+- `apps/api/scripts/set-password.ts` — новый dev-скрипт смены пароля: флоу сброса в приложении **нет** (нет почтовой инфраструктуры), поэтому забытый пароль иначе не восстановить. Хеширует хешером самого better-auth (`auth.$context.password.hash`) — любой другой даёт креденшл, который никогда не залогинится.
+- БД: удалён тестовый `probe1@example.com` (аккаунт + 4 сессии + 1 транзакция); пароль `arturfeniks88@gmail.com` сброшен на `admin` (баланс 4540 не тронут).
+
+**Тесты вперёд (RED→GREEN)**: `AuthForm.test.tsx` — 3 кейса: dev разворачивает `admin` → `admin@dev.local`; настоящий email не трогается; под `vi.stubEnv('DEV', false)` прод по-прежнему отвергает голый username. Ровно 1 упал до фикса. Гейт: API **575/575**, web **659/659**, tsc и ESLint чисто. Живая проверка: `admin`/`admin` в браузере → 200 → `/create` под Dev Admin с 1 млрд кредитов.
+
+## [2026-07-29] feat | Скрытая страница /compare — Qwen Image Max vs Nano Banana Pro vs FLUX dev
+
+**Зачем**: сравнить кандидата Qwen Image Max (DeepInfra) с текущими образ-моделями каталога на одном промпте, с честными метриками (время ожидания, цена).
+
+**Сделано** (по плану `docs/superpowers/plans/2026-07-29-compare-generators.md`, с поправками на реальность):
+- **Контракт DeepInfra проверен живьём** (метаданные модели): вход `{ prompt, size "W*H" }`, выход `{ images: [data-URL png], inference_status.cost }`, 7.5¢/картинка. Формы из плана (`resolution`/`aspect_ratio` → `image_url`) не существуют — реализовано по фактической схеме.
+- **3 панели вместо 2**: Nano Banana Pro уже есть в каталоге (`nano-banana-pro`, Runware) — он и `flux-dev` идут через боевой `POST /api/generations` (кредиты, полный продакшен-путь); Qwen — через новый `POST /api/compare/generate` (синхронный прокси, минуя леджер: токен — серверный секрет, в браузер не отдаётся).
+- API: `integrations/deepinfra/deepinfra-image.ts` (санитизированные ошибки в стиле DeepinfraError, таймаут 120с), `modules/compare/routes.ts` (requireUser, 10/мин), контракты `packages/contracts/src/compare.ts`.
+- Web: модуль `modules/Compare` (zustand-стор с параллельным фан-аутом, гардом от гонок через AbortSignal и независимым retry на панель; логика — plain async-экшены стора, НЕ хук-в-сторе из плана — тот паттерн невалиден в React), `CompareForm` + `GenerationPanel` (4 состояния UI), роут `_shell.compare.tsx` (скрыт из навигации, секундомер тикает и при retry, unmount абортит in-flight запросы).
+
+**Тесты вперёд**: contracts 7, API 12 (клиент + HTTP-границы: 401/400/502/успех/леджер не тронут), web 19 (стор: параллельность, независимый фейл, retry одной панели, «протухший ран не перетирает reset»; форма и панель по состояниям). Гейт: contracts **100/100**, API **587/587**, web **678/678**, tsc и ESLint чисто, build зелёный (чанк `_shell.compare` в бандле).

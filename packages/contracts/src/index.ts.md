@@ -6,7 +6,7 @@
 Public API barrel of `@opencreate/contracts` — the only import path (`package.json` `exports` maps `.` → this file) for both apps.
 
 ## What it does (for an AI reader)
-- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `auth-config`, `scene3d`, `model-render`, `asset3d`, `prompt`.
+- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `auth-config`, `scene3d`, `model-render`, `asset3d`, `prompt`, `compare`.
 - Public API / exports: the union of all modules' exports (schemas + inferred types).
 - Inputs → Outputs: none at runtime beyond module re-export.
 - Side effects: none.

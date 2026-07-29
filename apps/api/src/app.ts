@@ -41,6 +41,7 @@ import { createAnalyzeService } from './modules/assets3d/analyze'
 import { registerAsset3dRoutes } from './modules/assets3d/routes'
 import { createPromptEnhanceService } from './modules/prompt/enhance'
 import { registerPromptRoutes } from './modules/prompt/routes'
+import { registerCompareRoutes } from './modules/compare/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -389,6 +390,11 @@ export async function buildApp(deps: AppDeps) {
     log: app.log,
   })
   registerPromptRoutes(app, promptEnhanceService)
+  // Hidden /compare utility (model evaluation): a direct synchronous DeepInfra
+  // Qwen-Image-Max channel that bypasses the credit ledger — see the module's
+  // header for why it is not a generation. Same optional-secret discipline as
+  // the enhancer: with no token the route answers 502 provider_error.
+  registerCompareRoutes(app, { deepinfraToken: deps.config.deepinfraToken })
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.

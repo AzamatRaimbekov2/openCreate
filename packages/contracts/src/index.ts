@@ -42,3 +42,6 @@ export * from './asset3d'
 // cinematic Wan prompt), plus its 'soften' variant for content_blocked retries.
 // No dependencies on the above; ordering is immaterial.
 export * from './prompt'
+// Compare utility (hidden /compare page) — the direct DeepInfra image channel
+// for model evaluation. No dependencies on the above; ordering is immaterial.
+export * from './compare'

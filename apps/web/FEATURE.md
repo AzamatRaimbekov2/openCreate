@@ -332,6 +332,21 @@ The gallery of ready-made viral formats. ADR: `docs/wiki/decisions/template-cata
   `/cinema/$filmId`; the film-editor route reads `useTemplates()` and hands the list down, the same
   seam `useCatalog()` already uses.
 
+## Compare (`/compare`, hidden utility)
+
+Side-by-side model evaluation: one prompt → three image models in parallel. ADR-less
+utility (spec: `docs/superpowers/specs/2026-07-29-compare-generators-design.md`).
+
+- **Hidden on purpose** — no nav link, direct URL only; an operator tool, not a product feature.
+- Contenders: **FLUX dev** and **Nano Banana Pro** ride the production `POST /api/generations`
+  pipeline (credits, Runware, refund-on-failure); **Qwen Image Max** goes direct via
+  `POST /api/compare/generate` (synchronous DeepInfra proxy, bypasses the credit ledger, USD cost
+  from the provider's own `inference_status.cost`).
+- `modules/Compare`: zustand store (parallel fan-out, per-panel independent settle/retry,
+  AbortSignal race guard), `CompareForm` + `GenerationPanel` (4 UI states each), panels are
+  channel-blind (`costLabel` arrives pre-formatted: "2 cr" vs "$0.075").
+- Leaving the page aborts in-flight renders (they spend money) without clearing settled results.
+
 ## Design references
 
 - Design system: `docs/frontend/design.md`

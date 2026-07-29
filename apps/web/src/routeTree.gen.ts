@@ -17,6 +17,7 @@ import { Route as ShellPricingRouteImport } from './routes/_shell.pricing'
 import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
 import { Route as ShellEntitiesRouteImport } from './routes/_shell.entities'
 import { Route as ShellCreateRouteImport } from './routes/_shell.create'
+import { Route as ShellCompareRouteImport } from './routes/_shell.compare'
 import { Route as ShellTemplatesIndexRouteImport } from './routes/_shell.templates.index'
 import { Route as ShellSoulIndexRouteImport } from './routes/_shell.soul.index'
 import { Route as ShellCinemaIndexRouteImport } from './routes/_shell.cinema.index'
@@ -63,6 +64,11 @@ const ShellCreateRoute = ShellCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellCompareRoute = ShellCompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellTemplatesIndexRoute = ShellTemplatesIndexRouteImport.update({
   id: '/templates/',
   path: '/templates/',
@@ -97,6 +103,7 @@ const ShellAssetsAssetIdRoute = ShellAssetsAssetIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/compare': typeof ShellCompareRoute
   '/create': typeof ShellCreateRoute
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/compare': typeof ShellCompareRoute
   '/create': typeof ShellCreateRoute
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_shell': typeof ShellRouteWithChildren
   '/login': typeof LoginRoute
+  '/_shell/compare': typeof ShellCompareRoute
   '/_shell/create': typeof ShellCreateRoute
   '/_shell/entities': typeof ShellEntitiesRoute
   '/_shell/library': typeof ShellLibraryRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/compare'
     | '/create'
     | '/entities'
     | '/library'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/compare'
     | '/create'
     | '/entities'
     | '/library'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_shell'
     | '/login'
+    | '/_shell/compare'
     | '/_shell/create'
     | '/_shell/entities'
     | '/_shell/library'
@@ -255,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellCreateRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/compare': {
+      id: '/_shell/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof ShellCompareRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/templates/': {
       id: '/_shell/templates/'
       path: '/templates'
@@ -301,6 +320,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface ShellRouteChildren {
+  ShellCompareRoute: typeof ShellCompareRoute
   ShellCreateRoute: typeof ShellCreateRoute
   ShellEntitiesRoute: typeof ShellEntitiesRoute
   ShellLibraryRoute: typeof ShellLibraryRoute
@@ -314,6 +334,7 @@ interface ShellRouteChildren {
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
+  ShellCompareRoute: ShellCompareRoute,
   ShellCreateRoute: ShellCreateRoute,
   ShellEntitiesRoute: ShellEntitiesRoute,
   ShellLibraryRoute: ShellLibraryRoute,
