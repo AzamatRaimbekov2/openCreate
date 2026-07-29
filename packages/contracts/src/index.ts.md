@@ -6,7 +6,7 @@
 Public API barrel of `@opencreate/contracts` — the only import path (`package.json` `exports` maps `.` → this file) for both apps.
 
 ## What it does (for an AI reader)
-- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `auth-config`, `scene3d`, `model-render`, `asset3d`, `prompt`, `compare`.
+- Responsibilities: re-export everything from `errors`, `catalog`, `resolution`, `entity`, `presets`, `generation`, `film`, `templates`, `credits`, `user`, `auth-config`, `scene3d`, `model-render`, `asset3d`, `prompt`, `compare`, `canvas`.
 - Public API / exports: the union of all modules' exports (schemas + inferred types).
 - Inputs → Outputs: none at runtime beyond module re-export.
 - Side effects: none.
@@ -103,3 +103,19 @@ flowchart LR
   `content_blocked` generation offers. Prompt text DOES travel on the wire here (unlike templates/presets,
   which keep prompts server-side) because handing the improved text back IS the feature. No new
   `apiErrorCode`: it reuses `provider_error` (502) when `DEEPINFRA_TOKEN` is unset, exactly like storyboard.
+
+## Update 2026-07-30 — Canvas Mode contracts (Task 1)
+- Now also re-exports `./canvas` (ADR canvas-mode): `canvasNodeKindSchema`/`CanvasNodeKind`,
+  `canvasViewportSchema`/`CanvasViewport`, `canvasNodeConfigSchema`/`CanvasNodeConfig`,
+  `canvasNodeSchema`/`CanvasNode`, `canvasEdgeSchema`/`CanvasEdge`, `canvasSchema`/`Canvas`,
+  `canvasDetailSchema`/`CanvasDetail`, `canvasListSchema`/`CanvasList`,
+  `createCanvasInputSchema`/`CreateCanvasInput`, `updateCanvasInputSchema`/`UpdateCanvasInput`,
+  `canvasUploadInputSchema`/`CanvasUploadInput`, `canvasUploadResultSchema`/`CanvasUploadResult`.
+- Exported LAST (after `./compare`) — it imports only `zod` and nothing else in the barrel depends
+  on it, so ordering is immaterial (unlike `presets`→`generation` or `film`→`templates`).
+- Why this file exists: a `canvas` is the node-graph aggregate that CITES generations (the Film/Shot
+  and Asset3d pattern again) — nodes hold editor config plus an append-only `generationIds` history,
+  while money, media, and provider state stay in the generation system. The distinguishing constraint
+  is that PATCH carries the FULL document (debounced autosave, last-write-wins, single owner), so
+  every collection and string here is explicitly bounded: the bounds are what keeps one hostile
+  autosave from persisting megabytes.

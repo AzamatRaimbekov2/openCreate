@@ -45,3 +45,6 @@ export * from './prompt'
 // Compare utility (hidden /compare page) — the direct DeepInfra image channel
 // for model evaluation. No dependencies on the above; ordering is immaterial.
 export * from './compare'
+// Canvas Mode (ADR canvas-mode) — the node-graph aggregate that cites
+// generations. No dependencies on the above; ordering is immaterial.
+export * from './canvas'
