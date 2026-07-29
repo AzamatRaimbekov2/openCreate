@@ -260,6 +260,43 @@ describe('canvas CRUD', () => {
     expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
   })
 
+  it('rejects an edges-only PATCH with a self-edge (F3: validates against STORED nodes when nodes is absent)', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const { id } = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/canvases',
+        headers: { cookie },
+        payload: { title: 'X' },
+      })
+    ).json() as { id: string }
+    // First establish a stored node set — the PATCH below carries edges only,
+    // so validateGraph has to reach into storage for `n1` to catch the self-edge.
+    const seeded = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: { nodes: [NODE], edges: [] },
+    })
+    expect(seeded.statusCode).toBe(200)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: { edges: [{ id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n1' }] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect((res.json() as { error: { code: string } }).error.code).toBe('validation_failed')
+
+    // And the self-edge must not have been persisted either.
+    const detail = (
+      await app.inject({ method: 'GET', url: `/api/canvases/${id}`, headers: { cookie } })
+    ).json() as { edges: unknown[] }
+    expect(detail.edges).toHaveLength(0)
+  })
+
   it('stores an upload and returns its /media path; rejects svg', async () => {
     const app = await buildTestApp()
     const cookie = await registerAndGetCookie(app)

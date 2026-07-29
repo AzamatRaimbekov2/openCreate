@@ -86,6 +86,19 @@ sequenceDiagram
   nodes left over after removing all zero-indegree nodes sit on a cycle). Edge
   endpoints are only checked when `nodes` is present in the same PATCH — a
   title/viewport-only save has no node set to check them against.
+- **F3 fix (C1 residue): edges-only PATCH now validates too.**
+  `updateCanvasInputSchema` is `.partial()`, so a PATCH can legally send
+  `{ edges: [...] }` with `nodes` absent (meaning "the node set didn't
+  change"). `validateGraph` gates its self-edge/dangling checks on
+  `input.nodes !== undefined`, so an edges-only body used to skip them
+  entirely — a raw HTTP client could PATCH a self-edge or a dangling edge in
+  with 200 even though the SPA never sends edges without nodes. `updateCanvas`
+  now detects that exact shape (`edges !== undefined && nodes === undefined`),
+  loads the CURRENTLY STORED nodes for the canvas, and validates the incoming
+  edges against that set — the same `validateGraph` call, just fed the doc the
+  edges will actually join. The loaded nodes are used for validation ONLY;
+  the transaction below still writes from the original `input`, so a
+  title/edges-only save still leaves the stored `nodes` row set untouched.
 - **PATCH replaces, it does not merge.** These are single-owner documents with
   debounced autosave and last-write-wins semantics, so the stored doc must become
   exactly what was sent. Merging would resurrect nodes the user deleted. The
@@ -113,3 +126,5 @@ sequenceDiagram
 ## Commits
 
 - 4d074dd feat(canvas): aggregate CRUD — service, routes, ownership
+- 451f47d 2026-07-30 fix(canvas): server-side graph validation on PATCH (C1)
+- (fix-wave) fix(canvas): F3 — edges-only PATCH loads stored nodes so validateGraph still catches a self-edge/dangling edge/cycle (C1 residue)

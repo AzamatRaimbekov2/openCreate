@@ -165,7 +165,24 @@ export function createCanvasService({ db, storage }: Deps) {
   // was sent. One transaction so a crash can never leave nodes without edges.
   function updateCanvas(userId: string, canvasId: string, input: UpdateCanvasInput): CanvasDetail {
     requireCanvas(userId, canvasId)
-    validateGraph(input)
+    // F3 fix: validateGraph only runs its self-edge/dangling checks when
+    // input.nodes is present. An edges-only PATCH (nodes undefined, since
+    // updateCanvasInputSchema is .partial()) would otherwise persist a
+    // self-edge or a dangling edge untouched — load the STORED nodes so the
+    // new edges are checked against the document they will actually join.
+    const graphInput: UpdateCanvasInput =
+      input.edges !== undefined && input.nodes === undefined
+        ? {
+            ...input,
+            nodes: db
+              .select()
+              .from(canvasNode)
+              .where(eq(canvasNode.canvasId, canvasId))
+              .all()
+              .map(toNodeDto),
+          }
+        : input
+    validateGraph(graphInput)
     db.transaction((tx) => {
       tx.update(canvas)
         .set({
