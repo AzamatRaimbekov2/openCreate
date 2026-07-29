@@ -70,3 +70,4 @@ apps/web/.tanstack/
 
 # graphify knowledge-graph tool cache
 graphify-out/
+.superpowers/
