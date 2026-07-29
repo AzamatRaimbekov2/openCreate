@@ -1915,9 +1915,13 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
     set((s) => ({ edges: s.edges.filter((e) => e.id !== id), saveState: 'dirty' })),
 
   markSaving: () => set({ saveState: 'saving' }),
-  // Saved only if nothing changed while the PATCH was in flight — the autosave
-  // loop re-checks; a mid-save edit stays dirty and triggers another save.
-  markSaved: () => set((s) => (s.saveState === 'saving' || s.saveState === 'dirty' ? { saveState: 'saved' } : {})),
+  // I3 fix-wave correction: guard on 'saving' ONLY. The first version of this
+  // also matched 'dirty', so an edit made WHILE a PATCH was in flight (which
+  // flips saveState 'saving' -> 'dirty') got falsely stomped back to 'saved'
+  // by that PATCH's own markSaved() — the edit was never actually sent, and
+  // the autosave subscriber (armed only on the TRANSITION into dirty) never
+  // re-fired for it.
+  markSaved: () => set((s) => (s.saveState === 'saving' ? { saveState: 'saved' } : {})),
   markSaveError: () => set({ saveState: 'error' }),
 }))
 ```
@@ -2227,12 +2231,17 @@ import { MEDIA_SOURCE_KINDS } from './types'
 const POLL_INTERVAL_MS = 4000
 
 // Pure: node + graph → the POST body, or null when the node isn't runnable
-// yet (missing prompt/model, or a media parent that has no output). The
-// Generate button disables on null — a click can never submit a broken chain.
+// yet (missing prompt/model, or a media parent with no SUCCEEDED output).
+// The Generate button disables on null — a click can never submit a broken
+// chain. C2 fix-wave correction: the FIRST version of this function took
+// generationIds[length-1] with NO status check, so a child could cite a
+// still-processing or failed parent. `generationStatus` is a snapshot the
+// caller reads out of the shared TanStack Query cache (['generation', id]).
 export function buildRunInput(
   node: CanvasNode,
   nodes: readonly CanvasNode[],
   edges: readonly CanvasEdge[],
+  generationStatus: Readonly<Record<string, Generation['status'] | undefined>> = {},
 ): CreateGenerationInput | null {
   const prompt = node.config.prompt?.trim()
   const modelId = node.config.modelId
@@ -2247,17 +2256,21 @@ export function buildRunInput(
       : {}),
   }
 
-  // Media wire: the parent's LATEST generation id becomes inputGenerationId.
-  // Upload parents are previews only in this phase — their media is a stored
-  // file, not a generation, so there is nothing to cite yet.
+  // Media wire: the parent's NEWEST SUCCEEDED generation id becomes
+  // inputGenerationId — never merely the last history entry (that can be
+  // processing or failed). Upload parents are previews only in this phase —
+  // their media is a stored file, not a generation, so there is nothing to
+  // cite yet.
   const mediaParent = edges
     .filter((e) => e.targetNodeId === node.id)
     .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
     .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind) && n.kind !== 'upload')
   if (mediaParent) {
-    const latest = mediaParent.generationIds[mediaParent.generationIds.length - 1]
-    if (!latest) return null
-    input.inputGenerationId = latest
+    const succeeded = [...mediaParent.generationIds]
+      .reverse()
+      .find((gid) => generationStatus[gid] === 'succeeded')
+    if (!succeeded) return null
+    input.inputGenerationId = succeeded
   }
 
   return input
