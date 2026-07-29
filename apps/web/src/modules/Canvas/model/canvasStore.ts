@@ -50,10 +50,14 @@ const INITIAL = {
   saveState: 'saved' as SaveState,
 }
 
-// crypto.randomUUID is available in every target browser and jsdom. Ids only
-// need to be unique WITHIN one canvas (≤200 nodes), so 8 hex chars is ample
-// and keeps the stored document small — the server never joins on them.
-const mintId = () => crypto.randomUUID().slice(0, 8)
+// I1 fix: canvas_node.id / canvas_edge.id are GLOBAL primary keys server-side
+// (every canvas's rows share one table), NOT scoped to a single document. An
+// 8-char slice of a UUID collides across canvases at meaningful odds and
+// surfaces as an unmapped SQLite UNIQUE-constraint error — a 500 for an
+// innocent user. The full 36-char UUID is what the PK actually needs to stay
+// unique; it still fits the contract's 40-char id cap (canvasNodeSchema /
+// canvasEdgeSchema) with room to spare.
+const mintId = () => crypto.randomUUID()
 
 export const useCanvasStore = create<CanvasStore>((set) => ({
   ...INITIAL,
@@ -117,9 +121,13 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
     set((s) => ({ edges: s.edges.filter((e) => e.id !== id), saveState: 'dirty' })),
 
   markSaving: () => set({ saveState: 'saving' }),
-  // Saved only if nothing changed while the PATCH was in flight — the autosave
-  // loop re-checks; a mid-save edit stays dirty and triggers another save.
-  markSaved: () =>
-    set((s) => (s.saveState === 'saving' || s.saveState === 'dirty' ? { saveState: 'saved' } : {})),
+  // I3 fix: guard on 'saving' ONLY. An edit made while a PATCH is in flight
+  // flips saveState 'saving' -> 'dirty' (any mutator does that); the OLD code
+  // also matched 'dirty' here, so the in-flight PATCH's eventual markSaved()
+  // stomped that edit straight to 'saved' — it was never actually sent, and
+  // the autosave subscriber (which only re-arms on a 'dirty' TRANSITION)
+  // never re-fired for it. Matching 'saving' alone means a mid-save edit
+  // stays 'dirty' and the loop re-saves it.
+  markSaved: () => set((s) => (s.saveState === 'saving' ? { saveState: 'saved' } : {})),
   markSaveError: () => set({ saveState: 'error' }),
 }))

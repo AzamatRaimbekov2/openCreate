@@ -45,8 +45,13 @@ export const canvasNodeConfigSchema = z.object({
 export type CanvasNodeConfig = z.infer<typeof canvasNodeConfigSchema>
 
 export const canvasNodeSchema = z.object({
-  // Client-minted (nanoid/uuid) — the doc is replaced whole, ids only need to
-  // be unique within the canvas; the server never joins on them.
+  // Client-minted crypto.randomUUID() (36 chars). I1 fix-wave finding:
+  // canvas_node.id is a GLOBAL primary key on disk (every canvas's rows share
+  // one table), not scoped to one document — an id only needs to look unique
+  // WITHIN the canvas that mints it, but it must actually BE globally unique
+  // to avoid a cross-canvas collision surfacing as an unmapped SQLite UNIQUE
+  // error (500). 40 leaves headroom over the 36-char UUID; the server never
+  // joins on the value itself.
   id: z.string().min(1).max(40),
   kind: canvasNodeKindSchema,
   position: z.object({ x: z.number(), y: z.number() }),

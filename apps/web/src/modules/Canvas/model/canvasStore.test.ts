@@ -87,6 +87,34 @@ describe('useCanvasStore', () => {
     expect(useCanvasStore.getState().nodes[0]?.generationIds).toEqual(['g-new'])
   })
 
+  it('markSaved must NOT clear a mid-save edit (I3): an edit while saving stays dirty', () => {
+    // markSaving() -> a PATCH is in flight. An edit lands DURING that flight
+    // (saveState flips 'saving' -> 'dirty'). The in-flight PATCH's eventual
+    // markSaved() must not stomp that edit back to 'saved' — the edit was
+    // never sent, so the autosave loop must re-fire for it.
+    useCanvasStore.getState().init(DOC)
+    useCanvasStore.getState().markSaving()
+    useCanvasStore.getState().updateNodeConfig('n1', { prompt: 'edited mid-save' })
+    expect(useCanvasStore.getState().saveState).toBe('dirty')
+    useCanvasStore.getState().markSaved()
+    expect(useCanvasStore.getState().saveState).toBe('dirty')
+  })
+
+  it('mints a FULL crypto.randomUUID for new node/edge ids (I1: global PK, not just canvas-unique)', () => {
+    // canvas_node.id / canvas_edge.id are GLOBAL primary keys server-side, not
+    // scoped to one canvas — an 8-char slice collides across canvases and
+    // surfaces as an unmapped SQLite UNIQUE error (500) for an innocent user.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    useCanvasStore.getState().init(DOC)
+    useCanvasStore.getState().addNode('note', { x: 1, y: 2 })
+    const newNode = useCanvasStore.getState().nodes.at(-1)
+    expect(newNode?.id).toMatch(UUID_RE)
+
+    useCanvasStore.getState().addEdge('n1', newNode!.id)
+    const newEdge = useCanvasStore.getState().edges.at(-1)
+    expect(newEdge?.id).toMatch(UUID_RE)
+  })
+
   it('reset returns to the empty state', () => {
     useCanvasStore.getState().init(DOC)
     useCanvasStore.getState().reset()

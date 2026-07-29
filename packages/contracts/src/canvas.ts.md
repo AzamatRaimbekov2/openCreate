@@ -74,9 +74,16 @@ flowchart LR
 - **`generationIds` is append-only history, no FK.** Deleting a generation from the
   Library must leave an empty version on the node, never cascade the canvas away
   (same "cite, never own" rule as `shot.generation_id`).
-- Node ids are **client-minted** and only need to be unique within one canvas —
-  the document is replaced whole on save, so the server never joins on them.
+- **I1 fix-wave correction.** Node/edge ids are **client-minted** (the SPA mints
+  the full `crypto.randomUUID()`, 36 chars) but must be GLOBALLY unique, not just
+  unique within one canvas: `canvas_node.id` / `canvas_edge.id` are global SQLite
+  primary keys — every canvas's rows share one table. The earlier 8-char slice the
+  store minted collided across canvases at meaningful odds, surfacing as an
+  unmapped SQLite UNIQUE-constraint error (500) for an innocent user. The
+  `max(40)` cap here already accommodates a full UUID with room to spare, so no
+  schema change was needed — only the client's `mintId()` and this comment.
 
 ## Commits
 
 - 11a0e97 feat(canvas): wire contracts for the node-graph aggregate
+- (fix-wave) fix(canvas): I1 — correct the id-uniqueness comment (ids are global PKs, not canvas-scoped)
