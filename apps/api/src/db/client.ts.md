@@ -100,3 +100,14 @@ accompanies it (there are no columns being added to a pre-existing table). The p
 `image_generation_id` / `mesh_generation_id` are plain TEXT CITATIONS with no `REFERENCES` clause, so
 deleting a generation from the library never cascades a part away; only `asset3d.user_id` and
 `asset3d_part.asset_id` cascade. See ADR `docs/wiki/decisions/modular-3d-assets.md`.
+
+## Key decisions (2026-07-30) — Canvas Mode
+`createDb` now also execs `CANVAS_DDL` (imported from `./ddl`, exec'd right after `ASSET3D_DDL`),
+creating `canvas`, `canvas_node` and `canvas_edge`. Like the Studio3D and Assets3D tables these are
+brand-new, so a single `CREATE TABLE IF NOT EXISTS` covers a fresh db and a legacy file alike — **no**
+micro-migration guard accompanies it, because no column is being added to a pre-existing table.
+
+The node's `generation_ids_json` holds plain TEXT citations inside a JSON array (no `REFERENCES`
+clause is even possible there), so deleting a generation from the library never cascades a node away;
+only `canvas.user_id`, `canvas_node.canvas_id` and `canvas_edge.canvas_id` cascade. See ADR
+`docs/wiki/decisions/canvas-mode.md`.

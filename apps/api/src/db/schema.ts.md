@@ -149,3 +149,20 @@ adding a column to a table that already ships).
   here stores it.
 - `test/db-ddl.test.ts` pins the shape AND the citation-not-FK rule
   (`foreign_key_list(asset3d_part)` contains `asset3d`, not `generation`).
+
+## Key decisions (2026-07-30) — Canvas Mode
+Three drizzle tables mirroring `CANVAS_DDL` column-for-column (ADR `docs/wiki/decisions/canvas-mode.md`):
+
+- **`canvas`** — `id`, `userId` (→ `user`, cascade), `title`, `viewportJson` (default
+  `'{"x":0,"y":0,"zoom":1}'`), `createdAt`/`updatedAt` (`timestamp_ms`). `updatedAt` exists because the
+  list is ordered by it — a canvas is a document you return to, so "recently worked on" is the useful
+  order, unlike `asset3d`/`film` list ordering by creation.
+- **`canvasNode`** — `id`, `canvasId` (→ `canvas`, cascade), `kind` (drizzle `enum` over the 7 MVP
+  kinds, TS-level only — the column is plain TEXT), `positionJson`, `configJson` (default `'{}'`),
+  `generationIdsJson` (default `'[]'`), `uploadUrl` (nullable; upload nodes only).
+- **`canvasEdge`** — `id`, `canvasId` (→ `canvas`, cascade), `sourceNodeId`, `targetNodeId`.
+- **Citations are bare `text()` — NO `.references()`** on the ids inside `generationIdsJson` (they are
+  a JSON array, not a column) and none on the edge endpoints. The only cascading edges are the owner
+  edges. A gallery delete leaves an empty version on the node; it never removes the node or canvas.
+- **No status/derived column.** A node's run state is DERIVED from the cited generations at read time
+  in the SPA (the films/shots and asset3d lesson: a persisted status is a second source of truth).

@@ -126,3 +126,30 @@ what `test/db-ddl.test.ts` exists to catch):
 Both nullable and additive, so no backfill exists or is needed: NULL already means the right thing on
 every row that predates the feature. `entity_image.source` widening to admit `'generated'` needed no
 change here — it is plain TEXT and the enum is TypeScript-level.
+
+## Key decisions (2026-07-30) — Canvas Mode
+`CANVAS_DDL` (a fifth constant, exec'd after `ASSET3D_DDL`) creates the node-graph aggregate — the
+composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/decisions/canvas-mode.md`.
+
+- **`canvas`** — `id`, `user_id` (→ `user`, cascade), `title`, `viewport_json`, `created_at`,
+  `updated_at`. `viewport_json` (`{"x":0,"y":0,"zoom":1}` by DEFAULT) is the owner's last camera,
+  stored on the CANVAS rather than per-client: these are single-owner documents, so reopening where
+  you left off is the correct behavior and needs no client-side storage.
+  `idx_canvas_user_updated (user_id, updated_at DESC)` serves the only list query there is.
+- **`canvas_node`** — `id`, `canvas_id` (→ `canvas`, cascade), `kind`, `position_json`,
+  `config_json` (DEFAULT `'{}'`), `generation_ids_json` (DEFAULT `'[]'`), `upload_url`.
+  `kind` is plain TEXT with the enum living in TypeScript/zod — the `generation.type` precedent, so
+  adding an eighth node kind later needs no DDL.
+  `config_json` is deliberately **opaque to the server**: a node RUN goes through
+  `POST /api/generations`, which re-validates strictly against the catalog model. This column only
+  holds saved editor state, so the server never has to understand a field the editor just added.
+- **`canvas_edge`** — `id`, `canvas_id` (→ `canvas`, cascade), `source_node_id`, `target_node_id`.
+  The endpoint columns are **bare TEXT, not FKs**: the document is rewritten whole on every autosave
+  (delete + reinsert), so a mid-transaction FK on a node being replaced would fight the write for no
+  integrity gain — the client owns edge/node consistency and the whole replace is atomic.
+- **`generation_ids_json` carries no FK** — the same "cite, never own" rule as `shot.generation_id`
+  and `asset3d_part.image_generation_id`. Deleting a generation from the gallery must leave an empty
+  version on the node, never cascade the canvas away. The ONLY cascading edges are the owner edges
+  (`canvas.user_id`, `canvas_node.canvas_id`, `canvas_edge.canvas_id`).
+- **No cost/credit column anywhere.** A canvas composes generations; the money lives in the ledger
+  the generation system already owns. Zero new money code is the ADR's D1 constraint.

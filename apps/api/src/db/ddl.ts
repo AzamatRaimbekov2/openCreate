@@ -322,3 +322,48 @@ CREATE TABLE IF NOT EXISTS asset3d_part (
 );
 CREATE INDEX IF NOT EXISTS idx_asset3d_part_asset ON asset3d_part(asset_id, sort_order);
 `
+
+// Canvas Mode tables (ADR: canvas-mode). Exec'd with the main DDL — all
+// CREATE ... IF NOT EXISTS, so re-running on every boot is a no-op. The
+// composition layer OVER generations, exactly like film: a canvas owns nodes
+// and edges; a node CITES generations (JSON id history, no FK — deleting a
+// generation from the gallery leaves an empty version, it never cascades the
+// canvas away). No table here touches the credit ledger.
+export const CANVAS_DDL = `
+CREATE TABLE IF NOT EXISTS canvas (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  -- Last saved camera: {x, y, zoom} JSON. On the canvas, not per-client —
+  -- single-owner docs reopen where the owner left them.
+  viewport_json TEXT NOT NULL DEFAULT '{"x":0,"y":0,"zoom":1}',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_canvas_user_updated ON canvas(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS canvas_node (
+  id TEXT PRIMARY KEY,
+  canvas_id TEXT NOT NULL REFERENCES canvas(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  position_json TEXT NOT NULL,
+  -- Per-kind editor config (prompt/modelId/aspect/duration/entityId/text).
+  -- Opaque to the server: node RUNS go through POST /api/generations, which
+  -- re-validates everything strictly; this is just the saved editor state.
+  config_json TEXT NOT NULL DEFAULT '{}',
+  -- Append-only run history; latest succeeded = the node's output. JSON ids,
+  -- no FK — same "cite, never own" rule as shot.generation_id.
+  generation_ids_json TEXT NOT NULL DEFAULT '[]',
+  -- Upload nodes only: the stored '/media/<uuid>.<ext>' path.
+  upload_url TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_canvas_node_canvas ON canvas_node(canvas_id);
+
+CREATE TABLE IF NOT EXISTS canvas_edge (
+  id TEXT PRIMARY KEY,
+  canvas_id TEXT NOT NULL REFERENCES canvas(id) ON DELETE CASCADE,
+  source_node_id TEXT NOT NULL,
+  target_node_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_canvas_edge_canvas ON canvas_edge(canvas_id);
+`

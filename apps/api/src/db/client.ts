@@ -5,7 +5,15 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as schema from './schema'
-import { DDL, ENTITY_DDL, FILM_DDL, MODEL3D_DDL, ASSET3D_DDL, REFUND_ONCE_INDEX_DDL } from './ddl'
+import {
+  DDL,
+  ENTITY_DDL,
+  FILM_DDL,
+  MODEL3D_DDL,
+  ASSET3D_DDL,
+  CANVAS_DDL,
+  REFUND_ONCE_INDEX_DDL,
+} from './ddl'
 
 export type Db = ReturnType<typeof createDb>['db']
 
@@ -33,6 +41,9 @@ export function createDb(path: string) {
   // asset3d_part), so only the idempotent CREATE IF NOT EXISTS exec is needed —
   // no micro-migration guard.
   sqlite.exec(ASSET3D_DDL)
+  // Canvas Mode (ADR canvas-mode): three brand-new tables, so only the
+  // idempotent CREATE IF NOT EXISTS exec is needed — no micro-migration guard.
+  sqlite.exec(CANVAS_DDL)
   // Micro-migrations: CREATE TABLE IF NOT EXISTS never alters tables that
   // already exist, so columns added after a db file was first created must be
   // back-filled here (SQLite has no ADD COLUMN IF NOT EXISTS). Guarded by

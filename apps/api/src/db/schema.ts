@@ -391,3 +391,45 @@ export const asset3dPart = sqliteTable('asset3d_part', {
   transformJson: text('transform_json'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
+
+// Canvas Mode (ADR canvas-mode): the node-graph aggregate. Same discipline as
+// film/shot — the canvas owns nodes/edges (FK cascade), a node CITES
+// generations via a JSON id list with NO reference (a gallery delete must
+// leave an empty version, never cascade the canvas away).
+export const canvas = sqliteTable('canvas', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  // {x, y, zoom} JSON — the owner's last camera, restored on open.
+  viewportJson: text('viewport_json').notNull().default('{"x":0,"y":0,"zoom":1}'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+export const canvasNode = sqliteTable('canvas_node', {
+  id: text('id').primaryKey(),
+  canvasId: text('canvas_id')
+    .notNull()
+    .references(() => canvas.id, { onDelete: 'cascade' }),
+  kind: text('kind', {
+    enum: ['image', 'video', 'upload', 'character', 'upscale', 'remove-bg', 'note'],
+  }).notNull(),
+  positionJson: text('position_json').notNull(),
+  // Saved editor state, opaque to the server (runs re-validate at /generations).
+  configJson: text('config_json').notNull().default('{}'),
+  // Append-only version history (JSON string[]), latest succeeded = output.
+  generationIdsJson: text('generation_ids_json').notNull().default('[]'),
+  // Upload nodes only: server-minted '/media/…' path.
+  uploadUrl: text('upload_url'),
+})
+
+export const canvasEdge = sqliteTable('canvas_edge', {
+  id: text('id').primaryKey(),
+  canvasId: text('canvas_id')
+    .notNull()
+    .references(() => canvas.id, { onDelete: 'cascade' }),
+  sourceNodeId: text('source_node_id').notNull(),
+  targetNodeId: text('target_node_id').notNull(),
+})
