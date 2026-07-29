@@ -688,7 +688,10 @@
     "cast": {
       "title": "Cast",
       "add": "Character",
-      "remove": "Remove {{name}}"
+      "remove": "Remove {{name}}",
+      "empty": "No characters yet — add one in Entities.",
+      "unsupported": "This model cannot hold a character.",
+      "unsupportedWarning": "The chosen model ignores references — pick Cinema (Wan 2.7) or the character will not carry over."
     },
     "shotRef": {
       "title": "Reference images",
@@ -696,6 +699,7 @@
       "hint": "Click, drop, or paste an image (up to 10MB).",
       "remove": "Remove reference image",
       "previewAlt": "Attached reference image",
+      "modelHint": "This model doesn't use reference images — switch to Wan 2.7 \"Cinema\" to use them.",
       "gallery": "Attach from gallery",
       "galleryTitle": "Your images",
       "galleryEmpty": "No images yet — generate one first.",
