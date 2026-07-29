@@ -4,7 +4,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCanvasStore } from './canvasStore'
-import { AUTOSAVE_DEBOUNCE_MS, useCanvasAutosave } from './useCanvasDoc'
+import { AUTOSAVE_DEBOUNCE_MS, RETRY_BASE_MS, RETRY_MAX_MS, useCanvasAutosave } from './useCanvasDoc'
 import { saveCanvas } from './api'
 
 vi.mock('./api', async (importOriginal) => {
@@ -73,5 +73,74 @@ describe('useCanvasAutosave', () => {
     expect(mockSave).not.toHaveBeenCalled()
     unmount()
     expect(mockSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('I4: automatically retries after a failure with NO further edits, and recovers', async () => {
+    mockSave.mockRejectedValueOnce(new Error('offline'))
+    mockSave.mockResolvedValueOnce(DOC)
+    const { unmount } = renderHook(() => useCanvasAutosave())
+    act(() => useCanvasStore.getState().addNode('note', { x: 1, y: 2 }))
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 10)
+      await Promise.resolve()
+    })
+    expect(useCanvasStore.getState().saveState).toBe('error')
+    expect(mockSave).toHaveBeenCalledTimes(1)
+
+    // No edit happens here — only the backoff timer can re-flush.
+    await act(async () => {
+      vi.advanceTimersByTime(RETRY_BASE_MS + 10)
+      await Promise.resolve()
+    })
+    expect(mockSave).toHaveBeenCalledTimes(2)
+    expect(useCanvasStore.getState().saveState).toBe('saved')
+    unmount()
+  })
+
+  it('I4: backoff doubles on repeated failures, capped at RETRY_MAX_MS', async () => {
+    mockSave.mockRejectedValue(new Error('offline'))
+    const { unmount } = renderHook(() => useCanvasAutosave())
+    act(() => useCanvasStore.getState().addNode('note', { x: 1, y: 2 }))
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 10)
+      await Promise.resolve()
+    })
+    expect(mockSave).toHaveBeenCalledTimes(1) // first failure
+
+    await act(async () => {
+      vi.advanceTimersByTime(RETRY_BASE_MS + 10) // ~5s -> 2nd attempt
+      await Promise.resolve()
+    })
+    expect(mockSave).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      vi.advanceTimersByTime(RETRY_BASE_MS * 2 + 10) // ~10s -> 3rd attempt (doubled)
+      await Promise.resolve()
+    })
+    expect(mockSave).toHaveBeenCalledTimes(3)
+
+    await act(async () => {
+      vi.advanceTimersByTime(RETRY_MAX_MS + 10) // cap reached, never exceeds 30s
+      await Promise.resolve()
+    })
+    expect(mockSave).toHaveBeenCalledTimes(4)
+    expect(useCanvasStore.getState().saveState).toBe('error')
+    unmount()
+  })
+
+  it('I4: unmount clears the pending retry timer — no save fires after teardown', async () => {
+    mockSave.mockRejectedValue(new Error('offline'))
+    const { unmount } = renderHook(() => useCanvasAutosave())
+    act(() => useCanvasStore.getState().addNode('note', { x: 1, y: 2 }))
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 10)
+      await Promise.resolve()
+    })
+    const callsBeforeUnmount = mockSave.mock.calls.length
+    unmount()
+    mockSave.mockClear()
+    vi.advanceTimersByTime(RETRY_MAX_MS + 1000)
+    expect(mockSave).not.toHaveBeenCalled()
+    expect(callsBeforeUnmount).toBeGreaterThan(0)
   })
 })
