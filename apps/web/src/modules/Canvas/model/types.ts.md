@@ -26,7 +26,9 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
-- `CanvasModelOption` is a NARROWED copy of `CatalogModel`, not a re-export: the Canvas module may not import `modules/Generator`, so the route maps the catalog into this shape and passes it down as React Flow node data. Video pricing is per-duration on the wire; the option carries one flat `credits` number the node chip shows.
+- `CanvasModelOption` is a NARROWED copy of `CatalogModel`, not a re-export: the Canvas module may not import `modules/Generator`, so the route maps the catalog into this shape and passes it down as React Flow node data.
+- It carries BOTH `credits` (baseline) and the optional `creditsByDuration` table. The plan originally had only the flat number, but a video model bills per duration — showing the cheapest clip's price while a longer one is selected would put a number on the card the user is not charged. The node prices at the selected duration and falls back to `credits`.
+- `aspectRatios` is `AspectRatio[]`, not `string[]`: the node writes the chosen value straight into `config.aspectRatio`, which the contract types as that enum.
 - `MEDIA_SOURCE_KINDS` deliberately omits `video`: video is TERMINAL in the MVP (nothing downstream can consume a clip — i2i and i2v both need a still).
 - `upload` IS a media source for the graph (you may wire it), but `buildRunInput` still refuses to cite it as a chain input: an upload is a stored file, not a generation, so there is no `inputGenerationId` for it until phase 4's operation nodes.
 - `character` is absent from both lists on purpose — it travels the separate entity slot in `edgeRules.ts`.

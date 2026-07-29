@@ -1015,5 +1015,59 @@
       "rateLimited": "Too many requests — try again in a minute",
       "generic": "Couldn't enhance the prompt"
     }
+  },
+  "canvas": {
+    "title": "Canvases",
+    "new": "New canvas",
+    "untitled": "Untitled canvas",
+    "back": "Canvases",
+    "titleLabel": "Canvas title",
+    "empty": {
+      "title": "No canvases yet",
+      "description": "Create one and drag your first node onto the board."
+    },
+    "listError": "Could not load your canvases",
+    "docError": "Could not load this canvas",
+    "save": {
+      "saved": "saved",
+      "saving": "saving…",
+      "failed": "not saved · retry"
+    },
+    "palette": {
+      "label": "Node palette"
+    },
+    "kind": {
+      "image": "Image",
+      "video": "Video",
+      "upload": "Upload",
+      "note": "Note"
+    },
+    "status": {
+      "idle": "idle",
+      "processing": "processing",
+      "succeeded": "done",
+      "failed": "failed"
+    },
+    "node": {
+      "model": "Model",
+      "modelPlaceholder": "pick a model",
+      "aspect": "Aspect",
+      "duration": "Duration",
+      "promptPlaceholder": "Describe…",
+      "generate": "Generate",
+      "generating": "Generating…",
+      "retry": "Retry",
+      "idlePreview": "not generated yet",
+      "failedPreview": "Generation failed",
+      "uploadCta": "Click to upload an image",
+      "uploading": "Uploading…",
+      "uploadFailed": "Upload failed — try a smaller raster image",
+      "uploadAlt": "Uploaded image",
+      "notePlaceholder": "Note…",
+      "note": "Note",
+      "version": "v{{index}} / {{count}}",
+      "prevVersion": "Previous version",
+      "nextVersion": "Next version"
+    }
   }
 }

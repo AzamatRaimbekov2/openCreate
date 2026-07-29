@@ -2,7 +2,7 @@
 // Editor-side types over the wire contracts. The STORE holds contract shapes
 // (CanvasNode/CanvasEdge) as the single source of truth; React Flow objects
 // are DERIVED per render in CanvasEditor — never stored.
-import type { CanvasNodeKind } from '@opencreate/contracts'
+import type { AspectRatio, CanvasNodeKind } from '@opencreate/contracts'
 
 // What a node's latest run is doing — drives the status border.
 export type NodeRunStatus = 'idle' | 'processing' | 'succeeded' | 'failed'
@@ -14,9 +14,13 @@ export type CanvasModelOption = {
   name: string
   providerLabel: string
   type: 'image' | 'video'
+  // Baseline price: an image model's flat cost, a video model's cheapest
+  // duration. What the node CHARGES for a video is creditsByDuration[duration]
+  // — the chip reads that first so the price on the card is the price billed.
   credits: number
-  aspectRatios: string[]
+  aspectRatios: AspectRatio[]
   durationOptions?: number[]
+  creditsByDuration?: Record<string, number>
 }
 
 // Media-producing kinds — the only legal sources of a media wire. Video is
