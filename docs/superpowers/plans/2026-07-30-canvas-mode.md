@@ -2258,14 +2258,22 @@ export function buildRunInput(
 
   // Media wire: the parent's NEWEST SUCCEEDED generation id becomes
   // inputGenerationId — never merely the last history entry (that can be
-  // processing or failed). Upload parents are previews only in this phase —
-  // their media is a stored file, not a generation, so there is nothing to
-  // cite yet.
+  // processing or failed). F4 fix-wave correction: the FIRST version of this
+  // lookup excluded 'upload' from the match entirely, so a node wired to an
+  // upload got mediaParent === undefined — the SAME result as no wire at
+  // all — and silently fell through to a plain t2i/t2v, charging the user for
+  // a run that ignored a wire they could see on the board. The lookup now
+  // matches uploads like any other media-kind source; the explicit
+  // `mediaParent.kind === 'upload'` check below is what disables Generate
+  // (an upload has no `generationIds` history — a stored file, not a
+  // generation — so there is nothing to cite until phase 4's operation nodes
+  // give it one). The wire itself stays legal (edgeRules is unchanged).
   const mediaParent = edges
     .filter((e) => e.targetNodeId === node.id)
     .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
-    .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind) && n.kind !== 'upload')
+    .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind))
   if (mediaParent) {
+    if (mediaParent.kind === 'upload') return null
     const succeeded = [...mediaParent.generationIds]
       .reverse()
       .find((gid) => generationStatus[gid] === 'succeeded')

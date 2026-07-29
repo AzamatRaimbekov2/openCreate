@@ -86,7 +86,11 @@ describe('buildRunInput', () => {
     expect(buildRunInput(node, [parent, node], edges)).toBeNull()
   })
 
-  it('ignores an upload parent: a stored file is not a citable generation', () => {
+  it('disables Generate for a wired upload parent (F4): a stored file is not a citable generation yet', () => {
+    // Before the F4 fix, findMediaParent excluded 'upload' entirely, so a node
+    // wired to an upload fell through to a PLAIN t2i/t2v — silently ignoring a
+    // wire the user could see on the board and charging for the wrong thing.
+    // Upload citation is phase 4; the honest phase-2 behavior is to disable.
     const upload: CanvasNode = {
       id: 'u1',
       kind: 'upload',
@@ -97,7 +101,6 @@ describe('buildRunInput', () => {
     }
     const node = imageNode('n1')
     const edges: CanvasEdge[] = [{ id: 'e1', sourceNodeId: 'u1', targetNodeId: 'n1' }]
-    const input = buildRunInput(node, [upload, node], edges)
-    expect(input).toEqual({ modelId: 'flux-dev', prompt: 'a fox', aspectRatio: '1:1' })
+    expect(buildRunInput(node, [upload, node], edges)).toBeNull()
   })
 })

@@ -22,7 +22,12 @@ const POLL_INTERVAL_MS = 4000
 // Shared by buildRunInput AND the node components (which also need the
 // parent's id to keep its status fresh in the shared poll cache — see
 // ImageNode.tsx). Factored out so the two call sites can never disagree on
-// what counts as "the media parent".
+// what counts as "the media parent". Deliberately does NOT exclude 'upload'
+// (F4 fix-wave finding): an upload IS wired media, and buildRunInput below is
+// what decides whether it is citable — hiding it here made the wire silently
+// disappear instead, so Generate fell back to a plain t2i/t2v that ignored a
+// wire the user could see on the board (paying for something other than what
+// the graph showed).
 export function findMediaParent(
   nodeId: string,
   nodes: readonly CanvasNode[],
@@ -31,7 +36,7 @@ export function findMediaParent(
   return edges
     .filter((e) => e.targetNodeId === nodeId)
     .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
-    .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind) && n.kind !== 'upload')
+    .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind))
 }
 
 // Pure: node + graph → the POST body, or null when the node isn't runnable
@@ -68,6 +73,14 @@ export function buildRunInput(
   // Walk from the end so ties (several succeeded runs) still pick the newest.
   const mediaParent = findMediaParent(node.id, nodes, edges)
   if (mediaParent) {
+    // F4 fix-wave finding: an upload has no `generationIds` history — it is a
+    // stored file, not a generation — so there is nothing to cite YET (that's
+    // phase 4's job). Disable Generate here rather than silently falling
+    // through to a plain t2i/t2v: the wire is visible on the board, and
+    // charging the user for a run that ignores it would be dishonest. The
+    // wire itself stays legal (edgeRules is unchanged) — only the affordance
+    // is gated, same as "connected but not yet succeeded".
+    if (mediaParent.kind === 'upload') return null
     const succeeded = [...mediaParent.generationIds]
       .reverse()
       .find((gid) => generationStatus[gid] === 'succeeded')
