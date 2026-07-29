@@ -100,6 +100,16 @@ export function AppShell({
             >
               {t('nav.cinema')}
             </Link>
+            {/* Canvas sits beside Cinema for the same reason: a board you enter
+                from a library and keep working in, not a one-shot generation. */}
+            <Link
+              to="/canvas"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.canvas')}
+            </Link>
             {/* Modular 3D assets sit beside Cinema: both are multi-step workbenches
                 you enter from a library, not one-shot generations. */}
             <Link

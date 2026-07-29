@@ -96,6 +96,19 @@ flowchart LR
   auth guard and the module composition. Roles/labels unchanged, so
   `AppShell.test.tsx` (queries by role/name) is unaffected.
 
+## Update 2026-07-30 — Canvas Mode entry
+- Nav gains ONE `/canvas` typed `Link` (`t('nav.canvas')`), identical
+  `className={navLinkClass}` + `activeProps`/`inactiveProps` to every sibling. Nav
+  order is now create · library · cinema · **canvas** · assets · templates · souls ·
+  entities · pricing.
+- **Placed beside Cinema, before Assets**, for the reason the Assets entry gives:
+  `/canvas` is a WORKBENCH you enter from a library and keep working in, not a
+  one-shot generation. Without this link the route exists but is unreachable —
+  a shipped feature with no door.
+- The whole change is the one `<Link>`; `AppShell` stays presentational and still
+  imports nothing from `modules/*`. Roles/labels unchanged, so `AppShell.test.tsx`
+  (queries by role/name) is unaffected.
+
 ## Update 2026-07-23 — account slot extracted to AccountMenu
 - The private `AccountArea`/`UserMenu` moved to `shared/ui/AccountMenu.tsx` so the
   CinemaStudio editor's own top bar (`modules/Cinema/CinemaEditorHeader`) can render the
