@@ -34,4 +34,4 @@ flowchart TD
 - Deletion is not wired here yet (`useDeleteCanvas` exists in the API layer for it) — it needs a confirm surface, which lands with the phase-3 UI pass.
 
 ## Commits
-- _no commit yet_
+- bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes

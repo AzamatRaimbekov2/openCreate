@@ -41,4 +41,4 @@ flowchart TD
 - The DFS pops with an explicit `undefined` guard instead of `!` — the repo bans non-null assertions, and `stack.pop()` is typed optional even inside a `length > 0` loop.
 
 ## Commits
-- _no commit yet_
+- 1779f0c 2026-07-30 feat(canvas-web): @xyflow/react + pure edge rules

@@ -34,4 +34,5 @@ flowchart LR
 - `character` is absent from both lists on purpose — it travels the separate entity slot in `edgeRules.ts`.
 
 ## Commits
-- _no commit yet_
+- 1779f0c 2026-07-30 feat(canvas-web): @xyflow/react + pure edge rules
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip

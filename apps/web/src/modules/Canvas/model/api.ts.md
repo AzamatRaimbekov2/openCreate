@@ -38,4 +38,4 @@ flowchart LR
 - Upload bytes never travel inside the document: the server stores them and answers a `/media/…` path (the contract enforces that prefix at PATCH), which the caller writes into the node.
 
 ## Commits
-- _no commit yet_
+- 3da7615 2026-07-30 feat(canvas-web): api layer + per-document editor store

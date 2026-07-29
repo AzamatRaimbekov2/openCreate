@@ -40,4 +40,4 @@ sequenceDiagram
 - The autosave status is quiet by design — a `saved`/`saving…` caption, and an amber "not saved · retry" button on failure. No toasts: an autosave that shouts on every network blip trains people to ignore it.
 
 ## Commits
-- _no commit yet_
+- bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes

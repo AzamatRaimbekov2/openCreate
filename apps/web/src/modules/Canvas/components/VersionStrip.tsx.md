@@ -31,4 +31,4 @@ flowchart LR
 - `nodrag` on both buttons — without it React Flow starts a canvas drag from the click.
 
 ## Commits
-- _no commit yet_
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip

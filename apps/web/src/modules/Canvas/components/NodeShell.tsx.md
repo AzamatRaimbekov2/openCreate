@@ -33,4 +33,4 @@ flowchart LR
 - `rounded-2xl` per the card radius law; media plates inside stay `rounded-lg`.
 
 ## Commits
-- _no commit yet_
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip

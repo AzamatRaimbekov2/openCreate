@@ -34,4 +34,4 @@ flowchart LR
 - `buildRunInput`, `useRunNode`, `canConnect` and the node components stay unexported — a route composing those would be building a second editor.
 
 ## Commits
-- _no commit yet_
+- bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes

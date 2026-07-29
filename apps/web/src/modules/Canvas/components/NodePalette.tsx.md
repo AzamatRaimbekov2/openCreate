@@ -30,4 +30,4 @@ flowchart LR
 - Buttons hit `min-h-10` for the touch-target rule even though the rail is pointer-first.
 
 ## Commits
-- _no commit yet_
+- bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes

@@ -37,4 +37,4 @@ flowchart TD
 - `INITIAL` is spread on `reset()` so the nodes/edges arrays are fresh objects; sharing the array identity across resets would let a stale render mutate the next document.
 
 ## Commits
-- _no commit yet_
+- 3da7615 2026-07-30 feat(canvas-web): api layer + per-document editor store

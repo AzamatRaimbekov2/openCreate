@@ -45,4 +45,4 @@ sequenceDiagram
 - `appendGeneration` marks the store dirty, so a run is persisted by the ordinary autosave — no special save path for runs.
 
 ## Commits
-- _no commit yet_
+- 5443372 2026-07-30 feat(canvas-web): node run submit + shared-cache polling

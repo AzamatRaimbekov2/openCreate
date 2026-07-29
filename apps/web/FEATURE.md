@@ -226,7 +226,8 @@ src/
 │   ├── __root.tsx              # providers, crash boundary, offline overlay, 404
 │   ├── index.tsx  login.tsx    # standalone (no shell)
 │   ├── cinema.$filmId.tsx      # standalone (no shell) — the editor has its OWN top bar
-│   └── _shell.tsx + _shell.{create,library,cinema.index,entities,
+│   ├── canvas.$canvasId.tsx    # standalone (no shell) — the board owns the viewport
+│   └── _shell.tsx + _shell.{create,library,cinema.index,canvas.index,entities,
 │                              soul.index,soul.$entityId,assets.index,assets.$assetId,
 │                              pricing}.tsx
 ├── modules/
@@ -259,6 +260,19 @@ src/
 │   │                           # behind SpendConfirmModal per owner decision 2026-07-20),
 │   │                           # PartGenerationCard (shared plate, polls the CITED id)
 │   │                           # (public: AssetLibrary, AssetWizard; catalog fed from route)
+│   ├── Canvas/                 # Canvas Mode: the node-graph board on @xyflow/react.
+│   │                           # model/: edgeRules (PURE connection law, checked at
+│   │                           # drag AND at write), canvasStore (the document —
+│   │                           # singleton + init/reset per route param), useCanvasDoc
+│   │                           # (the debounced full-document autosave), api (typed
+│   │                           # /api/canvases + uploads), useNodeGeneration
+│   │                           # (buildRunInput → POST /api/generations, then the
+│   │                           # shared ['generation', id] poll); components/:
+│   │                           # CanvasEditor (React Flow shell — RF objects DERIVED
+│   │                           # from the store, changes written back), NodePalette,
+│   │                           # NodeShell + ImageNode/VideoNode/UploadNode/NoteNode,
+│   │                           # VersionStrip, CanvasLibrary
+│   │                           # (public: CanvasEditor, CanvasLibrary; catalog fed from route)
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, showcase spread, section heading, price tables
 │                               # (+ TableScrollRegion overflow wrapper), how-it-works,
@@ -346,6 +360,34 @@ utility (spec: `docs/superpowers/specs/2026-07-29-compare-generators-design.md`)
   AbortSignal race guard), `CompareForm` + `GenerationPanel` (4 UI states each), panels are
   channel-blind (`costLabel` arrives pre-formatted: "2 cr" vs "$0.075").
 - Leaving the page aborts in-flight renders (they spend money) without clearing settled results.
+
+## Canvas (`/canvas`, `/canvas/$canvasId`)
+
+The node-graph board: prompt → image → video, wired together instead of typed twice. ADR:
+`docs/wiki/decisions/canvas-mode.md`. Ships ADR phases 1–2 (image/video/upload/note nodes,
+wires, autosave); character nodes and operation nodes (upscale / remove-bg) follow.
+
+- **A canvas CITES generations, exactly like a film.** `canvas`/`canvas_node`/`canvas_edge`
+  own the document; a node keeps an append-only `generationIds` history with no FK, so
+  deleting a generation from the Library leaves an empty version instead of eating the board.
+  Running a node is an ordinary `POST /api/generations` — **zero new money code**.
+- **The chain edge is `inputGenerationId`**, not bytes: the client cites its own succeeded
+  image, the server resolves its own stored file. Image models receive it through the
+  server-only `referenceImages` channel (so it **counts against** `referenceMode` /
+  `maxReferenceImages`); video models receive it as the provider's seed frame. It is
+  mutually exclusive with `inputImage` at the contract level.
+- **`modules/Canvas` on `@xyflow/react`.** Nodes are ordinary DOM. The Zustand store is the
+  editing truth (singleton + `init()`/`reset()` per route param — the `wizardStore`
+  discipline); React Flow objects are **derived per render, never stored**.
+- **Autosave, not a save button** (the first in this codebase): edits mark the document dirty,
+  1.5 s of quiet triggers a full-document PATCH, unmount flushes. Failure is a quiet amber
+  "not saved · retry" in the header — never a toast storm.
+- **`edgeRules` is a pure function** checked twice: during the drag (an illegal wire refuses to
+  snap) and on write. Two slots per node (media + character), video is terminal, cycles are
+  refused. The graph therefore cannot hold an edge the rules would reject.
+- The module **imports nothing from Generator or Cinema**: the model catalog is read in
+  `routes/canvas.$canvasId.tsx` and handed down as node data — the seam `/cinema/$filmId`
+  already uses. Node polling shares the `['generation', id]` cache with every other poller.
 
 ## Design references
 

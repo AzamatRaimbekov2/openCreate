@@ -40,4 +40,4 @@ sequenceDiagram
 - `hasInput={false}`: an upload is a source only. It IS wirable downstream, but `buildRunInput` skips upload parents in this phase — a stored file has no generation id to cite (phase 4's operation nodes give it one).
 
 ## Commits
-- _no commit yet_
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip

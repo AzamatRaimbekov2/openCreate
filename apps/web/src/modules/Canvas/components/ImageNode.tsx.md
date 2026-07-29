@@ -41,4 +41,4 @@ flowchart TD
 - `if (!node) return null` sits AFTER every hook call, so hook order stays stable when a node is deleted mid-render.
 
 ## Commits
-- _no commit yet_
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip

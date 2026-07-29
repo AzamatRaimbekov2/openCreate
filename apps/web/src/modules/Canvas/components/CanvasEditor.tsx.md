@@ -38,4 +38,4 @@ flowchart TD
 - The dot grid uses `ridge` (#314062), one surface step above the steel cards, so texture reads as depth BEHIND the nodes.
 
 ## Commits
-- _no commit yet_
+- bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes

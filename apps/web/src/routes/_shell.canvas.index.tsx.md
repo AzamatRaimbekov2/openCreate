@@ -30,4 +30,4 @@ flowchart LR
 - No business logic here on purpose — a route is a composition seam. Everything stateful belongs to `modules/Canvas`.
 
 ## Commits
-- _no commit yet_
+- bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes

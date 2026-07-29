@@ -42,4 +42,4 @@ sequenceDiagram
 - A failed PATCH never touches the document — local state is authoritative until a save succeeds, so an offline blip cannot erase nodes.
 
 ## Commits
-- _no commit yet_
+- a7575d6 2026-07-30 feat(canvas-web): debounced full-document autosave

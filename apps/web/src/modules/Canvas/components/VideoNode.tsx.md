@@ -29,4 +29,4 @@ flowchart LR
 - Pricing differs from image nodes: the shared body prices the model at the SELECTED duration (`creditsByDuration`), so the card shows what will be billed.
 
 ## Commits
-- _no commit yet_
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip

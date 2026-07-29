@@ -31,4 +31,4 @@ flowchart LR
 - The textarea has an `aria-label` because a sticky has no visible label — placeholder-only fields are not accessible names.
 
 ## Commits
-- _no commit yet_
+- f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip
