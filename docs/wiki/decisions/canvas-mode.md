@@ -1,7 +1,7 @@
 ---
 type: decision
-status: proposed
-updated: 2026-07-29
+status: accepted
+updated: 2026-07-30
 sources:
   - docs/superpowers/specs/2026-07-29-canvas-mode-design.md — approved brainstorm design
   - Freepik Spaces / Flora / Krea product study — 2026-07-29 brainstorm session
@@ -19,7 +19,8 @@ tags:
 
 ## Status
 
-**Proposed — 2026-07-29** (design approved by owner in visual brainstorm; spec at
+**Accepted — 2026-07-30** (owner approved the written spec; design approved in the
+2026-07-29 visual brainstorm; spec at
 `docs/superpowers/specs/2026-07-29-canvas-mode-design.md`). Owner decisions locked
 during brainstorm: node graph with wires (not freeform board, not hybrid);
 task-block nodes (not ComfyUI-atomic); per-node run + "run branch" (not auto-cascade);
