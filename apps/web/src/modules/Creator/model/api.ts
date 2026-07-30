@@ -102,6 +102,14 @@ export function useCreatorSession(sessionId: string | null) {
     enabled: sessionId !== null,
     queryFn: () => api<CreatorSessionDetail>(`/api/creator/sessions/${sessionId}`),
     refetchInterval: (query) => sessionPollInterval(query.state),
+    // An agent turn runs for MINUTES and users tab away while it works. TanStack
+    // pauses interval refetches in hidden tabs by default, and this app disables
+    // refetchOnWindowFocus globally — together that froze a backgrounded
+    // transcript on «агент работает…» FOREVER (found live 2026-07-30: the
+    // interval callback armed and never ticked; document.visibilityState was
+    // 'hidden'). Background polling keeps the story moving; sessionPollInterval
+    // still stops it the moment the session settles, so an idle chat costs zero.
+    refetchIntervalInBackground: true,
   })
 }
 

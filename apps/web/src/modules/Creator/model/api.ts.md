@@ -45,3 +45,14 @@ flowchart TD
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-30 — background polling (hidden-tab freeze fix)
+
+- `useCreatorSession` now sets `refetchIntervalInBackground: true`. Found live:
+  TanStack v5 pauses interval refetches while `document.visibilityState ===
+  'hidden'`, and this app globally disables `refetchOnWindowFocus` — together a
+  backgrounded transcript froze on «агент работает…» FOREVER (the interval
+  callback armed — 4 evaluations returning 2000ms — and never ticked). An agent
+  turn runs for minutes and users tab away, so the chat must poll in background.
+- Cost bound: `sessionPollInterval` still returns `false` the moment the session
+  settles (idle/failed), so a resting chat polls zero.
