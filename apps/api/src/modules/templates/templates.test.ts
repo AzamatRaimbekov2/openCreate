@@ -54,6 +54,43 @@ describe('template catalog', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  it('names no trademark the providers moderate on', () => {
+    // Written for the brick shelf, enforced catalog-wide because the failure is
+    // expensive in two independent ways and neither is visible in review:
+    //   · Veo's moderation rejects prompts naming a toy brand outright, so the
+    //     premium tier — the only one that speaks — would 400 on every beat while
+    //     draft and standard rendered fine. A tier that silently doesn't work.
+    //   · It is someone else's registered mark, and these strings are product
+    //     copy on a public endpoint, not internal notes.
+    // The aesthetic is reachable without the name ("plastic construction bricks",
+    // "stop-motion brickfilm", "visible brick studs"), so there is no cost to the
+    // ban — only to forgetting it. Word-boundary matched so "allegory" and friends
+    // do not trip it.
+    const BANNED = /\blegos?\b/i
+    for (const t of TEMPLATES) {
+      const strings = [
+        t.id,
+        t.name,
+        t.tagline,
+        t.description,
+        t.titleTemplate,
+        t.musicPrompt ?? '',
+        ...Object.values(t.tierNotes ?? {}),
+        ...t.variables.flatMap((v) => [
+          v.label,
+          v.hint ?? '',
+          v.defaultValue,
+          ...(v.kind === 'select'
+            ? v.options.flatMap((o) => [o.label, o.prompt, o.spoken ?? ''])
+            : []),
+        ]),
+        ...t.shots.flatMap((s) => [s.beat, ...stringsOf(s).map((f) => f.text)]),
+      ]
+      for (const text of strings)
+        expect(BANNED.test(text), `${t.id}: "${text}" names a trademarked brand`).toBe(false)
+    }
+  })
+
   describe.each(TEMPLATES.map((t) => [t.id, t] as const))('%s', (_id, template) => {
     const declared = new Set(template.variables.map((v) => v.key))
     const textKeys = new Set(
@@ -190,6 +227,71 @@ describe('template catalog', () => {
         if (isClip(shot)) continue
         expect(shot.title.text.length).toBeGreaterThan(0)
       }
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The brick shelf («Брик-мульты») has promises the generic invariants above do
+// not cover, because they are promises of THIS PACK rather than of templates in
+// general: a whole shelf sold as "восемь готовых историй" has to actually hold
+// eight, each has to be a story (an arc that resolves, not a look), each has to
+// speak, and each has to cost about the same as its neighbours — a shelf where
+// one card is 280 credits and the next is 840 reads as a pricing bug.
+//
+// The pack is authored to a deliberately narrow shape: 5–6 paid clips plus 1–2
+// free cards. The floor is dramatic (five beats is the minimum that carries
+// setup → turn → resolution) and the ceiling is economic (a seventh clip pushes
+// the premium tier past ~1000 credits, which is where the format stops being an
+// impulse purchase).
+// ─────────────────────────────────────────────────────────────────────────────
+const BRICK = TEMPLATES.filter((t) => t.category === 'brick')
+
+describe('brick shelf', () => {
+  it('ships the eight stories the shelf claims', () => {
+    expect(BRICK.map((t) => t.id)).toEqual([
+      'brick-heist',
+      'brick-space',
+      'brick-race',
+      'brick-castle',
+      'brick-build',
+      'brick-noir',
+      'brick-pirates',
+      'brick-city',
+    ])
+  })
+
+  describe.each(BRICK.map((t) => [t.id, t] as const))('%s', (_id, template) => {
+    it('is 5–6 paid clips plus 1–2 free cards', () => {
+      const clips = template.shots.filter(isClip)
+      const cards = template.shots.length - clips.length
+      expect(clips.length).toBeGreaterThanOrEqual(5)
+      expect(clips.length).toBeLessThanOrEqual(6)
+      expect(cards).toBeGreaterThanOrEqual(1)
+      expect(cards).toBeLessThanOrEqual(2)
+    })
+
+    it('speaks on every paid beat', () => {
+      // A brickfilm without dialogue is a slideshow of toys. The Russian lines are
+      // the performance, and on the premium tier the model generates them itself —
+      // so a silent beat is a beat that pays for the expensive model and wastes it.
+      for (const shot of template.shots)
+        if (isClip(shot)) expect(shot.voiceover?.text.length, shot.beat).toBeGreaterThan(0)
+    })
+
+    it('has 2–3 knobs, at most one of them free text', () => {
+      // The closed rule: a select is validated against its option set before it can
+      // reach a paid prompt; free text cannot be. One text knob per story is the
+      // budget, and it only ever lands in a spoken line or a card (asserted for
+      // every template by the free-text test above).
+      expect(template.variables.length).toBeGreaterThanOrEqual(2)
+      expect(template.variables.length).toBeLessThanOrEqual(3)
+      expect(template.variables.filter((v) => v.kind === 'text').length).toBeLessThanOrEqual(1)
+    })
+
+    it('tells the audio panel what it wants, and says why premium costs more', () => {
+      expect(template.musicPrompt?.length, 'musicPrompt').toBeGreaterThan(0)
+      expect(template.tierNotes?.premium?.length, 'tierNotes.premium').toBeGreaterThan(0)
     })
   })
 })

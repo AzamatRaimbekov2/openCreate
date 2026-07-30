@@ -13,8 +13,12 @@
 // last is deliberate — the dramas are the reason someone opens this page.
 import type { Template } from '../types'
 import { anime } from './anime'
+import { brickBuild } from './brick-build'
 import { brickCastle } from './brick-castle'
+import { brickCity } from './brick-city'
 import { brickHeist } from './brick-heist'
+import { brickNoir } from './brick-noir'
+import { brickPirates } from './brick-pirates'
 import { brickRace } from './brick-race'
 import { brickSpace } from './brick-space'
 import { buran } from './buran'
@@ -48,6 +52,10 @@ export const TEMPLATES: Template[] = [
   brickSpace,
   brickRace,
   brickCastle,
+  brickBuild,
+  brickNoir,
+  brickPirates,
+  brickCity,
   buran,
   fruitDrama,
   catDrama,
