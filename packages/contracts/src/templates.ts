@@ -39,7 +39,24 @@ import { aspectRatioSchema } from './catalog'
 // language that the user re-aims with a couple of knobs and then edits. Unlike
 // a brainrot template (a finished joke) a format template is a starting grid:
 // picked to be *rewritten*, beat by beat, in the Cinema editor.
-export const templateCategorySchema = z.enum(['format', 'brainrot', 'animation'])
+//
+// 'brick' (2026-07-30, owner request «лего-мультфильмы с историями») is the
+// fourth shelf: stop-motion brickfilms — plastic-construction-brick worlds and
+// minifigure casts playing out eight complete short stories (a heist, a space
+// rescue, a castle escape…). It is not a brainrot format and not a 'format'
+// scaffold: a brainrot template is a joke picked to be posted and a format
+// template is a grid picked to be rewritten, while a brick template is a STORY
+// picked to be watched — an arc that resolves, with a beginning and an end,
+// which is why the pack is authored as eight distinct plots rather than one
+// look with knobs.
+//
+// NOTE FOR ANYONE ADDING TO THIS SHELF: the toy brand's name appears nowhere in
+// the catalog, and that is enforced by a test (templates.test.ts, "names no
+// trademark the providers moderate on"). It is both someone else's registered
+// mark and a phrase Veo's moderation rejects — which would break the premium
+// tier only, silently. The aesthetic vocabulary is "plastic construction
+// bricks", "minifigure", "brickfilm", "visible brick studs".
+export const templateCategorySchema = z.enum(['format', 'brainrot', 'animation', 'brick'])
 export type TemplateCategory = z.infer<typeof templateCategorySchema>
 
 // ─────────────────────────────────────────────────────────────────────────────
