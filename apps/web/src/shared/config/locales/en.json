@@ -1,6 +1,7 @@
 {
   "nav": {
     "create": "Create",
+    "creator": "Agent",
     "library": "Library",
     "pricing": "Pricing",
     "signIn": "Sign in",
@@ -1110,6 +1111,64 @@
         "parent": "An input in this chain cannot produce an image yet.",
         "nothingToRun": "This branch is already up to date — nothing to run."
       }
+    }
+  },
+  "creator": {
+    "title": "openCreator",
+    "lead": "Describe the task in one message. The agent plans it, shows the price, and runs it once you confirm.",
+    "rail": "Conversations",
+    "transcript": "Conversation",
+    "new": "New task",
+    "listError": "Could not load your conversations",
+    "chatError": "Could not load this conversation",
+    "empty": {
+      "title": "No conversations yet",
+      "description": "Describe what to create — a scene, a character, a whole board — and the agent takes it from there."
+    },
+    "pick": {
+      "title": "Pick a conversation",
+      "description": "Or start a new task: the agent always plans first and asks before spending anything."
+    },
+    "noMessages": "The agent is reading your task…",
+    "working": "the agent is working…",
+    "status": {
+      "idle": "ready",
+      "running": "working",
+      "awaiting_confirm": "awaiting confirmation",
+      "failed": "did not finish"
+    },
+    "step": {
+      "done": "done",
+      "error": "error",
+      "cost": "{{credits}} cr"
+    },
+    "plan": {
+      "title": "Budget",
+      "lead": "The agent will spend credits on this:",
+      "total": "Total",
+      "confirm": "Confirm · {{credits}} cr",
+      "confirmed": "budget confirmed",
+      "stale": "This plan is out of date. Send a new message and the agent will price the work again."
+    },
+    "result": {
+      "openCanvas": "Open the board",
+      "openSoul": "Open the character"
+    },
+    "composer": {
+      "label": "Task for the agent",
+      "placeholder": "Describe what to create…",
+      "send": "Send",
+      "waiting": "The agent is working — its answer will appear above.",
+      "gate": "Confirm the budget above to continue."
+    },
+    "busy": {
+      "title": "The agent is already working",
+      "description": "Its answer will appear in the chat in a moment."
+    },
+    "agentText": {
+      "notConfigured": "The agent is not switched on yet. Nothing was charged.",
+      "unavailable": "The agent is temporarily unavailable. Try again in a minute — nothing was charged.",
+      "turnFailed": "The turn did not finish. Send the task again — nothing was charged."
     }
   }
 }
