@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AspectRatio, CanvasNodeConfig, Generation } from '@opencreate/contracts'
-import { Badge, Button, Select, Skeleton, WELL_SURFACE } from 'shared/ui'
+import { Badge, Button, EnhanceButton, Select, Skeleton, WELL_SURFACE } from 'shared/ui'
 import type { SelectOption } from 'shared/ui'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import type { CanvasModelOption, NodeRunStatus } from '../model/types'
@@ -217,15 +217,37 @@ export function GenerationNode({
 
       <VersionStrip count={history.length} index={shownIndex} onStep={setVersionIndex} />
 
-      {/* nodrag: React Flow must not start a canvas drag from a form field */}
-      <textarea
-        value={node.config.prompt ?? ''}
-        onChange={(e) => updateNodeConfig(id, { prompt: e.target.value })}
-        placeholder={t('canvas.node.promptPlaceholder')}
-        aria-label={t('canvas.node.promptPlaceholder')}
-        rows={2}
-        className="nodrag mb-2 w-full resize-none rounded-lg border border-white/10 bg-steel px-2 py-1.5 text-xs text-mist transition-colors duration-200 placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none"
-      />
+      {/* The prompt field owns the enhance affordance, exactly like the /create
+          composer and the Cinema shot prompt: the sparkle lives INSIDE the field
+          (relative wrapper + `pr-10` so the text never slides under the icon).
+          `nodrag` on BOTH: React Flow must not start a canvas drag from a form
+          field, and its hit test walks ancestors, so the class on the button's
+          wrapper covers the button itself. */}
+      <div className="relative mb-2">
+        <textarea
+          value={node.config.prompt ?? ''}
+          onChange={(e) => updateNodeConfig(id, { prompt: e.target.value })}
+          placeholder={t('canvas.node.promptPlaceholder')}
+          aria-label={t('canvas.node.promptPlaceholder')}
+          rows={2}
+          className="nodrag w-full resize-none rounded-lg border border-white/10 bg-steel px-2 py-1.5 pr-10 text-xs text-mist transition-colors duration-200 placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none"
+        />
+        {/* Placement rides a WRAPPER, the ShotInspector precedent — never
+            `absolute` through EnhanceButton's own className: that class lands on
+            its internal `relative` box, which (a) Tailwind would resolve by
+            stylesheet order rather than class order, and (b) is the anchor its
+            error/nudge chip (`absolute bottom-full`) hangs from. */}
+        <div className="nodrag absolute right-1 bottom-1">
+          {/* Enhanced text goes to the DOCUMENT, not to local state — the same
+              setter a keystroke uses, so autosave persists it and the run
+              submits what the card shows. */}
+          <EnhanceButton
+            value={node.config.prompt ?? ''}
+            onEnhanced={(prompt) => updateNodeConfig(id, { prompt })}
+            className="nodrag"
+          />
+        </div>
+      </div>
 
       <div className="mb-2 flex flex-col gap-2">
         <Select

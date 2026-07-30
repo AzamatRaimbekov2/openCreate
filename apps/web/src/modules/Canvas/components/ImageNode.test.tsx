@@ -6,17 +6,27 @@ import userEvent from '@testing-library/user-event'
 import { ReactFlowProvider } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Generation } from '@opencreate/contracts'
+import { api } from 'shared/libs/apiClient'
 import type { CanvasModelOption } from '../model/types'
 import { useCanvasStore } from '../model/canvasStore'
 import { useNodeGeneration, useRunNode } from '../model/useNodeGeneration'
 import { ImageNode } from './ImageNode'
+// i18n init — the enhance affordance renders its own localized aria-label
+import 'shared/config/i18n'
 
 vi.mock('../model/useNodeGeneration', async (importOriginal) => {
   const original = await importOriginal<typeof import('../model/useNodeGeneration')>()
   return { ...original, useRunNode: vi.fn(), useNodeGeneration: vi.fn() }
 })
+// Only api() — the run/poll hooks above are mocked separately, so the only real
+// request this file can make is the enhance POST the sparkle fires.
+vi.mock('shared/libs/apiClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('shared/libs/apiClient')>()
+  return { ...actual, api: vi.fn() }
+})
 const mockRun = vi.mocked(useRunNode)
 const mockPoll = vi.mocked(useNodeGeneration)
+const apiMock = vi.mocked(api)
 
 const DOC = {
   id: 'c1',
@@ -206,6 +216,24 @@ describe('ImageNode', () => {
     client.setQueryData(['generation', 'g-parent'], gen('processing'))
     renderNode(client)
     expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
+  })
+
+  it('enhances the prompt in place from the sparkle, and the node keeps the result', async () => {
+    // Owner requirement: every node prompt field carries the enhance affordance.
+    // The enhanced text must land in the DOCUMENT (config.prompt), not in local
+    // component state — otherwise autosave would never persist it and the run
+    // would submit the old draft.
+    apiMock.mockResolvedValue({ prompt: 'a red fox at cinematic dusk, 35mm' })
+    renderNode()
+    await userEvent.click(screen.getByRole('button', { name: /enhance prompt/i }))
+    expect(await screen.findByDisplayValue('a red fox at cinematic dusk, 35mm')).toBeInTheDocument()
+    expect(useCanvasStore.getState().nodes[0]?.config.prompt).toBe(
+      'a red fox at cinematic dusk, 35mm',
+    )
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/prompt/enhance',
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 
   it('a wired character narrows the picker to reference-capable models', async () => {

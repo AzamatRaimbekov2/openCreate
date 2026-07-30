@@ -42,7 +42,8 @@ react-hook-form + zod, i18next.
   **enhance** sparkle (`POST /api/prompt/enhance`): one click rewrites a rough
   draft into a detailed cinematic prompt in place, with one-click Undo, a calm
   "unavailable" notice when the key-gated feature is off, and an occasional
-  once-per-session nudge — the same affordance rides the Cinema shot prompt.
+  once-per-session nudge — the same affordance rides the Cinema shot prompt and
+  every Canvas node prompt (owner requirement 2026-07-30).
   For image-capable models the composer takes a reference image three ways —
   the paperclip (click), a **drag-drop** onto the capsule, and a screenshot
   **paste** (Cmd/Ctrl+V) — all through the one shared `readImageFile` gate.
@@ -388,6 +389,10 @@ nodes (upscale / remove-bg) follow.
 - **`edgeRules` is a pure function** checked twice: during the drag (an illegal wire refuses to
   snap) and on write. Two slots per node (media + character), video is terminal, cycles are
   refused. The graph therefore cannot hold an edge the rules would reject.
+- **Every node prompt field carries the enhance sparkle** (owner requirement
+  2026-07-30) — the shared `EnhanceButton`, wired to `config.prompt` in both
+  directions, so the enhanced text is what autosave persists and what the run
+  submits (local state would have shown one prompt and paid for another).
 - **A character wire carries a Soul entity, not a picture.** The character node only names an
   `entityId`; the consumer node sends `entityRefs: [{ placeholder: 'e1', entityId }]` and puts
   `[[e1]]` in the prompt (prepended when the user did not place it themselves), so the server
