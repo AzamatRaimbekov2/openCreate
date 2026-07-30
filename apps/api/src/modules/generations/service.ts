@@ -701,8 +701,15 @@ export function createGenerationService({
         const r = await videoProvider.submit({
           // The preset-composed prompt (== input.prompt when no preset/entities).
           prompt: modelPrompt,
-          // Style preset negative (empty → omitted).
-          ...(negativePrompt ? { negativePrompt } : {}),
+          // Style preset negative (empty → omitted) — GATED on the model's
+          // capability exactly like the image path above: Runware rejects the
+          // WHOLE task on an unrecognized parameter, and Seedance 1.5 Pro
+          // started refusing `negativePrompt` outright ("Unsupported use of
+          // 'negativePrompt' parameter", verified live 2026-07-30). Before
+          // this gate every styled video on such a model failed and refunded.
+          ...(negativePrompt && model.supportsNegativePrompt !== false
+            ? { negativePrompt }
+            : {}),
           model: model.air,
           width,
           height,

@@ -338,4 +338,52 @@ describe('provider parameter compatibility wiring', () => {
     const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
     expect(arg.omitSafety).toBeUndefined()
   })
+  it('video create OMITS negativePrompt for models flagged supportsNegativePrompt=false', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    // Runware started rejecting the whole task on `negativePrompt` for
+    // Seedance 1.5 Pro ("Unsupported use of 'negativePrompt' parameter",
+    // verified live 2026-07-30 on a brick-template beat) — the same provider
+    // drift pattern as pixverse's `safety`. The anime style preset is what
+    // PRODUCES a negative here; the gate must swallow it for this model.
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'seedance-1-5-pro',
+        prompt: 'a girl by the window',
+        aspectRatio: '9:16',
+        duration: 5,
+        promptPreset: { styleId: 'anime' },
+      },
+    })
+    expect(res.statusCode).toBe(202)
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(arg.negativePrompt).toBeUndefined()
+    // The positive side of the preset still travels — only the negative is cut.
+    expect(String(arg.positivePrompt)).toContain('anime style')
+  })
+  it('video create still sends negativePrompt to models that accept it', async () => {
+    const rw = fakeRunware()
+    rw.submitVideo.mockResolvedValue(undefined)
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'minimax-hailuo',
+        prompt: 'a girl by the window',
+        aspectRatio: '16:9',
+        duration: 6,
+        promptPreset: { styleId: 'anime' },
+      },
+    })
+    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    expect(String(arg.negativePrompt)).toContain('photorealistic')
+  })
 })

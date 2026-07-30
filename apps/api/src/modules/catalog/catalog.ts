@@ -188,6 +188,12 @@ export const CATALOG: CatalogModel[] = [
     // verified live 2026-07-08) — flag off so the client omits it. Moderation
     // still applies via the NSFWContent flag on results.
     supportsSafetyParam: false,
+    // ...and as of 2026-07-30 the same channel rejects `negativePrompt` too
+    // ("Unsupported use of 'negativePrompt' parameter", verified live on a
+    // brick-template beat — the task is refused whole, then refunded). The
+    // video path gates the negative on this flag, exactly like the image path
+    // gates it for flux-kontext-pro.
+    supportsNegativePrompt: false,
   },
   {
     // Wan 2.7 straight from Alibaba Cloud Model Studio — no Runware in the path.

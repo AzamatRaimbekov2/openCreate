@@ -211,3 +211,17 @@ and the NSFW gate are byte-for-byte identical. Pinned by
 video chain reaches the seed frame; a stranger's id, an unknown id and an incapable model each 400
 with the balance untouched) plus the unchanged money suites `generations.test.ts`,
 `generations-entity-refs.test.ts`, `generations-money-atomicity.test.ts`.
+
+## Update 2026-07-30 — video path gates negativePrompt on model capability
+
+- The video submit spread now honours `model.supportsNegativePrompt !== false`
+  exactly like the image path always has. Runware rejects the WHOLE task on an
+  unrecognized parameter, and Seedance 1.5 Pro started refusing
+  `negativePrompt` outright ("Unsupported use of 'negativePrompt' parameter",
+  verified live 2026-07-30 on a brick-template beat) — before the gate, every
+  STYLED video on such a model failed at the provider and refunded. Same
+  provider-drift pattern (and fix shape) as pixverse's `safety` (d881897).
+- Companion catalog change: `seedance-1-5-pro` carries
+  `supportsNegativePrompt: false`. Pinned by two tests in generations.test.ts
+  («OMITS negativePrompt for flagged models» + «still sends to models that
+  accept it»).
