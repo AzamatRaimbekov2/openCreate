@@ -207,3 +207,41 @@ registerCanvasRoutes(app, createCanvasService({ db: deps.db, storage: deps.stora
   the canvas module never touches the ledger, the providers, or the settlement sweeps. That is
   ADR D1's constraint, and the registration line is where it is visible: no runware client, no
   video/mesh provider, no credit service passed in.
+
+## Update 2026-07-30 — openCreator agent wiring
+`buildApp` now also builds and registers openCreator (ADR
+`docs/wiki/decisions/opencreator-agent.md`), immediately after the canvas registration:
+
+```ts
+const canvasService = createCanvasService({ db: deps.db, storage: deps.storage })  // hoisted
+registerCanvasRoutes(app, canvasService)
+const creatorService = createCreatorService({
+  db: deps.db,
+  brains: deps.creatorBrains ?? buildBrainChain(deps.config.anthropicApiKey, deps.config.deepinfraToken),
+  tools: buildCreatorTools({ entities: entityService, canvas: canvasService, generations: generationService, configuredProviders }),
+  log: app.log,
+})
+registerCreatorRoutes(app, creatorService)
+settleStaleCreatorSessions(deps.db, Date.now(), app.log)
+```
+
+- **`canvasService` is now hoisted to a const** (it used to be constructed inline in the register
+  call). The agent writes to the same canvases the SPA edits, and a second instance would be a
+  second writer to the same rows with no shared view of them — the same reason `generationService`
+  and `entityService` were hoisted for Soul Studio and assets3d.
+- **The tools are wired from the EXISTING service instances**, in-process, with the caller's
+  `userId`. That is ADR D1 made visible at the composition root: no HTTP self-calls, no second
+  ledger, no provider client handed to the agent. The only spend it can reach is
+  `generationService.create()` behind the confirm gate.
+- **`configuredProviders` is handed down** so `list_models` hides a model whose backend is off —
+  the agent must not plan a shot that is guaranteed to fail *after* charging (the rule the public
+  catalog route already applies).
+- **New `AppDeps.creatorBrains?: Brain[]`** — the only new dep field. Absent → derived from the
+  `ANTHROPIC_API_KEY` / `DEEPINFRA_TOKEN` pair, so production needs no extra env wiring and an
+  unset key just drops its adapter. Tests inject a SCRIPTED brain (an agent assertion must not
+  depend on what a real model decides, and no suite may call Anthropic/DeepInfra); `[]` is
+  meaningful too — the "nothing configured" case, which must answer a clean provider_error.
+- **Third boot sweep: `settleStaleCreatorSessions`**, next to `settleStaleGenerations` and
+  `settleStaleRenders`. It refunds nothing (a turn spends LLM tokens, not credits; a generation the
+  agent started settles through its own poll path) — it exists because an in-flight turn lives in
+  process memory, so a restart would otherwise leave a session spinning forever.

@@ -82,3 +82,18 @@ flowchart LR
 
 ## Update 2026-07-23 — googleClientId / googleClientSecret overrides (Google OAuth, ADR google-oauth)
 - `TestAppOverrides.googleClientId?` / `googleClientSecret?` thread into `config` (were hard-coded `null`). Both default `null` → Google provider disabled and `GET /api/auth/config` reports `{ googleEnabled: false }`. Setting **BOTH** enables the better-auth Google provider and flips the flag to `true` (config gates on the pair). Used by `test/auth-config.test.ts`. The actual OAuth round-trip is NOT exercised over HTTP (it redirects to Google) — the flag endpoint + provider enablement is what the suite pins.
+
+## Update 2026-07-30 — creatorBrains override (openCreator, ADR opencreator-agent)
+- `TestAppOverrides.creatorBrains?: Brain[]` threads into `AppDeps.creatorBrains`, and is forwarded
+  only when **present** (`!== undefined`) rather than when truthy: `[]` is the meaningful "no LLM
+  configured" case the creator suite asserts on, and a truthiness check would silently swap it for
+  the token-derived chain.
+- Default (absent) → `buildApp` derives the chain from `anthropicApiKey` / `deepinfraToken`, both
+  `null` by default, i.e. an EMPTY chain. So every suite that never touches `/creator` is
+  unaffected, and a turn there would answer 502 `provider_error`.
+- `test/creator.test.ts` injects a **scripted** brain (a fixed list of `BrainReply`s, one per loop
+  step) plus a `hangingBrain` whose promise never settles — the only deterministic way to observe a
+  session that is genuinely still `running` (for the 409 and the reaper tests). Unlike the enhancer
+  and storyboard, agent SUCCESS *is* exercised over HTTP: the generation path underneath stays real
+  (`fakeRunware` + the real ledger), which is what makes "no provider call, balance unchanged" real
+  evidence that the budget gate held.

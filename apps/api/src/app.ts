@@ -44,6 +44,11 @@ import { registerPromptRoutes } from './modules/prompt/routes'
 import { registerCompareRoutes } from './modules/compare/routes'
 import { createCanvasService } from './modules/canvas/service'
 import { registerCanvasRoutes } from './modules/canvas/routes'
+import { buildBrainChain } from './modules/creator/brain'
+import type { Brain } from './modules/creator/brain'
+import { buildCreatorTools } from './modules/creator/tools'
+import { createCreatorService, settleStaleCreatorSessions } from './modules/creator/service'
+import { registerCreatorRoutes } from './modules/creator/routes'
 import { registerUserRoutes } from './modules/users/routes'
 
 export type AppDeps = {
@@ -83,6 +88,16 @@ export type AppDeps = {
   // to keep back-to-back poll scripts deterministic, or a real value to
   // exercise the throttle itself.
   pollMinIntervalMs?: number
+  // openCreator's brain chain (ADR opencreator-agent D3). Absent → derived below
+  // from the ANTHROPIC_API_KEY / DEEPINFRA_TOKEN pair, so production needs no
+  // extra wiring and an unset key simply drops its adapter.
+  //
+  // The override exists because an agent test must be able to SCRIPT the LLM: an
+  // HTTP suite that asserts "the budget gate refused this generation" cannot
+  // depend on what a real model decides to do (or on having a key at all). An
+  // empty array is meaningful too — it is the "nothing configured" case, which
+  // must answer with a clean provider_error rather than crash a turn.
+  creatorBrains?: Brain[]
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -401,7 +416,40 @@ export async function buildApp(deps: AppDeps) {
   // generations — CRUD only, zero money code; node runs arrive as ordinary
   // POST /api/generations from the SPA. `storage` is wired for the ONE thing
   // this module writes bytes for: upload-node images.
-  registerCanvasRoutes(app, createCanvasService({ db: deps.db, storage: deps.storage }))
+  //
+  // Hoisted to a const (it used to be constructed inline in the register call)
+  // because openCreator's tools need THIS instance: the agent writes to the same
+  // canvases the SPA edits, and a second instance would be a second writer to
+  // the same rows with no shared view of them.
+  const canvasService = createCanvasService({ db: deps.db, storage: deps.storage })
+  registerCanvasRoutes(app, canvasService)
+  // openCreator (ADR opencreator-agent): the chat agent that drives everything
+  // above. Its tools are THIN WRAPPERS over the service instances already in
+  // scope — entityService, canvasService, generationService — called in-process
+  // with the caller's userId, so ownership, capability checks, prices and refunds
+  // all stay where they already live. The agent has NO money code of its own: the
+  // only spend is generationService.create() behind the confirm gate.
+  //
+  // `configuredProviders` is handed down so list_models hides a model whose
+  // backend is off — the agent must not plan a shot that is guaranteed to fail
+  // after charging (the same rule the public catalog route applies).
+  //
+  // The brain chain is the ONLY new external dependency, and it is optional in
+  // exactly the storyboard/enhancer sense: with neither key set the chain is
+  // empty and the first turn answers a clean provider_error while the rest of the
+  // product keeps working.
+  const creatorService = createCreatorService({
+    db: deps.db,
+    brains: deps.creatorBrains ?? buildBrainChain(deps.config.anthropicApiKey, deps.config.deepinfraToken),
+    tools: buildCreatorTools({
+      entities: entityService,
+      canvas: canvasService,
+      generations: generationService,
+      configuredProviders,
+    }),
+    log: app.log,
+  })
+  registerCreatorRoutes(app, creatorService)
   // Boot-time sweep: settlement is poll-driven (no background workers), so a
   // processing row whose owner never returns would hold its credit charge
   // forever. Fail + refund anything older than the staleness threshold now.
@@ -409,6 +457,11 @@ export async function buildApp(deps: AppDeps) {
   // Render reaper (no refund — a render has no charge): a render whose ffmpeg
   // process died would hold 'processing' forever with no poller to settle it.
   settleStaleRenders(deps.db, Date.now(), app.log)
+  // Agent-turn reaper (no refund either — a turn spends LLM tokens, not credits;
+  // any generation it already started settles through its own poll path). An
+  // in-flight turn lives in process memory, so a restart leaves a `running`
+  // session that nothing else can move off the spinner.
+  settleStaleCreatorSessions(deps.db, Date.now(), app.log)
 
   // Serve downloaded generation assets at /media/* straight off the storage
   // dir. Public by design for the MVP: keys are unguessable UUIDs minted by

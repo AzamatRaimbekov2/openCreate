@@ -117,6 +117,16 @@ export type TestAppOverrides = {
   // enables the better-auth Google provider and flips the public config flag.
   googleClientId?: string | null
   googleClientSecret?: string | null
+  // openCreator's brain chain (ADR opencreator-agent). Absent → derived from the
+  // two (null-by-default) LLM keys, i.e. an EMPTY chain, so a suite that never
+  // touches /creator is unaffected and a turn would answer provider_error.
+  //
+  // The creator HTTP suite injects a SCRIPTED brain instead: asserting "the
+  // budget gate refused this generation" must not depend on what a real model
+  // decides to do, and no test may hit Anthropic or DeepInfra. The generation
+  // path underneath stays real (fakeRunware + the real ledger), which is what
+  // makes "no provider call, balance unchanged" meaningful evidence.
+  creatorBrains?: import('../../src/modules/creator/brain').Brain[]
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -131,6 +141,10 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
     ...(overrides.videoProviders ? { videoProviders: overrides.videoProviders } : {}),
     ...(overrides.meshProvider ? { meshProvider: overrides.meshProvider } : {}),
     ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
+    // Presence matters, not truthiness: `[]` is the meaningful "nothing
+    // configured" case the creator suite asserts on, so it must reach buildApp
+    // instead of falling back to the token-derived chain.
+    ...(overrides.creatorBrains !== undefined ? { creatorBrains: overrides.creatorBrains } : {}),
     // 0 disables the poll throttle by default (see TestAppOverrides note).
     pollMinIntervalMs: overrides.pollMinIntervalMs ?? 0,
     config: {
