@@ -104,9 +104,15 @@ function EditorInner({ models }: { models: CanvasModelOption[] }) {
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       for (const change of changes) {
-        // Write positions on drag END only — one store write (and one autosave
-        // arm) per gesture instead of sixty per second.
-        if (change.type === 'position' && change.dragging === false && change.position) {
+        // Apply positions on EVERY frame of the drag, not only on release. In
+        // controlled React Flow the node moves ONLY when the `nodes` prop
+        // reflects each intermediate position — writing on dragEnd alone left
+        // the card frozen under the cursor and teleporting on drop (owner
+        // report 2026-07-30). Per-frame store writes are cheap (the rfNodes
+        // cache rebuilds just the dragged node), and autosave still PATCHes
+        // once per gesture: the debounce arms on the saved→dirty TRANSITION,
+        // so sixty dirty writes ride one timer.
+        if (change.type === 'position' && change.position) {
           moveNode(change.id, change.position)
         }
         if (change.type === 'remove') removeNode(change.id)

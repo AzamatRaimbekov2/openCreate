@@ -54,3 +54,14 @@ flowchart TD
   keystroke after the first (found live 2026-07-30, one char landed per click).
 - Companion fix: the editor route memoizes `models` (its identity feeds the cache
   comparison) — see `routes/canvas.$canvasId.tsx`.
+
+## Update 2026-07-30 — drag follows the cursor (per-frame position writes)
+
+- `onNodesChange` now applies `position` changes on EVERY drag frame, not only
+  at `dragging === false`. In controlled React Flow a node moves only when the
+  `nodes` prop reflects each intermediate position — the old dragEnd-only write
+  left the card frozen under the cursor and teleporting on drop (owner report).
+- Cost analysis: per-frame store writes are cheap (the rfNodes identity cache
+  rebuilds only the dragged node's RF object), and autosave still PATCHes once
+  per gesture — the debounce arms on the saved→dirty TRANSITION, so sixty dirty
+  writes ride one timer.
