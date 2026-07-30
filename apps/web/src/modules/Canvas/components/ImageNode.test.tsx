@@ -2,6 +2,7 @@
 // runnable input). Hooks are mocked; React Flow needs its provider for Handle.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReactFlowProvider } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Generation } from '@opencreate/contracts'
@@ -44,7 +45,33 @@ const MODELS: CanvasModelOption[] = [
     credits: 2,
     aspectRatios: ['16:9', '1:1', '9:16'],
   },
+  // The reference-capable counterpart: only this one may hold a character
+  {
+    id: 'flux-kontext-pro',
+    name: 'Kontext',
+    providerLabel: 'FLUX.1 Kontext',
+    type: 'image',
+    credits: 8,
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    referenceMode: 'both',
+  },
 ]
+
+// A character node wired into n1 — the graph shape phase 3 introduces
+const CHARACTER_DOC = {
+  ...DOC,
+  nodes: [
+    ...DOC.nodes,
+    {
+      id: 'ch1',
+      kind: 'character' as const,
+      position: { x: 0, y: 0 },
+      config: { entityId: 'ent1' },
+      generationIds: [] as string[],
+    },
+  ],
+  edges: [{ id: 'e-ch', sourceNodeId: 'ch1', targetNodeId: 'n1' }],
+}
 
 function renderNode(client: QueryClient = new QueryClient()) {
   return render(
@@ -178,6 +205,27 @@ describe('ImageNode', () => {
     const client = new QueryClient()
     client.setQueryData(['generation', 'g-parent'], gen('processing'))
     renderNode(client)
+    expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
+  })
+
+  it('a wired character narrows the picker to reference-capable models', async () => {
+    // The server refuses a character on a model with no referenceMode with a
+    // clean 400 (nothing charged) — but offering a choice that is guaranteed to
+    // be refused is a promise the product does not keep (ModelSelect precedent).
+    useCanvasStore.getState().init(CHARACTER_DOC)
+    renderNode()
+    await userEvent.click(screen.getByRole('button', { name: /model/i }))
+    const options = screen.getAllByRole('option').map((option) => option.textContent ?? '')
+    expect(options.some((label) => label.includes('Kontext'))).toBe(true)
+    expect(options.some((label) => label.includes('Studio'))).toBe(false)
+  })
+
+  it('blocks the run with a hint when the chosen model cannot hold a wired character', () => {
+    // n1 still points at flux-dev (chosen before the wire existed): say why it
+    // cannot run instead of letting the click buy a guaranteed 400.
+    useCanvasStore.getState().init(CHARACTER_DOC)
+    renderNode()
+    expect(screen.getByText(/cannot hold a character/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
   })
 

@@ -1063,6 +1063,7 @@
       "image": "Image",
       "video": "Video",
       "upload": "Upload",
+      "character": "Character",
       "note": "Note"
     },
     "status": {
@@ -1088,6 +1089,11 @@
       "uploadAlt": "Uploaded image",
       "notePlaceholder": "Note…",
       "note": "Note",
+      "fromSoul": "from Soul",
+      "characterPlaceholder": "pick a character",
+      "characterEmpty": "No characters yet.",
+      "characterEmptyCta": "Create one in Soul",
+      "characterModelHint": "This model cannot hold a character — pick another.",
       "version": "v{{index}} / {{count}}",
       "prevVersion": "Previous version",
       "nextVersion": "Next version"

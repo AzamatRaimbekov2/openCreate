@@ -26,7 +26,8 @@ flowchart LR
 ## Key decisions / gotchas
 - A CUSTOM mime type (`application/x-opencreate-node-kind`), not `text/plain`: the board's `onDragOver` only calls `preventDefault()` when that type is present, so dragging a file or selected text over the canvas is left alone instead of being swallowed.
 - Glyphs are `aria-hidden` decoration; the localized label is the accessible name. Never icon-only (design.md §8).
-- The palette lists only the kinds the phase can actually run — `character`, `upscale` and `remove-bg` exist in the contract and in `edgeRules` already, but adding a button for a node that cannot do anything would be a promise the product does not keep yet.
+- The palette lists only the kinds the phase can actually USE — `upscale` and `remove-bg` exist in the contract and in `edgeRules` already, but adding a button for a node that cannot do anything would be a promise the product does not keep yet. `character` joined the rail with ADR phase 3a, the moment it could pick a real Soul character and feed it downstream.
+- Rail order follows the shape of a chain rather than the contract's enum order: what produces media (image · video · upload), then what identifies a subject (character), then the annotation that never runs (note).
 - Buttons hit `min-h-10` for the touch-target rule even though the rail is pointer-first.
 
 ## Commits

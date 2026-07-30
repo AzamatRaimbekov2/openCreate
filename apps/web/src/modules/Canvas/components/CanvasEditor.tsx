@@ -25,12 +25,13 @@ import {
 // standing as the font packages. React Flow cannot draw wires without it.
 import '@xyflow/react/dist/style.css'
 import type { CanvasNodeKind } from '@opencreate/contracts'
-import type { CanvasModelOption } from '../model/types'
+import type { CanvasEntityOption, CanvasModelOption } from '../model/types'
 import { canConnect } from '../model/edgeRules'
 import { useCanvasStore } from '../model/canvasStore'
 import { ImageNode } from './ImageNode'
 import { VideoNode } from './VideoNode'
 import { UploadNode } from './UploadNode'
+import { EntityNode } from './EntityNode'
 import { NoteNode } from './NoteNode'
 import { NODE_KIND_MIME, NodePalette } from './NodePalette'
 
@@ -40,6 +41,7 @@ const nodeTypes: NodeTypes = {
   image: ImageNode,
   video: VideoNode,
   upload: UploadNode,
+  character: EntityNode,
   note: NoteNode,
 }
 
@@ -47,7 +49,21 @@ const nodeTypes: NodeTypes = {
 // cards, so the texture reads as depth behind them rather than as noise on top.
 const GRID_COLOR = '#314062'
 
-function EditorInner({ models }: { models: CanvasModelOption[] }) {
+// What EVERY node receives as React Flow `data`. One shape for all kinds (each
+// component reads only its own slice) because React Flow's node data is typed
+// per NODE, not per type map — and because the cache comparison below has to
+// know the full field list to stay honest.
+type NodeData = { models: CanvasModelOption[]; entities: CanvasEntityOption[] }
+
+type EditorProps = {
+  models: CanvasModelOption[]
+  // The Soul characters a character node may pick from. Like `models`, this
+  // arrives from the ROUTE (Canvas imports neither Generator nor Entities) and
+  // must be MEMOIZED there: its identity is part of the rfNodes cache key below.
+  entities: CanvasEntityOption[]
+}
+
+function EditorInner({ models, entities }: EditorProps) {
   const { t } = useTranslation()
   const storeNodes = useCanvasStore((s) => s.nodes)
   const storeEdges = useCanvasStore((s) => s.edges)
@@ -79,23 +95,33 @@ function EditorInner({ models }: { models: CanvasModelOption[] }) {
     const mapped = storeNodes.map((n) => {
       seen.add(n.id)
       const prev = cache.get(n.id)
+      // Every field the node data carries has to appear in this comparison, or a
+      // changed catalog/character list would keep serving the cached RF object
+      // and the card would render stale options forever.
+      const prevData = prev?.data as NodeData | undefined
       if (
         prev &&
         prev.type === n.kind &&
         prev.position.x === n.position.x &&
         prev.position.y === n.position.y &&
-        (prev.data as { models: CanvasModelOption[] }).models === models
+        prevData?.models === models &&
+        prevData.entities === entities
       ) {
         return prev
       }
-      const next: Node = { id: n.id, type: n.kind, position: n.position, data: { models } }
+      const next: Node = {
+        id: n.id,
+        type: n.kind,
+        position: n.position,
+        data: { models, entities },
+      }
       cache.set(n.id, next)
       return next
     })
     // Deleted nodes must not pin their last RF object forever.
     for (const key of cache.keys()) if (!seen.has(key)) cache.delete(key)
     return mapped
-  }, [storeNodes, models, rfNodeCache])
+  }, [storeNodes, models, entities, rfNodeCache])
   const rfEdges: Edge[] = useMemo(
     () => storeEdges.map((e) => ({ id: e.id, source: e.sourceNodeId, target: e.targetNodeId })),
     [storeEdges],
@@ -218,10 +244,10 @@ function EditorInner({ models }: { models: CanvasModelOption[] }) {
   )
 }
 
-export function CanvasEditor({ models }: { models: CanvasModelOption[] }) {
+export function CanvasEditor({ models, entities }: EditorProps) {
   return (
     <ReactFlowProvider>
-      <EditorInner models={models} />
+      <EditorInner models={models} entities={entities} />
     </ReactFlowProvider>
   )
 }

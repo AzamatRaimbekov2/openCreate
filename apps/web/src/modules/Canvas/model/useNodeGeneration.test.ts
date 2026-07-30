@@ -2,7 +2,9 @@
 // plus its incoming wires. The media wire cites the parent's LATEST generation
 // as inputGenerationId — the server resolves its own stored media, so no bytes
 // travel. Upload parents are NOT citable in this phase (a stored file is not a
-// generation); the character wire arrives with phase 3.
+// generation). A wired CHARACTER parent travels as entityRefs, and its `[[e1]]`
+// token is prepended to the prompt so the server actually substitutes the
+// character's name + description where the tag sits.
 import { describe, expect, it } from 'vitest'
 import type { CanvasEdge, CanvasNode } from '@opencreate/contracts'
 import { buildRunInput } from './useNodeGeneration'
@@ -13,6 +15,20 @@ const imageNode = (id: string, generationIds: string[] = []): CanvasNode => ({
   position: { x: 0, y: 0 },
   config: { prompt: 'a fox', modelId: 'flux-dev', aspectRatio: '1:1' },
   generationIds,
+})
+
+const characterNode = (id: string, entityId?: string): CanvasNode => ({
+  id,
+  kind: 'character',
+  position: { x: 0, y: 0 },
+  config: entityId === undefined ? {} : { entityId },
+  generationIds: [],
+})
+
+const wire = (sourceNodeId: string, targetNodeId: string): CanvasEdge => ({
+  id: `e-${sourceNodeId}-${targetNodeId}`,
+  sourceNodeId,
+  targetNodeId,
 })
 
 describe('buildRunInput', () => {
@@ -102,5 +118,53 @@ describe('buildRunInput', () => {
     const node = imageNode('n1')
     const edges: CanvasEdge[] = [{ id: 'e1', sourceNodeId: 'u1', targetNodeId: 'n1' }]
     expect(buildRunInput(node, [upload, node], edges)).toBeNull()
+  })
+
+  it('sends a wired character as entityRefs and PREPENDS its placeholder to the prompt', () => {
+    // Without the token in the prompt the server substitutes nothing: the photo
+    // still conditions the image, but the character's name/description never
+    // reach the encoder — a paid run that half-honours the wire on the board.
+    const character = characterNode('ch1', 'ent1')
+    const node = imageNode('n1')
+    const input = buildRunInput(node, [character, node], [wire('ch1', 'n1')])
+    expect(input?.entityRefs).toEqual([{ placeholder: 'e1', entityId: 'ent1' }])
+    expect(input?.prompt).toBe('[[e1]] a fox')
+  })
+
+  it('leaves the prompt untouched when the user already placed [[e1]] themselves', () => {
+    const character = characterNode('ch1', 'ent1')
+    const node: CanvasNode = {
+      ...imageNode('n1'),
+      config: { prompt: 'a portrait of [[e1]] in the snow', modelId: 'flux-kontext-pro' },
+    }
+    const input = buildRunInput(node, [character, node], [wire('ch1', 'n1')])
+    expect(input?.prompt).toBe('a portrait of [[e1]] in the snow')
+    expect(input?.entityRefs).toEqual([{ placeholder: 'e1', entityId: 'ent1' }])
+  })
+
+  it('returns null while the wired character node has no character chosen', () => {
+    // Same law as an output-less media parent: the wire is visible on the board,
+    // so submitting a run that silently ignores it would charge for the wrong job.
+    const character = characterNode('ch1')
+    const node = imageNode('n1')
+    expect(buildRunInput(node, [character, node], [wire('ch1', 'n1')])).toBeNull()
+  })
+
+  it('carries BOTH wires at once: the media citation and the character ref', () => {
+    const parent = imageNode('p', ['g1'])
+    const character = characterNode('ch1', 'ent1')
+    const node: CanvasNode = {
+      ...imageNode('n1'),
+      config: { prompt: 'remix', modelId: 'flux-kontext-pro' },
+    }
+    const edges = [wire('p', 'n1'), wire('ch1', 'n1')]
+    const input = buildRunInput(node, [parent, character, node], edges, { g1: 'succeeded' })
+    expect(input?.inputGenerationId).toBe('g1')
+    expect(input?.entityRefs).toEqual([{ placeholder: 'e1', entityId: 'ent1' }])
+  })
+
+  it('omits entityRefs entirely when no character is wired', () => {
+    const input = buildRunInput(imageNode('n1'), [imageNode('n1')], [])
+    expect(input && 'entityRefs' in input).toBe(false)
   })
 })

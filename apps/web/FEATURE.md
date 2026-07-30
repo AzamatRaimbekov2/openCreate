@@ -270,9 +270,11 @@ src/
 │   │                           # shared ['generation', id] poll); components/:
 │   │                           # CanvasEditor (React Flow shell — RF objects DERIVED
 │   │                           # from the store, changes written back), NodePalette,
-│   │                           # NodeShell + ImageNode/VideoNode/UploadNode/NoteNode,
+│   │                           # NodeShell + ImageNode/VideoNode/UploadNode/
+│   │                           # EntityNode (character, output-only, never runs)/NoteNode,
 │   │                           # VersionStrip, CanvasLibrary
-│   │                           # (public: CanvasEditor, CanvasLibrary; catalog fed from route)
+│   │                           # (public: CanvasEditor, CanvasLibrary; catalog AND
+│   │                           # character library fed from the route, both memoized)
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
 │   └── Landing/                # hero, showcase spread, section heading, price tables
 │                               # (+ TableScrollRegion overflow wrapper), how-it-works,
@@ -364,8 +366,9 @@ utility (spec: `docs/superpowers/specs/2026-07-29-compare-generators-design.md`)
 ## Canvas (`/canvas`, `/canvas/$canvasId`)
 
 The node-graph board: prompt → image → video, wired together instead of typed twice. ADR:
-`docs/wiki/decisions/canvas-mode.md`. Ships ADR phases 1–2 (image/video/upload/note nodes,
-wires, autosave); character nodes and operation nodes (upscale / remove-bg) follow.
+`docs/wiki/decisions/canvas-mode.md`. Ships ADR phases 1–2 plus the phase-3 character node
+(image/video/upload/character/note nodes, wires, autosave); "run branch" and the operation
+nodes (upscale / remove-bg) follow.
 
 - **A canvas CITES generations, exactly like a film.** `canvas`/`canvas_node`/`canvas_edge`
   own the document; a node keeps an append-only `generationIds` history with no FK, so
@@ -385,9 +388,19 @@ wires, autosave); character nodes and operation nodes (upscale / remove-bg) foll
 - **`edgeRules` is a pure function** checked twice: during the drag (an illegal wire refuses to
   snap) and on write. Two slots per node (media + character), video is terminal, cycles are
   refused. The graph therefore cannot hold an edge the rules would reject.
-- The module **imports nothing from Generator or Cinema**: the model catalog is read in
-  `routes/canvas.$canvasId.tsx` and handed down as node data — the seam `/cinema/$filmId`
-  already uses. Node polling shares the `['generation', id]` cache with every other poller.
+- **A character wire carries a Soul entity, not a picture.** The character node only names an
+  `entityId`; the consumer node sends `entityRefs: [{ placeholder: 'e1', entityId }]` and puts
+  `[[e1]]` in the prompt (prepended when the user did not place it themselves), so the server
+  substitutes the character's name + description AND attaches her photo. Without the token the
+  photo would condition the render while the name never reached the encoder — half a wire, at
+  full price. Wired-but-uncast disables Generate; a model without `referenceMode` is dropped
+  from the picker (the API refuses it with a free 400 anyway).
+- The module **imports nothing from Generator, Cinema or Entities**: the model catalog and the
+  character library are both read in `routes/canvas.$canvasId.tsx` and handed down as node data
+  — the seam `/cinema/$filmId` already uses. Both arrays are **memoized there**, because their
+  identity is part of the editor's per-node React Flow cache key (a fresh array per render
+  resurrects a v12 focus-loss bug). Node polling shares the `['generation', id]` cache with
+  every other poller.
 
 ## Design references
 

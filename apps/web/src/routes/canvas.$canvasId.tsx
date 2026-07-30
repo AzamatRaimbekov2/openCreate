@@ -14,6 +14,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { requireSession } from 'modules/Auth'
 import { BalanceChip } from 'modules/Credits'
+import { useEntities } from 'modules/Entities'
 import { useCatalog } from 'modules/Generator'
 import {
   CanvasEditor,
@@ -21,6 +22,7 @@ import {
   useCanvasAutosave,
   useCanvasDetail,
   useCanvasStore,
+  type CanvasEntityOption,
   type CanvasModelOption,
 } from 'modules/Canvas'
 import { ErrorState, Skeleton } from 'shared/ui'
@@ -48,6 +50,10 @@ function buildModelOptions(catalogModels: CatalogModel[] | undefined): CanvasMod
             credits:
               m.type === 'image' ? m.credits : (Object.values(m.creditsByDuration)[0] ?? 0),
             aspectRatios: m.aspectRatios,
+            // Carried so a node with a character wire can hide models that
+            // cannot condition on a reference image — the server refuses those
+            // with a 400, and offering a guaranteed refusal is not a choice.
+            referenceMode: m.referenceMode ?? null,
             ...(m.type === 'video'
               ? { durationOptions: m.durationOptions, creditsByDuration: m.creditsByDuration }
               : {}),
@@ -87,6 +93,27 @@ function CanvasEditorPage() {
   const models: CanvasModelOption[] = useMemo(
     () => buildModelOptions(catalog.data?.models),
     [catalog.data],
+  )
+
+  // The character library, read here for the same reason as the catalog: Canvas
+  // may not import modules/Entities. id + name + primary photo travel — the id is
+  // what goes into `entityRefs`, the name is what the card shows, and the face is
+  // what tells two characters apart on a board (the same derivation
+  // routes/cinema.$filmId.tsx uses for a shot's cast).
+  // MEMOIZED for the same load-bearing reason as `models` above: this array's
+  // identity is part of the editor's per-node React Flow cache key.
+  const entities = useEntities()
+  const characters: CanvasEntityOption[] = useMemo(
+    () =>
+      (entities.data?.items ?? []).map((entity) => ({
+        id: entity.id,
+        name: entity.name,
+        imageUrl:
+          entity.images.find((image) => image.id === entity.primaryImageId)?.url ??
+          entity.images[0]?.url ??
+          null,
+      })),
+    [entities.data],
   )
 
   return (
@@ -133,7 +160,7 @@ function CanvasEditorPage() {
           <ErrorState message={t('canvas.docError')} onRetry={() => void doc.refetch()} />
         </div>
       ) : isLoaded ? (
-        <CanvasEditor models={models} />
+        <CanvasEditor models={models} entities={characters} />
       ) : (
         <div className="flex flex-1 items-center justify-center">
           <Skeleton className="h-64 w-96" />

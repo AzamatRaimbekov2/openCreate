@@ -3,11 +3,11 @@
 > AI-facing sidecar for `index.ts`. Created 2026-07-30. Keep this in sync with the code on every change.
 
 ## Purpose
-The public API of the Canvas module. Routes compose through these six exports and nothing else; the store internals, edge rules, run hooks and node components stay private so the editor keeps ownership of its document lifecycle.
+The public API of the Canvas module. Routes compose through these seven exports and nothing else; the store internals, edge rules, run hooks and node components stay private so the editor keeps ownership of its document lifecycle.
 
 ## What it does (for an AI reader)
 - Responsibilities: publish the module surface; keep everything else unreachable from outside.
-- Public API / exports / props / endpoints: `CanvasEditor`, `CanvasLibrary`, `useCanvasStore`, `useCanvasDetail`, `useCanvasAutosave`, `retrySave`, type `CanvasModelOption`.
+- Public API / exports / props / endpoints: `CanvasEditor`, `CanvasLibrary`, `useCanvasStore`, `useCanvasDetail`, `useCanvasAutosave`, `retrySave`, types `CanvasModelOption` + `CanvasEntityOption`.
 - Inputs → Outputs: n/a — a barrel.
 - Side effects (I/O, network, state): none.
 
@@ -25,11 +25,11 @@ flowchart LR
   IDX --> ST[useCanvasStore]
   IDX --> API[useCanvasDetail]
   IDX --> AS[useCanvasAutosave / retrySave]
-  IDX --> T[CanvasModelOption]
+  IDX --> T["CanvasModelOption + CanvasEntityOption"]
 ```
 
 ## Key decisions / gotchas
-- The module imports NOTHING from `modules/Generator` or `modules/Cinema` (their composer pieces are private). The catalog a node picker needs flows through the ROUTE seam as `CanvasModelOption[]`, which is exactly why that type is exported.
+- The module imports NOTHING from `modules/Generator`, `modules/Cinema` or `modules/Entities`. The catalog a node picker needs flows through the ROUTE seam as `CanvasModelOption[]`, and the Soul characters a character node picks from as `CanvasEntityOption[]` — which is exactly why both types are exported.
 - `useCanvasStore` is public even though it is internal machinery: the route owns the per-document lifecycle (`init` on load, `reset` on leave) and renders the title + save status in its own header, and the store is the only honest source for both.
 - `buildRunInput`, `useRunNode`, `canConnect` and the node components stay unexported — a route composing those would be building a second editor.
 

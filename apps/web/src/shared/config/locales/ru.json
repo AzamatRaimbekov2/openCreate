@@ -1069,6 +1069,7 @@
       "image": "Изображение",
       "video": "Видео",
       "upload": "Загрузка",
+      "character": "Персонаж",
       "note": "Заметка"
     },
     "status": {
@@ -1094,6 +1095,11 @@
       "uploadAlt": "Загруженное изображение",
       "notePlaceholder": "Заметка…",
       "note": "Заметка",
+      "fromSoul": "из Души",
+      "characterPlaceholder": "выберите персонажа",
+      "characterEmpty": "Персонажей пока нет.",
+      "characterEmptyCta": "Создать в Душе",
+      "characterModelHint": "Эта модель не умеет держать персонажа — выберите другую.",
       "version": "v{{index}} / {{count}}",
       "prevVersion": "Предыдущая версия",
       "nextVersion": "Следующая версия"

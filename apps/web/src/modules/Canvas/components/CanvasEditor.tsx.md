@@ -7,12 +7,12 @@ The React Flow shell: the board itself, plus the palette, minimap, controls and 
 
 ## What it does (for an AI reader)
 - Responsibilities: derive RF nodes/edges, register node types, translate drag/remove/connect/move events into store actions, enforce the edge law at drag time, host the palette and drop target.
-- Public API / exports / props / endpoints: `CanvasEditor({ models: CanvasModelOption[] })` — wraps `EditorInner` in `ReactFlowProvider`.
-- Inputs → Outputs: store document + catalog models → a rendered board; user gestures → `moveNode` / `removeNode` / `addNode` / `addEdge` / `removeEdge` / `setViewport`.
+- Public API / exports / props / endpoints: `CanvasEditor({ models: CanvasModelOption[], entities: CanvasEntityOption[] })` — wraps `EditorInner` in `ReactFlowProvider`. Both props are route-injected cross-module data and BOTH must be memoized by the route.
+- Inputs → Outputs: store document + catalog models + character library → a rendered board; user gestures → `moveNode` / `removeNode` / `addNode` / `addEdge` / `removeEdge` / `setViewport`.
 - Side effects (I/O, network, state): store writes only; no network. Imports the vendor stylesheet.
 
 ## Dependencies
-- Imports / depends on: `@xyflow/react` (+ `dist/style.css`), `../model/edgeRules`, `../model/canvasStore`, `../model/types`, the four node components, `./NodePalette`.
+- Imports / depends on: `@xyflow/react` (+ `dist/style.css`), `../model/edgeRules`, `../model/canvasStore`, `../model/types`, the five node components (`ImageNode`, `VideoNode`, `UploadNode`, `EntityNode`, `NoteNode`), `./NodePalette`.
 - Used by: `routes/canvas.$canvasId.tsx` through the module barrel.
 
 ## Diagram
@@ -65,3 +65,21 @@ flowchart TD
   rebuilds only the dragged node's RF object), and autosave still PATCHes once
   per gesture — the debounce arms on the saved→dirty TRANSITION, so sixty dirty
   writes ride one timer.
+
+## Update 2026-07-30 — character node (ADR phase 3a)
+
+- `nodeTypes` gained `character: EntityNode`.
+- Node data is now `{ models, entities }`: the character library is the SECOND
+  piece of cross-module data the route injects (Canvas may import neither
+  `modules/Generator` nor `modules/Entities`).
+- **The rfNodes cache comparison had to grow with it** — every field the data
+  object carries must appear there, or a changed library keeps serving the cached
+  RF object and the card renders a stale character list forever. `entities` is
+  therefore compared by identity exactly like `models`, and the route memoizes it
+  for the same load-bearing reason.
+- Wire colour by payload type (spec §3: green media / pink entity / blue
+  operation) is deliberately NOT implemented yet: it belongs with phase 4's
+  operation nodes so all three tones land together, and styling edges needs a
+  node-kind lookup inside the `rfEdges` memo — which, since per-frame drags
+  change `storeNodes` identity, would rebuild every edge object sixty times a
+  second unless it is done carefully.

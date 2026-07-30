@@ -15,6 +15,7 @@ import type { CanvasModelOption, NodeRunStatus } from '../model/types'
 import { useCanvasStore } from '../model/canvasStore'
 import {
   buildRunInput,
+  findCharacterParent,
   findMediaParent,
   useNodeGeneration,
   useRunNode,
@@ -80,9 +81,25 @@ export function GenerationNode({
   }
 
   if (!node) return null
-  const models = data.models.filter((m) => m.type === kind)
+  // A wired character costs a REFERENCE SLOT, which not every model has: the
+  // server refuses `entityRefs` on a model without `referenceMode` with a clean
+  // 400 before charging. So the picker hides those models while a character is
+  // wired (the ModelSelect precedent: filter the affordance, let the API decide),
+  // and if the node still points at one chosen before the wire existed, say so
+  // and block the run rather than let the click buy a guaranteed refusal.
+  const hasCharacterWire = findCharacterParent(node.id, nodes, edges) !== undefined
+  const models = data.models.filter(
+    (m) => m.type === kind && (!hasCharacterWire || m.referenceMode != null),
+  )
   const model = models.find((m) => m.id === node.config.modelId)
+  // Precise on purpose: the model must EXIST in the catalog and lack the
+  // capability. A modelId that matches nothing at all is a stale document, not a
+  // capability problem, and must not borrow this message.
+  const blockedByModel =
+    hasCharacterWire &&
+    data.models.some((m) => m.id === node.config.modelId && m.referenceMode == null)
   const runInput = buildRunInput(node, nodes, edges, generationStatus)
+  const canRun = runInput !== null && !blockedByModel
   const duration = node.config.duration ?? model?.durationOptions?.[0]
 
   const status: NodeRunStatus =
@@ -115,7 +132,7 @@ export function GenerationNode({
   }
 
   const submit = () => {
-    if (!runInput) return
+    if (!runInput || blockedByModel) return
     // A new run becomes the shown version; a parked index would hide it.
     setVersionIndex(null)
     run.mutate(runInput)
@@ -170,7 +187,7 @@ export function GenerationNode({
           <Badge variant="success">{t('canvas.node.refunded')}</Badge>
           {/* Calm recovery (ErrorState precedent): the amber ghost pill, not a
               red one — red stays the failure STATUS, not the way out of it. */}
-          <Button variant="ghost" size="sm" className="nodrag" onClick={submit} disabled={!runInput}>
+          <Button variant="ghost" size="sm" className="nodrag" onClick={submit} disabled={!canRun}>
             {t('canvas.node.retry')}
           </Button>
         </div>
@@ -219,6 +236,13 @@ export function GenerationNode({
           placeholder={t('canvas.node.modelPlaceholder')}
           panelWidth="wide"
         />
+        {/* AMBER, not red: nothing has failed — the graph and the model simply
+            disagree, and the way out is one pick away (the ErrorState law). */}
+        {blockedByModel ? (
+          <p role="status" className="text-[11px] leading-4 text-glow-amber">
+            {t('canvas.node.characterModelHint')}
+          </p>
+        ) : null}
         {/* Aspect (and duration) only appear once a model is chosen — their
             legal values come from that model, not from a global list. */}
         {model ? (
@@ -249,7 +273,7 @@ export function GenerationNode({
         size="sm"
         className="nodrag w-full"
         onClick={submit}
-        disabled={!runInput || status === 'processing'}
+        disabled={!canRun || status === 'processing'}
         isLoading={run.isPending}
       >
         {status === 'processing' ? t('canvas.node.generating') : t('canvas.node.generate')}

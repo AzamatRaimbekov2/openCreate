@@ -3,7 +3,7 @@
 // dataTransfer carries the kind; CanvasEditor's onDrop converts the pointer to
 // flow coordinates) or click to drop one at the viewport center — the click
 // path exists because drag-and-drop is not keyboard-reachable.
-// Character and operation nodes arrive in phases 3-4.
+// Operation nodes (upscale / remove-bg) arrive in phase 4.
 import type { DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CanvasNodeKind } from '@opencreate/contracts'
@@ -11,10 +11,16 @@ import type { CanvasNodeKind } from '@opencreate/contracts'
 export const NODE_KIND_MIME = 'application/x-opencreate-node-kind'
 
 // Glyphs are decorative; the label carries the meaning (never icon-only).
+// The rail lists only kinds that DO something today — a button for a node that
+// cannot act is a promise the product does not keep. `character` joins here with
+// ADR phase 3: it now picks a real Soul character and feeds it downstream.
+// Ordered by the shape of a chain: what produces media, then what identifies a
+// subject, then the annotation that never runs.
 const PALETTE: { kind: CanvasNodeKind; glyph: string }[] = [
   { kind: 'image', glyph: '▣' },
   { kind: 'video', glyph: '▶' },
   { kind: 'upload', glyph: '⇧' },
+  { kind: 'character', glyph: '☺' },
   { kind: 'note', glyph: '✎' },
 ]
 

@@ -21,6 +21,23 @@ export type CanvasModelOption = {
   aspectRatios: AspectRatio[]
   durationOptions?: number[]
   creditsByDuration?: Record<string, number>
+  // Can this model condition on a reference image at all (catalog
+  // `referenceMode`)? Absent/null = tagging is impossible on it, so a node with
+  // a character wire must not offer it — the server refuses such a request with
+  // a 400 before charging, and a picker that offers a guaranteed refusal is a
+  // promise the product does not keep (the ModelSelect precedent).
+  referenceMode?: 'portrait' | 'subject' | 'both' | null
+}
+
+// The slice of an Entity a character node needs (flows via the ROUTE seam —
+// Canvas may not import modules/Entities, exactly as it may not import
+// modules/Generator for the catalog). `imageUrl` is the entity's PRIMARY
+// reference photo: the face is what identifies the character on a board where
+// several cards are visible at once, so it travels with the name.
+export type CanvasEntityOption = {
+  id: string
+  name: string
+  imageUrl: string | null
 }
 
 // Media-producing kinds — the only legal sources of a media wire. Video is

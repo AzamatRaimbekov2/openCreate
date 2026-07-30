@@ -13,11 +13,19 @@ import type {
   Generation,
   GenerationList,
 } from '@opencreate/contracts'
+import { entityPlaceholderToken } from 'shared/libs/mentions'
 import { ApiClientError, api } from 'shared/libs/apiClient'
 import { useCanvasStore } from './canvasStore'
 import { MEDIA_SOURCE_KINDS } from './types'
 
 const POLL_INTERVAL_MS = 4000
+
+// The ONE placeholder key a canvas node ever needs. Fixed rather than derived
+// (the Generator scans for the lowest free `eN`) because both ends of this cap
+// agree at exactly one: `edgeRules` allows a single character wire per node, and
+// the wire contract caps `entityRefs` at 1. A generated key would imply a second
+// slot that neither the graph nor the API has.
+const PLACEHOLDER = 'e1'
 
 // Shared by buildRunInput AND the node components (which also need the
 // parent's id to keep its status fresh in the shared poll cache — see
@@ -37,6 +45,21 @@ export function findMediaParent(
     .filter((e) => e.targetNodeId === nodeId)
     .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
     .find((n) => n !== undefined && MEDIA_SOURCE_KINDS.includes(n.kind))
+}
+
+// The character wire's other end (phase 3). A separate lookup from
+// findMediaParent because a node has TWO independent input slots (edgeRules.ts
+// enforces one each): an image may hold a media parent AND a character at the
+// same time, and the two produce different fields on the POST body.
+export function findCharacterParent(
+  nodeId: string,
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+): CanvasNode | undefined {
+  return edges
+    .filter((e) => e.targetNodeId === nodeId)
+    .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
+    .find((n) => n !== undefined && n.kind === 'character')
 }
 
 // Pure: node + graph → the POST body, or null when the node isn't runnable
@@ -86,6 +109,26 @@ export function buildRunInput(
       .find((gid) => generationStatus[gid] === 'succeeded')
     if (!succeeded) return null
     input.inputGenerationId = succeeded
+  }
+
+  // Character wire: the parent's chosen entity becomes ONE entityRef, and the
+  // prompt must carry its token or the reference is only half-honoured. The
+  // server substitutes `[[e1]]` with the character's name + description
+  // (apps/api modules/entities/mentions.ts) and separately attaches her photo;
+  // with no token in the text the photo still conditions the image while the
+  // NAME never reaches the encoder — a paid run that ignores half of a wire the
+  // user can see on the board. So the token is PREPENDED when the user has not
+  // placed it themselves (they may want the character mid-sentence: "a portrait
+  // of [[e1]] in the snow"), and left exactly where they put it when they have.
+  const characterParent = findCharacterParent(node.id, nodes, edges)
+  if (characterParent) {
+    const entityId = characterParent.config.entityId
+    // Wired but nobody cast yet. Same law as an output-less media parent: refuse
+    // rather than silently submit a run that drops the wire (Generate disables).
+    if (!entityId) return null
+    input.entityRefs = [{ placeholder: PLACEHOLDER, entityId }]
+    const token = entityPlaceholderToken(PLACEHOLDER)
+    if (!prompt.includes(token)) input.prompt = `${token} ${prompt}`
   }
 
   return input
