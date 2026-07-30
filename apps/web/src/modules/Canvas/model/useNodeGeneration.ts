@@ -5,7 +5,7 @@
 // other poller in the app. On success the id is APPENDED to the node's
 // version history (never overwrites — spec: "⟳ v3 · history").
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { InfiniteData } from '@tanstack/react-query'
+import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type {
   CanvasEdge,
   CanvasNode,
@@ -137,7 +137,13 @@ export function buildRunInput(
 // Submit-only retries (Cinema's allowlist): a 5xx/429 on submit is safe to
 // retry — the server hasn't charged; anything else (validation, credits) is
 // final. Never retry the poll — it's already a loop.
-function shouldRetrySubmit(failureCount: number, error: unknown): boolean {
+//
+// EXPORTED for the branch runner (useRunBranch), which submits imperatively
+// instead of through useMutation. Sharing the PREDICATE rather than a whole
+// submit function is deliberate: useMutation owns its own retry loop, so a
+// shared "submit with retries" helper would retry twice under it. One policy,
+// two loops, no duplication of the rule itself.
+export function shouldRetrySubmit(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) return false
   if (!(error instanceof ApiClientError)) return false
   return (
@@ -148,6 +154,35 @@ function shouldRetrySubmit(failureCount: number, error: unknown): boolean {
   )
 }
 
+// Everything that must happen the instant a submit succeeds, wherever it came
+// from: the node's history grows, the poll cache is seeded so no first request
+// is wasted, the Library feed shows the run like any other, and the balance chip
+// refreshes. EXPORTED for the branch runner — these four writes are the contract
+// between a submit and the rest of the app, and a second copy of them is how a
+// canvas run would quietly stop appearing in the Library.
+export function absorbGeneration(
+  queryClient: QueryClient,
+  nodeId: string,
+  generation: Generation,
+): void {
+  // Version history is append-only; the poller takes over from here.
+  useCanvasStore.getState().appendGeneration(nodeId, generation.id)
+  queryClient.setQueryData(['generation', generation.id], generation)
+  // The Library shows canvas runs like any other (same cache seams as the
+  // Generator: prepend + refresh the balance chip).
+  queryClient.setQueryData<InfiniteData<GenerationList>>(['generations'], (old) =>
+    old && old.pages.length > 0
+      ? {
+          ...old,
+          pages: old.pages.map((page, index) =>
+            index === 0 ? { ...page, items: [generation, ...page.items] } : page,
+          ),
+        }
+      : old,
+  )
+  void queryClient.invalidateQueries({ queryKey: ['me'] })
+}
+
 export function useRunNode(nodeId: string) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -155,24 +190,7 @@ export function useRunNode(nodeId: string) {
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     mutationFn: (input: CreateGenerationInput) =>
       api<Generation>('/api/generations', { method: 'POST', body: JSON.stringify(input) }),
-    onSuccess: (generation) => {
-      // Version history is append-only; the poller below takes over from here.
-      useCanvasStore.getState().appendGeneration(nodeId, generation.id)
-      queryClient.setQueryData(['generation', generation.id], generation)
-      // The Library shows canvas runs like any other (same cache seams as the
-      // Generator: prepend + refresh the balance chip).
-      queryClient.setQueryData<InfiniteData<GenerationList>>(['generations'], (old) =>
-        old && old.pages.length > 0
-          ? {
-              ...old,
-              pages: old.pages.map((page, index) =>
-                index === 0 ? { ...page, items: [generation, ...page.items] } : page,
-              ),
-            }
-          : old,
-      )
-      void queryClient.invalidateQueries({ queryKey: ['me'] })
-    },
+    onSuccess: (generation) => absorbGeneration(queryClient, nodeId, generation),
   })
 }
 

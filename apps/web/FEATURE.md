@@ -268,12 +268,14 @@ src/
 │   │                           # (the debounced full-document autosave), api (typed
 │   │                           # /api/canvases + uploads), useNodeGeneration
 │   │                           # (buildRunInput → POST /api/generations, then the
-│   │                           # shared ['generation', id] poll); components/:
+│   │                           # shared ['generation', id] poll), useRunBranch
+│   │                           # (pure toposort + itemized price, then the
+│   │                           # sequential submit/poll queue); components/:
 │   │                           # CanvasEditor (React Flow shell — RF objects DERIVED
 │   │                           # from the store, changes written back), NodePalette,
 │   │                           # NodeShell + ImageNode/VideoNode/UploadNode/
 │   │                           # EntityNode (character, output-only, never runs)/NoteNode,
-│   │                           # VersionStrip, CanvasLibrary
+│   │                           # VersionStrip, RunBranchDialog, CanvasLibrary
 │   │                           # (public: CanvasEditor, CanvasLibrary; catalog AND
 │   │                           # character library fed from the route, both memoized)
 │   ├── Credits/                # balance chip + transactions modal (['me'] shared cache key)
@@ -367,9 +369,9 @@ utility (spec: `docs/superpowers/specs/2026-07-29-compare-generators-design.md`)
 ## Canvas (`/canvas`, `/canvas/$canvasId`)
 
 The node-graph board: prompt → image → video, wired together instead of typed twice. ADR:
-`docs/wiki/decisions/canvas-mode.md`. Ships ADR phases 1–2 plus the phase-3 character node
-(image/video/upload/character/note nodes, wires, autosave); "run branch" and the operation
-nodes (upscale / remove-bg) follow.
+`docs/wiki/decisions/canvas-mode.md`. Ships ADR phases 1–3 (image/video/upload/character/note
+nodes, wires, autosave, per-node runs and "run branch"); the operation nodes (upscale /
+remove-bg) follow.
 
 - **A canvas CITES generations, exactly like a film.** `canvas`/`canvas_node`/`canvas_edge`
   own the document; a node keeps an append-only `generationIds` history with no FK, so
@@ -389,6 +391,15 @@ nodes (upscale / remove-bg) follow.
 - **`edgeRules` is a pure function** checked twice: during the drag (an illegal wire refuses to
   snap) and on write. Two slots per node (media + character), video is terminal, cycles are
   refused. The graph therefore cannot hold an edge the rules would reject.
+- **"Run branch" is client-orchestrated, and it asks first.** The client topo-sorts what the
+  clicked node actually needs, itemizes the credits, and shows one confirm dialog; only then
+  does it submit the runs one at a time, polling each to a terminal state before the next.
+  Two rules carry the money: a node whose LATEST run succeeded ends the walk — it and
+  everything behind it are skipped, because re-running a grandparent whose child is already
+  done charges for an image nobody reads — and a mid-branch failure STOPS the queue, so
+  downstream never starts. Leaving the board or cancelling stops it before the next charge;
+  an already-submitted generation finishes server-side as usual. Auto-cascade stays rejected
+  (ADR D5): one edit must never trigger N unconfirmed charges.
 - **Every node prompt field carries the enhance sparkle** (owner requirement
   2026-07-30) — the shared `EnhanceButton`, wired to `config.prompt` in both
   directions, so the enhanced text is what autosave persists and what the run

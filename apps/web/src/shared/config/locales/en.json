@@ -1097,6 +1097,19 @@
       "version": "v{{index}} / {{count}}",
       "prevVersion": "Previous version",
       "nextVersion": "Next version"
+    },
+    "runBranch": {
+      "title": "Run branch",
+      "cta": "Run branch",
+      "lead": "These runs will be charged in order:",
+      "total": "Total",
+      "confirm": "Run · {{credits}} cr",
+      "blocked": {
+        "config": "A node in this chain still needs a prompt and a model.",
+        "character": "A character is wired into this chain, but nobody is cast yet.",
+        "parent": "An input in this chain cannot produce an image yet.",
+        "nothingToRun": "This branch is already up to date — nothing to run."
+      }
     }
   }
 }

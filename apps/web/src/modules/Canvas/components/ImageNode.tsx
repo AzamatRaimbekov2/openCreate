@@ -20,7 +20,15 @@ import {
   useNodeGeneration,
   useRunNode,
 } from '../model/useNodeGeneration'
+import type { BranchPlan } from '../model/useRunBranch'
+import {
+  useBranchNodeError,
+  useIsBranchBusy,
+  useIsBranchRunning,
+  useRunBranch,
+} from '../model/useRunBranch'
 import { NodeShell } from './NodeShell'
+import { RunBranchDialog } from './RunBranchDialog'
 import { VersionStrip } from './VersionStrip'
 
 export type GenerationNodeData = { models: CanvasModelOption[] }
@@ -54,6 +62,18 @@ export function GenerationNode({
   const edges = useCanvasStore((s) => s.edges)
   const updateNodeConfig = useCanvasStore((s) => s.updateNodeConfig)
   const run = useRunNode(id)
+  // Branch execution (ADR D5). `branch.state` is NOT read here: the pill only
+  // needs "is a queue running" (which would double-charge) and "does it own me"
+  // — two narrow selectors, so a run's per-node progress does not re-render
+  // every card on the board.
+  const branch = useRunBranch()
+  const isBranchBusy = useIsBranchBusy(id)
+  const isBranchRunning = useIsBranchRunning()
+  const branchErrorCode = useBranchNodeError(id)
+  // The plan is built at CLICK time, not per render: it reads the whole graph
+  // plus the live status cache, and a render-time plan would be stale by the
+  // time the user answered the dialog anyway.
+  const [plan, setPlan] = useState<BranchPlan | null>(null)
 
   // Which version shows: null = follow the latest, so a fresh run is always
   // what the card displays. Stepping back parks the index until the user
@@ -291,15 +311,56 @@ export function GenerationNode({
         ) : null}
       </div>
 
-      <Button
-        size="sm"
-        className="nodrag w-full"
-        onClick={submit}
-        disabled={!canRun || status === 'processing'}
-        isLoading={run.isPending}
-      >
-        {status === 'processing' ? t('canvas.node.generating') : t('canvas.node.generate')}
-      </Button>
+      {/* A branch failure that never produced a generation row (insufficient
+          credits is the common one) has no error card to land in, so the node
+          says it here. Suppressed when the shown run itself failed — that card
+          already tells the story, with the refund chip. */}
+      {branchErrorCode && status !== 'failed' ? (
+        <p role="status" className="mb-2 text-[11px] leading-4 text-glow-amber">
+          {t(errorCodeMessageKey(branchErrorCode))}
+        </p>
+      ) : null}
+
+      {/* Two pills, per spec §3: Generate is this node alone, Run branch is
+          everything it depends on. Both disable while a queue owns this node —
+          a manual submit mid-branch is the double-charge the confirm dialog
+          exists to prevent. */}
+      <div className="flex flex-col gap-1.5">
+        <Button
+          size="sm"
+          className="nodrag w-full"
+          onClick={submit}
+          disabled={!canRun || status === 'processing' || isBranchBusy}
+          isLoading={run.isPending}
+        >
+          {status === 'processing' ? t('canvas.node.generating') : t('canvas.node.generate')}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="nodrag w-full"
+          // Planning is cheap and pure; opening the dialog IS the plan being
+          // shown, so both happen in the same click.
+          onClick={() => setPlan(branch.buildPlan(id, data.models))}
+          disabled={isBranchRunning}
+        >
+          {t('canvas.runBranch.cta')}
+        </Button>
+      </div>
+
+      <RunBranchDialog
+        isOpen={plan !== null}
+        // A closed dialog still needs a plan shape; `nothingToRun` is the honest
+        // placeholder and is never seen (isOpen gates it).
+        plan={plan ?? { ok: false, nodeId: id, reason: 'nothingToRun' }}
+        onClose={() => setPlan(null)}
+        onConfirm={() => {
+          // Close FIRST, then spend: the dialog's job ended at the answer, and a
+          // modal hanging over a running board hides the progress it caused.
+          if (plan?.ok) void branch.run(plan)
+          setPlan(null)
+        }}
+      />
     </NodeShell>
   )
 }

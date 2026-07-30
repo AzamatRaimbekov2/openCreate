@@ -12,13 +12,14 @@ Turns one canvas node into a real generation: `buildRunInput` reads the node's c
   - `findCharacterParent(nodeId, nodes, edges) => CanvasNode | undefined` (pure) — the same lookup for the OTHER input slot. Separate function, not a parameterized one, because the two slots are independent (`edgeRules` allows one of each on the same node) and produce different fields on the request body. Also used by `ImageNode` to decide whether to narrow its model list.
   - `buildRunInput(node, nodes, edges, generationStatus = {}) => CreateGenerationInput | null` (pure). `generationStatus` is a `Record<id, Generation['status'] | undefined>` snapshot the CALLER reads out of the shared query cache.
   - `useRunNode(nodeId)` → mutation over `POST /api/generations`.
+  - `shouldRetrySubmit(failureCount, error)` and `absorbGeneration(queryClient, nodeId, generation)` — the submit POLICY and the post-submit side effects, exported for the branch runner (`useRunBranch`), which submits imperatively rather than through `useMutation`.
   - `useNodeGeneration(generationId | null)` → query over `GET /api/generations/:id`, key `['generation', id]`, 4 s interval while `processing`.
 - Inputs → Outputs: a `CanvasNode` + the graph → a generation request; a generation id → its live `Generation`.
 - Side effects (I/O, network, state): HTTP; `canvasStore.appendGeneration`; cache writes to `['generation', id]` and `['generations']`; invalidates `['me']` (balance).
 
 ## Dependencies
 - Imports / depends on: `@tanstack/react-query`, contract types, `api`/`ApiClientError` from `shared/libs/apiClient`, `entityPlaceholderToken` from `shared/libs/mentions`, `./canvasStore`, `MEDIA_SOURCE_KINDS` from `./types`.
-- Used by: `components/ImageNode.tsx` (and `VideoNode` through it) — the only consumers; the editor never runs nodes itself.
+- Used by: `components/ImageNode.tsx` (and `VideoNode` through it), plus `model/useRunBranch.ts` — which reuses `buildRunInput`, both parent lookups, and the two exports above. The editor never runs nodes itself.
 
 ## Diagram
 ```mermaid
@@ -49,6 +50,7 @@ sequenceDiagram
 - Retry is SUBMIT-only and allowlisted (5xx / rate_limited / provider_error / internal_error, max 2). A validation or insufficient-credits failure is final; retrying it would only re-cost the user. A bare network throw is NOT retried here — unlike Cinema's shot submit — because a dropped response may already have been charged.
 - The poll key is `['generation', id ?? '']`, byte-identical to Cinema's `useShotGeneration`, so a generation open in the canvas and in the Library shares one cache entry and one interval.
 - `appendGeneration` marks the store dirty, so a run is persisted by the ordinary autosave — no special save path for runs.
+- **Phase 3b extraction.** `shouldRetrySubmit` became exported and the whole `onSuccess` body moved into `absorbGeneration`, because the branch runner needs the SAME four post-submit writes (history · seed the poll cache · prepend the Library feed · refresh the balance). A second copy of those is exactly how canvas runs would quietly stop appearing in the Library. Note what was NOT shared: a combined "submit with retries" helper. `useMutation` owns its own retry loop, so one shared submit function would retry twice under `useRunNode` — the POLICY is shared, the loop is not.
 
 ## Commits
 - 5443372 2026-07-30 feat(canvas-web): node run submit + shared-cache polling

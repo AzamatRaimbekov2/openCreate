@@ -10,6 +10,7 @@ import { api } from 'shared/libs/apiClient'
 import type { CanvasModelOption } from '../model/types'
 import { useCanvasStore } from '../model/canvasStore'
 import { useNodeGeneration, useRunNode } from '../model/useNodeGeneration'
+import { useIsBranchBusy, useIsBranchRunning, useRunBranch } from '../model/useRunBranch'
 import { ImageNode } from './ImageNode'
 // i18n init — the enhance affordance renders its own localized aria-label
 import 'shared/config/i18n'
@@ -17,6 +18,19 @@ import 'shared/config/i18n'
 vi.mock('../model/useNodeGeneration', async (importOriginal) => {
   const original = await importOriginal<typeof import('../model/useNodeGeneration')>()
   return { ...original, useRunNode: vi.fn(), useNodeGeneration: vi.fn() }
+})
+// The branch runner is exercised in useRunBranch.test.ts; here only the node's
+// SIDE of it matters (a pill that plans + confirms, and a Generate that steps
+// aside while a queue owns this node), so its hooks are stubbed.
+vi.mock('../model/useRunBranch', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../model/useRunBranch')>()
+  return {
+    ...original,
+    useRunBranch: vi.fn(),
+    useIsBranchBusy: vi.fn(() => false),
+    useIsBranchRunning: vi.fn(() => false),
+    useBranchNodeError: vi.fn(() => null),
+  }
 })
 // Only api() — the run/poll hooks above are mocked separately, so the only real
 // request this file can make is the enhance POST the sparkle fires.
@@ -27,6 +41,15 @@ vi.mock('shared/libs/apiClient', async (importOriginal) => {
 const mockRun = vi.mocked(useRunNode)
 const mockPoll = vi.mocked(useNodeGeneration)
 const apiMock = vi.mocked(api)
+const mockBranch = vi.mocked(useRunBranch)
+const mockBusy = vi.mocked(useIsBranchBusy)
+
+const BRANCH_PLAN = {
+  ok: true as const,
+  nodeIds: ['n1'],
+  items: [{ nodeId: 'n1', kind: 'image' as const, modelName: 'Studio', credits: 2 }],
+  total: 2,
+}
 
 const DOC = {
   id: 'c1',
@@ -121,6 +144,17 @@ beforeEach(() => {
   useCanvasStore.getState().init(DOC)
   mockRun.mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
   mockPoll.mockReturnValue({ data: undefined } as never)
+  // Both branch flags are re-armed per test: `vi.clearAllMocks()` clears CALLS
+  // but keeps implementations, so a `mockReturnValue(true)` in one test would
+  // otherwise leak into every test after it.
+  mockBusy.mockReturnValue(false)
+  vi.mocked(useIsBranchRunning).mockReturnValue(false)
+  mockBranch.mockReturnValue({
+    buildPlan: vi.fn(() => BRANCH_PLAN),
+    run: vi.fn(),
+    cancel: vi.fn(),
+    state: { status: 'idle', activeNodeId: null, nodeIds: [], failedNodeId: null, errorCode: null },
+  } as never)
 })
 
 describe('ImageNode', () => {
@@ -216,6 +250,48 @@ describe('ImageNode', () => {
     client.setQueryData(['generation', 'g-parent'], gen('processing'))
     renderNode(client)
     expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
+  })
+
+  it('offers a Run-branch pill that opens the confirm dialog with the priced plan', async () => {
+    renderNode()
+    await userEvent.click(screen.getByRole('button', { name: /run branch/i }))
+    // The dialog restates the total ON the pill the click will land on. Matched
+    // by the full confirm label, not just the price: the model Select's trigger
+    // also carries "2 cr" in its accessible name (its `meta` slot).
+    expect(await screen.findByRole('button', { name: /run · 2 cr/i })).toBeInTheDocument()
+  })
+
+  it('confirming the dialog hands the SAME plan to the runner', async () => {
+    const run = vi.fn()
+    const buildPlan = vi.fn(() => BRANCH_PLAN)
+    mockBranch.mockReturnValue({
+      buildPlan,
+      run,
+      cancel: vi.fn(),
+      state: {
+        status: 'idle',
+        activeNodeId: null,
+        nodeIds: [],
+        failedNodeId: null,
+        errorCode: null,
+      },
+    } as never)
+    renderNode()
+    await userEvent.click(screen.getByRole('button', { name: /run branch/i }))
+    await userEvent.click(screen.getByRole('button', { name: /run · 2 cr/i }))
+    expect(run).toHaveBeenCalledWith(BRANCH_PLAN)
+    // Planned against THIS node, with the catalog the node already holds
+    expect(buildPlan).toHaveBeenCalledWith('n1', MODELS)
+  })
+
+  it('steps aside while a branch owns this node: no second charge from Generate', () => {
+    // Both flags, because that is the real state: a node can only be "owned by a
+    // branch" while a branch is running.
+    mockBusy.mockReturnValue(true)
+    vi.mocked(useIsBranchRunning).mockReturnValue(true)
+    renderNode()
+    expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /run branch/i })).toBeDisabled()
   })
 
   it('enhances the prompt in place from the sparkle, and the node keeps the result', async () => {
