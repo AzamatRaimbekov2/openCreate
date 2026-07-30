@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildTestApp, fakeRunware, registerAndGetCookie } from './helpers/build-test-app'
 import { createDb } from '../src/db/client'
-import { settleStaleCreatorSessions } from '../src/modules/creator/service'
+import { sanitizeAssistantText, settleStaleCreatorSessions } from '../src/modules/creator/service'
 import type { Brain, BrainReply, BrainToolCall } from '../src/modules/creator/brain'
 
 // The generation success path downloads the produced asset through global fetch.
@@ -407,5 +407,28 @@ describe('settleStaleCreatorSessions', () => {
       headers: { cookie },
     })
     expect((res.json() as Detail).status).toBe('running')
+  })
+})
+
+// Degenerate-reply guard (seen live 2026-07-30: DeepSeek looped «of the 1
+// image of the …» for 4000 chars instead of calling a tool). The guard is
+// shape-based — tiny vocabulary at abnormal length — so real prose passes.
+describe('sanitizeAssistantText', () => {
+  it('passes normal prose through, trimmed', () => {
+    expect(sanitizeAssistantText('  Готово: холст создан, картинка на месте.  ')).toBe(
+      'Готово: холст создан, картинка на месте.',
+    )
+  })
+  it('maps empty/undefined to the quiet default', () => {
+    expect(sanitizeAssistantText(undefined)).toBe('Готово.')
+    expect(sanitizeAssistantText('   ')).toBe('Готово.')
+  })
+  it('replaces a long low-vocabulary loop with the sanitized failure literal', () => {
+    const loop = 'of the 1 image '.repeat(300)
+    expect(sanitizeAssistantText(loop)).toBe('The agent turn failed')
+  })
+  it('keeps long REAL prose (vocabulary stays rich)', () => {
+    const words = Array.from({ length: 300 }, (_, i) => `слово${i}`).join(' ')
+    expect(sanitizeAssistantText(words)).toBe(words)
   })
 })

@@ -119,3 +119,16 @@ sequenceDiagram
 ## Commits
 
 - bb92a60 feat(creator): agent loop, budget gate, sessions API
+
+## Update 2026-07-30 — sanitizeAssistantText (degenerate-reply guard)
+
+- New exported helper `sanitizeAssistantText(text)`: trims/clips the agent's
+  final prose to 4000 chars and, when the reply is DEGENERATE (≥600 chars with
+  unique-word ratio < 0.15), replaces it with the existing sanitized literal
+  'The agent turn failed' (the SPA's agentCopy maps that closed set to RU).
+- Why: seen live — the DeepSeek fallback, asked to execute a confirmed plan,
+  produced no tool call and looped «of the 1 image of the …» to its token
+  limit; 4000 chars of junk landed in the transcript as the agent's answer.
+  Shape-based detection (tiny vocabulary at abnormal length): real prose stays
+  above ~0.3 unique-ratio, the observed loop scored ~0.01, threshold 0.15.
+- Wired at the single point where a no-tool-calls reply becomes a text message.

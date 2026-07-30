@@ -97,6 +97,28 @@ const SYSTEM_PROMPT = `Ты — openCreator, ИИ-режиссёр внутри 
 // Declared HERE, not in tools.ts, because it is not a wrapper over a service — it
 // is a control-flow signal to this loop: write a plan card, revoke any previous
 // confirmation, and stop the turn.
+// Final-text guard against a DEGENERATE model reply. Seen live 2026-07-30: the
+// DeepSeek fallback, asked to execute a confirmed plan, produced no tool call
+// and looped «of the 1 image of the …» until its token limit — 4000 chars of
+// junk landed in the user's transcript as the agent's answer. A degenerate
+// reply is recognizable by shape, not content: abnormally long text built from
+// a tiny vocabulary. Such a reply is replaced with honest failure copy (the
+// same register as the other sanitized failures; the SPA localizes it).
+// Exported for tests.
+export function sanitizeAssistantText(text: string | undefined): string {
+  const trimmed = text?.trim()
+  if (!trimmed) return 'Готово.'
+  const clipped = trimmed.slice(0, 4000)
+  if (clipped.length >= 600) {
+    const words = clipped.toLowerCase().split(/\s+/)
+    const uniqueRatio = new Set(words).size / words.length
+    // Real prose (even repetitive planning talk) stays well above 0.3; the
+    // observed loop scored ~0.01. 0.15 splits them with a wide margin.
+    if (uniqueRatio < 0.15) return 'The agent turn failed'
+  }
+  return clipped
+}
+
 const PROPOSE_PLAN_SPEC: BrainToolSpec = {
   name: 'propose_plan',
   description:
@@ -286,7 +308,7 @@ export function createCreatorService({ db, brains, tools, log }: Deps) {
         if (reply.toolCalls.length === 0) {
           appendMessage(sessionId, 'assistant', {
             kind: 'text',
-            text: (reply.text ?? 'Готово.').slice(0, 4000),
+            text: sanitizeAssistantText(reply.text),
           })
           setStatus(sessionId, 'idle')
           return
