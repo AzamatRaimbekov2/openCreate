@@ -418,6 +418,52 @@ remove-bg) follow.
   resurrects a v12 focus-loss bug). Node polling shares the `['generation', id]` cache with
   every other poller.
 
+## openCreator (`/creator`)
+
+The agent chat: describe a task in one message, and the agent writes the scenario, creates the
+character, assembles the canvas and — after ONE budget confirmation — runs the generations
+itself. ADR: `docs/wiki/decisions/opencreator-agent.md`. Server side is a detached tool-use
+loop; the SPA is a poller, and `modules/Creator` is the whole frontend.
+
+- **The transcript IS the state.** Every step the agent takes is a persisted message with
+  structured content (`text` / `step` / `plan` / `result`), so the screen re-renders the whole
+  story from one GET, needs no local progress state, and a reload loses nothing (ADR D4).
+  Array order is the server's (`created_at`, `rowid`) and is never re-sorted client-side.
+- **The poll runs at 2s while the session is `running` OR `awaiting_confirm`.** The second case
+  is the subtle one and it is deliberate: the budget gate can be left WITHOUT this tab acting
+  (a second tab confirms, a new user message resets the `confirmed` flag server-side, the
+  10-minute stale reaper fails the turn). A poll that stopped at the gate would leave a live
+  «Подтвердить» button hanging over a plan the server has already retired.
+- **The plan card is the only place money is spent, and it does not decide for itself.**
+  `planStateFor(messages, index, status)` classifies each plan over the WHOLE transcript —
+  `live` (the session is at the gate and this is the newest message), `answered` (something
+  followed it), `stale` (the gate is gone and nothing followed). A card reasoning from its own
+  content could confirm a budget a newer plan had already replaced. The frontend cannot tell
+  «confirmed» from «superseded» (a plan message carries no outcome field), so in `answered` it
+  claims neither and lets the messages below explain.
+- **Mutations absorb, they never invalidate.** Every POST answers `202` with the transcript so
+  far, so `absorbSessionDetail` writes it into `['creator-session', id]` and upserts the rail
+  row from it — new sessions prepend, known ones update in place so the list does not reshuffle
+  under the reader mid-turn. A `409` is an expected state race (the poll had not caught up when
+  the click landed), so it becomes a deduped info toast plus a reconciling refetch, never an
+  error screen.
+- **A sanitized SERVER failure is translated, not shown.** A dead turn lands one of three fixed
+  English sentences in the transcript; `model/agentCopy.ts` maps that closed set to localized
+  copy (exact match only — a model quoting the phrase mid-answer is prose, not a failure) and
+  renders it as a calm amber `role="status"` notice. Amber, not red: nothing the user did is
+  wrong, the agent's provider is simply off.
+- **The composer carries the enhance sparkle** (owner law) on a wrapper div inside its own
+  `relative` field box, `pr-10` on the textarea. It keeps the user's words when a send fails
+  (the draft clears only when the mutation RESOLVES) and, while closed, always names the next
+  action — «агент работает…» vs «подтвердите бюджет выше» are different situations and a bare
+  greyed box communicates neither. The draft is local state, not a store: nothing outside the
+  component reads it.
+- **The screen auto-opens the newest conversation**, which is what makes a reload land where the
+  user was without a URL parameter; `Selection` is a three-case union (`auto | session | new`)
+  so «New task» is not bounced straight back out by the auto-resolve. Known limitation: the
+  selection is not deep-linkable — a `?session=` search param is the upgrade path.
+- The module exports **exactly one** symbol (`CreatorWorkbench`) and imports no other module.
+
 ## Design references
 
 - Design system: `docs/frontend/design.md`
