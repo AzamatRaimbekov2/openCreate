@@ -350,6 +350,16 @@ The gallery of ready-made viral formats. ADR: `docs/wiki/decisions/template-cata
 - The module **imports nothing from Cinema**. It creates a film via the API and navigates to
   `/cinema/$filmId`; the film-editor route reads `useTemplates()` and hands the list down, the same
   seam `useCatalog()` already uses.
+- **Shelves** are `template.category`, grouped in the server's first-seen order and headed by
+  `t(`templates.category.${category}`)` — so a new shelf on the server needs the matching key in
+  **both** `ru.json` and `en.json` or its heading renders as the raw key. Four shelves now:
+  Форматы · **Брик-мульты** · Анимация · Брейнрот.
+- **Брик-мульты** (owner request 2026-07-30) is the largest shelf and sits second: eight stop-motion
+  brickfilm stories (ограбление, космос, гонка, замок, стройка, нуар, пираты, быт), 5–6 paid 8s
+  clips plus 1–2 free title cards each, 280–840 credits depending on tier. Unlike the other shelves
+  these are complete arcs — picked to be *watched*, where a format template is picked to be
+  rewritten and a brainrot template to be posted. Three of the eight are 16:9 (space, race,
+  pirates), so this is the first shelf where `BeatStrip` and the card render a landscape shape.
 
 ## Compare (`/compare`, hidden utility)
 

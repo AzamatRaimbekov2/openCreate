@@ -36,7 +36,7 @@ are the product, and it preserves the client-sends-ids / server-composes law fro
 
   | Export | Role |
   |---|---|
-  | `templateCategorySchema` / `TemplateCategory` | `'format' \| 'brainrot' \| 'animation'` — the gallery shelf. `'format'` (2026-07-18, owner request) is the LOOK/GENRE shelf — «Фильм», «Сериал», «Аниме»: a beat scaffold picked to be rewritten, not a finished joke. Enum so the rail's tabs stay exhaustive. A shelf needs an i18n key per locale (`templates.category.<id>`). |
+  | `templateCategorySchema` / `TemplateCategory` | `'format' \| 'brainrot' \| 'animation' \| 'brick'` — the gallery shelf. `'format'` (2026-07-18, owner request) is the LOOK/GENRE shelf — «Фильм», «Сериал», «Аниме»: a beat scaffold picked to be rewritten, not a finished joke. `'brick'` (2026-07-30, owner request «лего-мультфильмы с историями») is the stop-motion brickfilm shelf, «Брик-мульты» — eight complete stories picked to be *watched*. Enum so the rail's tabs stay exhaustive. A shelf needs an i18n key per locale (`templates.category.<id>`) — a value the SPA has no key for renders as the raw key, which is what `templates.test.ts` in this package now pins. |
   | `templateTierSchema` / `TemplateTier`, `TEMPLATE_TIERS` | `'draft' \| 'standard' \| 'premium'` — the price/quality knob, and the **only** thing that selects a model. |
   | `templateVariableOptionSchema` / `TemplateVariableOption` | `{ value, label }`. The English prompt fragment is deliberately **absent** — server-side only. |
   | `templateVariableSchema` / `TemplateVariable` | One `{{placeholder}}`. `kind: 'select' \| 'text'`. |
@@ -104,7 +104,9 @@ flowchart TD
   user's back. This is enforced by a contract test
   (`apps/api/src/modules/templates/templates.test.ts`), not by the type system.
   The three brainrot tiers (`pixverse-v6` / `wan-2-7` / `veo-3-1-fast`) were
-  chosen precisely because all three do 8s at 9:16.
+  chosen precisely because all three do 8s at 9:16 — and all three also do 8s at
+  **16:9**, which is what lets the `brick` shelf pick its aspect ratio per story
+  (`brick-space`, `brick-race`, `brick-pirates` are landscape) on the same tiers.
 - **Applying a template is FREE.** Shots land as drafts (`generationId = null`).
   Credits are spent only when the user presses Generate on a shot. A one-click
   "spend 1120 credits" button would be a trap — and a lie, since the user hasn't
@@ -119,7 +121,20 @@ flowchart TD
   spoken lines and on-screen titles. Video models are markedly worse at non-English
   staging direction, and free text in a prompt is a hole we'd rather not have.
   Select values are validated against a closed set before they can reach a prompt.
+- **No template string may name the toy brand behind the `brick` shelf.** Enforced
+  catalog-wide by `apps/api/src/modules/templates/templates.test.ts` ("names no
+  trademark the providers moderate on"), word-boundary matched so ordinary English
+  words are not caught. Two independent reasons: it is someone else's registered
+  mark, and Veo's moderation rejects prompts containing it — which would break the
+  **premium tier only**, silently, while draft and standard rendered fine. The
+  aesthetic vocabulary that replaces it: "plastic construction bricks",
+  "minifigure", "brickfilm", "visible brick studs".
+- **Adding a shelf needs a locale key in BOTH `ru.json` and `en.json`**
+  (`templates.category.<id>`), because `TemplateCatalog` renders every heading
+  through `t(\`templates.category.${category}\`)` and a missing key renders as the
+  raw key. `templates.test.ts` in this package pins the enum's membership so the
+  set of shelves the server can emit stays the set the SPA has headings for.
 
 ## Commits
 
-- _no commit yet_
+- `f0ea3b1` feat(contracts): add the 'brick' template shelf to the category enum

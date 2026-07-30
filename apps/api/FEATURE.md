@@ -275,12 +275,12 @@ Runbook (env table, first run, TLS/reverse proxy, backup/restore): `PROD.md`.
 Pre-authored viral formats that instantiate into a whole film. ADR:
 `docs/wiki/decisions/template-catalog.md`.
 
-Three shelves (`TemplateCategory`): **`format`** — «Фильм» (trailer grammar),
+Four shelves (`TemplateCategory`): **`format`** — «Фильм» (trailer grammar),
 «Сериал» (prime-time episode with recap + cliffhanger cards), «Аниме» (shōnen
 battle cold-open, styleId 'anime') — LOOK/GENRE scaffolds the user rewrites,
 all 16:9 · 8s beats · wan-2-7 as the standard tier (its r2v references keep a
-tagged hero consistent across beats); **`animation`** («Буран»); **`brainrot`**
-(the viral dramas).
+tagged hero consistent across beats); **`brick`** («Брик-мульты» — see below);
+**`animation`** («Буран»); **`brainrot`** (the viral dramas).
 
 - `modules/templates/catalog/*.ts` — the templates, **one file per template**. This is where the
   prompts live and they never leave the server: `GET /api/templates` returns a `TemplateSummary`
@@ -295,6 +295,34 @@ tagged hero consistent across beats); **`animation`** («Буран»); **`brain
   snaps the duration, changing both the cut and the price behind the user's back.
 - **Two substitution modes.** `{{var}}` in a visual prompt → the option's English fragment; in a
   title or a spoken line → its Russian noun. Free text never reaches a visual prompt.
+
+### `brick` — «Брик-мульты» (owner request 2026-07-30)
+
+Eight stop-motion brickfilm stories, the largest shelf in the catalog: `brick-heist`,
+`brick-space`, `brick-race`, `brick-castle`, `brick-build`, `brick-noir`, `brick-pirates`,
+`brick-city`. Each is 5–6 paid 8s clips plus 1–2 free title cards (280 / 675 / 700 credits at
+5 clips, 336 / 810 / 840 at 6), a Russian line on every paid beat, and 2–3 knobs of which at
+most one is free text. Aspect ratio is per story: 9:16 for the ones composed of close-ups and
+tall spaces, 16:9 for space, race and pirates — all three tier models do 8s at both, so the
+choice costs nothing and the boot assertion covers it.
+
+- **The toy brand's name must appear in NO template string** — asserted catalog-wide by
+  `templates.test.ts` ("names no trademark the providers moderate on"), word-boundary matched.
+  It is a registered mark AND a phrase Veo's moderation rejects, which would break the
+  **premium tier only**, silently, while draft and standard rendered fine. Vocabulary instead:
+  "plastic construction bricks", "minifigure", "brickfilm", "visible brick studs".
+- **Three prompt instructions carry the look**, each a fight with the model's defaults rather
+  than a flourish (stated in full in `catalog/brick-heist.ts`): *stepped stop-motion, no motion
+  blur* (a model trained on live action interpolates smoothly and the brick characters end up
+  moving like a CGI render); *rigid unmoving printed face* (left alone it animates a rubbery
+  cartoon face and the toy stops being a toy); *tilt-shift macro with visible studs, mould
+  seams and dust* (what says "photographed on a table" instead of "rendered").
+- `styleId: 'cinematic'` on every beat — a brickfilm is photographed physical plastic, and that
+  style's negative prompt ("cartoon, anime, illustration") pushes away the failure mode above.
+  Practical effects are named explicitly where the medium has one: cotton wool for smoke, a sea
+  built from tilted plates, models bursting into loose bricks for any crash.
+- Shelf-level invariants live in `templates.test.ts`: eight ids, 5–6 clips + 1–2 cards, a spoken
+  line on every paid beat, 2–3 knobs with ≤1 free text, a `musicPrompt` and a premium tier note.
 
 ## AI Soul Studio
 
