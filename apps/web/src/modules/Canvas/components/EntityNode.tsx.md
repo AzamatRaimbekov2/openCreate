@@ -37,4 +37,4 @@ flowchart LR
 - A character with no photo keeps the plate's box and shows a `☺` glyph (`aria-hidden`) — the row must not change height the moment a face lands, and the name is never icon-only.
 
 ## Commits
-- _pending_
+- 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference

@@ -54,3 +54,4 @@ sequenceDiagram
 - 5443372 2026-07-30 feat(canvas-web): node run submit + shared-cache polling
 - 505a544 2026-07-30 fix(canvas): buildRunInput cites the newest SUCCEEDED parent (C2)
 - (fix-wave) fix(canvas): F4 — a wired upload parent disables Generate instead of silently running a plain t2i/t2v
+- 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference

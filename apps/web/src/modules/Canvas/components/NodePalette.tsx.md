@@ -32,3 +32,4 @@ flowchart LR
 
 ## Commits
 - bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes
+- 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference

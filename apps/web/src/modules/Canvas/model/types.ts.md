@@ -38,3 +38,4 @@ flowchart LR
 ## Commits
 - 1779f0c 2026-07-30 feat(canvas-web): @xyflow/react + pure edge rules
 - f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip
+- 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference
