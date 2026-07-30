@@ -146,6 +146,13 @@ export const CATALOG: CatalogModel[] = [
     // 2026-07-15: honest margin over a flat price).
     nativeAudio: 'switchable',
     creditsByDurationWithAudio: { '5': 70, '8': 112, '10': 140, '15': 210 },
+    // PixVerse rejects Runware's `safety` param too ("Unsupported use of
+    // 'safety' parameter", verified live 2026-07-30 on a canvas i2v run — the
+    // allowed-params list in the error has no `safety`). Same treatment as
+    // seedance-1-5-pro below: flag off so the client omits it; moderation
+    // still applies via the NSFWContent flag on results. Provider drift —
+    // this model accepted the param when it was added.
+    supportsSafetyParam: false,
   },
   {
     id: 'minimax-hailuo',

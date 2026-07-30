@@ -79,3 +79,15 @@ flowchart LR
 - An over-long timeline strip snaps down to the model's own max at generation
   (`composeShotClipInput.nearestDuration`), so 15 on the slider is honest for every
   model. Exact per-channel max is re-verified live before it can 400.
+
+## Update 2026-07-30 — pixverse-v6 rejects Runware `safety` (provider drift)
+
+- `pixverse-v6` now carries `supportsSafetyParam: false`, same treatment (and
+  comment style) as `seedance-1-5-pro`. Verified live on a canvas i2v run:
+  Runware answered "Unsupported use of 'safety' parameter" and the error's
+  allowed-params list has no `safety` — so EVERY pixverse submit (t2v and i2v,
+  composer and canvas alike) had been failing at the provider and refunding.
+  Provider drift: the param was accepted when the entry was added.
+- Moderation still applies via the NSFWContent flag on results; the flag only
+  controls whether the client SENDS the request-side `safety` object
+  (runware/client.ts `omitSafety` plumbing, already tested).
