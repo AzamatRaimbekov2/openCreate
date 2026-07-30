@@ -70,7 +70,12 @@ export function TemplateDetailModal({ template, onClose }: TemplateDetailModalPr
 
   return (
     <Modal isOpen onClose={onClose} title={template.name} size="lg">
-      <div className="flex flex-col gap-6">
+      {/* min-h-0 + overflow-y-auto make THIS block the scroller inside the
+          Modal panel's max-h flex column. Without them a tall sheet (a
+          6-beat template on a laptop viewport) paints past the panel bottom
+          and «Создать фильм» is unreachable by mouse — found live 2026-07-30
+          on the brick-heist sheet at 871px viewport height. */}
+      <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pr-1">
         <p className="text-sm leading-relaxed text-mist-dim">{template.description}</p>
 
         {/* 1 — the shape of the film */}

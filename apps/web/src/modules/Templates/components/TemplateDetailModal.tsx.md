@@ -65,3 +65,18 @@ flowchart TD
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-30 — the sheet scrolls (unreachable CTA fix)
+
+- The content root gained `min-h-0 overflow-y-auto` (+ `pr-1` for the
+  scrollbar), making it the scroller inside the Modal panel's `max-h-[92dvh]`
+  flex column. Before: a flex child defaults to `min-height: auto`, so a tall
+  sheet did not shrink — it painted PAST the panel bottom, and «Создать фильм»
+  sat off-viewport, unreachable by mouse. Found live 2026-07-30 on the
+  brick-heist sheet at 871px viewport height (the brick pack's 6-beat sheets
+  are taller than the brainrot ones that sized this modal).
+- The ✕ close stays pinned (absolutely positioned on the panel, not in the
+  scroller). Whole-sheet scrolling (CTA scrolls with content) was chosen over
+  a pinned footer as the minimal change; revisit if sheets grow further.
+- NOTE for other modal owners: any Modal child taller than 92dvh has the same
+  latent failure — the panel does not clip, the CHILD must opt into scrolling.
