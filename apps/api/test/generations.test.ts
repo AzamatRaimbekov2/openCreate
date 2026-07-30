@@ -326,11 +326,14 @@ describe('provider parameter compatibility wiring', () => {
     rw.submitVideo.mockResolvedValue(undefined)
     const app = await buildTestApp({ runware: rw })
     const cookie = await registerAndGetCookie(app)
+    // minimax-hailuo carries no supportsSafetyParam flag — it accepts the
+    // param. (pixverse-v6 was the example here until Runware started rejecting
+    // safety on it too — d881897 flipped its flag, see catalog.ts.)
     await app.inject({
       method: 'POST',
       url: '/api/generations',
       headers: { cookie },
-      payload: { modelId: 'pixverse-v6', prompt: 'ocean waves at dusk', aspectRatio: '9:16', duration: 5 },
+      payload: { modelId: 'minimax-hailuo', prompt: 'ocean waves at dusk', aspectRatio: '16:9', duration: 6 },
     })
     const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
     expect(arg.omitSafety).toBeUndefined()
