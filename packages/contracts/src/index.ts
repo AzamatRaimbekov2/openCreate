@@ -48,3 +48,7 @@ export * from './compare'
 // Canvas Mode (ADR canvas-mode) — the node-graph aggregate that cites
 // generations. No dependencies on the above; ordering is immaterial.
 export * from './canvas'
+// openCreator (ADR opencreator-agent) — the agent chat: sessions + structured
+// messages (step/plan/result cards). Cites canvases/entities/generations by id
+// only, so ordering is immaterial here too.
+export * from './creator'

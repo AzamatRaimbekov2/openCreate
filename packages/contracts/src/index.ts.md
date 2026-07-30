@@ -120,3 +120,19 @@ flowchart LR
   is that PATCH carries the FULL document (debounced autosave, last-write-wins, single owner), so
   every collection and string here is explicitly bounded: the bounds are what keeps one hostile
   autosave from persisting megabytes.
+
+## Update 2026-07-30 — openCreator agent contracts (Task 1)
+- Now also re-exports `./creator` (ADR opencreator-agent): `creatorSessionStatusSchema`/`CreatorSessionStatus`,
+  `creatorMessageContentSchema`/`CreatorMessageContent`, `creatorMessageSchema`/`CreatorMessage`,
+  `creatorSessionSchema`/`CreatorSession`, `creatorSessionDetailSchema`/`CreatorSessionDetail`,
+  `creatorSessionListSchema`/`CreatorSessionList`, `createCreatorSessionInputSchema`/`CreateCreatorSessionInput`,
+  `postCreatorMessageInputSchema`/`PostCreatorMessageInput`.
+- Exported LAST (after `./canvas`) — it imports only `zod`, and it cites canvases/entities/generations
+  by plain id string rather than by their types, so nothing in the barrel depends on it and ordering
+  is immaterial.
+- Why this file exists: openCreator is a CHAT whose transcript IS the agent's audit trail — every
+  executed tool becomes a `step` message and the budget gate becomes a `plan` message, so one
+  `GET /api/creator/sessions/:id` re-renders the whole story and a reload loses nothing. Note what is
+  deliberately absent: no `tool` role (raw tool JSON never reaches the chat) and no money field beyond
+  the informational `costCredits` on a step — the gate is enforced in `modules/creator/tools.ts`
+  against the session's `confirmed` flag, never by this schema.
