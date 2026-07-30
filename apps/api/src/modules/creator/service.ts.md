@@ -118,4 +118,4 @@ sequenceDiagram
 
 ## Commits
 
-- (pending) feat(creator): agent loop, budget gate, sessions API
+- bb92a60 feat(creator): agent loop, budget gate, sessions API

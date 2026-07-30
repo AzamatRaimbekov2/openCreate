@@ -101,4 +101,4 @@ flowchart TD
 
 ## Commits
 
-- (pending) feat(creator): provider-neutral brain — anthropic tool-use + deepseek fallback
+- 355b03e feat(creator): provider-neutral brain — anthropic tool-use + deepseek fallback

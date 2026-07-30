@@ -123,4 +123,4 @@ flowchart TD
 
 ## Commits
 
-- (pending) feat(creator): agent tools over existing services — budget gate structural
+- 7004c75 feat(creator): agent tools over existing services — budget gate structural

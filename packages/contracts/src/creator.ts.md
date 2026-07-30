@@ -95,4 +95,4 @@ flowchart LR
 
 ## Commits
 
-- (pending) feat(creator): wire contracts for the agent chat
+- 0e16d98 feat(creator): wire contracts for the agent chat
