@@ -49,3 +49,4 @@ flowchart TD
 - f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip
 - (fix-wave) fix(canvas): C2/C3/C4/I5 — gate on succeeded parent status, localized failure copy + refunded chip, processing progress %
 - 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference
+- 40c54d1 2026-07-30 feat(canvas-web): enhance sparkle on every node prompt field
