@@ -12,6 +12,7 @@ import {
   MODEL3D_DDL,
   ASSET3D_DDL,
   CANVAS_DDL,
+  CREATOR_DDL,
   REFUND_ONCE_INDEX_DDL,
 } from './ddl'
 
@@ -44,6 +45,12 @@ export function createDb(path: string) {
   // Canvas Mode (ADR canvas-mode): three brand-new tables, so only the
   // idempotent CREATE IF NOT EXISTS exec is needed — no micro-migration guard.
   sqlite.exec(CANVAS_DDL)
+  // openCreator (ADR opencreator-agent): two brand-new tables (creator_session,
+  // creator_message) — same story, no micro-migration guard. Exec'd here rather
+  // than lazily on first use so a deployment that never opens /creator still has
+  // the tables (and so the boot-time stale-session sweep in app.ts has something
+  // to sweep).
+  sqlite.exec(CREATOR_DDL)
   // Micro-migrations: CREATE TABLE IF NOT EXISTS never alters tables that
   // already exist, so columns added after a db file was first created must be
   // back-filled here (SQLite has no ADD COLUMN IF NOT EXISTS). Guarded by

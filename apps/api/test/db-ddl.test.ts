@@ -9,6 +9,7 @@ import Database from 'better-sqlite3'
 import {
   ASSET3D_DDL,
   CANVAS_DDL,
+  CREATOR_DDL,
   DDL,
   ENTITY_DDL,
   FILM_DDL,
@@ -154,5 +155,83 @@ describe('CANVAS_DDL', () => {
     expect(fks).toContain('canvas')
     expect(fks).not.toContain('canvas_node')
     expect(fks).not.toContain('generation')
+  })
+})
+
+// openCreator (ADR opencreator-agent, Task 2). Shape + idempotence, plus the two
+// properties the BUDGET GATE rests on: `confirmed` exists and defaults to 0 (a
+// brand-new session can never spend), and a message CITES artifacts inside
+// content_json rather than through an FK (deleting a generation must leave a
+// stale citation in the chat, never cascade the conversation away).
+describe('CREATOR_DDL', () => {
+  const boot = () => {
+    const db = new Database(':memory:')
+    for (const sql of [DDL, REFUND_ONCE_INDEX_DDL, CREATOR_DDL]) db.exec(sql)
+    return db
+  }
+
+  it('creates creator_session and creator_message', () => {
+    const db = boot()
+    const names = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
+      .all()
+      .map((r) => (r as { name: string }).name)
+    expect(names).toContain('creator_session')
+    expect(names).toContain('creator_message')
+  })
+
+  it('is idempotent — booting twice does not throw', () => {
+    const db = boot()
+    expect(() => db.exec(CREATOR_DDL)).not.toThrow()
+  })
+
+  it('confirmed defaults to 0 — a fresh session structurally cannot spend', () => {
+    // THE budget gate's foundation (ADR D2): tools.ts refuses start_generation
+    // while this flag is 0, so a column that defaulted to 1 (or was nullable and
+    // read as truthy) would hand a brand-new session the user's whole balance.
+    const db = boot()
+    db.prepare(
+      `INSERT INTO user (id, email, email_verified, created_at, updated_at) VALUES ('u1','a@b.c',0,0,0)`,
+    ).run()
+    db.prepare(
+      `INSERT INTO creator_session (id, user_id, title, status, created_at, updated_at)
+       VALUES ('s1','u1','t','idle',0,0)`,
+    ).run()
+    const row = db.prepare(`SELECT confirmed FROM creator_session WHERE id='s1'`).get()
+    expect((row as { confirmed: number }).confirmed).toBe(0)
+  })
+
+  it('creator_message cascades from its session and cites artifacts without FKs', () => {
+    const db = boot()
+    db.pragma('foreign_keys = ON')
+    const fks = db
+      .prepare(`PRAGMA foreign_key_list(creator_message)`)
+      .all()
+      .map((f) => (f as { table: string }).table)
+    expect(fks).toContain('creator_session')
+    // A step message names a canvas/entity/generation inside content_json. No FK:
+    // a gallery delete must leave the chat readable, not erase the conversation.
+    expect(fks).not.toContain('generation')
+    expect(fks).not.toContain('canvas')
+    expect(fks).not.toContain('entity')
+  })
+
+  it('deleting a session removes its messages (owned, unlike the citations)', () => {
+    const db = boot()
+    db.pragma('foreign_keys = ON')
+    db.prepare(
+      `INSERT INTO user (id, email, email_verified, created_at, updated_at) VALUES ('u1','a@b.c',0,0,0)`,
+    ).run()
+    db.prepare(
+      `INSERT INTO creator_session (id, user_id, title, status, created_at, updated_at)
+       VALUES ('s1','u1','t','idle',0,0)`,
+    ).run()
+    db.prepare(
+      `INSERT INTO creator_message (id, session_id, role, content_json, created_at)
+       VALUES ('m1','s1','user','{"kind":"text","text":"hi"}',0)`,
+    ).run()
+    db.prepare(`DELETE FROM creator_session WHERE id='s1'`).run()
+    const left = db.prepare(`SELECT COUNT(*) AS n FROM creator_message`).get()
+    expect((left as { n: number }).n).toBe(0)
   })
 })

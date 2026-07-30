@@ -154,3 +154,33 @@ composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/
   (`canvas.user_id`, `canvas_node.canvas_id`, `canvas_edge.canvas_id`).
 - **No cost/credit column anywhere.** A canvas composes generations; the money lives in the ledger
   the generation system already owns. Zero new money code is the ADR's D1 constraint.
+
+## Key decisions (2026-07-30) — openCreator agent
+`CREATOR_DDL` (a sixth constant, exec'd after `CANVAS_DDL`) creates the agent chat. See ADR
+`docs/wiki/decisions/opencreator-agent.md`.
+
+- **`creator_session`** — `id`, `user_id` (→ `user`, cascade), `title`, `status`, `confirmed`,
+  `created_at`, `updated_at`. `idx_creator_session_user (user_id, updated_at DESC)` serves the only
+  list query (the left rail, most-recent-first).
+- **`confirmed INTEGER NOT NULL DEFAULT 0` is the budget gate (ADR D2), and the DEFAULT is
+  load-bearing.** `tools.ts` refuses `start_generation` outright — no service call, no charge — while
+  this flag is 0, so the column's default is what guarantees a brand-new (or freshly re-planned)
+  session cannot spend a credit. `POST /confirm` sets it to 1; every new `propose_plan` resets it to 0.
+  A nullable column would be read as falsy and *work*, but NOT NULL states the invariant where the
+  database can enforce it. Pinned by `test/db-ddl.test.ts`.
+- **`status` is plain TEXT** with the union (`idle|running|awaiting_confirm|failed`) in TypeScript —
+  the `generation.status` precedent, so a new state is not a migration. `updated_at` doubles as the
+  staleness clock: in-flight agent loops live in process memory (like DeepInfra jobs), so a restart
+  leaves `running` rows that only the boot-time reaper can settle.
+- **`creator_message`** — `id`, `session_id` (→ `creator_session`, cascade), `role`, `content_json`,
+  `created_at`. `idx_creator_message_session (session_id, created_at)` serves the transcript read,
+  which is always the whole conversation in order.
+- **`content_json` is JSON, not columns.** The four card kinds (`text`/`step`/`plan`/`result`) share
+  almost no fields, and nothing ever queries INTO a message — the service reads a session's messages
+  whole. Validated on the way out by `creatorMessageContentSchema`.
+- **A message cites artifacts with NO FK.** `canvasId`/`entityId`/`generationId` live inside
+  `content_json`, so deleting a generation from the gallery leaves a stale citation on an old card
+  rather than erasing the conversation — the same "cite, never own" rule as `shot.generation_id`.
+  The ONLY cascading edges are the owner edges (`creator_session.user_id`, `creator_message.session_id`).
+- **No cost/credit column.** The agent spends only through `generationService.create()`; `costCredits`
+  on a step card is a copy of what that call already charged, for display. Zero new money code (D1).

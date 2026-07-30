@@ -171,3 +171,27 @@ Three drizzle tables mirroring `CANVAS_DDL` column-for-column (ADR `docs/wiki/de
   citation-not-FK rule for both `canvas_node` (`foreign_key_list` contains `canvas`, not `generation`)
   and `canvas_edge` (contains `canvas`, not `canvas_node` or `generation` — edge endpoints are
   validated at the SERVICE layer, `service.ts` `validateGraph`, not by a SQLite FK).
+
+## Key decisions (2026-07-30) — openCreator agent
+Two drizzle tables mirroring `CREATOR_DDL` column-for-column (ADR `docs/wiki/decisions/opencreator-agent.md`):
+
+- **`creatorSession`** — `id`, `userId` (→ `user`, cascade), `title`, `status` (drizzle `enum` over
+  `idle|running|awaiting_confirm|failed`, TS-level only — the column is plain TEXT), `confirmed`,
+  `createdAt`/`updatedAt` (`timestamp_ms`).
+- **`confirmed` is `integer(..., { mode: 'boolean' }).notNull().default(false)`** — the budget gate
+  (ADR D2). `mode: 'boolean'` is what lets the service read it as `true`/`false` while SQLite stores
+  0/1. It is re-read from the row before EVERY charging tool call rather than captured once per turn,
+  so a confirm that lands mid-turn is honoured and a fresh plan revokes the previous confirmation.
+- **`updatedAt` is also the staleness clock.** In-flight agent loops live in process memory (the
+  DeepInfra-job precedent), so an API restart leaves `running` sessions that nothing would settle;
+  `settleStaleCreatorSessions` fails those older than the threshold at boot.
+- **`creatorMessage`** — `id`, `sessionId` (→ `creatorSession`, cascade), `role` (`user|assistant`),
+  `contentJson`, `createdAt`.
+- **`role` has no `'tool'` member**, though the ADR sketched one: a tool result is not something a
+  user reads. The loop writes each executed tool as an assistant `step` card and keeps the raw JSON
+  inside that turn's in-memory transcript, so the chat never shows provider payloads.
+- **Citations are inside `contentJson`, so there is no `.references()` to `generation`, `canvas` or
+  `entity`** — a gallery delete must leave a stale link on an old card, never remove the conversation.
+  The only cascading edges are the owner edges (`creatorSession.userId`, `creatorMessage.sessionId`).
+- `test/db-ddl.test.ts` pins the shape of both tables, boot idempotence, `confirmed` defaulting to 0,
+  the citation-not-FK rule, and the session→messages cascade.

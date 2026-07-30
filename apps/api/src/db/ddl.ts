@@ -367,3 +367,38 @@ CREATE TABLE IF NOT EXISTS canvas_edge (
 );
 CREATE INDEX IF NOT EXISTS idx_canvas_edge_canvas ON canvas_edge(canvas_id);
 `
+
+// openCreator tables (ADR: opencreator-agent D4). Same idempotent contract as
+// CANVAS_DDL. A session is a persisted CHAT and every agent step is a message,
+// so the SPA can poll one GET and redraw the whole story — in-flight loops live
+// in process memory (like DeepInfra jobs), but nothing the user has seen does.
+//
+// These two tables are the feature's entire DB surface: the agent CREATES
+// canvases, entities and generations through the existing services, and cites
+// them by id inside content_json. That is why there is no FK to any of them —
+// deleting a generation from the gallery must leave a stale citation in an old
+// chat card, never erase the conversation that produced it (the same "cite,
+// never own" rule as shot.generation_id and canvas_node.generation_ids_json).
+export const CREATOR_DDL = `
+CREATE TABLE IF NOT EXISTS creator_session (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL,
+  -- Budget gate (ADR D2): flipped to 1 by /confirm, back to 0 by every new plan.
+  -- Charging tools are STRUCTURALLY refused while 0 — see tools.ts.
+  confirmed INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_creator_session_user ON creator_session(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS creator_message (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES creator_session(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  content_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_creator_message_session ON creator_message(session_id, created_at);
+`

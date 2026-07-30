@@ -112,3 +112,19 @@ The node's `generation_ids_json` holds plain TEXT citations inside a JSON array 
 clause is even possible there), so deleting a generation from the library never cascades a node away;
 only `canvas.user_id`, `canvas_node.canvas_id` and `canvas_edge.canvas_id` cascade. See ADR
 `docs/wiki/decisions/canvas-mode.md`.
+
+## Key decisions (2026-07-30) — openCreator agent
+`createDb` now also execs `CREATOR_DDL` (imported from `./ddl`, exec'd right after `CANVAS_DDL`),
+creating `creator_session` and `creator_message`. Brand-new tables again, so a single
+`CREATE TABLE IF NOT EXISTS` covers a fresh db and a legacy file alike — **no** micro-migration guard,
+because no column is being added to a pre-existing table.
+
+It runs unconditionally (not lazily on first `/creator` request) for two reasons: a deployment that
+never opens the page still gets a consistent schema, and the boot-time
+`settleStaleCreatorSessions` sweep in `app.ts` needs the table to exist before any request arrives.
+
+`creator_message.content_json` holds the agent's citations (`canvasId`/`entityId`/`generationId`) as
+plain strings inside JSON, so no `REFERENCES` clause is possible or wanted there: deleting a
+generation leaves a stale citation on an old chat card instead of erasing the conversation. Only
+`creator_session.user_id` and `creator_message.session_id` cascade. See ADR
+`docs/wiki/decisions/opencreator-agent.md`.

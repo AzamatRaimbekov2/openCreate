@@ -433,3 +433,50 @@ export const canvasEdge = sqliteTable('canvas_edge', {
   sourceNodeId: text('source_node_id').notNull(),
   targetNodeId: text('target_node_id').notNull(),
 })
+
+// openCreator (ADR opencreator-agent D4): the agent chat. Two tables and no more
+// — the agent's OUTPUT lives in the existing aggregates (entity, canvas,
+// generation) and is cited by id inside content_json, so this module owns the
+// conversation and nothing else.
+export const creatorSession = sqliteTable('creator_session', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  // First user message, trimmed — the left rail needs a label before the agent
+  // has said anything.
+  title: text('title').notNull(),
+  // TS-level enum over a TEXT column, exactly like generation.status: the union
+  // is enforced in code (and by the shared contracts schema on the way out),
+  // which keeps a new status from being a migration.
+  status: text('status', {
+    enum: ['idle', 'running', 'awaiting_confirm', 'failed'],
+  }).notNull(),
+  // THE BUDGET GATE (ADR D2). Integer 0/1 because SQLite has no boolean; read
+  // fresh before EVERY charging tool call (never cached in the loop), so a
+  // confirm that lands mid-turn is honoured and a new plan revokes the previous
+  // confirmation. 0 is the default at the DDL level too — a session that never
+  // reached /confirm structurally cannot spend.
+  confirmed: integer('confirmed', { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  // Doubles as the staleness clock: settleStaleCreatorSessions fails a `running`
+  // session whose updated_at is older than the threshold (the API restart case —
+  // in-flight turns live in process memory, so nothing else would settle them).
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+export const creatorMessage = sqliteTable('creator_message', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => creatorSession.id, { onDelete: 'cascade' }),
+  // No 'tool' role (the ADR sketched one): a tool result is not something the
+  // user reads — the loop turns each executed tool into an assistant `step`
+  // message and keeps the raw JSON inside the turn's transcript.
+  role: text('role', { enum: ['user', 'assistant'] }).notNull(),
+  // creatorMessageContentSchema, stringified. JSON rather than columns because
+  // the four card kinds share almost no fields, and the server never queries
+  // INTO a message — it reads the whole conversation, in order, or nothing.
+  contentJson: text('content_json').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+})
