@@ -53,3 +53,4 @@ flowchart TD
 - (fix-wave) fix(canvas): C2/C3/C4/I5 — gate on succeeded parent status, localized failure copy + refunded chip, processing progress %
 - 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference
 - 40c54d1 2026-07-30 feat(canvas-web): enhance sparkle on every node prompt field
+- cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend

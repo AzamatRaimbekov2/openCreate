@@ -60,4 +60,4 @@ sequenceDiagram
 - `buildPlan(targetId, models)` takes the catalog as a PARAMETER because the Canvas module may not import `modules/Generator`; the caller is a node, which already holds exactly that array via the route seam. The `[]` default is fail-safe: no catalog → no price → confirm disabled.
 
 ## Commits
-- _pending_
+- cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend

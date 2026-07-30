@@ -38,4 +38,4 @@ flowchart LR
 - The caller closes BEFORE running (`onConfirm` then `setPlan(null)`): a modal hanging over a running board hides the progress it just caused.
 
 ## Commits
-- _pending_
+- cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend
