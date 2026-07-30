@@ -117,6 +117,19 @@ flowchart LR
 - `AppShell` lost its `useState`/`Skeleton` usage (they went with the menu). Nav, wordmark,
   balance and lang are untouched — roles/labels unchanged, so `AppShell.test.tsx` is unaffected.
 
+## Update 2026-07-30 — openCreator (agent) entry
+- Nav gains ONE `/creator` typed `Link` (`t('nav.creator')` — "Agent" / «Агент»), with the
+  identical `navLinkClass` + `activeProps`/`inactiveProps` as every sibling. Nav order is
+  now create · **creator** · library · cinema · canvas · assets · templates · souls · entities · pricing.
+- **Placed immediately after Create**: the two answer the same question from opposite
+  ends — `/create` is the manual pen, `/creator` is the agent you hand the whole task to.
+  The adjacency is the hint that one is the autonomous form of the other. Putting it next
+  to the workbenches (cinema/canvas/assets) would imply a multi-step editor the user
+  drives; openCreator drives itself after one budget confirmation.
+- The whole change is the one `<Link>`. `AppShell` stays presentational and imports
+  nothing from `modules/*`; the route (`_shell.creator.tsx`) does the auth guard and the
+  module composition. Roles/labels unchanged, so `AppShell.test.tsx` is unaffected.
+
 ## Commits
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)

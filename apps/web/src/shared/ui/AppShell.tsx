@@ -84,6 +84,18 @@ export function AppShell({
             >
               {t('nav.create')}
             </Link>
+            {/* openCreator sits beside Create because they answer the same
+                question from opposite ends: /create is the manual pen, /creator
+                is the agent you hand the whole task to. The adjacency is the
+                hint that one is the autonomous form of the other. */}
+            <Link
+              to="/creator"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.creator')}
+            </Link>
             <Link
               to="/library"
               className={navLinkClass}

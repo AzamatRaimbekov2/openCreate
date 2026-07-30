@@ -17,6 +17,7 @@ import { Route as CanvasCanvasIdRouteImport } from './routes/canvas.$canvasId'
 import { Route as ShellPricingRouteImport } from './routes/_shell.pricing'
 import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
 import { Route as ShellEntitiesRouteImport } from './routes/_shell.entities'
+import { Route as ShellCreatorRouteImport } from './routes/_shell.creator'
 import { Route as ShellCreateRouteImport } from './routes/_shell.create'
 import { Route as ShellCompareRouteImport } from './routes/_shell.compare'
 import { Route as ShellTemplatesIndexRouteImport } from './routes/_shell.templates.index'
@@ -64,6 +65,11 @@ const ShellLibraryRoute = ShellLibraryRouteImport.update({
 const ShellEntitiesRoute = ShellEntitiesRouteImport.update({
   id: '/entities',
   path: '/entities',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellCreatorRoute = ShellCreatorRouteImport.update({
+  id: '/creator',
+  path: '/creator',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellCreateRoute = ShellCreateRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/compare': typeof ShellCompareRoute
   '/create': typeof ShellCreateRoute
+  '/creator': typeof ShellCreatorRoute
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/compare': typeof ShellCompareRoute
   '/create': typeof ShellCreateRoute
+  '/creator': typeof ShellCreatorRoute
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_shell/compare': typeof ShellCompareRoute
   '/_shell/create': typeof ShellCreateRoute
+  '/_shell/creator': typeof ShellCreatorRoute
   '/_shell/entities': typeof ShellEntitiesRoute
   '/_shell/library': typeof ShellLibraryRoute
   '/_shell/pricing': typeof ShellPricingRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/compare'
     | '/create'
+    | '/creator'
     | '/entities'
     | '/library'
     | '/pricing'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/compare'
     | '/create'
+    | '/creator'
     | '/entities'
     | '/library'
     | '/pricing'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_shell/compare'
     | '/_shell/create'
+    | '/_shell/creator'
     | '/_shell/entities'
     | '/_shell/library'
     | '/_shell/pricing'
@@ -292,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellEntitiesRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/creator': {
+      id: '/_shell/creator'
+      path: '/creator'
+      fullPath: '/creator'
+      preLoaderRoute: typeof ShellCreatorRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/create': {
       id: '/_shell/create'
       path: '/create'
@@ -361,6 +380,7 @@ declare module '@tanstack/react-router' {
 interface ShellRouteChildren {
   ShellCompareRoute: typeof ShellCompareRoute
   ShellCreateRoute: typeof ShellCreateRoute
+  ShellCreatorRoute: typeof ShellCreatorRoute
   ShellEntitiesRoute: typeof ShellEntitiesRoute
   ShellLibraryRoute: typeof ShellLibraryRoute
   ShellPricingRoute: typeof ShellPricingRoute
@@ -376,6 +396,7 @@ interface ShellRouteChildren {
 const ShellRouteChildren: ShellRouteChildren = {
   ShellCompareRoute: ShellCompareRoute,
   ShellCreateRoute: ShellCreateRoute,
+  ShellCreatorRoute: ShellCreatorRoute,
   ShellEntitiesRoute: ShellEntitiesRoute,
   ShellLibraryRoute: ShellLibraryRoute,
   ShellPricingRoute: ShellPricingRoute,
