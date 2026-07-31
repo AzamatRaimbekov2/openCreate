@@ -474,6 +474,59 @@ loop; the SPA is a poller, and `modules/Creator` is the whole frontend.
   selection is not deep-linkable — a `?session=` search param is the upgrade path.
 - The module exports **exactly one** symbol (`CreatorWorkbench`) and imports no other module.
 
+## Styles (`/styles`)
+
+The Style Studio — a style is a user-built CONSTRUCTOR (a name plus two prompt
+fragments) that resolves at generation time the way a model resolves against the
+catalog. ADR `docs/wiki/decisions/style-studio.md`.
+
+- **One registry, two sources.** `GET /api/styles` answers with the seven builtin
+  styles (still code — `STYLE_PRESETS`) and the caller's own rows, unioned, in one
+  shape; `builtin: true` is the only thing that distinguishes them, and it is the
+  server's answer, never a client inference. `modules/Styles/model/api.ts` holds it
+  under `['styles']`; every write ABSORBS its answer into that cache instead of
+  refetching, and an unloaded cache is left alone rather than fabricated from a
+  single write.
+- **The page** (`StyleLibrary`) is two sections over that one list: MY STYLES leads
+  (the reason to be here), BUILT-IN follows as a reference shelf whose fragments are
+  readable on purpose — reading one is how you learn to write a better one. A builtin
+  carries a badge and NO action menu at all: there is nothing a user may do to code
+  that ships with the app, and the API refuses an update or delete on one with a 400.
+  The empty state is scoped to "none of your own", because the list is never
+  literally empty. Deleting is confirmed — the style vanishes from every picker in
+  the app, and films/shots already citing it ask for a style again at their next run.
+- **The constructor** (`StyleEditor`) is one modal for create and edit: name, the
+  positive fragment with the MANDATORY sparkle (`EnhanceButton`), the negative, and
+  an advisory `recommendedModelId` from the catalog — which arrives as a PROP from
+  the route, because `modules/Styles` must not import `modules/Generator`.
+- **Preview** is an ordinary paid generation (the registry itself never charges):
+  `POST /api/generations` with `promptPreset.styleId` so the server resolves the
+  style exactly as a real run does, poll `['generation', id]`, then CITE the
+  succeeded run via `previewGenerationId`. Three rules: the run is owned by the
+  LIBRARY (a poll owned by the modal would die on close and strand a charged
+  generation); the button SAVES first (the server resolves the style out of the
+  database, so previewing before the PATCH would render stale fragments); and the
+  poll sets `refetchIntervalInBackground: true` (TanStack pauses interval refetches
+  on a hidden tab and this app disables `refetchOnWindowFocus` globally).
+  `STYLE_PREVIEW_PROMPT` is deliberately styleless so the only difference between two
+  previews is the style's own fragment.
+- **Every style picker reads the registry** (`styleOptions(styles, t)`): the Cinema
+  shot inspector, the film's default style (create + edit) and the storyboard. The
+  list is read at the ROUTE (`_shell.styles`, `_shell.cinema.index`,
+  `cinema.$filmId`) and threaded down as props — Cinema must not import Styles.
+  Soul stays on the BUILTIN table by decision: `soulPresentation` indexes
+  `STYLE_PRESETS` by that value, so a user style would have no label to render.
+- **An empty list means "not loaded", never "no styles"** — the registry always
+  carries the builtins, so `styleRegistry()` falls back to the bundled table. The
+  picker is therefore never empty and never disabled while the request is in flight;
+  only the user's OWN styles are briefly absent. For the same window the composed
+  prompt hint UNDER-reports (a user style's fragment is missing) rather than
+  mis-reporting — the server composes it either way.
+- A builtin is still spelled by i18n (`cinema.preset.style.<id>`) because the
+  server sends its hardcoded Russian `label` as `name`; a user style renders its own
+  name verbatim; an id with no SPA copy falls back to the server's name instead of
+  painting a raw key.
+
 ## Design references
 
 - Design system: `docs/frontend/design.md`
