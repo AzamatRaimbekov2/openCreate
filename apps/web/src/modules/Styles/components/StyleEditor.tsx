@@ -134,7 +134,21 @@ export function StyleEditor({
       onClose={onClose}
       title={isEdit ? t('styles.edit.title') : t('styles.create.title')}
     >
-      <div className="flex flex-col gap-4">
+      {/* THE FIELDS SCROLL, THE ACTIONS DO NOT.
+          The kit Modal panel is a `max-h-[92dvh]` flex column, and a flex child
+          defaults to `min-height:auto` — so without `min-h-0` this block refuses
+          to shrink below its content, paints past the panel bottom, and the wheel
+          scrolls the PAGE behind the overlay instead. Found live 2026-07-31 at
+          1336×728: the reference strip was half-visible and Save / Cancel /
+          «Сгенерировать превью» were unreachable by mouse. Same class of bug as
+          TemplateDetailModal (a50f5a7), same two classes fix it.
+          `pr-1` keeps the scrollbar off the fields' focus rings.
+          WHERE THIS DIVERGES FROM THE TEMPLATES CANON: that sheet keeps its CTA
+          inside the scroller, which is fine for a read-mostly page with one
+          button. This is the app's tallest FORM, and its actions are the reason
+          the modal is open — pinning them below the scroller means Save cannot be
+          pushed out of reach by a growing reference strip or an error line. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
         <Input
           label={t('styles.field.name')}
           value={name}
@@ -205,6 +219,15 @@ export function StyleEditor({
           <p className="text-[11px] text-mist-dim/70">{t('styles.references.unsaved')}</p>
         )}
 
+      </div>
+
+      {/* THE PINNED FOOTER — outside the scroller, so the actions are reachable
+          at any scroll position. `shrink-0` keeps it at its natural height while
+          the fields above absorb the squeeze; the hairline is the same separator
+          language the Modal header uses. The failure notice lives HERE rather
+          than in the scroller: it explains why the button beside it did nothing,
+          so it must be visible wherever that button is. */}
+      <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4">
         {isError ? (
           <span role="alert" className="text-sm text-glow-red">
             {t('errors.actionFailed')}

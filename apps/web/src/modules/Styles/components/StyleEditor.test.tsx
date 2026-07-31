@@ -136,6 +136,28 @@ it('offers no preview while the style is still being typed', () => {
   expect(screen.queryByRole('button', { name: /generate preview/i })).not.toBeInTheDocument()
 })
 
+it('scrolls its own body so the actions stay reachable on a short viewport', () => {
+  // Found live 2026-07-31 at 1336×728: the kit Modal panel is a max-h-[92dvh]
+  // flex column, and a flex child defaults to min-height:auto — so this form
+  // (name + fragment + negative + model + references) painted PAST the panel
+  // bottom, the wheel scrolled the page behind the overlay, and Save / Cancel /
+  // Generate preview could not be reached with a mouse. Same class of bug as
+  // TemplateDetailModal (a50f5a7).
+  renderEditor(styleRow())
+
+  // The Modal portals to document.body, so the render's own container is empty —
+  // query the dialog itself.
+  const scroller = screen.getByRole('dialog').querySelector('.overflow-y-auto')
+  expect(scroller).not.toBeNull()
+  // min-h-0 is the half that actually does the work: without it the flex child
+  // refuses to shrink below its content and overflow-y-auto never engages.
+  expect(scroller).toHaveClass('min-h-0')
+
+  // The actions live OUTSIDE the scroller, so they are reachable at any scroll
+  // position rather than only after scrolling to the end.
+  expect(scroller?.contains(screen.getByRole('button', { name: /^done$/i }))).toBe(false)
+})
+
 it('carries the reference strip once the style exists', () => {
   renderEditor(styleRow())
 

@@ -86,3 +86,27 @@ flowchart TD
   681698a: the draft lives in `useState`, so without a key the second style opened
   showed the first one's text. Keying on the ID (not the row) means a reference
   upload — which replaces the row — does NOT remount and wipe unsaved typing.
+
+## Update 2026-07-31 (c) — the body scrolls, the actions are pinned
+- **The bug (found live at 1336×728):** the kit `Modal` panel is a
+  `max-h-[92dvh]` flex column, and a flex child defaults to `min-height:auto`, so
+  this form (name + fragment + negative + model + reference strip) painted PAST
+  the panel bottom. The wheel scrolled the PAGE behind the overlay, the reference
+  strip was half-visible, and Save / Cancel / «Сгенерировать превью» could not be
+  reached with a mouse. Exactly the `TemplateDetailModal` class of bug (a50f5a7).
+- **The fix:** the field stack became
+  `flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1`. `min-h-0` is the half
+  that does the work — without it the flex child refuses to shrink below its
+  content and `overflow-y-auto` never engages. `pr-1` keeps the scrollbar off the
+  fields' focus rings.
+- **Divergence from the Templates canon, deliberate:** that sheet keeps its CTA
+  inside the scroller, which suits a read-mostly page with one button. This is the
+  app's tallest FORM and its actions are the reason the modal is open, so they sit
+  in a PINNED footer (`shrink-0`, hairline `border-t`) below the scroller —
+  Save can never be pushed out of reach by a growing reference strip or an error
+  line. The failure notice moved into that footer for the same reason: it explains
+  why the button beside it did nothing, so it must be visible wherever that button
+  is.
+- Pinned by a test that asserts the scroller exists, carries `min-h-0`, and does
+  NOT contain the submit button. Verified red-green: reverting only the two
+  classes fails it.
