@@ -328,6 +328,10 @@ export async function buildApp(deps: AppDeps) {
     meshProvider,
     storage: deps.storage,
     entities: entityService,
+    // The registry lookup, narrowed to the ONE question the money path asks
+    // (ADR style-studio D3). Passing the function rather than styleService keeps
+    // create/update/delete out of reach of the generation service entirely.
+    resolveStyle: styleService.resolveStyleFragments,
     log: app.log,
     // undefined → the service's own 3s default; only tests override this.
     ...(deps.pollMinIntervalMs !== undefined ? { pollMinIntervalMs: deps.pollMinIntervalMs } : {}),

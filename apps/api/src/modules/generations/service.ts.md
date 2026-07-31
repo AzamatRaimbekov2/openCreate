@@ -49,12 +49,27 @@ flowchart TD
 ```
 
 ## Key decisions / gotchas
-- **The style is resolved HERE and passed into `applyPromptPreset`** (ADR style-studio D3,
-  2026-07-31). The composer no longer owns a style table. As of the contracts commit this step is
-  builtin-only (`resolveBuiltinStyle`) and byte-identical to the lookup the composer used to do
-  internally — pinned end-to-end by `test/generations-styles.test.ts`, whose expectations are literal
-  strings captured before the refactor. The user-style registry replaces this call with an injected
-  `resolveStyle`, which also makes an unresolvable id a 400 BEFORE the charge.
+- **The style is resolved HERE, with the pre-charge guards, and passed into `applyPromptPreset`**
+  (ADR style-studio D1/D3, 2026-07-31). The composer no longer owns a style table. Resolution sits up
+  with the model/aspect/capability checks rather than down at composition time, for the reason those
+  guards give: it runs before the charge, before any provider call, and before the reference-image
+  reads — a request we already know cannot compose correctly must cost the user nothing and must not
+  do work on their behalf. Byte-identical builtin output is pinned end-to-end by
+  `test/generations-styles.test.ts`, whose expectations are literal strings captured before the
+  refactor.
+- **`resolveStyle` is injected as a FUNCTION, not as the style service.** This path asks exactly one
+  question — "what fragments does this styleId mean for this user, if any?" — and taking the whole
+  service would hand the money path a create/update/delete surface it has no business holding.
+- **Its absence is a real mode, not an oversight.** Without it the service resolves BUILTIN-ONLY,
+  which is what the many direct-service unit tests constructing `{ db, runware, storage }` need
+  (they predate user styles and must keep composing builtins). `buildApp` always injects the
+  registry, so the product path is never builtin-only.
+- **`null` → `400 unknown style <the id the caller sent>`, before the charge.** Unknown, foreign and
+  deleted are deliberately indistinguishable: the message echoes back only the caller's own input, so
+  the endpoint cannot be used to discover which style ids exist and a foreign style's fragments can
+  never leak into an error. "Deleted" is the interesting one — deleting a style does not rewrite the
+  films and shots that cited it (ADR D4), so this 400 is exactly how an old shot reports "the style
+  you used is gone": honestly, and for free.
 - Charge happens BEFORE any provider call: a 402 means Runware was never contacted (asserted in tests).
 - **Atomic charge+insert (review finding)**: the credit charge and the processing-row insert run in ONE `db.transaction` (`chargeCredits` in tx mode) — as two transactions, a crash between them charged the user for a row that never existed (nothing to settle or refund). The `credits.charge` audit line is emitted only after the combined commit (`logCharge`). Pinned by `test/generations-money-atomicity.test.ts`.
 - **Atomic failure settlement (review finding)**: `failGeneration` runs the processing→failed flip AND the idempotent refund in ONE transaction (`refundCredits` in tx mode). The old flip-then-refund pair could crash in between, leaving a failed row whose charge was kept forever (the stale sweep only rescues 'processing' rows). Now a refund failure aborts the flip too — the row stays processing and the next poll/sweep re-runs the settlement. Fail/refund logs are emitted after the commit, gated on the flip/mutation actually applying.

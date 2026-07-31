@@ -7,7 +7,12 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, lt, or } from 'drizzle-orm'
 import { applyPromptPreset, resolveBuiltinStyle } from '@opencreate/contracts'
-import type { CreateGenerationInput, Generation, PromptPreset } from '@opencreate/contracts'
+import type {
+  CreateGenerationInput,
+  Generation,
+  PromptPreset,
+  StyleFragments,
+} from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import { createRunwareVideoAdapter } from '../../integrations/runware/video-adapter'
@@ -98,6 +103,18 @@ type Deps = {
   // tagging keep constructing the service with { db, runware, storage }: without
   // it, a request carrying entityRefs is rejected rather than silently untagged.
   entities?: EntityService
+  // Style registry lookup (ADR style-studio D1/D3). A FUNCTION, not the style
+  // service: this path needs exactly one question answered — "what fragments
+  // does this styleId mean for this user, if any?" — and taking the whole
+  // service would hand the money path a create/update/delete surface it has no
+  // business holding.
+  //
+  // Optional, and its absence is a real mode rather than an oversight: without
+  // it the service falls back to BUILTIN-ONLY resolution, which is exactly what
+  // the many direct-service unit tests constructing { db, runware, storage }
+  // need (they predate user styles and must keep composing builtins). buildApp
+  // always injects the registry, so the product path is never builtin-only.
+  resolveStyle?: (userId: string, styleId: string) => StyleFragments | null
   log?: MoneyLog
   pollMinIntervalMs?: number
 }
@@ -246,6 +263,7 @@ export function createGenerationService({
   meshProvider,
   storage,
   entities,
+  resolveStyle,
   log: baseLog,
   pollMinIntervalMs = DEFAULT_POLL_MIN_INTERVAL_MS,
 }: Deps) {
@@ -318,6 +336,32 @@ export function createGenerationService({
     // know cannot succeed must cost the user nothing.
     if (model.type === 'model3d' && !input.inputImage)
       throw new ValidationError(`${model.id} requires a photo`)
+    // Hoisted above its use in composition because the STYLE inside it is
+    // resolved here, with the other pre-charge guards.
+    const preset: PromptPreset | undefined = input.promptPreset
+    // STYLE RESOLUTION (ADR style-studio D1/D3), and it sits up here with the
+    // other capability guards for the same reason they do: it runs before the
+    // charge, before any provider call, and before the reference-image reads
+    // below — a request we already know cannot compose correctly must cost the
+    // user nothing and must not do work on their behalf.
+    //
+    // The registry answers builtin OR the caller's own row. `null` covers three
+    // situations that must stay INDISTINGUISHABLE at the boundary — an id that
+    // never existed, one that belongs to someone else, and one the user deleted
+    // — so a generation request can never be used to discover which style ids
+    // exist, and a foreign style's fragments can never leak into an error.
+    //
+    // Deleted is worth naming: deleting a style deliberately does not rewrite
+    // the films and shots that cited it (ADR D4), so this 400 is exactly how an
+    // old shot reports "the style you used is gone" — honestly, and for free.
+    let styleFragments: StyleFragments | null = null
+    if (preset?.styleId) {
+      styleFragments = resolveStyle
+        ? resolveStyle(userId, preset.styleId)
+        : // No registry injected (direct-service unit tests): builtin-only.
+          resolveBuiltinStyle(preset.styleId)
+      if (!styleFragments) throw new ValidationError(`unknown style ${preset.styleId}`)
+    }
     // Canvas chain edge (ADR canvas-mode D2). Capability first, resolution
     // second — a citation the model cannot honour must cost nothing and fail
     // with the reason, not with a confusing reference-count error.
@@ -488,14 +532,13 @@ export function createGenerationService({
     // and an empty negative, so every existing (preset-less) request is byte-for-
     // byte identical. `modelPrompt` is what the provider actually receives.
     //
-    // The style fragments are RESOLVED here and passed in, because
-    // applyPromptPreset no longer owns a style table (ADR style-studio D3).
-    // This step is builtin-only for the moment — the user-style registry lands
-    // with the resolveStyle dep — and it is byte-identical to the lookup the
-    // composer used to do inside itself, which is what keeps every existing
-    // styled generation composing to the same prompt.
-    const preset: PromptPreset | undefined = input.promptPreset
-    const styleFragments = preset?.styleId ? resolveBuiltinStyle(preset.styleId) : null
+    // The style fragments were RESOLVED far above (with the pre-charge guards)
+    // and are merely passed in here, because applyPromptPreset no longer owns a
+    // style table (ADR style-studio D3). A builtin resolves to exactly the
+    // strings the composer used to look up itself, which is what keeps every
+    // pre-existing styled generation composing to the identical prompt; a user
+    // style arrives as the same two strings and is therefore indistinguishable
+    // from here on — no branch, no second code path, no new money code.
     const { positivePrompt: modelPrompt, negativePrompt } = applyPromptPreset(
       composedPrompt,
       preset,
