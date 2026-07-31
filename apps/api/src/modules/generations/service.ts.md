@@ -49,6 +49,12 @@ flowchart TD
 ```
 
 ## Key decisions / gotchas
+- **The style is resolved HERE and passed into `applyPromptPreset`** (ADR style-studio D3,
+  2026-07-31). The composer no longer owns a style table. As of the contracts commit this step is
+  builtin-only (`resolveBuiltinStyle`) and byte-identical to the lookup the composer used to do
+  internally — pinned end-to-end by `test/generations-styles.test.ts`, whose expectations are literal
+  strings captured before the refactor. The user-style registry replaces this call with an injected
+  `resolveStyle`, which also makes an unresolvable id a 400 BEFORE the charge.
 - Charge happens BEFORE any provider call: a 402 means Runware was never contacted (asserted in tests).
 - **Atomic charge+insert (review finding)**: the credit charge and the processing-row insert run in ONE `db.transaction` (`chargeCredits` in tx mode) — as two transactions, a crash between them charged the user for a row that never existed (nothing to settle or refund). The `credits.charge` audit line is emitted only after the combined commit (`logCharge`). Pinned by `test/generations-money-atomicity.test.ts`.
 - **Atomic failure settlement (review finding)**: `failGeneration` runs the processing→failed flip AND the idempotent refund in ONE transaction (`refundCredits` in tx mode). The old flip-then-refund pair could crash in between, leaving a failed row whose charge was kept forever (the stale sweep only rescues 'processing' rows). Now a refund failure aborts the flip too — the row stays processing and the next poll/sweep re-runs the settlement. Fail/refund logs are emitted after the commit, gated on the flip/mutation actually applying.

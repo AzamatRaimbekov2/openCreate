@@ -66,6 +66,14 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- **`soul.styleId` is `builtinStyleIdSchema`, not the open wire id** (ADR style-studio D1, 2026-07-31).
+  A soul is a constructor over fixed tables: every other axis is an enum, the UI renders this one as a
+  pill row straight out of `STYLE_PRESETS`, and `soulPresentation` indexes that table by this value to
+  name the style back to the user. A user style resolves to fragments and nothing else — no label, no
+  pill, no reverse lookup — so accepting one here would be a value half the surrounding code cannot
+  render. User styles reach a portrait the same way they reach everything else: through the shot's own
+  `promptPreset` at generation time. The "ONE style table" intent of the original comment is preserved
+  exactly, it just names the builtin schema now.
 
 - **Style is NOT composed into the soul text**, even though `soul.styleId` exists. Style is a
   *preset axis* and it owns a **negative** prompt; composing the fragment here would smuggle in the

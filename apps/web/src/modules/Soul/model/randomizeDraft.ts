@@ -19,8 +19,8 @@ import {
   hairColorSchema,
   hairStyleSchema,
   outfitSchema,
+  builtinStyleIdSchema,
   skinSchema,
-  styleIdSchema,
   vibeSchema,
 } from '@opencreate/contracts'
 import type { Soul, TraitId } from '@opencreate/contracts'
@@ -64,7 +64,9 @@ function pickTraits(): TraitId[] {
 function randomizeSoul(): Soul {
   const soul: Soul = {
     archetype: pick(archetypeSchema.options),
-    styleId: pick(styleIdSchema.options),
+    // Builtin enum, not the open wire id: shuffling needs a finite vocabulary
+    // to draw from, and a soul's style axis is builtin by contract anyway.
+    styleId: pick(builtinStyleIdSchema.options),
     traits: pickTraits(),
     notes: '',
   }

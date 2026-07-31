@@ -6,7 +6,7 @@
 // it fully testable with the scripted fake in test/helpers/build-test-app.ts.
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, lt, or } from 'drizzle-orm'
-import { applyPromptPreset } from '@opencreate/contracts'
+import { applyPromptPreset, resolveBuiltinStyle } from '@opencreate/contracts'
 import type { CreateGenerationInput, Generation, PromptPreset } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
@@ -487,8 +487,20 @@ export function createGenerationService({
     // fragments around it. With NO preset this returns composedPrompt unchanged
     // and an empty negative, so every existing (preset-less) request is byte-for-
     // byte identical. `modelPrompt` is what the provider actually receives.
+    //
+    // The style fragments are RESOLVED here and passed in, because
+    // applyPromptPreset no longer owns a style table (ADR style-studio D3).
+    // This step is builtin-only for the moment — the user-style registry lands
+    // with the resolveStyle dep — and it is byte-identical to the lookup the
+    // composer used to do inside itself, which is what keeps every existing
+    // styled generation composing to the same prompt.
     const preset: PromptPreset | undefined = input.promptPreset
-    const { positivePrompt: modelPrompt, negativePrompt } = applyPromptPreset(composedPrompt, preset)
+    const styleFragments = preset?.styleId ? resolveBuiltinStyle(preset.styleId) : null
+    const { positivePrompt: modelPrompt, negativePrompt } = applyPromptPreset(
+      composedPrompt,
+      preset,
+      styleFragments ?? undefined,
+    )
     // Stored only when a preset was supplied: composed_prompt is the debugging/
     // provenance record of the fully-composed text; a preset-less row leaves it
     // NULL and the DTO falls back to `prompt`.

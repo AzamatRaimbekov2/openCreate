@@ -22,8 +22,23 @@ import { z } from 'zod'
 // prompt (a Disney render must actively push away "photorealistic, live action")
 // and a recommended model (the seam through which a LoRA-backed style could
 // later swap the model — see the ADR's rejected-alternatives note).
+//
+// TWO IDS, ONE AXIS (ADR style-studio D1). Since users build their own styles,
+// the WIRE id is an open string that the SERVER resolves at use time against a
+// registry of two sources — these builtins, and the caller's own `style` rows —
+// exactly the way `modelId` is resolved against the catalog rather than pinned
+// by an enum. The enum below survives as the type of THIS table's keys: the
+// seven builtin ids are immutable (every existing film, shot and template holds
+// one), and anything that indexes STYLE_PRESETS must still be exhaustive.
+//
+// Which of the two a consumer wants is a real decision, not a formality:
+//   · wire/user-chosen surface (promptPreset.styleId, film.defaultStyleId,
+//     storyboard input) → `styleIdSchema`, because a user style is legal there;
+//   · fixed internal catalog (STYLE_PRESETS itself, the server-side template
+//     catalog, a soul's style axis) → `builtinStyleIdSchema`, because those are
+//     authored in code against these seven and index the table directly.
 // ─────────────────────────────────────────────────────────────────────────────
-export const styleIdSchema = z.enum([
+export const builtinStyleIdSchema = z.enum([
   'disney',
   'anime',
   '2d-cartoon',
@@ -32,10 +47,18 @@ export const styleIdSchema = z.enum([
   'comic',
   'cinematic',
 ])
+export type BuiltinStyleId = z.infer<typeof builtinStyleIdSchema>
+
+// The wire id. Open, and deliberately keeping the old export NAME so every
+// consumer for which "any resolvable style" was always the honest meaning keeps
+// compiling untouched. Widening only: all seven builtin ids still parse, so no
+// stored row and no client build becomes invalid. 60 chars fits a uuid with
+// room to spare; the server rejects anything it cannot resolve, before charging.
+export const styleIdSchema = z.string().min(1).max(60)
 export type StyleId = z.infer<typeof styleIdSchema>
 
 export type StylePreset = {
-  id: StyleId
+  id: BuiltinStyleId
   // Human label for the picker (single source: web reads it, API ignores it).
   label: string
   // Prepended to the model prompt.
@@ -137,7 +160,24 @@ export const STYLE_PRESETS = {
     negative: 'cartoon, anime, illustration, low quality, deformed',
     recommendedModelId: 'seedance-1-5-pro',
   },
-} satisfies Record<StyleId, StylePreset>
+} satisfies Record<BuiltinStyleId, StylePreset>
+
+// The builtin half of the style registry, as a lookup (ADR style-studio D1).
+// Callers hand the result straight to applyPromptPreset; `null` means "not a
+// builtin id", which the server then tries to resolve as one of the caller's
+// own style rows — and refuses if that misses too.
+//
+// It returns the WHOLE preset rather than just the two fragments the composer
+// needs, because the other two readers of a resolved builtin want the rest of
+// it: the registry's list endpoint needs `label`, and the Cinema inspector
+// needs `recommendedModelId` to default its model picker. A StylePreset already
+// satisfies StyleFragments structurally, so one lookup serves all three instead
+// of three near-identical ones.
+export function resolveBuiltinStyle(id: string): StylePreset | null {
+  return Object.hasOwn(STYLE_PRESETS, id)
+    ? STYLE_PRESETS[id as BuiltinStyleId]
+    : null
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The three "modifier" axes. Each is a small id→fragment table with the same
@@ -265,6 +305,14 @@ export type PromptPreset = z.infer<typeof promptPresetSchema>
 
 export type ComposedPrompt = { positivePrompt: string; negativePrompt: string }
 
+// The resolved style, reduced to the only two things composition needs. This is
+// the SEAM of ADR style-studio D3: a builtin preset and a user's `style` row are
+// different records with different lifetimes and different owners, but by the
+// time they reach the composer they are indistinguishable — two strings. That is
+// what lets a user style apply everywhere a builtin one does without the
+// composer, the wire, or the money path learning that user styles exist.
+export type StyleFragments = { fragment: string; negative: string }
+
 // Compose the model-facing prompt from the user's text + the structured preset.
 //
 // Order (fixed, so a stored composedPrompt is reproducible): style, framing,
@@ -281,16 +329,35 @@ export type ComposedPrompt = { positivePrompt: string; negativePrompt: string }
 // it started pushing away "busy background". Collecting and joining is the shape
 // that survives a third axis. With exactly one negative present the result is
 // that string verbatim, so every pre-existing (style-only) request is unchanged.
-export function applyPromptPreset(userPrompt: string, preset?: PromptPreset): ComposedPrompt {
+//
+// STYLE ARRIVES AS A PARAMETER, NOT A LOOKUP (ADR style-studio D3). This
+// function used to read STYLE_PRESETS[preset.styleId] itself, which is exactly
+// what a user-defined style cannot be found by — its fragments live in a db row
+// owned by one caller, and a pure function shared with the browser must not
+// know how to fetch that. So resolution moves OUT: whoever composes resolves
+// the id first (server: registry → builtin or the caller's own row; client:
+// resolveBuiltinStyle for a preview) and passes the two strings in. The
+// composition itself — the order, the joins, the trim — is untouched, which is
+// why a builtin style still produces byte-identical output (pinned by
+// "builtin composition is frozen" in presets.test.ts).
+//
+// The style fragments are gated on `style`, NOT on `preset.styleId`: an id
+// without resolved fragments is a caller that skipped resolution, and silently
+// composing it as a bare id would put the literal "anime" into the prompt. It
+// contributes nothing instead. On the server that state is unreachable by
+// construction — create() refuses an unresolvable id before it charges, so the
+// failure mode is a 400 rather than an unstyled generation the user paid for.
+export function applyPromptPreset(
+  userPrompt: string,
+  preset?: PromptPreset,
+  style?: StyleFragments,
+): ComposedPrompt {
   const fragments: string[] = []
   const negatives: string[] = []
 
-  if (preset?.styleId) {
-    const style = STYLE_PRESETS[preset.styleId]
-    if (style) {
-      fragments.push(style.fragment)
-      if (style.negative) negatives.push(style.negative)
-    }
+  if (style) {
+    if (style.fragment) fragments.push(style.fragment)
+    if (style.negative) negatives.push(style.negative)
   }
   if (preset?.framing) {
     const framing = FRAMING_PRESETS[preset.framing]

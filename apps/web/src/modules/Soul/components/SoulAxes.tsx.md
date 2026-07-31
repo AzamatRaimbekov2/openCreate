@@ -40,6 +40,8 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- The style `PillGroup` is typed `BuiltinStyleId` (ADR style-studio, 2026-07-31) — a soul's style axis
+  stays the seven builtins even though the wire `StyleId` opened to a string.
 
 - NAME-LESS and stateless on purpose: two owners frame the name/submit
   differently (composer dock vs edit modal), so the axes alone are shared.

@@ -36,6 +36,14 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- **`styleOptions` is BUILTIN-only, knowingly** (ADR style-studio, 2026-07-31). It builds from
+  `builtinStyleIdSchema.options`, not the now-open `styleIdSchema` (a `ZodString` has no `.options`).
+  This builder is pure, synchronous and i18n-keyed over a table that ships in the bundle; user styles
+  come from `GET /api/styles` — an async source with its own 4 states and server-authored names that
+  must NOT go through the `cinema.preset.style.<id>` key lookup. Merging the two belongs where the
+  data is fetched (the route that already loads the catalog), not here.
+- `StyleChoice` is now `string | ''` because `StyleId` opened. That is intentional: a shot may HOLD a
+  user style set elsewhere even while this picker still offers only the seven builtins.
 
 - Options are built from each enum's `.options` (not `Object.values`) so values
   stay typed as their literal union member and the order is deterministic.

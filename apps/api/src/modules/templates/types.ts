@@ -19,8 +19,8 @@
 // model sees.
 import type {
   AspectRatio,
+  BuiltinStyleId,
   PromptPreset,
-  StyleId,
   TemplateCategory,
   TemplateTier,
   TitlePosition,
@@ -118,7 +118,12 @@ export type Template = {
   tagline: string
   description: string
   aspectRatio: AspectRatio
-  defaultStyleId: StyleId | null
+  // BUILTIN styles only, deliberately narrower than the wire's open styleId
+  // (ADR style-studio D1). A template is authored in code, shipped to every
+  // user, and instantiated on their behalf — it cannot cite a style that lives
+  // in one user's `style` table. Keeping the enum here means a typo in a catalog
+  // file is a compile error rather than a film that 400s at generate time.
+  defaultStyleId: BuiltinStyleId | null
   // The film's title, with {{key}} placeholders — "Клубника и {{lover}}".
   titleTemplate: string
 

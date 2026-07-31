@@ -41,6 +41,11 @@ flowchart TD
 ```
 
 ## Key decisions / gotchas
+- **`defaultStyleId` is `BuiltinStyleId | null`, narrower than the wire** (ADR style-studio D1,
+  2026-07-31). A template is authored in code, shipped to every user and instantiated on their behalf,
+  so it cannot cite a style that lives in ONE user's `style` table. Keeping the enum here turns a typo
+  in a catalog file into a compile error instead of a film that 400s at generate time. The film it
+  creates stores the value in the open `film.defaultStyleId` column — narrower type, same data.
 
 - **These types are NOT in `packages/contracts`, on purpose.** None of this travels.
   The client receives a `TemplateSummary` (name, beat sheet, prices, knobs) and posts

@@ -60,6 +60,15 @@ flowchart TD
 ```
 
 ## Key decisions / gotchas
+- **`resolveBuiltinStyle`, never `STYLE_PRESETS[id]`** (ADR style-studio, 2026-07-31). `styleId` is an
+  open string now, so a shot may hold a USER style id this table has never heard of; indexing it
+  directly is both a type error and a runtime `undefined`. Two places changed: the model
+  recommendation (`initialModelId`) falls through to the next-best guess when the style is not
+  builtin, and `composedHint` passes the resolved fragments as `applyPromptPreset`'s third argument
+  because the function no longer looks styles up itself.
+- **Known gap until the picker migration:** a USER style's fragment is missing from the composed HINT
+  (client-side resolution only knows builtins). The server still applies it — the hint under-reports,
+  it never mis-reports. Closing it needs the async `GET /api/styles` list.
 
 - **v6 dock, why:** the v4/v5 side rail (360px sticky) was the one column
   fighting the preview for width, and a long prompt lived in a cramped corner

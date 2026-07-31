@@ -36,6 +36,9 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- **Shuffling draws from `builtinStyleIdSchema.options`** (ADR style-studio, 2026-07-31). The open wire
+  `styleIdSchema` is a `ZodString` with no `.options` — and a shuffle needs a finite vocabulary anyway.
+  A soul's style axis is builtin by contract, so nothing is lost.
 
 - Every value comes from a zod enum's `.options` / `Object.keys(TRAITS)` — NEVER
   a hardcoded list. That is what keeps the shuffle in lockstep with contracts: a

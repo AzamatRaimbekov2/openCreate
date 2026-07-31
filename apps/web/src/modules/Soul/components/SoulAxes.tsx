@@ -12,7 +12,7 @@
 // the two from drifting a picker apart. It composes NOTHING itself: every
 // fragment, label and order comes from @opencreate/contracts (via soulOptions).
 import { useTranslation } from 'react-i18next'
-import type { Archetype, Soul, StyleId, TraitId } from '@opencreate/contracts'
+import type { Archetype, BuiltinStyleId, Soul, TraitId } from '@opencreate/contracts'
 import { PillGroup, Select } from 'shared/ui'
 import {
   ANY,
@@ -54,7 +54,7 @@ export function SoulAxes({ soul, onChange }: SoulAxesProps) {
         value={soul.archetype}
         onChange={(archetype) => patchSoul({ archetype })}
       />
-      <PillGroup<StyleId>
+      <PillGroup<BuiltinStyleId>
         label={t('soul.field.style')}
         options={styleOptions()}
         value={soul.styleId}

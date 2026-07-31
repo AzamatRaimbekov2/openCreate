@@ -33,20 +33,20 @@ import {
   hairColorSchema,
   hairStyleSchema,
   outfitSchema,
+  builtinStyleIdSchema,
   skinSchema,
-  styleIdSchema,
   vibeSchema,
 } from '@opencreate/contracts'
 import type {
   Age,
   Archetype,
   Build,
+  BuiltinStyleId,
   EyeColor,
   HairColor,
   HairStyle,
   Outfit,
   Skin,
-  StyleId,
   Vibe,
 } from '@opencreate/contracts'
 import type { PillOption, SelectOption } from 'shared/ui'
@@ -80,8 +80,11 @@ export function archetypeOptions(): PillOption<Archetype>[] {
   return toOptions(archetypeSchema.options, ARCHETYPES)
 }
 
-export function styleOptions(): PillOption<StyleId>[] {
-  return toOptions(styleIdSchema.options, STYLE_PRESETS)
+// Builtin-only, like every other axis here — a soul's styleId is
+// builtinStyleIdSchema by contract (see soulSchema), because toOptions needs a
+// `label` per id and a user style has none.
+export function styleOptions(): PillOption<BuiltinStyleId>[] {
+  return toOptions(builtinStyleIdSchema.options, STYLE_PRESETS)
 }
 
 // The optional axes render as Selects, each with the "any" row first.

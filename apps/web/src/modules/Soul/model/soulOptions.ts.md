@@ -43,6 +43,10 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- **`styleOptions` reads `builtinStyleIdSchema`** (ADR style-studio, 2026-07-31). A soul's `styleId` is
+  builtin-by-contract, so this axis behaves like every other one here: a finite enum paired with a
+  table that has a `label` per id. A user style has no label, no pill and no reverse lookup, so it is
+  not a value this constructor can render.
 
 - Order comes from the zod enum's `.options` (typed `Archetype[]`, not
   `string[]`), so the table lookup needs no cast and a new contract value shows up

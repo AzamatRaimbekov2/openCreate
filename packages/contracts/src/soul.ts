@@ -25,7 +25,7 @@
 // to applyPromptPreset, which owns both halves. See composePortraitPrompt.
 import { z } from 'zod'
 import type { PresetOption } from './presets'
-import { styleIdSchema } from './presets'
+import { builtinStyleIdSchema } from './presets'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The single-select axes. Every one of them is OPTIONAL in the schema: an unset
@@ -434,7 +434,17 @@ export const soulSchema = z.object({
   // Shared with CinemaStudio (presets.ts). ONE style table on purpose: a
   // character built in `anime` and then animated in an `anime` film must agree,
   // and two enums would drift the moment one gains a value.
-  styleId: styleIdSchema,
+  //
+  // BUILTIN-ONLY, deliberately, now that the wire `styleId` is an open string
+  // (ADR style-studio D1). A soul is a CONSTRUCTOR over fixed tables: every
+  // other axis here is an enum, the UI renders this one as a pill row straight
+  // out of STYLE_PRESETS, and soulPresentation indexes that table by this value
+  // to name the style back to the user. A user style resolves to fragments and
+  // nothing else — no label, no pill, no reverse lookup — so accepting one here
+  // would be a value half the code around it cannot render. User styles reach a
+  // portrait the same way they reach everything else: through the shot's own
+  // promptPreset at generation time.
+  styleId: builtinStyleIdSchema,
   age: ageSchema.optional(),
   build: buildSchema.optional(),
   hairColor: hairColorSchema.optional(),

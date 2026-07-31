@@ -48,6 +48,10 @@ flowchart TD
 ```
 
 ## Key decisions / gotchas
+- **`composeSoulPreview` passes the style fragments in** (ADR style-studio D3, 2026-07-31).
+  `applyPromptPreset` stopped reading `STYLE_PRESETS` itself, so the preview would silently lose the
+  style fragment without this. Indexed straight out of the table with no fallback, because a soul's
+  `styleId` is `BuiltinStyleId` — there is no id it could hold that the table lacks.
 
 - The preview is the HERO view (`PORTRAIT_SHEET_VIEWS[0]`), read from the contract
   array rather than written as `'front'`, so reordering the sheet there moves the

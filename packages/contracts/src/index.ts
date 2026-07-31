@@ -12,6 +12,11 @@ export * from './entity'
 // applyPromptPreset. Exported before generation because generation.ts imports
 // promptPresetSchema.
 export * from './presets'
+// Style Studio (ADR style-studio) — the user-built style entity. Exported after
+// presets because the two are one axis with two sources: presets.ts holds the
+// builtin half (and resolveBuiltinStyle), this holds the row half and the shape
+// the registry answers with for both.
+export * from './style'
 // AI Soul Studio — the structured character spec (trait tables + composeSoul).
 // Exported after presets because soul.ts builds on styleIdSchema, and it is what
 // entity.soul is typed by.

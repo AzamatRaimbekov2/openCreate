@@ -16,7 +16,7 @@ import {
   soulSchema,
 } from './soul'
 import type { Soul } from './soul'
-import { applyPromptPreset } from './presets'
+import { applyPromptPreset, resolveBuiltinStyle } from './presets'
 
 // The minimum a soul can be: the two required axes and nothing else.
 const bare: Soul = { archetype: 'female', styleId: 'anime', traits: [], notes: '' }
@@ -151,6 +151,9 @@ describe('soulPromptPreset — the negatives that make a sheet clean', () => {
     const { negativePrompt } = applyPromptPreset(
       composePortraitPrompt({ ...bare, styleId: 'disney' }, 'front'),
       soulPromptPreset({ ...bare, styleId: 'disney' }),
+      // A soul's style axis is builtin-only (see soulSchema), so the caller
+      // resolves it straight out of the table the pills are rendered from.
+      resolveBuiltinStyle('disney')!,
     )
     expect(negativePrompt).toContain('photorealistic') // style's
     expect(negativePrompt).toContain('multiple characters') // framing's
@@ -162,6 +165,7 @@ describe('soulPromptPreset — the negatives that make a sheet clean', () => {
     const { positivePrompt } = applyPromptPreset(
       composePortraitPrompt(soul, 'front'),
       soulPromptPreset(soul),
+      resolveBuiltinStyle(soul.styleId)!,
     )
     expect(positivePrompt).toContain('comic book art style')
     expect(positivePrompt).toContain('plain neutral seamless studio background')

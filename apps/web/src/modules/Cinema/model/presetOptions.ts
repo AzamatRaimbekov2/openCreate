@@ -5,12 +5,13 @@
 // sentinel row is prepended by the inspector with a translated label, because
 // styleId — unlike the modifier axes — has no first-class 'none'.
 import {
+  builtinStyleIdSchema,
   cameraMotionSchema,
   cameraShotSchema,
   qualitySchema,
-  styleIdSchema,
 } from '@opencreate/contracts'
 import type {
+  BuiltinStyleId,
   CameraMotion,
   CameraShot,
   PromptPreset,
@@ -21,6 +22,9 @@ import type { SelectOption } from 'shared/ui'
 
 // Style has no 'none' in its enum, so the picker value widens to allow the
 // unset sentinel ('' → no style, composed prompt is just the modifier axes).
+// StyleId is now an open string (ADR style-studio D1), so this is `string | ''`
+// — a user style is a legal value on a shot, and the draft must be able to hold
+// one even while the OPTIONS below still come from the builtin table.
 export type StyleChoice = StyleId | ''
 
 // The four preset axes as one editable unit — the shape the pickers bind to.
@@ -74,8 +78,18 @@ export function hasAnyPreset(draft: PresetDraft): boolean {
 // surfaces as a visible missing key rather than a silent language flip.
 type Translate = (key: string) => string
 
-export function styleOptions(t: Translate): SelectOption<StyleId>[] {
-  return styleIdSchema.options.map((id) => ({ value: id, label: t(`cinema.preset.style.${id}`) }))
+// BUILTIN-ONLY, and knowingly so: this is a pure, synchronous, i18n-keyed
+// builder over a table that ships with the bundle. User styles come from
+// GET /api/styles — an async source with its own loading/empty/error states and
+// server-authored names that must NOT be run through the i18n key lookup below.
+// Merging the two happens where the data lives (the route that already fetches
+// the catalog), not here; until then the picker offers the seven builtins while
+// a shot can still HOLD a user style set elsewhere.
+export function styleOptions(t: Translate): SelectOption<BuiltinStyleId>[] {
+  return builtinStyleIdSchema.options.map((id) => ({
+    value: id,
+    label: t(`cinema.preset.style.${id}`),
+  }))
 }
 
 export function cameraShotOptions(t: Translate): SelectOption<CameraShot>[] {

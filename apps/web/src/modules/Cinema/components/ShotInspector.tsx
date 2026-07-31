@@ -35,7 +35,7 @@ import type {
   Transition,
   UpdateShotInput,
 } from '@opencreate/contracts'
-import { STYLE_PRESETS, applyPromptPreset, transitionSchema } from '@opencreate/contracts'
+import { applyPromptPreset, resolveBuiltinStyle, transitionSchema } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from 'shared/libs/mentions'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
@@ -117,8 +117,12 @@ function nearestSeconds(durationMs: number): number {
 function initialModelId(shot: Shot, videoModels: CatalogVideoModel[]): string {
   const has = (id: string | undefined) => id !== undefined && videoModels.some((m) => m.id === id)
   if (has(shot.modelId ?? undefined)) return shot.modelId as string
+  // resolveBuiltinStyle, not STYLE_PRESETS[id]: styleId is an open string now
+  // (ADR style-studio D1), so a shot may legitimately hold a USER style id that
+  // this table has never heard of. That resolves to null — no recommendation,
+  // fall through to the next-best guess — instead of an undefined lookup.
   const recommended = shot.promptPreset?.styleId
-    ? STYLE_PRESETS[shot.promptPreset.styleId].recommendedModelId
+    ? resolveBuiltinStyle(shot.promptPreset.styleId)?.recommendedModelId
     : undefined
   if (has(recommended)) return recommended as string
   return videoModels[0]?.id ?? ''
@@ -221,9 +225,15 @@ export function ShotInspector({
   const canGenerate = prompt.trim().length >= 2 && model !== undefined && !isBusy
   // The exact positive prompt the server will build — shown (in the expand
   // drawer) so the preset choice is legible before spending a credit.
+  // applyPromptPreset no longer looks the style up itself (ADR style-studio D3),
+  // so the hint has to resolve it the way the server will. The client half of
+  // the registry is the builtin table; a USER style resolves to null here and
+  // its fragment is simply missing from the preview — the server still applies
+  // it. Fixing that needs the async styles list, which is the picker migration.
   const composedHint = applyPromptPreset(
     prompt,
     hasAnyPreset(preset) ? draftToPreset(preset) : undefined,
+    (preset.styleId ? resolveBuiltinStyle(preset.styleId) : null) ?? undefined,
   ).positivePrompt
 
   const buildVoiceover = () =>

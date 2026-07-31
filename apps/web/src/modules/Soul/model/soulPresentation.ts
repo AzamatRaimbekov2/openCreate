@@ -43,8 +43,16 @@ const PREVIEW_VIEW = PORTRAIT_SHEET_VIEWS[0]
 // AND the reference-sheet framing, which is where the "clean, one character,
 // plain background" negative lives. Composing it here with the SAME two contract
 // functions the API calls is what makes the preview honest.
+// The style fragments are passed IN now (ADR style-studio D3 — applyPromptPreset
+// stopped reading the table itself). Straight out of STYLE_PRESETS with no
+// fallback, because a soul's styleId is builtin by contract: there is no id it
+// could hold that this table does not have.
 export function composeSoulPreview(soul: Soul): ComposedPrompt {
-  return applyPromptPreset(composePortraitPrompt(soul, PREVIEW_VIEW), soulPromptPreset(soul))
+  return applyPromptPreset(
+    composePortraitPrompt(soul, PREVIEW_VIEW),
+    soulPromptPreset(soul),
+    STYLE_PRESETS[soul.styleId],
+  )
 }
 
 // The single-select axes, in the order a character sheet reads best. `traits`
