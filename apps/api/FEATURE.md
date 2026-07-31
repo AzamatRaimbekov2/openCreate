@@ -173,6 +173,9 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | POST | `/api/films/:id/renders` | ✓ | 202; ffmpeg export job (rate-limited 10/min) |
 | GET | `/api/films/:id/renders/:renderId` | ✓ | render poll (progress → succeeded/failed) |
 | POST | `/api/films/:id/storyboard` | ✓ | Claude script→draft shots; 502 `provider_error` if `ANTHROPIC_API_KEY` unset |
+| GET | `/api/styles` | ✓ | Style Studio registry: the 7 builtins (code) + the caller's own rows, one list — what every style picker renders from |
+| POST/PATCH/DELETE | `/api/styles[/:id]` | ✓ | owner-scoped CRUD; foreign == missing (404), a builtin is immutable (400). Free — the only spend near a style is its preview, an ordinary `POST /api/generations` |
+| POST/DELETE | `/api/styles/:id/references[...]` | ✓ | attach / detach a style reference image → updated Style; cap 3 (`STYLE_MAX_REFERENCES`), svg/oversize rejected, builtin refused (400), unknown refId on DELETE is a 200 no-op |
 | POST | `/api/prompt/enhance` | ✓ | body `{ text: string(1..2000), mode?: 'enhance'\|'soften' }` → `{ prompt }`; rewrites a rough idea into one cinematic Wan prompt (`soften` also strips filter-triggering content) via a DeepInfra DeepSeek-V3 → Groq llama-3.3-70b fallback chain. FREE (no credits), 20/min; 502 `provider_error` only if BOTH `DEEPINFRA_TOKEN` and `GROQ_API_KEY` are unset/failing |
 | GET | `/media/:file` | – | stored generation assets AND rendered films |
 | GET | `/*` | – | production only: built SPA + index.html fallback |
@@ -361,6 +364,36 @@ it exists.
 - **`entity_image.view`** makes the sheet render in a stable order and makes **re-rolling one view
   REPLACE it** (old row deleted, file removed; if it was the primary, the new one inherits that).
   Without the column, a re-roll would silently append a fifth image.
+
+## Style Studio — the style package
+
+A style is a user-built constructor that the server resolves by id at generation time, exactly the
+way it resolves a model against the catalog. ADR: `docs/wiki/decisions/style-studio.md`. Two sources
+(the 7 builtins are code, user styles are rows in `style`), one shape, **zero new money code** — the
+only spend near a style is its preview, which is an ordinary `POST /api/generations`.
+
+Since the **2026-07-31 amendment** a style carries *both* halves of a look at once — prompt fragments
+**and** up to `STYLE_MAX_REFERENCES` (3) reference images:
+
+- **`style.reference_images_json`** — JSON `[{ id, path }]`, the same shape and the same
+  pragma-guarded micro-migration as `shot.reference_images_json`. `kind` stays `'prompt'`: the images
+  are a capability of the existing constructor, not a new kind, so every style id already stored in a
+  film, shot or template stays valid. Uploaded bytes land in the ordinary `STORAGE_DIR`; the wire
+  reads them back as `{ id, url }`, never as bytes.
+- **`resolveStyle(userId, styleId)`** answers `{ fragment, negative, referenceImagePaths }` in one
+  owner-scoped lookup, or `null` — and `null` deliberately cannot distinguish unknown from foreign
+  from deleted, so a generation request can never probe which style ids exist. Builtins resolve with
+  an empty path list: code has nowhere to keep a file.
+- **Delivery is the EXISTING channel.** `generations.create()` reads the paths into the server-only
+  `referenceImages` channel that entity photos, shot attachments and the canvas chain edge already
+  share — merged **last**, because a style is *ambient*: the user picked an atmosphere, not these
+  specific pictures.
+- **A style may never break a request that would have worked.** On a model with no `referenceMode`
+  the images are dropped **silently** and the fragments still apply (the owner's 2026-07-24
+  shot-reference precedent). On overflow the **style's** images are trimmed first, never the entity's
+  — and the trim is why the reference count gate never sees them, so attaching a third picture to a
+  style cannot start rejecting generations that tag a character. A stored file that has gone missing
+  drops that one reference with a `style.reference.missing` warn line and the paid request continues.
 
 ## Design references
 

@@ -246,3 +246,37 @@ with the balance untouched) plus the unchanged money suites `generations.test.ts
   `supportsNegativePrompt: false`. Pinned by two tests in generations.test.ts
   («OMITS negativePrompt for flagged models» + «still sends to models that
   accept it»).
+
+## Update 2026-07-31 — the style PACKAGE reaches the reference channel
+ADR `style-studio` amendment A2/A3. `resolveStyle` now answers the whole style —
+`ResolvedStyle = { fragment, negative, referenceImagePaths }` (type imported type-only from
+`modules/styles/service`; the runtime dependency runs styles → generations, never back) — and
+`create()` merges those images into the SAME server-only `referenceImages` channel entity photos,
+shot attachments and the canvas chain edge already use.
+
+**Where the merge sits, and why it sits there.** LAST: after the entity-derived refs and after the
+direct/shot refs are folded in, immediately before pricing. A style is AMBIENT — the user picked an
+atmosphere, not these specific pictures — whereas an entity tag is something they explicitly put in
+this shot. Position IS the priority order.
+
+Three rules, all of them one rule ("an ambient style must never make a request that would have
+worked fail"):
+1. **No capability refusal (A3).** A model with no `referenceMode` — image models that are not edit
+   models, video models without r2v, audio/3D by construction — simply does not get them. The
+   owner's 2026-07-24 shot-reference precedent verbatim: *refs are simply dropped silently for such
+   models*. The FRAGMENTS still apply, on every model, which is what lets one style be used anywhere.
+2. **The count gate never sees them.** That gate (`refs.length + directRefs.length >
+   maxReferenceImages`) throws a 400. If style images were folded in before it, attaching a third
+   picture to a style would start rejecting kontext generations that tag a character — a failure the
+   user could not possibly connect to a style they edited last week. Instead the remaining budget is
+   computed here (`(model.maxReferenceImages ?? 1) - referenceImages.length`) and the overflow is
+   **trimmed silently**.
+3. **A dead file is not a failed generation.** `storage.readAsDataUri` throwing drops that one
+   reference with a `style.reference.missing` warn line and lets the paid request continue.
+
+Runs BEFORE `chargeCredits`, like every other reference read, so nothing here can fail after money
+moved. Pinned by `test/generations-styles.test.ts` (delivery on flux-kontext-pro · silent absence on
+flux-schnell with the fragment still composed · entity ref + 2 style refs on a max-2 model trims the
+style side and still succeeds · 3 style refs never turn a tagged request into a 400 · a deleted
+stored file is dropped without failing). The builtin byte-identical composition pins in that file are
+unchanged.

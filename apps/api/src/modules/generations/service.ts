@@ -7,12 +7,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, lt, or } from 'drizzle-orm'
 import { applyPromptPreset, resolveBuiltinStyle } from '@opencreate/contracts'
-import type {
-  CreateGenerationInput,
-  Generation,
-  PromptPreset,
-  StyleFragments,
-} from '@opencreate/contracts'
+import type { CreateGenerationInput, Generation, PromptPreset } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import { createRunwareVideoAdapter } from '../../integrations/runware/video-adapter'
@@ -27,6 +22,10 @@ import { chargeCredits, logCharge, logRefund, refundCredits, type MoneyLog } fro
 import { composePrompt } from '../entities/mentions'
 import type { MentionEntities } from '../entities/mentions'
 import type { EntityService } from '../entities/service'
+// Type-only, and the direction matters: styles → generations is the runtime
+// dependency (the registry never imports this file), so naming its result type
+// here closes no cycle.
+import type { ResolvedStyle } from '../styles/service'
 import { creditsFor, getModel, resolutionFor } from '../catalog/catalog'
 
 // Server-only create() input (ADR modular-3d-assets, Task 4). The wire contract
@@ -114,7 +113,14 @@ type Deps = {
   // the many direct-service unit tests constructing { db, runware, storage }
   // need (they predate user styles and must keep composing builtins). buildApp
   // always injects the registry, so the product path is never builtin-only.
-  resolveStyle?: (userId: string, styleId: string) => StyleFragments | null
+  //
+  // It answers the WHOLE style — fragments AND the stored paths of its reference
+  // images (ADR style-studio A2) — because the two always travel together and a
+  // second lookup would be a second place for the ownership rule to be forgotten.
+  // PATHS, not bytes: this service decides what its model can honour and reads
+  // only what it will actually send, so a style with three images costs nothing
+  // to resolve on a model that takes no references at all.
+  resolveStyle?: (userId: string, styleId: string) => ResolvedStyle | null
   log?: MoneyLog
   pollMinIntervalMs?: number
 }
@@ -354,13 +360,20 @@ export function createGenerationService({
     // Deleted is worth naming: deleting a style deliberately does not rewrite
     // the films and shots that cited it (ADR D4), so this 400 is exactly how an
     // old shot reports "the style you used is gone" — honestly, and for free.
-    let styleFragments: StyleFragments | null = null
+    let resolvedStyle: ResolvedStyle | null = null
     if (preset?.styleId) {
-      styleFragments = resolveStyle
-        ? resolveStyle(userId, preset.styleId)
-        : // No registry injected (direct-service unit tests): builtin-only.
-          resolveBuiltinStyle(preset.styleId)
-      if (!styleFragments) throw new ValidationError(`unknown style ${preset.styleId}`)
+      if (resolveStyle) resolvedStyle = resolveStyle(userId, preset.styleId)
+      else {
+        // No registry injected (direct-service unit tests): builtin-only, and a
+        // builtin can never carry images — it is code, and code has nowhere to
+        // keep a file — so the path list is empty by construction, not by
+        // omission.
+        const builtin = resolveBuiltinStyle(preset.styleId)
+        resolvedStyle = builtin
+          ? { fragment: builtin.fragment, negative: builtin.negative, referenceImagePaths: [] }
+          : null
+      }
+      if (!resolvedStyle) throw new ValidationError(`unknown style ${preset.styleId}`)
     }
     // Canvas chain edge (ADR canvas-mode D2). Capability first, resolution
     // second — a citation the model cannot honour must cost nothing and fail
@@ -504,6 +517,63 @@ export function createGenerationService({
     // extractor would redraw from the prompt alone at full price.
     if (directRefs.length > 0) referenceImages = [...(referenceImages ?? []), ...directRefs]
 
+    // ── The style package's reference images (ADR style-studio A2/A3) ─────────
+    // LAST, and that position is the whole design. A style is AMBIENT: the user
+    // picked an atmosphere, not these specific pictures, whereas an entity tag
+    // and a shot attachment are things they explicitly put in this shot. So the
+    // style's images are appended after everything else, and they are the ones
+    // that give way when the model cannot take them all.
+    //
+    // Three rules, and every one of them is "the style must never make a request
+    // that would have worked fail":
+    //
+    //  1. NO CAPABILITY REFUSAL (A3). A model with no `referenceMode` — every
+    //     image model that is not an edit model, every video model without r2v,
+    //     and audio/3D by construction — simply does not get them. It is the
+    //     owner's 2026-07-24 shot-reference precedent verbatim ("refs are simply
+    //     dropped silently for such models"), and it is what lets a user keep one
+    //     style and generate with it on ANY model: the fragments always apply,
+    //     the pictures apply where they can.
+    //
+    //  2. THE COUNT GATE ABOVE NEVER SEES THEM. That gate throws a 400, and it
+    //     runs on entity + direct refs only. If style images were folded in
+    //     before it, attaching a third picture to a style would start rejecting
+    //     kontext generations that tag a character — a failure the user could not
+    //     possibly connect to the style they edited last week. Instead the budget
+    //     is computed here and the overflow is TRIMMED, silently.
+    //
+    //  3. A DEAD FILE IS NOT A FAILED GENERATION. A missing stored file (a
+    //     half-restored backup, a manual media cleanup) drops that one reference
+    //     with a warn line for the operator and lets the paid request continue.
+    //     Failing here would refuse a generation over a picture the user did not
+    //     ask for in this request.
+    //
+    // Runs BEFORE the charge like every other reference read, so the I/O happens
+    // in the same phase as the rest and nothing here can fail after money moved.
+    const stylePaths = resolvedStyle?.referenceImagePaths ?? []
+    if (stylePaths.length > 0 && model.referenceMode) {
+      // What is left after the refs the user explicitly asked for. `?? 1` is the
+      // catalog's own default for a reference-capable model, the same fallback
+      // the gates above use, so one model can never be read two ways.
+      const budget = (model.maxReferenceImages ?? 1) - (referenceImages?.length ?? 0)
+      const styleImages: string[] = []
+      for (const path of stylePaths) {
+        if (styleImages.length >= budget) break
+        try {
+          styleImages.push(await storage.readAsDataUri(path))
+        } catch (err) {
+          // Not a failure of THIS request — a fact about our storage. Logged so
+          // the operator can find the dangling row; the generation goes on.
+          log?.warn(
+            { event: 'style.reference.missing', userId, styleId: preset?.styleId, path, err },
+            'style reference image could not be read; dropping it',
+          )
+        }
+      }
+      if (styleImages.length > 0)
+        referenceImages = [...(referenceImages ?? []), ...styleImages]
+    }
+
     let cost: number
     try {
       // Audio-on prices from the with-audio table on 'switchable' models — the
@@ -542,7 +612,9 @@ export function createGenerationService({
     const { positivePrompt: modelPrompt, negativePrompt } = applyPromptPreset(
       composedPrompt,
       preset,
-      styleFragments ?? undefined,
+      // ResolvedStyle IS a StyleFragments plus paths, so composition reads the
+      // two strings it always did and never learns that images exist.
+      resolvedStyle ?? undefined,
     )
     // Stored only when a preset was supplied: composed_prompt is the debugging/
     // provenance record of the fully-composed text; a preset-less row leaves it

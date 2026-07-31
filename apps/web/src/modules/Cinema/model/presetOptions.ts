@@ -101,6 +101,10 @@ function bundledBuiltins(): Style[] {
     negative: STYLE_PRESETS[id].negative,
     recommendedModelId: STYLE_PRESETS[id].recommendedModelId,
     previewUrl: null,
+    // Empty, permanently: a builtin is code and has nowhere to store an uploaded
+    // image, so the reference half of the style package (ADR style-studio A1) is
+    // only ever populated for a user's own row.
+    referenceImages: [],
     createdAt: null,
     updatedAt: null,
   }))

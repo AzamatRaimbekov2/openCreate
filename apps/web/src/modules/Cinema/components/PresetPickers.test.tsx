@@ -32,6 +32,7 @@ function style(overrides: Partial<Style> & Pick<Style, 'id'>): Style {
     negative: '',
     recommendedModelId: null,
     previewUrl: null,
+    referenceImages: [],
     createdAt: null,
     updatedAt: null,
     ...overrides,

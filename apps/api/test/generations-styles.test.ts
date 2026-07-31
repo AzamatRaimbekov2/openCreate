@@ -10,8 +10,15 @@
 //
 // The rest of the file is the new behavior: a user style applies everywhere a
 // builtin one does, and an unresolvable id costs the caller nothing.
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildTestApp, fakeRunware, registerAndGetCookie } from './helpers/build-test-app'
+
+// A minimal but valid raster image data URI (8-byte PNG signature): saveDataUri
+// stores it, and readAsDataUri reads it back at generation time.
+const PNG = 'data:image/png;base64,iVBORw0KGgo='
 
 async function createStyle(
   app: Awaited<ReturnType<typeof buildTestApp>>,
@@ -26,6 +33,44 @@ async function createStyle(
   })
   if (res.statusCode !== 201) throw new Error(`style create failed: ${res.body}`)
   return res.json()
+}
+
+async function attachRef(
+  app: Awaited<ReturnType<typeof buildTestApp>>,
+  cookie: string,
+  styleId: string,
+): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/api/styles/${styleId}/references`,
+    headers: { cookie },
+    payload: { dataUri: PNG },
+  })
+  if (res.statusCode !== 201) throw new Error(`style reference upload failed: ${res.body}`)
+  const refs = res.json().referenceImages as Array<{ url: string }>
+  return refs[refs.length - 1]!.url
+}
+
+// A character with a photo — the only kind of tag that can actually be rendered,
+// and what occupies the model's reference budget before a style ever sees it.
+async function seedTaggedCharacter(
+  app: Awaited<ReturnType<typeof buildTestApp>>,
+  cookie: string,
+): Promise<string> {
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/entities',
+    headers: { cookie },
+    payload: { kind: 'character', name: 'Аня', description: 'тёмные волосы' },
+  })
+  const entityId = created.json().id as string
+  await app.inject({
+    method: 'POST',
+    url: `/api/entities/${entityId}/images`,
+    headers: { cookie },
+    payload: { dataUri: PNG },
+  })
+  return entityId
 }
 
 async function balanceOf(app: Awaited<ReturnType<typeof buildTestApp>>, cookie: string) {
@@ -129,6 +174,178 @@ describe('a user style applies exactly where a builtin does', () => {
     // Same composition law as a builtin: style leads, the user's text is last.
     expect(call.positivePrompt).toBe('neon noir, wet asphalt reflections, a knight')
     expect(call.negativePrompt).toBe('daylight, pastel')
+  })
+})
+
+// The REFERENCE half of the package (amendment A2/A3). Everything here is about
+// one property: a style is AMBIENT. It rides along with whatever the request
+// already carries, so it may never turn a request that would have succeeded into
+// one that fails — not by exceeding the model's budget, not by landing on a model
+// that takes no references, and not because one of its stored files went missing.
+describe('a style delivers its reference images through the existing channel', () => {
+  it('sends the package’s images to the provider as data URIs', async () => {
+    const rw = fakeRunware()
+    rw.imageInference.mockResolvedValue({ imageURL: 'https://im.runware.ai/a.webp', seed: 1 })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const style = await createStyle(app, cookie, {
+      name: 'Неоновый нуар',
+      fragment: 'neon noir',
+    })
+    await attachRef(app, cookie, style.id)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'flux-kontext-pro',
+        prompt: 'a knight',
+        aspectRatio: '1:1',
+        promptPreset: { styleId: style.id },
+      },
+    })
+    expect(res.statusCode).toBe(201)
+    const call = rw.imageInference.mock.calls[0]?.[0]
+    // The bytes were sourced by the SERVER from its own storage — the wire
+    // contract has no referenceImages field, so a client can never inject them.
+    expect(call.referenceImages).toHaveLength(1)
+    expect(call.referenceImages[0]).toMatch(/^data:image\/png;base64,/)
+    // …and the fragment applied as it always did.
+    expect(call.positivePrompt).toBe('neon noir, a knight')
+  })
+
+  // A3 — the owner's 2026-07-24 shot-reference precedent: refs are simply dropped
+  // for a model that cannot use them. No refusal, no charge difference, and the
+  // FRAGMENTS still apply, because the prompt half works on every model.
+  it('drops them SILENTLY on a model with no reference support, keeping the fragments', async () => {
+    const rw = fakeRunware()
+    rw.imageInference.mockResolvedValue({ imageURL: 'https://im.runware.ai/a.webp', seed: 1 })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const style = await createStyle(app, cookie, {
+      name: 'Неоновый нуар',
+      fragment: 'neon noir',
+      negative: 'daylight',
+    })
+    await attachRef(app, cookie, style.id)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        // flux-schnell has no referenceMode at all.
+        modelId: 'flux-schnell',
+        prompt: 'a knight',
+        aspectRatio: '1:1',
+        promptPreset: { styleId: style.id },
+      },
+    })
+    expect(res.statusCode).toBe(201)
+    const call = rw.imageInference.mock.calls[0]?.[0]
+    // Omitted entirely, not sent empty — and the request succeeded.
+    expect(call.referenceImages).toBeUndefined()
+    expect(call.positivePrompt).toBe('neon noir, a knight')
+    expect(call.negativePrompt).toBe('daylight')
+  })
+
+  // A2 — the trim order. The tagged character is what the user explicitly asked
+  // for; the style is atmosphere. On overflow the atmosphere goes.
+  it('trims STYLE refs first when the model’s budget is full, never the entity’s', async () => {
+    const rw = fakeRunware()
+    rw.imageInference.mockResolvedValue({ imageURL: 'https://im.runware.ai/a.webp', seed: 1 })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const entityId = await seedTaggedCharacter(app, cookie)
+    const style = await createStyle(app, cookie, { name: 'Неон', fragment: 'neon noir' })
+    await attachRef(app, cookie, style.id)
+    await attachRef(app, cookie, style.id)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        // flux-kontext-pro: maxReferenceImages = 2.
+        modelId: 'flux-kontext-pro',
+        prompt: '[[e1]] on a rooftop',
+        aspectRatio: '1:1',
+        entityRefs: [{ placeholder: 'e1', entityId }],
+        promptPreset: { styleId: style.id },
+      },
+    })
+    // 1 entity + 2 style = 3 > 2, and it still SUCCEEDS: the ambient half is
+    // trimmed rather than the request being refused for a budget the user never
+    // knowingly exceeded.
+    expect(res.statusCode).toBe(201)
+    const call = rw.imageInference.mock.calls[0]?.[0]
+    expect(call.referenceImages).toHaveLength(2)
+    // The entity photo leads — it was resolved first and is never the one dropped.
+    expect(call.positivePrompt).toContain('neon noir')
+  })
+
+  it('never lets an ambient style push a request over the model’s budget', async () => {
+    const rw = fakeRunware()
+    rw.imageInference.mockResolvedValue({ imageURL: 'https://im.runware.ai/a.webp', seed: 1 })
+    const app = await buildTestApp({ runware: rw })
+    const cookie = await registerAndGetCookie(app)
+    const entityId = await seedTaggedCharacter(app, cookie)
+    const style = await createStyle(app, cookie, { name: 'Неон', fragment: 'neon noir' })
+    for (let i = 0; i < 3; i++) await attachRef(app, cookie, style.id)
+    const before = await balanceOf(app, cookie)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'flux-kontext-pro',
+        prompt: '[[e1]] on a rooftop',
+        aspectRatio: '1:1',
+        entityRefs: [{ placeholder: 'e1', entityId }],
+        promptPreset: { styleId: style.id },
+      },
+    })
+    // A 400 here would be the bug the trim exists to prevent: the count gate
+    // must never see the style's images, or attaching a third reference to a
+    // style would break every kontext generation that tags a character.
+    expect(res.statusCode).toBe(201)
+    expect(rw.imageInference.mock.calls[0]?.[0].referenceImages).toHaveLength(2)
+    // Charged the ordinary price, once.
+    await expect(balanceOf(app, cookie)).resolves.toBe(before - 8)
+  })
+
+  // A dead file is an operational fact (a half-restored backup, a manual media
+  // cleanup), not a reason to fail a paid request. The style is ambient: the
+  // worst it may do is contribute nothing.
+  it('drops a reference whose stored file is gone, without failing the generation', async () => {
+    const rw = fakeRunware()
+    rw.imageInference.mockResolvedValue({ imageURL: 'https://im.runware.ai/a.webp', seed: 1 })
+    const storageDir = mkdtempSync(join(tmpdir(), 'oc-style-dead-'))
+    const app = await buildTestApp({ runware: rw, storageDir })
+    const cookie = await registerAndGetCookie(app)
+    const style = await createStyle(app, cookie, { name: 'Неон', fragment: 'neon noir' })
+    const deadUrl = await attachRef(app, cookie, style.id)
+    const liveUrl = await attachRef(app, cookie, style.id)
+    expect(liveUrl).not.toBe(deadUrl)
+    // Delete the bytes out from under the row, leaving the reference dangling.
+    rmSync(join(storageDir, basename(deadUrl)))
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'flux-kontext-pro',
+        prompt: 'a knight',
+        aspectRatio: '1:1',
+        promptPreset: { styleId: style.id },
+      },
+    })
+    expect(res.statusCode).toBe(201)
+    // The surviving one still went; only the dead ref was dropped.
+    expect(rw.imageInference.mock.calls[0]?.[0].referenceImages).toHaveLength(1)
   })
 })
 

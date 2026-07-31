@@ -32,6 +32,7 @@ function styleRow(overrides: Partial<Style> = {}): Style {
     negative: '',
     recommendedModelId: null,
     previewUrl: null,
+    referenceImages: [],
     createdAt: '2026-07-31T10:00:00.000Z',
     updatedAt: '2026-07-31T10:00:00.000Z',
     ...overrides,
