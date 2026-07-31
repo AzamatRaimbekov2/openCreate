@@ -30,7 +30,14 @@ export function RunBranchDialog({ isOpen, plan, onClose, onConfirm }: RunBranchD
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} role="alertdialog" title={t('canvas.runBranch.title')}>
-      <div className="flex flex-col gap-4">
+      {/* The plan SCROLLS, the confirm does not (design.md §6 Modal law). A
+          branch is unbounded — a long chain makes this list taller than the
+          panel, and the kit Modal is a max-h-[92dvh] flex column whose children
+          default to min-height:auto, so without min-h-0 + overflow-y-auto the
+          list paints past the bottom and the wheel scrolls the page behind the
+          overlay. On a SPEND gate that is the worst version of the bug: the
+          confirm the user must reach is the part that goes out of reach. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
         {plan.ok ? (
           <>
             <p className="text-sm text-mist">{t('canvas.runBranch.lead')}</p>
@@ -75,6 +82,12 @@ export function RunBranchDialog({ isOpen, plan, onClose, onConfirm }: RunBranchD
           </p>
         )}
 
+      </div>
+
+      {/* PINNED footer — outside the scroller, so a 24-node plan cannot push the
+          confirm out of reach. `shrink-0` keeps it at its natural height while
+          the list above absorbs the squeeze. */}
+      <div className="mt-4 shrink-0 border-t border-white/10 pt-4">
         <div className="flex items-center justify-end gap-3">
           {/* Backing out of a spend is never the action to nudge toward or away
               from — same reasoning as SpendConfirmModal's quiet cancel. */}

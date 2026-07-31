@@ -56,6 +56,23 @@ beforeEach(() => {
 })
 
 describe('CreateAssetModal', () => {
+  it('scrolls the form and keeps the actions reachable', async () => {
+    // With a concept picked the preview plate is max-h-56, and a server error
+    // adds a three-line block above the buttons — together they push past the
+    // panel's usable height at a 728px viewport. The kit Modal is a
+    // max-h-[92dvh] flex column whose children default to min-height:auto, so
+    // without the scroller Submit goes out of reach exactly when an error is
+    // telling the user to try again (design.md §6 Modal law).
+    renderModal()
+
+    // The router mounts asynchronously, so the dialog is awaited rather than
+    // queried straight away.
+    const scroller = (await screen.findByRole('dialog')).querySelector('.overflow-y-auto')
+    expect(scroller).not.toBeNull()
+    expect(scroller).toHaveClass('min-h-0')
+    expect(scroller?.contains(screen.getByRole('button', { name: /create/i }))).toBe(false)
+  })
+
   it('encodes the picked image as a data URI and submits it with the title', async () => {
     apiMock.mockResolvedValue({
       id: 'new-asset',

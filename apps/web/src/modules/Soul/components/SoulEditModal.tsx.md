@@ -44,3 +44,15 @@ flowchart LR
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — modal scroller (design.md §6 Modal law)
+- `<SoulConstructor>` is now wrapped in `flex min-h-0 flex-1 flex-col overflow-y-auto pr-1`.
+  This is the tallest body any modal hands to the kit Modal (name + two required axes +
+  eight optional selects + trait chips + notes + preview), and the panel is a
+  `max-h-[92dvh]` flex column whose children default to `min-height:auto` — so it painted
+  past the bottom and the wheel scrolled the page behind the overlay.
+- **The Save button scrolls WITH the content here**, unlike StyleEditor's pinned footer:
+  the submit lives INSIDE `SoulConstructor`, and pulling it out would mean restructuring
+  that component rather than wrapping this body — beyond the surgical scope of this
+  sweep. This is the Templates canon shape and it fully fixes reachability (one scroll
+  brings Save into view). Pinning is the upgrade if `SoulConstructor` is ever split.

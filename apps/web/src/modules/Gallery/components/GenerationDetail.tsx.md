@@ -55,3 +55,14 @@ flowchart LR
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+
+## Update 2026-07-31 — modal scroller (design.md §6 Modal law)
+- The body already carried `min-h-0`; this adds the `overflow-y-auto` that completes the
+  pair. One word, and it was the missing half.
+- The MEDIA was never the risk — `max-h-[70dvh]` shrinks it with the viewport. The PROMPT
+  is: contracts allow 2000 characters, which wraps to more height than the panel has left,
+  pushing the action rail past the bottom while the wheel scrolls the page behind the
+  overlay.
+- The actions scroll WITH the content rather than being pinned: this is a read-mostly
+  detail sheet (the Templates canon), and its icon rail is a set of options, not the one
+  outcome the sheet exists for.

@@ -39,3 +39,16 @@ flowchart LR
 
 ## Commits
 - cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend
+
+## Update 2026-07-31 — modal scroller (design.md §6 Modal law)
+- The plan list is now wrapped in `flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1`
+  and the cancel/confirm row moved OUT of it into a `shrink-0` footer with a hairline.
+- **Why this one first:** a branch is unbounded, so a long chain makes the `<ol>` taller
+  than the panel — and the kit Modal is a `max-h-[92dvh]` flex column whose children
+  default to `min-height:auto`. Without the scroller the list painted past the bottom,
+  the wheel scrolled the PAGE behind the overlay, and the CONFIRM went out of reach.
+  On a SPEND gate that is the worst version of the bug: the one control the dialog
+  exists for is the one that disappears.
+- PINNED rather than scroll-with-content because this is an actions dialog, not a
+  read-mostly sheet. Pinned by a test that builds a 24-item plan and asserts the
+  confirm is NOT inside the scroller.

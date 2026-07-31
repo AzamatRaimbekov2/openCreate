@@ -63,3 +63,13 @@ flowchart TD
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 — modal scroller (design.md §6 Modal law)
+- The `<form>` became the flex column (`flex min-h-0 flex-1 flex-col`); its fields moved
+  into a `flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1` child, and the server
+  error + free-caption + buttons into a `shrink-0` footer. The scroller stays INSIDE the
+  form so the footer's `type="submit"` still submits it.
+- The trigger is the combination, not any single field: with a concept picked the preview
+  plate is `max-h-56`, and a server error adds a three-line block above the buttons —
+  together they run past the panel's usable height at a 728px viewport. That would put
+  Submit out of reach exactly when an error is telling the user to try again.

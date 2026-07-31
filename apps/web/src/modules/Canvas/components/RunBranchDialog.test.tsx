@@ -37,6 +37,32 @@ describe('RunBranchDialog', () => {
     expect(screen.getByText('19 cr')).toBeInTheDocument()
   })
 
+  it('scrolls the plan list and keeps the confirm reachable', () => {
+    // A branch is unbounded — a long chain makes an <ol> taller than the panel,
+    // and the kit Modal is a max-h-[92dvh] flex column whose children default to
+    // min-height:auto. Without a scroller the list paints past the panel bottom
+    // and the CONFIRM goes out of reach, which on a SPEND gate is the worst form
+    // of this bug (the StyleEditor case, design.md §6 Modal law).
+    const long: BranchPlan = {
+      ...PLAN,
+      items: Array.from({ length: 24 }, (_, i) => ({
+        nodeId: `n${i}`,
+        kind: 'image' as const,
+        modelName: 'Studio',
+        credits: 2,
+      })),
+      nodeIds: Array.from({ length: 24 }, (_, i) => `n${i}`),
+      total: 48,
+    }
+    renderDialog(long)
+
+    const scroller = screen.getByRole('alertdialog').querySelector('.overflow-y-auto')
+    expect(scroller).not.toBeNull()
+    expect(scroller).toHaveClass('min-h-0')
+    // The confirm sits OUTSIDE the scroller, so it cannot be scrolled away from
+    expect(scroller?.contains(screen.getByRole('button', { name: /48 cr/ }))).toBe(false)
+  })
+
   it('restates the total on the confirm pill, where the click is aimed', async () => {
     const { onConfirm } = renderDialog(PLAN)
     const confirm = screen.getByRole('button', { name: /21 cr/ })

@@ -67,7 +67,15 @@ export function GenerationDetail({
         surface="glass"
         hideHeader
       >
-        <div className="flex min-h-0 flex-col gap-3">
+        {/* `overflow-y-auto` completes the pair this body already had half of
+            (design.md §6 Modal law). The MEDIA is bounded — max-h-[70dvh] shrinks
+            it with the viewport — but the PROMPT below is not: contracts allow
+            2000 characters, which wraps to more height than the panel has left,
+            and without the scroller that pushes the action rail past the bottom
+            while the wheel scrolls the page behind the overlay. The actions scroll
+            WITH the content here rather than being pinned: this is a read-mostly
+            detail sheet (the Templates canon), not a form with one outcome. */}
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
           {mediaUrl ? (
             // The media well: a height-capped box on the recessed abyss step,
             // one surface step BELOW the glass sheet holding it — the frosted

@@ -47,14 +47,28 @@ export function SoulEditModal({ entity, isOpen, onClose }: SoulEditModalProps) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('soul.card.edit')} size="lg">
-      <SoulConstructor
-        draft={draft}
-        onChange={setDraft}
-        onSubmit={handleSave}
-        submitLabel={t('soul.constructor.save')}
-        isSubmitting={updateMutation.isPending}
-        error={error}
-      />
+      {/* THE SCROLLER (design.md §6 Modal law). The constructor — name + two
+          required axes + eight optional selects + trait chips + notes + preview —
+          is the tallest body any modal hands to the kit Modal, and the panel is a
+          max-h-[92dvh] flex column whose children default to min-height:auto. So
+          without these two classes it painted past the panel bottom and the wheel
+          scrolled the PAGE behind the overlay.
+          THE SAVE BUTTON SCROLLS WITH IT, unlike StyleEditor's pinned footer:
+          the submit lives INSIDE SoulConstructor, and pulling it out would mean
+          restructuring that component rather than wrapping this body. This is the
+          Templates canon shape (scroller with the CTA inside) and it fully fixes
+          the reachability bug — one scroll brings Save into view. Pinning is the
+          upgrade if SoulConstructor is ever split. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+        <SoulConstructor
+          draft={draft}
+          onChange={setDraft}
+          onSubmit={handleSave}
+          submitLabel={t('soul.constructor.save')}
+          isSubmitting={updateMutation.isPending}
+          error={error}
+        />
+      </div>
     </Modal>
   )
 }

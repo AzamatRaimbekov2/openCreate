@@ -152,8 +152,15 @@ export function CreateAssetModal({ isOpen, onClose }: CreateAssetModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('assets3d.create.title')}>
       {/* noValidate: zod owns validation — native bubbles would preempt our copy */}
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
-        <Input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex min-h-0 flex-1 flex-col">
+        {/* THE FIELDS SCROLL, THE ACTIONS DO NOT (design.md §6 Modal law). With a
+            concept picked the preview plate is max-h-56, and a server error adds a
+            three-line block above the buttons — together they run past the panel's
+            usable height at a 728px viewport, which would put Submit out of reach
+            exactly when an error is telling the user to try again. The scroller
+            stays INSIDE the <form> so the footer's submit button still submits it. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+          <Input
           label={t('assets3d.create.name')}
           placeholder={t('assets3d.create.namePlaceholder')}
           error={errors.title ? t(errors.title.message ?? 'errors.actionFailed') : undefined}
@@ -207,27 +214,34 @@ export function CreateAssetModal({ isOpen, onClose }: CreateAssetModalProps) {
           )}
         />
 
-        {serverErrorKey ? (
-          // Inline non-blocking failure: a calm recessed block with a glow-red
-          // LEFT RULE — red marks the status, never the whole surface
-          <p
-            role="alert"
-            className="rounded-lg border-l-2 border-glow-red bg-abyss px-4 py-3 text-sm text-mist"
-          >
-            {t(serverErrorKey)}
-          </p>
-        ) : null}
+        </div>
 
-        {/* Said out loud, because an upload box implies a charge is coming */}
-        <p className="text-xs text-mist-dim">{t('assets3d.create.free')}</p>
+        {/* PINNED footer — outside the scroller, so a server error cannot push
+            Submit past the panel bottom. The error and the free-caption belong
+            here with it: both explain the button beside them. */}
+        <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4">
+          {serverErrorKey ? (
+            // Inline non-blocking failure: a calm recessed block with a glow-red
+            // LEFT RULE — red marks the status, never the whole surface
+            <p
+              role="alert"
+              className="rounded-lg border-l-2 border-glow-red bg-abyss px-4 py-3 text-sm text-mist"
+            >
+              {t(serverErrorKey)}
+            </p>
+          ) : null}
 
-        <div className="flex items-center justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" isLoading={createAsset.isPending}>
-            {t('assets3d.create.submit')}
-          </Button>
+          {/* Said out loud, because an upload box implies a charge is coming */}
+          <p className="text-xs text-mist-dim">{t('assets3d.create.free')}</p>
+
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="ghost" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" isLoading={createAsset.isPending}>
+              {t('assets3d.create.submit')}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

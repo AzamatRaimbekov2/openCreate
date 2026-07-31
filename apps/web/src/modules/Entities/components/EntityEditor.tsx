@@ -82,7 +82,13 @@ export function EntityEditor({ entity, isOpen, onClose }: EntityEditorProps) {
       onClose={onClose}
       title={isEdit ? t('entities.edit.title') : t('entities.create.title')}
     >
-      <div className="flex flex-col gap-4">
+      {/* THE FIELDS SCROLL, THE ACTIONS DO NOT (design.md §6 Modal law). The kit
+          Modal panel is a max-h-[92dvh] flex column and a flex child defaults to
+          min-height:auto, so without min-h-0 this stack — name + description +
+          preset chips + a photo grid that WRAPS as photos are added — paints past
+          the panel bottom, the wheel scrolls the page behind the overlay, and
+          Save becomes unreachable. Same class as the StyleEditor case. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
         {/* Input owns its own label caption — no wrapping <label> needed */}
         <Input
           label={t('entities.field.name')}
@@ -159,6 +165,13 @@ export function EntityEditor({ entity, isOpen, onClose }: EntityEditorProps) {
           </div>
         ) : null}
 
+      </div>
+
+      {/* PINNED footer — outside the scroller, so a growing photo grid cannot
+          push Save out of reach. The failure notice sits here too: it explains
+          why the button beside it did nothing, so it must be visible wherever
+          that button is. */}
+      <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4">
         {errorKey ? (
           <span role="alert" className="text-sm text-glow-red">
             {t(errorKey)}
