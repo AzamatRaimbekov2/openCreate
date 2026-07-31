@@ -5,7 +5,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import type { Style } from '@opencreate/contracts'
 import { Button, EmptyState, ErrorState, Skeleton } from 'shared/ui'
 import { useFilms } from '../model/filmsApi'
 import { FilmCard } from './FilmCard'
@@ -16,15 +15,12 @@ import { PlusIcon } from './icons'
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4']
 const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4'
 
-export type CinemaLibraryProps = {
-  // The style registry, injected from the route (Cinema must not import
-  // modules/Styles) and handed to the New-film modal, where a film's DEFAULT
-  // style is chosen. Empty while GET /api/styles is in flight — the picker then
-  // falls back to the bundled builtins rather than showing nothing.
-  styles?: readonly Style[]
-}
-
-export function CinemaLibrary({ styles }: CinemaLibraryProps = {}) {
+// No props. The style registry used to arrive here for the New-film modal's
+// default-style picker; create mode no longer poses that question (owner request
+// 2026-07-31), so the seam is gone rather than left threading a value nobody
+// reads. Editing a film's default style still happens in CinemaEditorHeader,
+// which keeps its own `styles` prop from the route.
+export function CinemaLibrary() {
   const { t } = useTranslation()
   const { data, isPending, isError, refetch } = useFilms()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -92,7 +88,6 @@ export function CinemaLibrary({ styles }: CinemaLibraryProps = {}) {
       {/* One modal, create mode (film=null); it navigates into the new editor */}
       <FilmSettingsModal
         film={null}
-        styles={styles}
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />

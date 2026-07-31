@@ -43,3 +43,10 @@ flowchart LR
 - The route is the seam because `modules/Cinema` must not import `modules/Styles`;
   this mirrors what `cinema.$filmId.tsx` does for the editor.
 - Shares the `['styles']` cache entry with `/styles` and the film editor.
+
+## Update 2026-07-31 — the style read is gone
+- Dropped `useStyles()` and the `styles` prop on `CinemaLibrary`. This route read the
+  registry only to feed the New-film modal's default-style picker, and create mode no
+  longer asks for a style (owner request 2026-07-31), so the fetch had no consumer.
+- The route is composition-only again, exactly as it was before dbb6af1. The style seam
+  is alive in `cinema.$filmId`, which still feeds the editor's three pickers.

@@ -71,3 +71,15 @@ flowchart TD
   all, which is what its existing tests do.
 - `styles` is read in `routes/_shell.cinema.index.tsx`; this module imports nothing
   from `modules/Styles`.
+
+## Update 2026-07-31 — the create seam lost its styles prop
+- `CinemaLibraryProps` is gone; the component takes no props again. It existed only to
+  carry the style registry to the New-film modal's default-style picker, and create mode
+  no longer poses that question (owner request 2026-07-31).
+- Removed rather than left threading a value nobody reads: a prop that is passed, typed
+  and documented but unused is the kind of thing the next reader spends ten minutes
+  proving is dead. `routes/_shell.cinema.index.tsx` dropped its `useStyles()` read in the
+  same change.
+- The style seam itself is untouched where it still matters: `cinema.$filmId` feeds
+  `CinemaEditorHeader` → `FilmSettingsModal` in EDIT mode, plus the inspector and the
+  storyboard.

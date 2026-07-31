@@ -537,7 +537,14 @@
       "aspect": "Aspect ratio",
       "style": "Default style",
       "styleNone": "No style",
-      "create": "Create film"
+      "create": "Create film",
+      "cover": {
+        "label": "Cover (optional)",
+        "add": "Add cover image",
+        "remove": "Remove cover",
+        "hint": "Click, drop or paste an image.",
+        "replace": "Click the picture to replace it."
+      }
     },
     "timeline": {
       "title": "Timeline",

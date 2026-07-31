@@ -47,3 +47,17 @@ flowchart LR
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — the plate shows the film's cover
+- A film can carry a cover now (picked when it is created), so the media well renders
+  `film.coverUrl` when there is one and falls back to the existing `TextCardIcon` glyph
+  when there is not. The stale "no cover art to show yet" comment — an assumption baked
+  into the file header — went with it.
+- `object-cover`, not `object-contain`: the plate's job is to preview the film's SHAPE
+  (its aspect drives `ASPECT_CLASS`), so the picture crops to that rather than
+  letterboxing inside it. The modal shows the same image `object-contain` at pick time,
+  where judging the whole frame is the point.
+- The glyph branch keeps the plate's box, so a shelf mixing covered and uncovered films
+  never reflows.
+- Pinned by a new `FilmCard.test.tsx`: an `img` with the cover's src when `coverUrl` is
+  set, and NO img at all when it is null (a broken image would be worse than the glyph).

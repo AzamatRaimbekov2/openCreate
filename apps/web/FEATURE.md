@@ -56,8 +56,12 @@ react-hook-form + zod, i18next.
   processing=amber / succeeded=green / failed=red.
 - **CinemaStudio (`/cinema`, `/cinema/$filmId`, guarded)** — compose films on top
   of the generation lifecycle. The library lists film cards (canvas-shaped abyss
-  plates, `Link` into the editor) with a green "New film" modal (title + aspect
-  `PillGroup` + default-style `Select`). The editor (v7) is a real
+  plates showing the film's cover when it has one, `Link` into the editor) with a
+  green "New film" modal that asks only for a TITLE plus an optional COVER —
+  aspect and default style moved to edit-only (2026-07-31), because neither is
+  answerable before the film exists. The cover rides the create body as bytes, so
+  naming it and picking a picture is one request that cannot half-succeed. The
+  editor (v7) is a real
   NLE WORKBENCH: one viewport-height column, no page scroll — the STAGE
   (header · transient render status strip · `PreviewPlayer`) scrolls inside
   itself, with the TRACKS panel pinned beneath; the composer is a
@@ -511,9 +515,10 @@ catalog. ADR `docs/wiki/decisions/style-studio.md`.
   `STYLE_PREVIEW_PROMPT` is deliberately styleless so the only difference between two
   previews is the style's own fragment.
 - **Every style picker reads the registry** (`styleOptions(styles, t)`): the Cinema
-  shot inspector, the film's default style (create + edit) and the storyboard. The
-  list is read at the ROUTE (`_shell.styles`, `_shell.cinema.index`,
-  `cinema.$filmId`) and threaded down as props — Cinema must not import Styles.
+  shot inspector, the film's default style (EDIT only since 2026-07-31 — the
+  New-film dialog no longer asks) and the storyboard. The list is read at the ROUTE
+  (`_shell.styles`, `cinema.$filmId`) and threaded down as props — Cinema must not
+  import Styles.
   Soul stays on the BUILTIN table by decision: `soulPresentation` indexes
   `STYLE_PRESETS` by that value, so a user style would have no label to render.
 - **An empty list means "not loaded", never "no styles"** — the registry always
