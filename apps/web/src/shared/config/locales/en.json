@@ -495,6 +495,9 @@
       "add": "Add reference image",
       "remove": "Remove reference",
       "previewAlt": "Style reference",
+      "count_one": "{{count}} ref",
+      "count_other": "{{count}} refs",
+      "full": "All {{count}} used.",
       "hint": "Click, drop or paste up to {{count}} images.",
       "ambient": "A hint, applied where the model can use them — some models ignore images.",
       "unsaved": "Create the style first — then you can attach references."

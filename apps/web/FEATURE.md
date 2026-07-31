@@ -529,10 +529,14 @@ catalog. ADR `docs/wiki/decisions/style-studio.md`.
 - **The style is a PACKAGE, not either/or** (ADR amendment A1/A4): the constructor
   also carries up to `STYLE_MAX_REFERENCES` (3) reference images through
   `StyleReferenceImages` — click, drop and paste, all via the shared
-  `readImageFile` gate, thumbs with a per-thumb remove, an `N / 3` counter, and the
-  add tile GONE (not disabled) at the cap. Edit mode only: an image attaches to a
-  style by id. Both writes answer with the whole updated `Style`, so the strip
-  re-renders from the server's own row and nothing is merged client-side.
+  `readImageFile` gate, thumbs with a per-thumb remove, an `N / 3` counter, and — at
+  the cap — a `disabled` add tile beside an amber "all 3 used" line (the `PartsStage`
+  law: a disabled control states its reason; the gesture handlers refuse
+  independently, so the disable is never merely visual). Edit mode only: an image
+  attaches to a style by id. Both writes answer with the whole updated `Style`, so
+  the strip re-renders from the server's own row and nothing is merged client-side.
+  The library tile prints the reference count beside the fragment teaser, so the
+  package's picture half is visible without opening the constructor.
 - **The reference copy is deliberately non-committal.** The server applies style
   images through the same channel as entity photos and shot references, WITH the
   model's gates: dropped silently on a model that takes no references, and trimmed

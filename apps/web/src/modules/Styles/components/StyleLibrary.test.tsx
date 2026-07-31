@@ -110,6 +110,36 @@ it('renders my style with its preview image and an edit affordance', async () =>
   expect(screen.queryByText(/no styles of your own/i)).not.toBeInTheDocument()
 })
 
+it('shows the package on the tile — how many references a style carries', async () => {
+  apiMock.mockResolvedValue({
+    items: [
+      styleRow({
+        referenceImages: [
+          { id: 'r1', url: '/media/a.png' },
+          { id: 'r2', url: '/media/b.png' },
+        ],
+      }),
+    ],
+  })
+  renderLibrary()
+
+  const mine = await screen.findByRole('listitem', { name: /neon noir/i })
+  // A style is a PACKAGE (fragments + pictures); the library must say so, or the
+  // second half is invisible until you open the constructor.
+  expect(within(mine).getByText(/2 refs/i)).toBeInTheDocument()
+})
+
+it('says nothing about references on a style that carries none', async () => {
+  apiMock.mockResolvedValue({ items: [BUILTIN, styleRow()] })
+  renderLibrary()
+
+  const mine = await screen.findByRole('listitem', { name: /neon noir/i })
+  expect(within(mine).queryByText(/ref/i)).not.toBeInTheDocument()
+  // A builtin can never carry any — no empty badge on the reference shelf either
+  const builtin = screen.getByRole('listitem', { name: /anime/i })
+  expect(within(builtin).queryByText(/ref/i)).not.toBeInTheDocument()
+})
+
 it('re-initialises the draft when a different style is opened', async () => {
   // The editor holds its draft in useState, so without a key the SECOND style
   // opened would show the FIRST one's text — the bug the Cinema inspector avoids

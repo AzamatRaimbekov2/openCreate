@@ -69,3 +69,15 @@ flowchart TD
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 (b) — the cap DISABLES instead of hiding
+- At `STYLE_MAX_REFERENCES` the add tile now stays on screen `disabled` rather than
+  unmounting (team-lead request, and the better read): keeping it visible keeps the
+  CEILING legible, where a vanished control just looks like the feature moved.
+- It is paired with a stated reason, per the Assets3D `PartsStage` law that "a
+  disabled control with no reason reads as a bug": the `N / 3` counter turns amber
+  AND a `styles.references.full` line spells it out. Amber, not red — nothing
+  failed, the package is simply full and removing one re-opens it.
+- The gesture handlers (`acceptFile`) still refuse independently of the tile's
+  disabled attribute, so a drop or paste cannot slip past what is only a visual
+  state. A test pins that a drop at the cap fires no request.

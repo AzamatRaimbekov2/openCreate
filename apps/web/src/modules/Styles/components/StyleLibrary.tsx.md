@@ -85,3 +85,12 @@ flowchart TD
   SECOND style opened showed the FIRST one's text. The Cinema inspector keys on
   `shot.id` for exactly this reason. Keying on the ID rather than the row means a
   reference upload does not remount the editor and discard unsaved typing.
+
+## Update 2026-07-31 (b) — the tile shows the package
+- A user style's tile now prints `styles.references.count` ("2 refs" / «2 реф.») in
+  amber beside the fragment teaser when it carries reference images (team-lead
+  request). A style is a PACKAGE of words AND pictures since ADR amendment A1, and
+  without a count in the library that half is invisible until the constructor opens.
+- Rendered ONLY when the count is > 0, so the builtin shelf — which can never carry
+  references — is not littered with empty zeroes. The teaser line became a flex row
+  so the count keeps its width (`shrink-0`) while the fragment truncates.

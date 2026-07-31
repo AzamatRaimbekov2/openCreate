@@ -155,29 +155,46 @@ export function StyleReferenceImages({ styleId, references }: StyleReferenceImag
 
         {/* Add tile — a real <label> wrapping a sr-only input (the
             CreateAssetModal pattern): the input carries the accessible name, the
-            label is the click target. GONE at the cap, not disabled: the server
-            refuses a fourth with a 400, and an affordance that always fails is
-            worse than none. */}
-        {!atCap ? (
-          <label className="grid size-16 cursor-pointer place-items-center rounded-2xl border border-dashed border-white/15 text-mist-dim transition-colors duration-200 hover:border-white/30 hover:bg-white/5 focus-within:ring-2 focus-within:ring-portal">
-            <input
-              type="file"
-              accept="image/*"
-              aria-label={t('styles.references.add')}
-              className="sr-only"
-              onChange={handleInputChange}
-            />
-            <span aria-hidden="true" className="text-lg leading-none">
-              +
-            </span>
-          </label>
-        ) : null}
+            label is the click target.
+            At the cap it is DISABLED, not removed, and the amber `N / 3` beside
+            it plus the "all 3 used" line say WHY — the Assets3D PartsStage law
+            ("a disabled control with no reason reads as a bug"). Keeping the tile
+            on screen keeps the ceiling legible; a vanished control just looks
+            like the feature moved. The gesture handlers refuse independently, so
+            a drop or paste cannot slip past a merely-visual disable. */}
+        <label
+          className={`grid size-16 place-items-center rounded-2xl border border-dashed transition-colors duration-200 ${
+            atCap
+              ? 'cursor-not-allowed border-white/10 text-mist-dim/40'
+              : 'cursor-pointer border-white/15 text-mist-dim hover:border-white/30 hover:bg-white/5 focus-within:ring-2 focus-within:ring-portal'
+          }`}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            aria-label={t('styles.references.add')}
+            disabled={atCap}
+            className="sr-only"
+            onChange={handleInputChange}
+          />
+          <span aria-hidden="true" className="text-lg leading-none">
+            +
+          </span>
+        </label>
       </div>
 
       {/* Discoverability: names all three gestures, only while there is room. */}
       {references.length === 0 && !atCap ? (
         <p className="text-[11px] text-mist-dim/70">
           {t('styles.references.hint', { count: STYLE_MAX_REFERENCES })}
+        </p>
+      ) : null}
+
+      {/* The reason the tile above is dead. Amber, not red: nothing failed — the
+          package is simply full, and removing one re-opens it. */}
+      {atCap ? (
+        <p className="text-[11px] text-lumen-amber">
+          {t('styles.references.full', { count: STYLE_MAX_REFERENCES })}
         </p>
       ) : null}
 

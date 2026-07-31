@@ -110,16 +110,34 @@ it('refuses a non-image locally, with localized copy and no request', async () =
   expect(apiMock).not.toHaveBeenCalled()
 })
 
-it('counts against the shared cap and drops the add tile when full', () => {
+it('counts against the cap and disables the add tile when full', () => {
   const full = Array.from({ length: STYLE_MAX_REFERENCES }, (_, i) => ({
     id: `r${i}`,
     url: `/media/${i}.png`,
   }))
   renderRefs(full)
 
+  // The counter is the REASON, and it stays visible beside the disabled control
+  // (the Assets3D PartsStage law: a disabled control with no stated reason reads
+  // as a bug). Disabled rather than removed so the ceiling stays legible.
   expect(screen.getByText(`${STYLE_MAX_REFERENCES} / ${STYLE_MAX_REFERENCES}`)).toBeInTheDocument()
-  // At the cap the affordance is GONE, not disabled — the server would 400 it
-  expect(screen.queryByLabelText(/add reference/i)).not.toBeInTheDocument()
+  expect(screen.getByLabelText(/add reference/i)).toBeDisabled()
+})
+
+it('ignores a drop once the cap is reached', async () => {
+  const full = Array.from({ length: STYLE_MAX_REFERENCES }, (_, i) => ({
+    id: `r${i}`,
+    url: `/media/${i}.png`,
+  }))
+  renderRefs(full)
+
+  fireEvent.drop(screen.getByRole('group', { name: /style references/i }), {
+    dataTransfer: { files: [pngFile()] },
+  })
+
+  // Disabling the tile must not leave the gesture path open — the server 400s a
+  // fourth, so the refusal belongs here, before the request.
+  await waitFor(() => expect(apiMock).not.toHaveBeenCalled())
 })
 
 it('removes a reference by its id', async () => {

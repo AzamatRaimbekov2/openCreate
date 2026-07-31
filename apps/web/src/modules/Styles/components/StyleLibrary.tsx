@@ -109,8 +109,19 @@ export function StyleLibrary({ models }: StyleLibraryProps) {
             </p>
             {/* The fragment IS the style — showing it is what lets a user read a
                 builtin and write a better one (contracts style.ts: fragments are
-                exposed on purpose) */}
-            <p className="truncate text-xs text-mist-dim">{style.fragment}</p>
+                exposed on purpose). Beside it, the PACKAGE indicator: a style can
+                carry pictures as well as words (ADR amendment A1), and without a
+                count here that half is invisible until you open the constructor.
+                Rendered only when there ARE references, so the shelf of builtins
+                — which can never carry any — is not littered with empty zeroes. */}
+            <p className="flex items-baseline gap-1.5 text-xs text-mist-dim">
+              <span className="truncate">{style.fragment}</span>
+              {style.referenceImages.length > 0 ? (
+                <span className="shrink-0 text-lumen-amber">
+                  {t('styles.references.count', { count: style.referenceImages.length })}
+                </span>
+              ) : null}
+            </p>
           </div>
           {style.builtin ? (
             <Badge>{t('styles.builtinBadge')}</Badge>
