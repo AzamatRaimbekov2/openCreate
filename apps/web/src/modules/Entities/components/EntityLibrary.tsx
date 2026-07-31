@@ -120,7 +120,22 @@ export function EntityLibrary() {
         </ul>
       )}
 
-      <EntityEditor entity={editing} isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} />
+      {/* KEYED, and it is load-bearing. EntityEditor seeds its fields with
+          `useState(entity?.name ?? '')` — which runs once, at mount — and this
+          component renders it PERMANENTLY (the Modal returns null while closed,
+          but the component never unmounts). Without a key it mounted on the first
+          render with `editing === null` and never re-seeded, so "edit" opened on
+          a real entity showed its title and photos over EMPTY name/description.
+          That is data loss, not just confusion: `handleSave` sends `description`
+          as it finds it, so typing a name to re-enable the disabled Save button
+          would silently overwrite the real description with ''. Same defect and
+          same fix as StyleLibrary (de5ce6b). */}
+      <EntityEditor
+        key={editing?.id ?? 'new'}
+        entity={editing}
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+      />
     </div>
   )
 }

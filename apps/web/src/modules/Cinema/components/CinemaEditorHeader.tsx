@@ -162,13 +162,25 @@ export function CinemaEditorHeader({
 
       {film ? (
         <>
-          {/* Style default + a full rename/aspect form still reachable in edit mode */}
-          <FilmSettingsModal
-            film={film}
-            styles={styles}
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-          />
+          {/* Style default + a full rename/aspect form still reachable in edit mode.
+              MOUNTED ONLY WHILE OPEN (`&& isSettingsOpen`), the SoulCard precedent,
+              and it is load-bearing: FilmSettingsModal seeds its fields with
+              `useState(film?.title ?? '')`, which runs once at mount. Guarded on
+              `film` alone it mounted the moment the film loaded and never re-seeded
+              — while BOTH controls in this very bar go on mutating that film
+              (FilmTitleField renames it, AspectChip changes its ratio). So after an
+              inline rename this form still held the OLD title, and saving a style
+              change from it would have silently reverted the rename. Same defect
+              class as EntityLibrary/StyleLibrary; here the fix is a mount guard
+              rather than a key, because the film's id never changes. */}
+          {isSettingsOpen ? (
+            <FilmSettingsModal
+              film={film}
+              styles={styles}
+              isOpen
+              onClose={() => setIsSettingsOpen(false)}
+            />
+          ) : null}
 
           {/* Destructive confirm: the mutation fires only on the danger pill (§9) */}
           <Modal

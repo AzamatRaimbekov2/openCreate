@@ -65,3 +65,19 @@ flowchart TD
 ## Commits
 
 - b6ab9ec 2026-07-09 feat: CinemaStudio, entity library and shared/ui listbox refactor
+
+## Update 2026-07-31 — the editor is KEYED (it opened blank on existing entities)
+- **The bug (from b6ab9ec, found live):** `<EntityEditor entity={editing} …/>` had no
+  `key`. The editor seeds its fields with `useState(entity?.name ?? '')` — which runs
+  once, at mount — and this component renders it PERMANENTLY (the `Modal` returns null
+  while closed, but the component never unmounts). So it mounted on the first render
+  with `editing === null` and never re-seeded: pressing "edit" on a real entity showed
+  that entity's title and photos over EMPTY name and description fields.
+- **It was data loss, not just confusion.** `handleSave` sends `description` as it finds
+  it, so a user who typed a name to re-enable the disabled Save button would silently
+  overwrite the stored description with `''`.
+- **Fix:** `key={editing?.id ?? 'new'}` — the same one-line fix `StyleLibrary` took in
+  de5ce6b, and the same reason the Cinema inspector keys on `shot.id`. Keying on the ID
+  (not the row) means an unrelated cache update does not remount and discard typing.
+- Pinned by `EntityLibrary.test.tsx`: opening edit shows the entity's name AND
+  description, and opening a second entity re-seeds. Verified red before the fix.

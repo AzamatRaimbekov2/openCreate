@@ -69,3 +69,22 @@ flowchart LR
   where the film's default style is picked. Pure pass-through: this bar renders no
   style UI of its own.
 - Route-injected on the same seam as `chrome` — Cinema must not import `modules/Styles`.
+
+## Update 2026-07-31 — the settings modal mounts only while open
+- Found while auditing for more instances of the EntityLibrary/StyleLibrary defect.
+  `FilmSettingsModal` was guarded on `film` alone, so it mounted the moment the film
+  loaded and stayed mounted — while it seeds its fields with `useState(film?.title ?? '')`,
+  which runs once at mount.
+- **Why that bites HERE specifically:** both of the other controls in this same bar go
+  on mutating the film underneath it — `FilmTitleField` renames it and `AspectChip`
+  changes its ratio, each through `useUpdateFilm`. So after an inline rename the
+  settings form still held the OLD title, and saving a default-style change from it
+  would have silently reverted the rename.
+- **Fix:** `{isSettingsOpen ? <FilmSettingsModal … isOpen/> : null}` — mount on open, the
+  `SoulCard` → `SoulEditModal` precedent ("mounted only while open, so each edit starts
+  from the SAVED soul"). A mount guard rather than a `key` because the film's id never
+  changes; what goes stale is its CONTENT.
+- **Ships without a dedicated test, deliberately:** this file's harness bakes the `film`
+  prop into a router route component, so swapping it between opens is harness surgery in
+  another agent's module — beyond the surgical remit of this sweep. The header's existing
+  236 tests still pass. Worth covering when this file is next owned properly.
