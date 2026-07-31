@@ -14,6 +14,7 @@ import {
 } from '@tanstack/react-router'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Film } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
@@ -98,6 +99,51 @@ async function renderHeader({
   return result
 }
 
+// A variant of the harness whose `film` can change AFTER mount, which the plain
+// one cannot do (it bakes the prop into a router route component). That is the
+// exact condition the settings modal has to survive: this bar's own controls
+// PATCH the film while it is on screen — FilmTitleField renames it, AspectChip
+// changes its ratio — and the parent then re-renders with fresh film data.
+//
+// The button below stands in for that re-render. It is a test-only affordance,
+// not a claim about the UI: what is being modelled is "the film prop changed
+// after the header mounted", however it changed.
+function renderHeaderWithMutableFilm(initialFilm: Film) {
+  function Harness() {
+    const [film, setFilm] = useState(initialFilm)
+    return (
+      <>
+        <button type="button" onClick={() => setFilm({ ...film, title: 'Renamed Live' })}>
+          simulate-parent-refresh
+        </button>
+        <CinemaEditorHeader film={film} onExport={() => {}} canExport isStarting={false} />
+      </>
+    )
+  }
+
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const rootRoute = createRootRoute()
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/',
+    component: Harness,
+  })
+  const libraryStub = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/cinema',
+    component: () => null,
+  })
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([indexRoute, libraryStub]),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+}
+
 beforeEach(() => {
   apiMock.mockReset()
   apiMock.mockResolvedValue(makeFilm())
@@ -148,6 +194,25 @@ describe('CinemaEditorHeader', () => {
       method: 'PATCH',
       body: JSON.stringify({ aspectRatio: '9:16' }),
     })
+  })
+
+  it('opens film settings on the CURRENT film, not the one it mounted with', async () => {
+    // The settings modal seeds its fields with useState(film?.title ?? ''), which
+    // runs once at mount. Mounted alongside the bar it seeded at load and never
+    // again — so after an inline rename it still held the OLD title, and saving a
+    // default-style change from it would have silently REVERTED the rename. That
+    // is why it now mounts only while open. Fourth instance of the defect class
+    // fixed in StyleLibrary (de5ce6b) and EntityLibrary (6d1b19f).
+    const user = userEvent.setup()
+    renderHeaderWithMutableFilm(makeFilm({ title: 'Neon Drift' }))
+    await screen.findByRole('button', { name: /mp4/i })
+
+    await user.click(screen.getByRole('button', { name: /simulate-parent-refresh/i }))
+
+    await user.click(screen.getByRole('button', { name: /film actions/i }))
+    await user.click(screen.getByRole('menuitem', { name: /film settings/i }))
+
+    expect(screen.getByRole('textbox', { name: /^title$/i })).toHaveValue('Renamed Live')
   })
 
   it('shows the film META — shot count and duration', async () => {

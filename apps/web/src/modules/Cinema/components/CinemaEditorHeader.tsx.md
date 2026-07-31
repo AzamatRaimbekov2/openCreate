@@ -84,7 +84,12 @@ flowchart LR
   `SoulCard` → `SoulEditModal` precedent ("mounted only while open, so each edit starts
   from the SAVED soul"). A mount guard rather than a `key` because the film's id never
   changes; what goes stale is its CONTENT.
-- **Ships without a dedicated test, deliberately:** this file's harness bakes the `film`
-  prop into a router route component, so swapping it between opens is harness surgery in
-  another agent's module — beyond the surgical remit of this sweep. The header's existing
-  236 tests still pass. Worth covering when this file is next owned properly.
+- **Now covered** (the gap above is closed). `CinemaEditorHeader.test.tsx` gained
+  `renderHeaderWithMutableFilm`, a second harness whose `film` can change AFTER mount —
+  the plain one bakes the prop into a router route component and cannot. The test
+  refreshes the film, opens Film settings, and asserts the Title field carries the NEW
+  title. Verified red-green against the production code: with the mount guard removed the
+  field came back «Neon Drift» instead of «Renamed Live» — the reversion bug itself.
+  The harness's `simulate-parent-refresh` button is a test-only stand-in for "the parent
+  re-rendered with fresh film data"; the real triggers are FilmTitleField and AspectChip,
+  both of which PATCH the film from this same bar.
