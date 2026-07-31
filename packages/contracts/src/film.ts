@@ -31,6 +31,32 @@ import { cameraMotionSchema, cameraShotSchema, promptPresetSchema, styleIdSchema
 // contracts so the composer renders the same ceiling the API enforces.
 export const MAX_SHOT_REFERENCE_IMAGES = 5
 
+// The user-supplied-image rule, named ONCE and declared here (above its first
+// use — a `const` is not hoisted, and both consumers below would otherwise hit
+// the temporal dead zone). It governs every image this file lets across the
+// wire — a shot's reference and a film's cover:
+//  · `data:image/` — a raster image, never a URL and never text. The API does
+//    not fetch addresses users hand it (SSRF guard).
+//  · NOT svg — `image/svg+xml` is an "image" that carries <script>; served from
+//    our own origin it becomes stored XSS. The storage layer (parseImageDataUri)
+//    rejects it again on the disk side, but the boundary rejects it first so a
+//    bad upload is a clean 400, not a 500 surfaced deep in a service.
+//  · size-capped on the base64 string; the storage layer re-checks the DECODED
+//    byte count (base64 inflates ~4/3), so the real ceiling is measured, not
+//    guessed.
+//
+// ONE const rather than a copy per consumer because it is a SECURITY boundary:
+// two copies of an svg refusal are two things that can drift, and the one that
+// drifts is the one nobody re-reads. (`contracts/style.ts` carries a third copy
+// for a style's reference image; folding that in too would make style.ts import
+// from film.ts, which inverts a sensible dependency — flagged, not done.)
+const rasterImageDataUriSchema = z
+  .string()
+  .startsWith('data:image/')
+  .max(14_000_000)
+  // Case-insensitive: `data:IMAGE/SVG+XML` is svg too.
+  .refine((v) => !/^data:image\/svg/i.test(v), 'svg images are not allowed')
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Film — the top-level project. A title, a canvas aspect ratio every shot is
 // scaled/padded to, and a default style the composer pre-selects for new shots.
@@ -49,6 +75,20 @@ export const filmSchema = z.object({
   // prompt the template authored, so the user doesn't have to invent "melancholic
   // soap-opera strings" themselves) and analytics ("which templates get finished?").
   templateId: z.string().nullable(),
+  // The film's cover picture: the '/media/<uuid>.<ext>' path of an image the user
+  // uploaded when they created it, or null. Owner request 2026-07-31 — the film
+  // library was a grid of identical glyphs, because a film genuinely had no cover
+  // anywhere in the system (FilmCard.tsx said so in a comment).
+  //
+  // NULLABLE, NEVER ABSENT: the card decides between the picture and its
+  // placeholder plate off `coverUrl === null`, so a missing key would be a server
+  // that forgot to answer rather than a film without a cover. Every film that
+  // predates the column reads null, which is exactly what it is.
+  //
+  // A PATH, not bytes, and not a generation citation: the cover is an uploaded
+  // file, so it is stored the way every other uploaded image is (saveDataUri into
+  // STORAGE_DIR) and read back as the path we minted.
+  coverUrl: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -56,10 +96,34 @@ export type Film = z.infer<typeof filmSchema>
 
 // Note there is no templateId here on purpose: a film's template provenance is
 // a fact the SERVER establishes, not a claim the client may assert.
+//
+// THE DIALOG COLLAPSED TO "TITLE + AN OPTIONAL COVER" (owner, 2026-07-31). Aspect
+// ratio and default style did not go away — they moved to the detail page's
+// settings, where they belong: both are decisions about a film you are already
+// looking at, and asking for them before the film exists made the first screen a
+// form to fill in rather than a thing to name.
+//
+// Both changes here are WIDENING — every body an older client sends still parses,
+// and the from-template path that has always supplied a ratio is untouched —
+// which is the only reason this ships without a version bump.
 export const createFilmInputSchema = z.object({
   title: z.string().min(1).max(120),
-  aspectRatio: aspectRatioSchema,
+  // Optional on the wire, DEFAULTED BY THE SERVER (not by `.default()` here).
+  // One place decides what a film's ratio is when nobody said, and it is the
+  // side that owns the row — a schema default would mean the client library and
+  // the server each carrying an opinion, which is how they come to disagree.
+  aspectRatio: aspectRatioSchema.optional(),
   defaultStyleId: styleIdSchema.nullable().optional(),
+  // The cover, as BYTES on the create request. Same rule as every other
+  // user-supplied image on this wire (see rasterImageDataUriSchema): a raster
+  // data URI, never a URL — the API does not fetch addresses users hand it.
+  //
+  // It rides the create body rather than a follow-up upload so that "name it and
+  // pick a picture" is ONE request: a second round-trip could half-succeed and
+  // leave a film whose cover silently never arrived. The server therefore stores
+  // the bytes BEFORE inserting the row, so a rejected image means no film at all
+  // rather than a film with a broken cover.
+  coverDataUri: rasterImageDataUriSchema.optional(),
 })
 export type CreateFilmInput = z.infer<typeof createFilmInputSchema>
 
@@ -238,13 +302,7 @@ export type UpdateShotInput = z.infer<typeof updateShotInputSchema>
 //    byte count (base64 inflates ~4/3), so the real ceiling is measured, not
 //    guessed.
 export const addShotReferenceInputSchema = z.object({
-  dataUri: z
-    .string()
-    .startsWith('data:image/')
-    .max(14_000_000)
-    // svg is an image mime that carries script — reject it before it can be stored
-    // and served from our origin. Case-insensitive: `data:IMAGE/SVG+XML` is svg too.
-    .refine((v) => !/^data:image\/svg/i.test(v), 'svg images are not allowed'),
+  dataUri: rasterImageDataUriSchema,
 })
 export type AddShotReferenceInput = z.infer<typeof addShotReferenceInputSchema>
 

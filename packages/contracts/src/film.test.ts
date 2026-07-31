@@ -7,6 +7,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   addShotReferenceInputSchema,
+  createFilmInputSchema,
+  filmSchema,
   generateShotClipInputSchema,
   shotReferenceImageSchema,
   shotSchema,
@@ -81,6 +83,93 @@ describe('addShotReferenceInputSchema', () => {
   it('rejects an oversize payload (cap mirrors the entity image ~14MB limit)', () => {
     const huge = 'data:image/png;base64,' + 'A'.repeat(14_000_001)
     expect(addShotReferenceInputSchema.safeParse({ dataUri: huge }).success).toBe(false)
+  })
+})
+
+// The create dialog collapsed to "title + an optional cover" (owner, 2026-07-31):
+// aspect ratio and style moved to the detail page's settings, so the wire has to
+// stop demanding them up front. Both changes are WIDENING — every body an older
+// client sends still parses — which is the only reason this is safe to ship
+// without a version bump.
+describe('createFilmInputSchema', () => {
+  it('accepts a title alone — the whole dialog is now one field', () => {
+    expect(createFilmInputSchema.safeParse({ title: 'Мой фильм' }).success).toBe(true)
+  })
+
+  it('still accepts a body carrying aspectRatio and defaultStyleId', () => {
+    // The widening must not break the clients already in the wild, nor the
+    // from-template path that has always sent a ratio.
+    const r = createFilmInputSchema.safeParse({
+      title: 'Мой фильм',
+      aspectRatio: '9:16',
+      defaultStyleId: 'anime',
+    })
+    expect(r.success).toBe(true)
+    expect(r.data?.aspectRatio).toBe('9:16')
+  })
+
+  // Optional, NOT defaulted in the schema: the server owns the default so there
+  // is one place it is decided, and a client that omits the field cannot be told
+  // apart from one that never knew about it.
+  it('leaves an omitted aspectRatio undefined for the server to default', () => {
+    const r = createFilmInputSchema.safeParse({ title: 'Мой фильм' })
+    expect(r.data?.aspectRatio).toBeUndefined()
+  })
+
+  it('still rejects a garbage aspectRatio when one IS sent', () => {
+    expect(createFilmInputSchema.safeParse({ title: 'X', aspectRatio: '4:3' }).success).toBe(false)
+  })
+
+  it('rejects an empty or oversize title', () => {
+    expect(createFilmInputSchema.safeParse({ title: '' }).success).toBe(false)
+    expect(createFilmInputSchema.safeParse({ title: 'x'.repeat(121) }).success).toBe(false)
+  })
+
+  // The cover obeys the SAME rule as every other user-supplied image on the wire.
+  // It is the identical guard because it protects the identical thing: bytes we
+  // will store and then serve from our own origin.
+  it('accepts a raster cover data URI', () => {
+    expect(createFilmInputSchema.safeParse({ title: 'X', coverDataUri: PNG }).success).toBe(true)
+  })
+
+  it('rejects an svg cover (stored-XSS carrier)', () => {
+    const svg = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
+    expect(createFilmInputSchema.safeParse({ title: 'X', coverDataUri: svg }).success).toBe(false)
+  })
+
+  it('rejects a URL cover — bytes only, never a fetchable address (SSRF)', () => {
+    expect(
+      createFilmInputSchema.safeParse({ title: 'X', coverDataUri: 'https://x/y.png' }).success,
+    ).toBe(false)
+  })
+
+  it('rejects an oversize cover', () => {
+    const huge = 'data:image/png;base64,' + 'A'.repeat(14_000_001)
+    expect(createFilmInputSchema.safeParse({ title: 'X', coverDataUri: huge }).success).toBe(false)
+  })
+})
+
+describe('filmSchema.coverUrl', () => {
+  const baseFilm = {
+    id: 'f1',
+    title: 'Мой фильм',
+    aspectRatio: '16:9' as const,
+    defaultStyleId: null,
+    templateId: null,
+    createdAt: '2026-07-31T00:00:00.000Z',
+    updatedAt: '2026-07-31T00:00:00.000Z',
+  }
+
+  it('carries the stored cover as a server media path', () => {
+    const r = filmSchema.safeParse({ ...baseFilm, coverUrl: '/media/abc.png' })
+    expect(r.success).toBe(true)
+  })
+
+  it('is null for a film with no cover — present and null, never absent', () => {
+    expect(filmSchema.safeParse({ ...baseFilm, coverUrl: null }).success).toBe(true)
+    // A payload MISSING the key is a server that forgot to fill it. The card
+    // renders a placeholder off `coverUrl === null`, so the field has to exist.
+    expect(filmSchema.safeParse(baseFilm).success).toBe(false)
   })
 })
 

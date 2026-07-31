@@ -201,3 +201,36 @@ Inheriting a check that can never fire would only mislead the next reader.
 Nothing about the shape changed: the same fields, the same `entityRefs` widening
 to `MAX_SHOT_REFERENCE_IMAGES`, the same stripping of a hand-rolled
 `referenceImages` key.
+
+## Update 2026-07-31 — film cover + the create dialog collapses to "title + picture"
+
+Owner request: creating a film should ask for a **name and, optionally, a cover** — nothing else.
+Aspect ratio and default style did not disappear, they moved to the detail page's settings, where
+they are decisions about a film you are already looking at.
+
+- **`filmSchema.coverUrl: z.string().nullable()`** — the `/media/<uuid>.<ext>` path of an uploaded
+  cover, or null. Nullable and **never absent**: `FilmCard` chooses between the picture and its
+  placeholder plate off `coverUrl === null`, so a missing key would mean "the server forgot", not
+  "this film has no cover". Every film predating the column reads null, which is what it is. Reaches
+  the list and the detail for free — both are built from `filmSchema`.
+  Until now a film had **no cover anywhere in the system**; `FilmCard.tsx` said so in a comment.
+- **`createFilmInputSchema.aspectRatio` is now optional**, and is defaulted **by the server**
+  (`'16:9'`), not by `.default()` here. One side owns that decision, and it is the side that owns
+  the row — a schema default would put an opinion in the client bundle too, which is how the two
+  come to disagree.
+- **`createFilmInputSchema.coverDataUri`** — the cover as BYTES on the create request. It rides the
+  create body rather than a follow-up upload so "name it and pick a picture" is ONE request: a second
+  round trip can half-succeed and leave a film whose cover silently never arrived. The server stores
+  the bytes **before** inserting the row, so a rejected image means no film at all rather than a film
+  with a broken cover.
+- **Both changes are WIDENING.** Every body an older client sends still parses, and the from-template
+  path that has always supplied a ratio is untouched — the only reason this ships without a version
+  bump. Pinned by a test that sends the old full body and one that sends a bare title.
+- **`rasterImageDataUriSchema` extracted** (top of file, above its first use — `const` is not
+  hoisted). One named rule now serves `addShotReferenceInputSchema` and `coverDataUri`, because it is
+  a SECURITY boundary: two copies of an svg refusal are two things that can drift, and the one that
+  drifts is the one nobody re-reads. `contracts/style.ts` still carries a third copy for a style's
+  reference — folding that in would make `style.ts` import from `film.ts` and invert a sensible
+  dependency, so it is **flagged, not done**.
+- Scope: **create only**. There is deliberately no cover on `updateFilmInputSchema` — changing a
+  cover after the fact was not asked for (noted as a possible follow-up).
