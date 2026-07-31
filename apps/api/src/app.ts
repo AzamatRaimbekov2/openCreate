@@ -44,6 +44,8 @@ import { registerPromptRoutes } from './modules/prompt/routes'
 import { registerCompareRoutes } from './modules/compare/routes'
 import { createCanvasService } from './modules/canvas/service'
 import { registerCanvasRoutes } from './modules/canvas/routes'
+import { createStyleService } from './modules/styles/service'
+import { registerStyleRoutes } from './modules/styles/routes'
 import { buildBrainChain } from './modules/creator/brain'
 import type { Brain } from './modules/creator/brain'
 import { buildCreatorTools } from './modules/creator/tools'
@@ -308,6 +310,14 @@ export async function buildApp(deps: AppDeps) {
   // One entity service instance, shared: the generation service needs it to
   // resolve tagged mentions, and the entity routes expose the same rules.
   const entityService = createEntityService({ db: deps.db, storage: deps.storage })
+  // Style registry (ADR style-studio D1). Constructed BEFORE the generation
+  // service because that one resolves a style on every styled create — the
+  // dependency runs styles → generations, never back, which is why this service
+  // takes only the db and reads a cited preview generation's row directly (the
+  // acyclicity choice entities/service.ts documents on copyGeneratedAsset).
+  // It spends nothing: a preview is an ordinary POST /api/generations.
+  const styleService = createStyleService({ db: deps.db })
+  registerStyleRoutes(app, styleService)
   // Hoisted to a const (it used to be constructed inline in the register call)
   // because Soul Studio's portrait orchestrator needs THIS instance: it is the
   // single money path, and a second instance would mean a second poll-throttle map.

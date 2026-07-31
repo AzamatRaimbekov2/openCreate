@@ -368,6 +368,42 @@ CREATE TABLE IF NOT EXISTS canvas_edge (
 CREATE INDEX IF NOT EXISTS idx_canvas_edge_canvas ON canvas_edge(canvas_id);
 `
 
+// Style Studio (ADR: style-studio D2). ONE table, and only for the USER half of
+// the registry — the seven builtin styles stay code (STYLE_PRESETS), exactly the
+// way the model catalog does, so templates and defaults never depend on the db
+// and their ids can never be edited out from under an existing film.
+//
+// kind + config_json are the extension seam: 'lora' and 'reference' styles are
+// meant to arrive as a new `kind` value plus keys inside config_json, so growing
+// the feature needs neither a migration nor a wire change.
+//
+// preview_generation_id CITES a generation and does not own it (canvas-mode D1 —
+// the same "cite, never own" rule as shot.generation_id), hence no FK: deleting
+// the generation from the gallery must leave a style with no preview, never
+// cascade the style away. Resolution re-checks ownership at read time anyway.
+export const STYLE_DDL = `
+CREATE TABLE IF NOT EXISTS style (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  -- Discriminator for the constructor kind. One value in the MVP: 'prompt'.
+  kind TEXT NOT NULL DEFAULT 'prompt',
+  -- EN positive fragment, prepended to the model prompt (<=500 at the wire).
+  fragment TEXT NOT NULL,
+  -- EN negative, pushed into the negative prompt (<=300). '' is the norm.
+  negative TEXT NOT NULL DEFAULT '',
+  -- Advisory only, never forced — same contract as a builtin's.
+  recommended_model_id TEXT,
+  -- Room for future kinds (lora weights, reference strength) without a migration.
+  config_json TEXT NOT NULL DEFAULT '{}',
+  -- The style's sample image: a generation id, deliberately WITHOUT a foreign key.
+  preview_generation_id TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_style_user_updated ON style(user_id, updated_at DESC);
+`
+
 // openCreator tables (ADR: opencreator-agent D4). Same idempotent contract as
 // CANVAS_DDL. A session is a persisted CHAT and every agent step is a message,
 // so the SPA can poll one GET and redraw the whole story — in-flight loops live

@@ -26,6 +26,11 @@ erDiagram
 ```
 
 ## Key decisions / gotchas
+- **`style`** (ADR style-studio D2, 2026-07-31): the USER half of the style registry. Builtins are
+  deliberately NOT rows — they are code, so a template or a film default can cite one without the db
+  existing. `previewGenerationId` cites a generation with no reference (same rule as
+  `shot.generationId`): deleting the generation empties the preview instead of cascading the style
+  away, and ownership is re-checked whenever the preview is read.
 - ANY change here MUST be mirrored in `ddl.ts` (idempotent SQL bootstrap) — there are no drizzle-kit migrations in MVP. Columns added AFTER first ship also need a guarded `ALTER TABLE` micro-migration in `client.ts` (CREATE IF NOT EXISTS never alters existing tables).
 - `generation.errorCode` (`error_code`, nullable) is the machine-readable failure reason — today only `'content_blocked'` for NSFW safety blocks, so the SPA can localize the message instead of echoing raw provider text.
 - `creditsBalance` is mutated ONLY inside the same transaction as a `credit_transaction` row (ledger invariant).

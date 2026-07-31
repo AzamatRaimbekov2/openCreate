@@ -22,6 +22,14 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- **`STYLE_DDL`** (ADR style-studio D2, 2026-07-31): ONE table, `style`, for the USER half of the
+  style registry only — the seven builtins stay code (`STYLE_PRESETS`), like the model catalog, so
+  templates and film defaults never depend on the db and their ids cannot be edited out from under an
+  existing film. `kind` + `config_json` are the extension seam ('lora'/'reference' arrive as a new
+  kind value plus keys in the JSON, with no migration and no wire change).
+  `preview_generation_id` has **no FK on purpose** — "cite, never own", the same rule as
+  `shot.generation_id` and `canvas_node.generation_ids_json`: deleting the generation must leave a
+  style with an empty preview, never cascade the style away.
 - Indexes: `idx_generation_user_created(user_id, created_at DESC)` and `idx_credit_tx_user(user_id, created_at DESC)` back the library list and transactions endpoints.
 - Idempotent by construction — safe to run on every boot; adding a column later requires a guarded `ALTER TABLE` micro-migration in `client.ts` (CREATE IF NOT EXISTS never alters existing tables).
 - `generation.error_code` (nullable TEXT) mirrors `schema.ts` — machine-readable failure reason (`content_blocked` for NSFW safety blocks); back-filled for older db files by `client.ts`.

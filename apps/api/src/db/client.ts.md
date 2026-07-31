@@ -22,6 +22,9 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- `STYLE_DDL` is exec'd with the rest (2026-07-31). ONE brand-new table for the user half of the
+  style registry — builtins stay in code — so the idempotent `CREATE TABLE IF NOT EXISTS` is the
+  whole story: no micro-migration guard needed.
 - `foreign_keys=ON` must be set per-connection (SQLite default is OFF) — cascades depend on it.
 - better-sqlite3 is synchronous: `db.transaction((tx) => …)` with `.run()/.get()/.all()` — no `await` inside transactions.
 - **Refund-once unique index (review finding)**: `REFUND_ONCE_INDEX_DDL` (UNIQUE on `credit_transaction(generation_id, kind)`) is exec'd SEPARATELY from `DDL` and wrapped in try/catch: a legacy db that already contains duplicate rows would make `CREATE UNIQUE INDEX` throw, and bricking the boot over a backstop is worse than running on the ledger's app-level guard alone — the skip is `console.warn`ed so the operator knows the ledger needs manual repair. Pinned by `test/ledger.test.ts` (fresh dbs get the index + boot survives legacy dupes).

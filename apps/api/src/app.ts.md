@@ -26,6 +26,11 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
+- **`styleService` is constructed BEFORE `generationService`** (ADR style-studio, 2026-07-31), because
+  the generation service resolves a style on every styled create. The dependency runs styles →
+  generations and never back, which is why the style service takes only `db` and reads a cited
+  preview generation's row directly (the acyclicity choice `entities/service.ts` documents on
+  `copyGeneratedAsset`). It spends nothing — a style preview is an ordinary POST /api/generations.
 - Error mapping: `err.apiCode` (set by domain errors like `InsufficientCreditsError` / `requireUser`) wins and keeps its client-facing message; otherwise 4xx→`validation_failed` with the message, and **unexpected 5xx are SANITIZED** — fixed `{ internal_error, 'Something went wrong' }` envelope, real message + stack logged via `req.log.error({ err, event: 'unhandled_error' })` (pinned by `test/errors-sanitized.test.ts`).
 - Rate limiting: `@fastify/rate-limit` registered before any route (its onRoute hook must see every registration). Global 300/min per IP; strict per-route buckets via `config.rateLimit` — `/api/auth/*` 10/min (`modules/auth/plugin.ts`), `POST /api/generations` 20/min (`modules/generations/routes.ts`). `errorResponseBuilder` **must return an Error with `statusCode: 429` + `apiCode: 'rate_limited'`** — the plugin THROWS the builder result, so it flows through our central error handler which then emits the shared envelope (a plain object here would read as an unexpected 500 and get sanitized). Pinned by `test/rate-limit.test.ts`.
 - `trustProxy: deps.config.trustProxy` on the Fastify constructor (review finding): the limiter keys buckets on `req.ip`, and production runs behind a reverse proxy forwarding everyone from loopback (PROD.md) — without trust, EVERY user shares one bucket per limit (10 cheap auth requests/min = auth-lockout DoS; per-client attribution impossible). Default `false` (client-forged `X-Forwarded-For` ignored on direct exposure); operators opt in via `TRUST_PROXY` (`true` or address/CIDR list — see `config.ts.md` and PROD.md). Pinned by `test/rate-limit.test.ts` ("behind a reverse proxy").

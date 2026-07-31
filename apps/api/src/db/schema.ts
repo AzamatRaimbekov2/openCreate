@@ -434,6 +434,33 @@ export const canvasEdge = sqliteTable('canvas_edge', {
   targetNodeId: text('target_node_id').notNull(),
 })
 
+// Style Studio (ADR style-studio D2): the USER half of the style registry. The
+// seven builtins are not here and never will be — they are code (STYLE_PRESETS),
+// so a template or a film's default can cite one without the db existing.
+// previewGenerationId CITES a generation with no reference, the same rule as
+// shot.generationId: deleting the generation empties the preview, it must never
+// cascade the style away.
+export const style = sqliteTable('style', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  // Constructor discriminator; 'lora'/'reference' are the designed successors.
+  kind: text('kind', { enum: ['prompt'] })
+    .notNull()
+    .default('prompt'),
+  fragment: text('fragment').notNull(),
+  negative: text('negative').notNull().default(''),
+  // Advisory, never forced — same contract as a builtin's.
+  recommendedModelId: text('recommended_model_id'),
+  // Future kinds' parameters, so growing needs no migration.
+  configJson: text('config_json').notNull().default('{}'),
+  previewGenerationId: text('preview_generation_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
 // openCreator (ADR opencreator-agent D4): the agent chat. Two tables and no more
 // — the agent's OUTPUT lives in the existing aggregates (entity, canvas,
 // generation) and is cited by id inside content_json, so this module owns the

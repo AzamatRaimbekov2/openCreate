@@ -12,6 +12,7 @@ import {
   MODEL3D_DDL,
   ASSET3D_DDL,
   CANVAS_DDL,
+  STYLE_DDL,
   CREATOR_DDL,
   REFUND_ONCE_INDEX_DDL,
 } from './ddl'
@@ -45,6 +46,10 @@ export function createDb(path: string) {
   // Canvas Mode (ADR canvas-mode): three brand-new tables, so only the
   // idempotent CREATE IF NOT EXISTS exec is needed — no micro-migration guard.
   sqlite.exec(CANVAS_DDL)
+  // Style Studio (ADR style-studio): ONE brand-new table for the user half of
+  // the style registry — the builtins stay in code — so the idempotent CREATE
+  // IF NOT EXISTS is the whole story, no micro-migration guard.
+  sqlite.exec(STYLE_DDL)
   // openCreator (ADR opencreator-agent): two brand-new tables (creator_session,
   // creator_message) — same story, no micro-migration guard. Exec'd here rather
   // than lazily on first use so a deployment that never opens /creator still has
