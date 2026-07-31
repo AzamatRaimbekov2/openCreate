@@ -8,7 +8,11 @@
 // can lead to — its preview — is an ordinary POST /api/generations, which
 // carries the money path's own limits and charges.
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { createStyleInputSchema, updateStyleInputSchema } from '@opencreate/contracts'
+import {
+  addStyleReferenceInputSchema,
+  createStyleInputSchema,
+  updateStyleInputSchema,
+} from '@opencreate/contracts'
 import { StyleNotFoundError, StyleValidationError } from './service'
 import type { StyleService } from './service'
 
@@ -61,4 +65,34 @@ export function registerStyleRoutes(app: FastifyInstance, service: StyleService)
       return reply.status(204).send()
     })
   })
+
+  // The reference half of the package (ADR style-studio A4) — a deliberate
+  // mirror of the shot-reference endpoints, down to the status codes: 201 for an
+  // upload that created something, 200 for a detach that returns the survivors,
+  // and the UPDATED STYLE as the body of both. Returning the whole style rather
+  // than the one reference is what lets the constructor re-render its thumbnail
+  // strip from one response, with no client-side merge to get wrong.
+  //
+  // Still no rate bucket of its own: an upload writes one bounded file, and the
+  // cap (3) plus the wire's byte limit are the real ceiling here.
+  app.post<{ Params: { id: string } }>('/api/styles/:id/references', async (req, reply) => {
+    const user = await app.requireUser(req)
+    const parsed = addStyleReferenceInputSchema.safeParse(req.body)
+    // The zod refusal covers svg and oversize payloads BEFORE the service ever
+    // sees them; storage.saveDataUri re-guards the disk regardless.
+    if (!parsed.success) return badInput(reply, parsed.error.issues[0]?.message ?? 'invalid input')
+    return guard(reply, async () =>
+      reply.status(201).send(await service.addReference(user.id, req.params.id, parsed.data.dataUri)),
+    )
+  })
+
+  app.delete<{ Params: { id: string; refId: string } }>(
+    '/api/styles/:id/references/:refId',
+    async (req, reply) => {
+      const user = await app.requireUser(req)
+      // No 404 for an unknown refId — the service treats it as a no-op, so a
+      // retried delete answers 200 with the same surviving list.
+      return guard(reply, () => service.removeReference(user.id, req.params.id, req.params.refId))
+    },
+  )
 }

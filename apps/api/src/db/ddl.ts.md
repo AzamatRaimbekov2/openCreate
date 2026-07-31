@@ -193,3 +193,12 @@ composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/
   The ONLY cascading edges are the owner edges (`creator_session.user_id`, `creator_message.session_id`).
 - **No cost/credit column.** The agent spends only through `generationService.create()`; `costCredits`
   on a step card is a copy of what that call already charged, for display. Zero new money code (D1).
+
+## Update 2026-07-31 — style.reference_images_json
+- `STYLE_DDL` `style` table += `reference_images_json TEXT` (nullable) — JSON `[{ id, path }]`, the
+  image half of the style package (ADR `style-studio` amendment A1) and the same shape as
+  `shot.reference_images_json`.
+- A column rather than a key inside `config_json` because these are stored FILES with a lifetime: an
+  orphan sweep must see them without parsing an open-ended blob.
+- Additive and nullable, so a legacy db file is covered by the pragma-guarded `ALTER TABLE` in
+  `client.ts` and a fresh one by this DDL — no backfill, no contract step.

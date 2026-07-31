@@ -456,6 +456,13 @@ export const style = sqliteTable('style', {
   recommendedModelId: text('recommended_model_id'),
   // Future kinds' parameters, so growing needs no migration.
   configJson: text('config_json').notNull().default('{}'),
+  // The OTHER half of the style package (ADR style-studio A1): JSON array of
+  // { id, path }, byte-identically shaped to shot.reference_images_json. It is a
+  // COLUMN and not a key inside config_json because these are stored files with
+  // a lifetime — a sweep that reclaims orphaned media has to be able to see them
+  // without parsing an open-ended blob. Nullable: a style with nothing attached
+  // reads NULL, which is exactly what every row that predates this is.
+  referenceImagesJson: text('reference_images_json'),
   previewGenerationId: text('preview_generation_id'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),

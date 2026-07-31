@@ -16,8 +16,11 @@ the service, map the two domain errors onto the `ApiError` envelope.
   - `POST /api/styles` → `201 Style`
   - `PATCH /api/styles/:id` → `200 Style`
   - `DELETE /api/styles/:id` → `204`
-- Inputs → Outputs: `createStyleInputSchema` / `updateStyleInputSchema` bodies → `Style` DTOs.
-  Invalid body → `400 validation_failed` with the first zod issue's message.
+  - `POST /api/styles/:id/references` `{ dataUri }` → `201 Style` (the UPDATED style)
+  - `DELETE /api/styles/:id/references/:refId` → `200 Style` (the updated style)
+- Inputs → Outputs: `createStyleInputSchema` / `updateStyleInputSchema` /
+  `addStyleReferenceInputSchema` bodies → `Style` DTOs. Invalid body → `400 validation_failed` with
+  the first zod issue's message.
 - Side effects: none of its own; delegates to the service.
 
 ## Dependencies
@@ -30,7 +33,8 @@ flowchart LR
   C[SPA] -->|"GET /api/styles"| RT[style routes]
   C -->|"POST/PATCH/DELETE"| RT
   RT -->|requireUser| A[session]
-  RT -->|zod parse| V["createStyleInput /<br/>updateStyleInput"]
+  C -->|"POST/DELETE :id/references"| RT
+  RT -->|zod parse| V["createStyleInput /<br/>updateStyleInput /<br/>addStyleReferenceInput"]
   RT --> S[styleService]
   S -->|StyleNotFoundError| E404["404 not_found<br/>(foreign == missing)"]
   S -->|StyleValidationError| E400["400 validation_failed<br/>(builtin / bad preview)"]
@@ -45,6 +49,18 @@ flowchart LR
   because those refusals (a builtin, a bad preview citation) describe an action the caller may fix.
 - `GET /api/styles` is the ONLY read: there is no `GET /api/styles/:id`, because the list is small,
   bounded by one user's rows plus seven, and every consumer wants the whole thing.
+- **The reference endpoints are a deliberate mirror of the shot-reference ones** (ADR A4), down to
+  the status codes: `201` for an upload that created something, `200` for a detach that returns the
+  survivors, and the **whole updated style** as the body of both — so the constructor re-renders its
+  thumbnail strip from one response with no client-side merge to get wrong.
+- **svg is refused twice, on purpose.** `addStyleReferenceInputSchema` rejects it at the wire (along
+  with oversize payloads) and `storage.saveDataUri` → `parseImageDataUri` re-guards the disk. Defence
+  in depth: the wire check is what produces a clean message, the disk check is what is actually
+  load-bearing if a future caller bypasses the route.
+- **An unknown `refId` DELETE answers 200, not 404** — the service treats it as a no-op, so a retried
+  delete is safe and idempotent.
+- Reference uploads get no rate bucket of their own either: the cap (3 per style) plus the wire's
+  byte limit are the real ceiling.
 
 ## Commits
 - _no commit yet_

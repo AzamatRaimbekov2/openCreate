@@ -131,3 +131,12 @@ plain strings inside JSON, so no `REFERENCES` clause is possible or wanted there
 generation leaves a stale citation on an old chat card instead of erasing the conversation. Only
 `creator_session.user_id` and `creator_message.session_id` cascade. See ADR
 `docs/wiki/decisions/opencreator-agent.md`.
+
+## Update 2026-07-31 — style.reference_images_json micro-migration
+Pragma-guarded `ALTER TABLE style ADD COLUMN reference_images_json TEXT`, reading its own
+`pragma table_info(style)` (`styleColumns`) exactly like the `shot` block above it. The style package
+(ADR `style-studio` amendment A1) stores its images as JSON `[{ id, path }]`.
+
+NULL is not a gap here, it is the meaning: "this style has nothing attached", which is every row
+written before the amendment. So the EXPAND step is the whole migration — nothing to backfill, no
+contract step, and rolling the code back leaves a column no writer reads.

@@ -16,10 +16,37 @@
 // never charges, never refunds, and never touches the ledger.
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq } from 'drizzle-orm'
-import { resolveBuiltinStyle, STYLE_PRESETS } from '@opencreate/contracts'
-import type { CreateStyleInput, Style, StyleFragments, UpdateStyleInput } from '@opencreate/contracts'
+import { resolveBuiltinStyle, STYLE_MAX_REFERENCES, STYLE_PRESETS } from '@opencreate/contracts'
+import type {
+  CreateStyleInput,
+  Style,
+  StyleFragments,
+  StyleReferenceImage,
+  UpdateStyleInput,
+} from '@opencreate/contracts'
 import type { Db } from '../../db/client'
+import type { StorageProvider } from '../../storage/local'
+import { InvalidImageDataUriError } from '../../storage/dataUri'
 import { generation, style } from '../../db/schema'
+
+// What a resolved style MEANS to the money path (ADR style-studio D3, extended
+// by amendment A2): the two composition strings, plus the stored paths of the
+// package's images.
+//
+// PATHS, NOT BYTES, and that split is the design. This service does no I/O for a
+// generation: it answers what the style is, and the generation service — which
+// already owns the closed server-only referenceImages channel, the model
+// capability gates and the failure behaviour — decides what its model can
+// honour and reads only what it will actually send. Handing back data URIs here
+// would make every style resolution pay for three file reads even on a model
+// that cannot take a single reference.
+export type ResolvedStyle = StyleFragments & { referenceImagePaths: string[] }
+
+// The stored shape, byte-identical to shot.reference_images_json. The WIRE shape
+// renames `path` to `url` (styleReferenceImageSchema) because the SPA consumes it
+// as an <img src>; the column keeps the shot's spelling so the two reference
+// stores stay recognizably the same thing.
+type StoredStyleReference = { id: string; path: string }
 
 // Foreign and missing raise the SAME error (films/canvas precedent): an
 // attacker must not learn which style ids exist by reading status codes.
@@ -49,11 +76,14 @@ export class StyleValidationError extends Error {
 // canvas chain edge share this exact wording discipline).
 const PREVIEW_REFUSAL = 'previewGenerationId must cite your own succeeded image generation'
 
-type Deps = { db: Db }
+// `storage` arrived with the reference package and is REQUIRED rather than
+// optional: an upload that silently no-ops because a dependency was missing is
+// worse than a construction error, and there is exactly one caller in the app.
+type Deps = { db: Db; storage: StorageProvider }
 
 export type StyleService = ReturnType<typeof createStyleService>
 
-export function createStyleService({ db }: Deps) {
+export function createStyleService({ db, storage }: Deps) {
   // Resolve a cited generation to the caller's own stored image, or null.
   // Used in two modes and that is the whole design:
   //  · WRITING a citation (updateStyle) — null must be refused, because a
@@ -71,6 +101,12 @@ export function createStyleService({ db }: Deps) {
     return (JSON.parse(row.mediaJson) as string[])[0] ?? null
   }
 
+  // The stored package, as an array. NULL — every row written before the column
+  // existed, and every style with nothing attached — reads as [], never null,
+  // so no caller here or on the wire branches on absence.
+  const readRefs = (row: typeof style.$inferSelect): StoredStyleReference[] =>
+    row.referenceImagesJson ? (JSON.parse(row.referenceImagesJson) as StoredStyleReference[]) : []
+
   function toDto(userId: string, row: typeof style.$inferSelect): Style {
     return {
       id: row.id,
@@ -81,6 +117,12 @@ export function createStyleService({ db }: Deps) {
       negative: row.negative,
       recommendedModelId: row.recommendedModelId,
       previewUrl: resolvePreviewUrl(userId, row.previewGenerationId),
+      // path → url at the wire boundary: the value is the same '/media/…' string
+      // either way, and the rename is where it belongs — one place, on the way
+      // out — rather than in every component that renders a thumbnail.
+      referenceImages: readRefs(row).map(
+        (ref): StyleReferenceImage => ({ id: ref.id, url: ref.path }),
+      ),
       createdAt: new Date(row.createdAt).toISOString(),
       updatedAt: new Date(row.updatedAt).toISOString(),
     }
@@ -101,6 +143,10 @@ export function createStyleService({ db }: Deps) {
       // Builtins are code: no row, so no preview and no history. The nulls are
       // information, not padding — they tell a client there is nothing to show.
       previewUrl: null,
+      // Empty for the same reason, and permanently: a builtin has nowhere to
+      // store an uploaded file. [] rather than a missing key so the picker maps
+      // builtins and user rows through the identical code path.
+      referenceImages: [],
       createdAt: null,
       updatedAt: null,
     }))
@@ -206,6 +252,65 @@ export function createStyleService({ db }: Deps) {
       db.delete(style).where(eq(style.id, styleId)).run()
     },
 
+    // Attach one image to the package (ADR style-studio A1/A4), mirroring
+    // films/shot-references.addReference operation for operation — same cap-first
+    // ordering, same storage call, same error mapping — because it guards the
+    // same things: a bounded number of files, written only for their owner.
+    async addReference(userId: string, styleId: string, dataUri: string): Promise<Style> {
+      // Builtin check BEFORE the ownership lookup, exactly as updateStyle does:
+      // a builtin has no row, so requireStyle would answer 404 and hide the real
+      // reason ("this one is code") behind a misleading "not found".
+      refuseBuiltin(styleId)
+      const row = requireStyle(userId, styleId)
+      // Budget checked BEFORE any bytes touch the disk, so the (N+1)th upload is
+      // a clean 400 rather than a stored file nobody can ever reach. >= because
+      // at the cap the next upload is the one that overflows it.
+      if (readRefs(row).length >= STYLE_MAX_REFERENCES)
+        throw new StyleValidationError(
+          `a style can carry at most ${STYLE_MAX_REFERENCES} reference images`,
+        )
+      // Fresh media key, independent of the style id: saveDataUri → parseImageDataUri
+      // re-guards the DISK (raster only — no svg stored-XSS — and a decoded-byte cap)
+      // even though the wire schema already refused svg. A rejected payload is the
+      // client's fault, so it becomes a 400 rather than a 500 leaking the storage
+      // error class out of the service.
+      let path: string
+      try {
+        path = await storage.saveDataUri(dataUri, randomUUID())
+      } catch (err) {
+        if (err instanceof InvalidImageDataUriError) throw new StyleValidationError(err.message)
+        throw err
+      }
+      const next: StoredStyleReference[] = [...readRefs(row), { id: randomUUID(), path }]
+      db.update(style)
+        .set({ referenceImagesJson: JSON.stringify(next), updatedAt: new Date() })
+        .where(eq(style.id, styleId))
+        .run()
+      return toDto(userId, db.select().from(style).where(eq(style.id, styleId)).get()!)
+    },
+
+    // Detach one image. The stored FILE is deliberately left on disk — a harmless
+    // orphan a future sweep reclaims — the same treatment shot references and
+    // entity media get: the alternative is a delete that can fail halfway and
+    // leave the row pointing at nothing. An unknown refId is a NO-OP rather than
+    // a 404, because the caller's goal ("this ref is gone") is already true, which
+    // also makes a retried DELETE safe.
+    removeReference(userId: string, styleId: string, refId: string): Style {
+      refuseBuiltin(styleId)
+      const row = requireStyle(userId, styleId)
+      const next = readRefs(row).filter((ref) => ref.id !== refId)
+      db.update(style)
+        .set({
+          // Back to NULL when the last one goes, so "nothing attached" has ONE
+          // representation in the column rather than drifting into '[]'.
+          referenceImagesJson: next.length ? JSON.stringify(next) : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(style.id, styleId))
+        .run()
+      return toDto(userId, db.select().from(style).where(eq(style.id, styleId)).get()!)
+    },
+
     // THE function the generation service calls, on every styled create, before
     // it charges. Builtin first — those ids are immutable and shared, so a user
     // row could never shadow one even if it somehow carried the same id — then
@@ -215,15 +320,32 @@ export function createStyleService({ db }: Deps) {
     // NOT distinguish unknown from foreign from deleted: all three are the same
     // 400 at the caller, so a generation request cannot be used to probe which
     // style ids exist.
-    resolveStyleFragments(userId: string, styleId: string): StyleFragments | null {
+    //
+    // It answers the WHOLE package (amendment A2) — fragments and image paths in
+    // one lookup — because the two always travel together and a second query
+    // would be a second place for the ownership rule to be forgotten. A builtin
+    // resolves with an empty path list, which is not a special case but a fact:
+    // code has nowhere to keep a file.
+    resolveStyle(userId: string, styleId: string): ResolvedStyle | null {
       const builtin = resolveBuiltinStyle(styleId)
-      if (builtin) return { fragment: builtin.fragment, negative: builtin.negative }
+      if (builtin)
+        return {
+          fragment: builtin.fragment,
+          negative: builtin.negative,
+          referenceImagePaths: [],
+        }
       const row = db
         .select()
         .from(style)
         .where(and(eq(style.id, styleId), eq(style.userId, userId)))
         .get()
-      return row ? { fragment: row.fragment, negative: row.negative } : null
+      return row
+        ? {
+            fragment: row.fragment,
+            negative: row.negative,
+            referenceImagePaths: readRefs(row).map((ref) => ref.path),
+          }
+        : null
     },
   }
 }

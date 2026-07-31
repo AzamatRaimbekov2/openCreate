@@ -201,3 +201,15 @@ Two drizzle tables mirroring `CREATOR_DDL` column-for-column (ADR `docs/wiki/dec
   The only cascading edges are the owner edges (`creatorSession.userId`, `creatorMessage.sessionId`).
 - `test/db-ddl.test.ts` pins the shape of both tables, boot idempotence, `confirmed` defaulting to 0,
   the citation-not-FK rule, and the session→messages cascade.
+
+## Update 2026-07-31 — style.reference_images_json
+- `style` += `referenceImagesJson text('reference_images_json')` (nullable) — the IMAGE half of the
+  style package (ADR `style-studio` amendment A1). JSON `[{ id, path }]`, byte-identically shaped to
+  `shot.reference_images_json`, so the two reference stores stay recognizably the same thing.
+- **A column, not a key inside `config_json`**, even though `config_json` was designed as the
+  extension seam: these are STORED FILES with a lifetime, and an orphan sweep has to be able to see
+  them without parsing an open-ended blob.
+- NULL = nothing attached, which is what every row written before this has always meant — so the
+  expand step is the whole migration (nothing to backfill, no contract step). Paired with a
+  pragma-guarded `ALTER TABLE style ADD COLUMN reference_images_json TEXT` in `client.ts`.
+- `kind` did NOT gain a value: a style is a PACKAGE (fragments AND images at once), not a new kind.

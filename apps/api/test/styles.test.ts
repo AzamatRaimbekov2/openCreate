@@ -12,11 +12,29 @@
 //  · a preview must CITE a generation the caller already paid for — same four
 //    default-deny checks and the same single message as copyGeneratedAsset, so
 //    a probe learns nothing about other people's rows;
-//  · the registry NEVER charges. Every refusal above leaves the balance alone.
+//  · the registry NEVER charges. Every refusal above leaves the balance alone;
+//  · a style is a PACKAGE (amendment A1) — its reference images obey the same
+//    rules its fragments do: capped, owner-scoped, refused on a builtin.
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildTestApp, fakeRunware, registerAndGetCookie } from './helpers/build-test-app'
 import { createDb } from '../src/db/client'
+import { createLocalStorage } from '../src/storage/local'
 import { createStyleService } from '../src/modules/styles/service'
+
+// A minimal but valid raster image data URI (8-byte PNG signature) — saveDataUri
+// decodes and stores it, exactly as the shot-reference suite does.
+const PNG = 'data:image/png;base64,iVBORw0KGgo='
+const SVG = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
+
+// The registry constructed directly (not through buildApp) needs the same two
+// dependencies the app gives it. Storage is only ever touched by an upload, but
+// stating it in the type is what keeps a second, silent file-writing path from
+// growing here later.
+const directRegistry = (db: ReturnType<typeof createDb>['db']) =>
+  createStyleService({ db, storage: createLocalStorage(mkdtempSync(join(tmpdir(), 'oc-style-'))) })
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -71,6 +89,8 @@ describe('styles: authentication', () => {
       ['POST', '/api/styles'],
       ['PATCH', '/api/styles/x'],
       ['DELETE', '/api/styles/x'],
+      ['POST', '/api/styles/x/references'],
+      ['DELETE', '/api/styles/x/references/r1'],
     ] as const) {
       const res = await app.inject({ method, url, payload: {} })
       expect(res.statusCode).toBe(401)
@@ -214,10 +234,142 @@ describe('styles: owner-scoped CRUD', () => {
   })
 })
 
-// resolveStyleFragments is the function the GENERATION service calls before it
+// The second half of the package (amendment A1/A4). Every rule the fragments
+// already obey applies here unchanged — owner-scoped, builtin-immutable, capped
+// before any bytes reach the disk — which is the point: references are a
+// capability of the existing constructor, not a new entity with new rules.
+describe('styles: the reference package', () => {
+  const uploadRef = (
+    app: Awaited<ReturnType<typeof buildTestApp>>,
+    cookie: string,
+    styleId: string,
+    dataUri = PNG,
+  ) =>
+    app.inject({
+      method: 'POST',
+      url: `/api/styles/${styleId}/references`,
+      headers: { cookie },
+      payload: { dataUri },
+    })
+
+  it('attaches an image and returns the updated style', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const style = (await createStyle(app, cookie)).json()
+
+    const res = await uploadRef(app, cookie, style.id)
+    expect(res.statusCode).toBe(201)
+    expect(res.json().referenceImages).toHaveLength(1)
+    expect(res.json().referenceImages[0].id).toEqual(expect.any(String))
+    // A stable server path we minted — never the bytes back.
+    expect(res.json().referenceImages[0].url).toMatch(/^\/media\/.+\.png$/)
+
+    // Persisted, not merely echoed: the list carries it too.
+    const list = await app.inject({ method: 'GET', url: '/api/styles', headers: { cookie } })
+    const own = (list.json().items as Array<Record<string, unknown>>).find((s) => !s.builtin)!
+    expect(own.referenceImages).toHaveLength(1)
+  })
+
+  it('lists every builtin with an empty reference array, never a missing key', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const list = await app.inject({ method: 'GET', url: '/api/styles', headers: { cookie } })
+    const items = list.json().items as Array<Record<string, unknown>>
+    expect(items.every((s) => Array.isArray(s.referenceImages))).toBe(true)
+    expect(items.filter((s) => s.builtin).every((s) => (s.referenceImages as []).length === 0)).toBe(
+      true,
+    )
+  })
+
+  it('caps the package at three images — the fourth is refused before it is stored', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const style = (await createStyle(app, cookie)).json()
+    for (let i = 0; i < 3; i++) expect((await uploadRef(app, cookie, style.id)).statusCode).toBe(201)
+
+    const overflow = await uploadRef(app, cookie, style.id)
+    expect(overflow.statusCode).toBe(400)
+    expect(overflow.json().error.code).toBe('validation_failed')
+
+    // …and it really was not stored.
+    const list = await app.inject({ method: 'GET', url: '/api/styles', headers: { cookie } })
+    const own = (list.json().items as Array<Record<string, unknown>>).find((s) => !s.builtin)!
+    expect(own.referenceImages).toHaveLength(3)
+  })
+
+  it('rejects an svg upload at the boundary (stored-XSS carrier)', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const style = (await createStyle(app, cookie)).json()
+    const res = await uploadRef(app, cookie, style.id, SVG)
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error.code).toBe('validation_failed')
+  })
+
+  it('refuses to attach to a BUILTIN — 400, the same objection as editing one', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const res = await uploadRef(app, cookie, 'anime')
+    expect(res.statusCode).toBe(400)
+    const del = await app.inject({
+      method: 'DELETE',
+      url: '/api/styles/anime/references/r1',
+      headers: { cookie },
+    })
+    expect(del.statusCode).toBe(400)
+  })
+
+  it('404s another user’s style — indistinguishably from one that never existed', async () => {
+    const app = await buildTestApp()
+    const mine = await registerAndGetCookie(app, 'mine@b.co')
+    const theirs = await registerAndGetCookie(app, 'theirs@b.co')
+    const style = (await createStyle(app, theirs)).json()
+
+    const foreign = await uploadRef(app, mine, style.id)
+    const missing = await uploadRef(app, mine, 'no-such-style')
+    expect(foreign.statusCode).toBe(404)
+    expect(missing.statusCode).toBe(404)
+    expect(foreign.json().error.message).toBe(missing.json().error.message)
+
+    // The owner's style is untouched.
+    const list = await app.inject({ method: 'GET', url: '/api/styles', headers: { cookie: theirs } })
+    const own = (list.json().items as Array<Record<string, unknown>>).find((s) => !s.builtin)!
+    expect(own.referenceImages).toHaveLength(0)
+  })
+
+  it('detaches an image, and an unknown refId is a no-op rather than a 404', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const style = (await createStyle(app, cookie)).json()
+    await uploadRef(app, cookie, style.id)
+    const second = await uploadRef(app, cookie, style.id)
+    const refId = second.json().referenceImages[0].id as string
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/styles/${style.id}/references/${refId}`,
+      headers: { cookie },
+    })
+    expect(del.statusCode).toBe(200)
+    expect(del.json().referenceImages).toHaveLength(1)
+    expect(del.json().referenceImages.some((r: { id: string }) => r.id === refId)).toBe(false)
+
+    // Removing it AGAIN is success, not 404: the caller's goal ("this ref is
+    // gone") is already satisfied, so the request is idempotent.
+    const again = await app.inject({
+      method: 'DELETE',
+      url: `/api/styles/${style.id}/references/${refId}`,
+      headers: { cookie },
+    })
+    expect(again.statusCode).toBe(200)
+    expect(again.json().referenceImages).toHaveLength(1)
+  })
+})
+
+// resolveStyle is the function the GENERATION service calls before it
 // charges, so its precedence and its ownership rule are tested directly rather
 // than only through an endpoint.
-describe('styles: resolveStyleFragments — what a styleId means for a caller', () => {
+describe('styles: resolveStyle — what a styleId means for a caller', () => {
   it('answers builtin fragments, own-row fragments, and null for everything else', async () => {
     const db = createDb(':memory:').db
     const app = await buildTestApp({ db })
@@ -229,23 +381,46 @@ describe('styles: resolveStyleFragments — what a styleId means for a caller', 
     ).json()
 
     // Same db, so the registry sees exactly the rows the HTTP calls wrote.
-    const registry = createStyleService({ db })
+    const registry = directRegistry(db)
     const me = (await app.inject({ method: 'GET', url: '/api/me', headers: { cookie: mine } })).json()
 
-    expect(registry.resolveStyleFragments(me.id, 'anime')).toEqual({
+    expect(registry.resolveStyle(me.id, 'anime')).toEqual({
       fragment: expect.stringContaining('anime style'),
       negative: expect.stringContaining('photorealistic'),
+      // A builtin is code: it has no row, so it can never carry an image.
+      referenceImagePaths: [],
     })
-    expect(registry.resolveStyleFragments(me.id, ownStyle.id)).toEqual({
+    expect(registry.resolveStyle(me.id, ownStyle.id)).toEqual({
       fragment: NEON.fragment,
       negative: '',
+      referenceImagePaths: [],
     })
     // Someone else's style is as unusable as one that never existed — and both
     // read as the same null, so a generation cannot probe for foreign ids.
-    expect(registry.resolveStyleFragments(me.id, foreignStyle.id)).toBeNull()
-    expect(registry.resolveStyleFragments(me.id, 'no-such-style')).toBeNull()
+    expect(registry.resolveStyle(me.id, foreignStyle.id)).toBeNull()
+    expect(registry.resolveStyle(me.id, 'no-such-style')).toBeNull()
     // Prototype keys are not styles (resolveBuiltinStyle uses Object.hasOwn).
-    expect(registry.resolveStyleFragments(me.id, 'constructor')).toBeNull()
+    expect(registry.resolveStyle(me.id, 'constructor')).toBeNull()
+  })
+
+  it('answers the STORED PATHS of an attached package, not the bytes', async () => {
+    const db = createDb(':memory:').db
+    const app = await buildTestApp({ db })
+    const cookie = await registerAndGetCookie(app)
+    const created = (await createStyle(app, cookie)).json()
+    await app.inject({
+      method: 'POST',
+      url: `/api/styles/${created.id}/references`,
+      headers: { cookie },
+      payload: { dataUri: PNG },
+    })
+    const me = (await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json()
+
+    // Paths, because the money path re-reads them into the closed
+    // referenceImages channel itself (readAsDataUri) — the registry does no I/O.
+    const resolved = directRegistry(db).resolveStyle(me.id, created.id)!
+    expect(resolved.referenceImagePaths).toHaveLength(1)
+    expect(resolved.referenceImagePaths[0]).toMatch(/^\/media\/.+\.png$/)
   })
 
   it('resolves a deleted style to null — the film keeps the id, the generation refuses', async () => {
@@ -254,11 +429,11 @@ describe('styles: resolveStyleFragments — what a styleId means for a caller', 
     const cookie = await registerAndGetCookie(app)
     const created = (await createStyle(app, cookie)).json()
     const me = (await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json()
-    const registry = createStyleService({ db })
-    expect(registry.resolveStyleFragments(me.id, created.id)).not.toBeNull()
+    const registry = directRegistry(db)
+    expect(registry.resolveStyle(me.id, created.id)).not.toBeNull()
 
     await app.inject({ method: 'DELETE', url: `/api/styles/${created.id}`, headers: { cookie } })
-    expect(registry.resolveStyleFragments(me.id, created.id)).toBeNull()
+    expect(registry.resolveStyle(me.id, created.id)).toBeNull()
   })
 })
 

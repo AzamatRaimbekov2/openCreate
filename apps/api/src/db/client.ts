@@ -174,6 +174,20 @@ export function createDb(path: string) {
   if (!entityImageColumns.includes('view')) {
     sqlite.exec('ALTER TABLE entity_image ADD COLUMN view TEXT')
   }
+  // Style Studio amendment A1 — a style is a PACKAGE (fragments AND up to three
+  // reference images), so:
+  //  · style.reference_images_json  JSON [{ id, path }], the same shape (and the
+  //    same micro-migration shape) as shot.reference_images_json above. Additive
+  //    and nullable, and NULL is not a gap: it is what a style with nothing
+  //    attached has always meant, which is every row written before this. So the
+  //    expand step IS the whole migration — there is nothing to backfill and no
+  //    contract step, and rolling the code back leaves a column no writer reads.
+  const styleColumns = (sqlite.pragma('table_info(style)') as Array<{ name: string }>).map(
+    (column) => column.name,
+  )
+  if (!styleColumns.includes('reference_images_json')) {
+    sqlite.exec('ALTER TABLE style ADD COLUMN reference_images_json TEXT')
+  }
   // DB-level refund-once backstop (review finding): UNIQUE(generation_id,
   // kind) makes a duplicate refund (or charge) ledger row physically
   // impossible even if a future code path bypasses the ledger's transactional

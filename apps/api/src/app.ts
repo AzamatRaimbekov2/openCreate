@@ -316,7 +316,11 @@ export async function buildApp(deps: AppDeps) {
   // takes only the db and reads a cited preview generation's row directly (the
   // acyclicity choice entities/service.ts documents on copyGeneratedAsset).
   // It spends nothing: a preview is an ordinary POST /api/generations.
-  const styleService = createStyleService({ db: deps.db })
+  // Storage joined the registry with the reference package (amendment A1): a
+  // style now carries uploaded images, and they land in the SAME STORAGE_DIR
+  // every other user-supplied image does (entity photos, shot references), so
+  // there is one place to sweep and one place to serve /media from.
+  const styleService = createStyleService({ db: deps.db, storage: deps.storage })
   registerStyleRoutes(app, styleService)
   // Hoisted to a const (it used to be constructed inline in the register call)
   // because Soul Studio's portrait orchestrator needs THIS instance: it is the
@@ -330,8 +334,9 @@ export async function buildApp(deps: AppDeps) {
     entities: entityService,
     // The registry lookup, narrowed to the ONE question the money path asks
     // (ADR style-studio D3). Passing the function rather than styleService keeps
-    // create/update/delete out of reach of the generation service entirely.
-    resolveStyle: styleService.resolveStyleFragments,
+    // create/update/delete — and now the reference uploads too — out of reach of
+    // the generation service entirely.
+    resolveStyle: styleService.resolveStyle,
     log: app.log,
     // undefined → the service's own 3s default; only tests override this.
     ...(deps.pollMinIntervalMs !== undefined ? { pollMinIntervalMs: deps.pollMinIntervalMs } : {}),

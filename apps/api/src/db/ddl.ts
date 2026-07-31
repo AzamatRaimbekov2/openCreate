@@ -396,6 +396,11 @@ CREATE TABLE IF NOT EXISTS style (
   recommended_model_id TEXT,
   -- Room for future kinds (lora weights, reference strength) without a migration.
   config_json TEXT NOT NULL DEFAULT '{}',
+  -- The image half of the style package (ADR style-studio A1): JSON [{ id, path }],
+  -- the same shape as shot.reference_images_json. A column rather than a key inside
+  -- config_json because these are STORED FILES with a lifetime — an orphan sweep has
+  -- to see them without parsing an open-ended blob. NULL = nothing attached.
+  reference_images_json TEXT,
   -- The style's sample image: a generation id, deliberately WITHOUT a foreign key.
   preview_generation_id TEXT,
   created_at INTEGER NOT NULL,
