@@ -35,3 +35,11 @@ flowchart LR
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — reads the style registry for the New-film modal
+- Adds `useStyles()` (from `modules/Styles`) and passes `styles.data?.items ?? []`
+  to `CinemaLibrary`, which forwards it to `FilmSettingsModal` — the film's DEFAULT
+  style, which since ADR style-studio D5 may be a style the user wrote.
+- The route is the seam because `modules/Cinema` must not import `modules/Styles`;
+  this mirrors what `cinema.$filmId.tsx` does for the editor.
+- Shares the `['styles']` cache entry with `/styles` and the film editor.

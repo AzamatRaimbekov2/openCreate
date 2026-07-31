@@ -41,3 +41,12 @@ flowchart TD
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — style picker reads the registry
+- Gains `styles?: readonly Style[]` (route-injected via `FilmEditor`) and passes it
+  to `styleOptions(styles, t)`. A storyboard can now cite a style the user wrote in
+  the Style Studio, like every other style picker (ADR style-studio D5).
+- Defaults to `[]`, which `styleOptions` reads as "not loaded" and answers with the
+  bundled builtins — so an in-flight or failed registry never empties this picker.
+- `defaultStyleId` is unchanged and still an open `StyleId`: a film's default may
+  already BE a user style, and it prefills here exactly as a builtin id always did.

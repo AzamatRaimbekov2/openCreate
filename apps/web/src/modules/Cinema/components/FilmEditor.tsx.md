@@ -301,3 +301,14 @@ between the tracks and the fixed composer dock). The clearance must equal the
 COLLAPSED dock height; the old 28 (112px) exceeded it, leaving a gap. If the
 tracks ever tuck under the collapsed dock, step it back up (pb-24→pb-26/pb-28).
 Blind-tuned (no browser session) — verify visually.
+
+## Update 2026-07-31 — fans the style registry out to three pickers
+- Gains `styles?: Style[]` (route-injected, defaults to `[]`) and hands it to all
+  three style pickers on this screen: `ShotInspector` (the shot's style),
+  `StoryboardModal` (the script's style) and `CinemaEditorHeader` → `FilmSettingsModal`
+  (the film's default style).
+- Same cross-module seam as `models`, `templates` and `entities`, and for the same
+  reason: Cinema must not import `modules/Styles`. This component is the fan-out
+  point because it is where all three consumers already live.
+- Empty while `GET /api/styles` is in flight; each picker falls back to the bundled
+  builtins, so no style choice ever disappears mid-request.

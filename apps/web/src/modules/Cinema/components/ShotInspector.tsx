@@ -31,11 +31,12 @@ import type {
   CatalogAudioModel,
   CatalogVideoModel,
   Shot,
+  Style,
   TitlePosition,
   Transition,
   UpdateShotInput,
 } from '@opencreate/contracts'
-import { applyPromptPreset, resolveBuiltinStyle, transitionSchema } from '@opencreate/contracts'
+import { applyPromptPreset, transitionSchema } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from 'shared/libs/mentions'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
@@ -46,7 +47,14 @@ import { useGenerateShotClip, useShotGeneration } from '../model/shotGeneration'
 import { useShotFailureToast } from '../model/shotFailureToast'
 import { createSoftenRetry } from '../model/softenRetry'
 import { useGenerateVoiceover } from '../model/voiceoverApi'
-import { SHOT_DURATIONS_SECONDS, draftToPreset, hasAnyPreset, presetToDraft } from '../model/presetOptions'
+import {
+  SHOT_DURATIONS_SECONDS,
+  draftToPreset,
+  findStyle,
+  hasAnyPreset,
+  presetToDraft,
+  resolveStyleFragments,
+} from '../model/presetOptions'
 import type { PresetDraft } from '../model/presetOptions'
 import type { CastableEntity } from './ShotCastField'
 import { ShotCastField } from './ShotCastField'
@@ -72,6 +80,12 @@ export type ShotInspectorProps = {
   // Characters available to cast in this shot (route-injected; Cinema must not
   // import Entities). Empty while the library is empty.
   entities: CastableEntity[]
+  // The style registry — builtin rows plus the styles this user wrote in the
+  // Style Studio — injected from the route on the same seam as `entities`
+  // (Cinema must not import modules/Styles). Empty while GET /api/styles is in
+  // flight; the picker then falls back to the bundled builtins and the composed
+  // hint under-reports a user style rather than mis-reporting it.
+  styles?: readonly Style[]
   // Where this shot starts on the timeline, in ms — the offset a generated voice
   // track is filed at, so the line plays under the beat that speaks it. Computed
   // by the editor (it is the one that knows every shot's duration).
@@ -114,17 +128,22 @@ function nearestSeconds(durationMs: number): number {
 //      now that shot.modelId is persisted);
 //   2. the model its STYLE recommends;
 //   3. the first video model, which is a guess.
-function initialModelId(shot: Shot, videoModels: CatalogVideoModel[]): string {
+function initialModelId(
+  shot: Shot,
+  videoModels: CatalogVideoModel[],
+  styles: readonly Style[],
+): string {
   const has = (id: string | undefined) => id !== undefined && videoModels.some((m) => m.id === id)
   if (has(shot.modelId ?? undefined)) return shot.modelId as string
-  // resolveBuiltinStyle, not STYLE_PRESETS[id]: styleId is an open string now
-  // (ADR style-studio D1), so a shot may legitimately hold a USER style id that
-  // this table has never heard of. That resolves to null — no recommendation,
-  // fall through to the next-best guess — instead of an undefined lookup.
+  // Through the REGISTRY, not the builtin table: styleId is an open string (ADR
+  // style-studio D1), so a shot may hold a USER style — and a user style carries
+  // its own recommendedModelId, which is advice worth honouring here just like a
+  // builtin's. An id nothing knows about resolves to undefined (no recommendation,
+  // fall through to the next-best guess), never an undefined lookup.
   const recommended = shot.promptPreset?.styleId
-    ? resolveBuiltinStyle(shot.promptPreset.styleId)?.recommendedModelId
+    ? findStyle(styles, shot.promptPreset.styleId)?.recommendedModelId
     : undefined
-  if (has(recommended)) return recommended as string
+  if (has(recommended ?? undefined)) return recommended as string
   return videoModels[0]?.id ?? ''
 }
 
@@ -135,6 +154,7 @@ export function ShotInspector({
   videoModels,
   ttsModel,
   entities,
+  styles = [],
   startMs,
   isVoiced,
 }: ShotInspectorProps) {
@@ -188,7 +208,7 @@ export function ShotInspector({
   const handlePromptDragEnd = () => setPromptDrag(null)
   const [prompt, setPrompt] = useState(shot.prompt)
   const [preset, setPreset] = useState<PresetDraft>(presetToDraft(shot.promptPreset))
-  const [modelId, setModelId] = useState(() => initialModelId(shot, videoModels))
+  const [modelId, setModelId] = useState(() => initialModelId(shot, videoModels, styles))
   const [seconds, setSeconds] = useState(String(nearestSeconds(shot.durationMs)))
   const [transition, setTransition] = useState<Transition>(shot.transition)
   const [transitionMs, setTransitionMs] = useState(String(shot.transitionMs || 500))
@@ -226,14 +246,15 @@ export function ShotInspector({
   // The exact positive prompt the server will build — shown (in the expand
   // drawer) so the preset choice is legible before spending a credit.
   // applyPromptPreset no longer looks the style up itself (ADR style-studio D3),
-  // so the hint has to resolve it the way the server will. The client half of
-  // the registry is the builtin table; a USER style resolves to null here and
-  // its fragment is simply missing from the preview — the server still applies
-  // it. Fixing that needs the async styles list, which is the picker migration.
+  // so the hint resolves it the way the server will — now through the REGISTRY,
+  // so a style the user wrote shows its real fragment here instead of silently
+  // dropping out of the preview. While the list is still in flight a builtin
+  // resolves from the bundle and a user style resolves to undefined: the hint
+  // under-reports for one request, and never mis-reports.
   const composedHint = applyPromptPreset(
     prompt,
     hasAnyPreset(preset) ? draftToPreset(preset) : undefined,
-    (preset.styleId ? resolveBuiltinStyle(preset.styleId) : null) ?? undefined,
+    preset.styleId ? resolveStyleFragments(styles, preset.styleId) : undefined,
   ).positivePrompt
 
   const buildVoiceover = () =>
@@ -413,6 +434,7 @@ export function ShotInspector({
                   <PresetPickers
                     value={preset}
                     onChange={(patch) => setPreset((prev) => ({ ...prev, ...patch }))}
+                    styles={styles}
                   />
                 </InspectorSection>
 

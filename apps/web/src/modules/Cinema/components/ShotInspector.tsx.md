@@ -209,3 +209,24 @@ error surfacing, money-path guards) unchanged.
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 — the shot's style comes from the registry
+- New prop `styles?: readonly Style[]` (route-injected via `FilmEditor`, defaults to
+  `[]`). It feeds THREE things, all of which used to read the builtin table only:
+  1. **The picker** — handed to `PresetPickers`, so a style the user wrote in the
+     Style Studio is selectable on a shot (ADR style-studio D5).
+  2. **The composed hint** — `resolveStyleFragments(styles, preset.styleId)` replaces
+     `resolveBuiltinStyle(...)`. This closes the gap the previous commit documented:
+     a USER style now shows its real fragment in the preview of the prompt the server
+     will build, instead of silently dropping out of it.
+  3. **`initialModelId`** — the style's `recommendedModelId` now goes through
+     `findStyle`, so a USER style's recommendation pre-selects a model exactly as a
+     builtin's always did. That advice existed on the row and was being ignored.
+- **The loading window is honest, not blocked.** While `GET /api/styles` is in flight
+  the list is empty, which `styleRegistry` reads as "not loaded" and answers with the
+  bundled builtins. So the picker stays full, a builtin's fragment still resolves
+  exactly, and only a user style's fragment is briefly missing from the hint —
+  UNDER-reporting, never mis-reporting. The server composes it either way.
+- `resolveBuiltinStyle` is no longer imported here; the one lookup rule lives in
+  `../model/presetOptions` so the picker, the hint and the model recommendation
+  cannot disagree about what a style id means at a given moment.

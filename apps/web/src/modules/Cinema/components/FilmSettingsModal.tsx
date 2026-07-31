@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import type { AspectRatio, Film } from '@opencreate/contracts'
+import type { AspectRatio, Film, Style } from '@opencreate/contracts'
 import { aspectRatioSchema } from '@opencreate/contracts'
 import { Button, Input, Modal, PillGroup, Select } from 'shared/ui'
 import { useCreateFilm, useUpdateFilm } from '../model/filmsApi'
@@ -16,13 +16,25 @@ import type { StyleChoice } from '../model/presetOptions'
 export type FilmSettingsModalProps = {
   // null → create mode; a film → edit mode (prefilled)
   film: Film | null
+  // The style registry (builtin + the caller's own), injected from the route: a
+  // film's DEFAULT style is the one every new shot inherits, so a style the user
+  // wrote has to be offerable here. Empty while in flight — styleOptions then
+  // falls back to the bundled builtins rather than emptying the picker.
+  // Explicit `| undefined` because tsconfig has exactOptionalPropertyTypes and
+  // the callers pass a value that may itself be undefined.
+  styles?: readonly Style[] | undefined
   isOpen: boolean
   onClose: () => void
 }
 
 const ASPECT_OPTIONS = aspectRatioSchema.options.map((value) => ({ value, label: value }))
 
-export function FilmSettingsModal({ film, isOpen, onClose }: FilmSettingsModalProps) {
+export function FilmSettingsModal({
+  film,
+  styles = [],
+  isOpen,
+  onClose,
+}: FilmSettingsModalProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const createFilm = useCreateFilm()
@@ -82,7 +94,10 @@ export function FilmSettingsModal({ film, isOpen, onClose }: FilmSettingsModalPr
 
         <Select<StyleChoice>
           label={t('cinema.settings.style')}
-          options={[{ value: '', label: t('cinema.settings.styleNone') }, ...styleOptions(t)]}
+          options={[
+            { value: '', label: t('cinema.settings.styleNone') },
+            ...styleOptions(styles, t),
+          ]}
           value={styleId}
           onChange={setStyleId}
         />

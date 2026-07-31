@@ -63,3 +63,9 @@ flowchart LR
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 — carries the style registry to the settings modal
+- Gains `styles?: readonly Style[]`, passed straight through to `FilmSettingsModal`
+  where the film's default style is picked. Pure pass-through: this bar renders no
+  style UI of its own.
+- Route-injected on the same seam as `chrome` — Cinema must not import `modules/Styles`.

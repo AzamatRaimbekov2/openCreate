@@ -63,3 +63,13 @@ flowchart LR
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — reads the style registry for the editor's pickers
+- Adds `useStyles()` (from `modules/Styles`) as a FOURTH cross-module seam beside
+  `useCatalog`, `useTemplates` and `useEntities`, passing `styles.data?.items ?? []`
+  to `FilmEditor`, which fans it out to the shot inspector, the storyboard and the
+  film-settings modal (ADR style-studio D5).
+- Routes MAY import modules; `modules/Cinema` may not import `modules/Styles`, which
+  is exactly why the read happens here.
+- Same `['styles']` cache entry the `/styles` page fills, so arriving from the Style
+  Studio into a film costs no extra request.

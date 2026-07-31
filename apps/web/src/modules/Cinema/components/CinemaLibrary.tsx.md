@@ -62,3 +62,12 @@ flowchart TD
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — feeds the style registry to the New-film modal
+- Gains `CinemaLibraryProps = { styles?: readonly Style[] }` (its first props type —
+  it took none before) and forwards `styles` to `FilmSettingsModal`, so the film a
+  user creates from the library can default to a style they wrote.
+- The parameter is defaulted (`= {}`) so the component still renders with no props at
+  all, which is what its existing tests do.
+- `styles` is read in `routes/_shell.cinema.index.tsx`; this module imports nothing
+  from `modules/Styles`.

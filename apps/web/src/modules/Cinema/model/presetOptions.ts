@@ -5,17 +5,19 @@
 // sentinel row is prepended by the inspector with a translated label, because
 // styleId — unlike the modifier axes — has no first-class 'none'.
 import {
+  STYLE_PRESETS,
   builtinStyleIdSchema,
   cameraMotionSchema,
   cameraShotSchema,
   qualitySchema,
 } from '@opencreate/contracts'
 import type {
-  BuiltinStyleId,
   CameraMotion,
   CameraShot,
   PromptPreset,
   Quality,
+  Style,
+  StyleFragments,
   StyleId,
 } from '@opencreate/contracts'
 import type { SelectOption } from 'shared/ui'
@@ -76,20 +78,91 @@ export function hasAnyPreset(draft: PresetDraft): boolean {
 // (so a new preset cannot be missed); the SPA owns how it is spelled to a human.
 // Keys live under cinema.preset.<axis>.<id>, so adding a preset without copy
 // surfaces as a visible missing key rather than a silent language flip.
-type Translate = (key: string) => string
+// `defaultValue` is part of the contract now (see styleOptions): a style id the
+// SPA has no copy for must degrade to a real name, not to a visible i18n key.
+// Written as two OVERLOADS rather than one optional parameter because i18next's
+// own `t` is overloaded the same way, and under exactOptionalPropertyTypes an
+// `options?: {...}` signature is not something `TFunction` can satisfy.
+type Translate = {
+  (key: string): string
+  (key: string, options: { defaultValue: string }): string
+}
 
-// BUILTIN-ONLY, and knowingly so: this is a pure, synchronous, i18n-keyed
-// builder over a table that ships with the bundle. User styles come from
-// GET /api/styles — an async source with its own loading/empty/error states and
-// server-authored names that must NOT be run through the i18n key lookup below.
-// Merging the two happens where the data lives (the route that already fetches
-// the catalog), not here; until then the picker offers the seven builtins while
-// a shot can still HOLD a user style set elsewhere.
-export function styleOptions(t: Translate): SelectOption<BuiltinStyleId>[] {
+// The seven builtins as registry rows, straight from the bundled table. This is
+// the CLIENT HALF of the registry — the same two sources the server unions, with
+// the code half available synchronously because it ships in the build.
+function bundledBuiltins(): Style[] {
   return builtinStyleIdSchema.options.map((id) => ({
-    value: id,
-    label: t(`cinema.preset.style.${id}`),
+    id,
+    name: STYLE_PRESETS[id].label,
+    kind: 'prompt' as const,
+    builtin: true,
+    fragment: STYLE_PRESETS[id].fragment,
+    negative: STYLE_PRESETS[id].negative,
+    recommendedModelId: STYLE_PRESETS[id].recommendedModelId,
+    previewUrl: null,
+    createdAt: null,
+    updatedAt: null,
   }))
+}
+
+// Build the style picker from the REGISTRY (ADR style-studio D5) — builtin rows
+// and the caller's own, exactly as GET /api/styles unioned them, so a style
+// written in the Style Studio is selectable here without this file knowing it
+// exists. The list arrives from the ROUTE as a prop (Cinema must not import
+// modules/Styles); see PresetPickers.
+//
+// AN EMPTY LIST MEANS "NOT LOADED", NEVER "NO STYLES". The registry always
+// carries the seven builtins, so there is no honest reading of an empty answer
+// as an empty catalogue — and since that table is in the bundle, the picker
+// falls back to it instead of disabling itself or showing nothing. A failed or
+// in-flight /api/styles costs the user their OWN styles for a moment; it must
+// never cost them the ability to pick a style at all.
+//
+// THE LABEL STILL COMES FROM i18n FOR A BUILTIN. The server sends a builtin's
+// `name` straight out of STYLE_PRESETS.label, and those strings are hardcoded
+// RUSSIAN — they are the API's own naming, not UI copy. Rendering them is what
+// once left these pickers reading «Аниме» in an English app. So a builtin is
+// spelled by `cinema.preset.style.<id>`, a USER style is spelled by its own name
+// (the user's words, never key-looked-up), and a builtin with no SPA copy falls
+// back to the server's name rather than painting a raw key on screen.
+export function styleOptions(styles: readonly Style[], t: Translate): SelectOption<StyleChoice>[] {
+  return styleRegistry(styles).map((style) => ({
+    value: style.id,
+    label: style.builtin
+      ? t(`cinema.preset.style.${style.id}`, { defaultValue: style.name })
+      : style.name,
+  }))
+}
+
+// The list every style lookup reads from: the server's registry once it has
+// landed, the bundled builtins until then. ONE rule, so the picker, the composed
+// hint and the model recommendation can never disagree about what a style id
+// means at a given moment.
+export function styleRegistry(styles: readonly Style[]): readonly Style[] {
+  return styles.length > 0 ? styles : bundledBuiltins()
+}
+
+// One style by id, or undefined when nothing known answers to it (a deleted
+// style still named by an old shot, or a user style before the list arrives).
+export function findStyle(styles: readonly Style[], styleId: string): Style | undefined {
+  return styleRegistry(styles).find((style) => style.id === styleId)
+}
+
+// The fragments a styleId composes with, for the LOCAL preview of the prompt the
+// server will build.
+//
+// UNDER-REPORT, NEVER MIS-REPORT. Before the registry lands, a builtin still
+// resolves exactly — it is in the bundle — while a user style resolves to
+// undefined and its fragment is simply absent from the preview. The server
+// applies it regardless, so the hint is allowed to be incomplete for one request
+// but never allowed to show a composition that is not the one being sent.
+export function resolveStyleFragments(
+  styles: readonly Style[],
+  styleId: string,
+): StyleFragments | undefined {
+  const known = findStyle(styles, styleId)
+  return known ? { fragment: known.fragment, negative: known.negative } : undefined
 }
 
 export function cameraShotOptions(t: Translate): SelectOption<CameraShot>[] {

@@ -31,6 +31,7 @@ import type {
   CatalogAudioModel,
   CatalogModel,
   CatalogVideoModel,
+  Style,
   TemplateSummary,
 } from '@opencreate/contracts'
 import { ErrorState, Skeleton } from 'shared/ui'
@@ -70,6 +71,13 @@ export type FilmEditorProps = {
   // Empty while the library is empty; the cast control then says so rather than
   // offering a dead button.
   entities?: CastableEntity[]
+  // The style registry — the seven builtins plus the styles this user wrote in
+  // the Style Studio — read at the route and passed down (ADR style-studio D5;
+  // Cinema must not import modules/Styles). It reaches THREE style pickers from
+  // here: the shot inspector's, the storyboard's, and — via the header — the
+  // film's default. Empty while GET /api/styles is in flight; each picker then
+  // falls back to the bundled builtins, so a style choice never disappears.
+  styles?: Style[]
   // The global chrome (balance · lang · account) for the editor's OWN top bar,
   // injected by the route. This module can't import modules/Auth or
   // modules/Credits, so — exactly like AppShell's `balanceSlot` — the route
@@ -104,6 +112,7 @@ export function FilmEditor({
   models,
   templates = [],
   entities = [],
+  styles = [],
   chrome,
 }: FilmEditorProps) {
   const { t } = useTranslation()
@@ -156,6 +165,7 @@ export function FilmEditor({
       // place that holds the shot list, so it computes both and hands them down.
       shotCount={data?.shots.length}
       durationMs={data ? totalDurationMs(data.shots) : undefined}
+      styles={styles}
       chrome={chrome}
     />
   )
@@ -252,6 +262,7 @@ export function FilmEditor({
           <StoryboardModal
             filmId={filmId}
             defaultStyleId={data.film.defaultStyleId}
+            styles={styles}
             isOpen={isStoryboardOpen}
             onClose={() => setIsStoryboardOpen(false)}
           />
@@ -279,6 +290,7 @@ export function FilmEditor({
               videoModels={videoModels}
               ttsModel={ttsModel}
               entities={entities}
+              styles={styles}
               startMs={selectedStartMs}
               isVoiced={isSelectedVoiced}
             />

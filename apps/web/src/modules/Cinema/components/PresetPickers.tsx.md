@@ -46,3 +46,19 @@ Now builds options via `styleOptions(t)` / `cameraShotOptions(t)` /
 `cameraMotionOptions(t)` / `qualityOptions(t)` instead of importing the
 constant arrays, whose labels came from `contracts/presets.ts` and were
 hardcoded Russian regardless of the active language.
+
+## Update 2026-07-31 — the style axis reads the registry
+- `PresetPickersProps` gains `styles: readonly Style[]`, and the style `Select` now
+  renders `styleOptions(styles, t)` instead of the builtin-only `styleOptions(t)`.
+  Framing, motion and quality are untouched — they are still closed enums over the
+  bundled contract tables.
+- **Why a prop and not a hook:** the list comes from `GET /api/styles`, which lives
+  in `modules/Styles`, and modules never import each other. It is read at the route
+  (`cinema.$filmId`) and handed down — the same seam this editor already uses for
+  the model catalog, the templates and the cast.
+- **No loading/disabled state, deliberately.** An empty list can only mean "not
+  loaded" (the registry always carries the seven builtins), and those builtins ship
+  in the bundle, so `styleOptions` falls back to them. Disabling the picker for one
+  request would remove function the user already has.
+- The `''` no-style sentinel is still prepended HERE with translated copy: unlike
+  the other three axes, `styleId` has no first-class 'none' in its own vocabulary.

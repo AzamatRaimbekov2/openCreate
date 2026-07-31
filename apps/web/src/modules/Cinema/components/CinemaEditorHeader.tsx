@@ -21,7 +21,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import type { AspectRatio, Film } from '@opencreate/contracts'
+import type { AspectRatio, Film, Style } from '@opencreate/contracts'
 import { aspectRatioSchema } from '@opencreate/contracts'
 import type { ReactNode } from 'react'
 import { Button, Menu, Modal, Skeleton } from 'shared/ui'
@@ -48,6 +48,10 @@ export type CinemaEditorHeaderProps = {
   // caller (FilmEditor) passes `data?.shots.length`, a real `number | undefined`.
   shotCount?: number | undefined
   durationMs?: number | undefined
+  // The style registry, passed straight through to FilmSettingsModal (where the
+  // film's DEFAULT style is picked). Route-injected like `chrome`: Cinema must
+  // not import modules/Styles.
+  styles?: readonly Style[]
   // balance · lang · account, injected by the route (this module can't import
   // modules/Auth or modules/Credits — see the file header).
   chrome?: ReactNode
@@ -60,6 +64,7 @@ export function CinemaEditorHeader({
   isStarting,
   shotCount,
   durationMs,
+  styles,
   chrome,
 }: CinemaEditorHeaderProps) {
   const { t } = useTranslation()
@@ -160,6 +165,7 @@ export function CinemaEditorHeader({
           {/* Style default + a full rename/aspect form still reachable in edit mode */}
           <FilmSettingsModal
             film={film}
+            styles={styles}
             isOpen={isSettingsOpen}
             onClose={() => setIsSettingsOpen(false)}
           />

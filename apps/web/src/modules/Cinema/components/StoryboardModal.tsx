@@ -7,7 +7,7 @@
 // rather than a scary failure — storyboarding is optional, not broken.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { StyleId } from '@opencreate/contracts'
+import type { Style, StyleId } from '@opencreate/contracts'
 import { Button, Modal, Select } from 'shared/ui'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { useStoryboard } from '../model/storyboardApi'
@@ -18,6 +18,10 @@ export type StoryboardModalProps = {
   filmId: string
   // Prefill the style with the film's default (if any)
   defaultStyleId: StyleId | null
+  // The style registry (builtin + the caller's own), injected from the route —
+  // a storyboard should be able to cite a style the user wrote, like any other
+  // picker. Empty while in flight: styleOptions falls back to the bundle.
+  styles?: readonly Style[]
   isOpen: boolean
   onClose: () => void
 }
@@ -25,7 +29,13 @@ export type StoryboardModalProps = {
 // '' = let the model choose the count
 const SHOT_COUNTS = ['', '3', '4', '5', '6', '8'] as const
 
-export function StoryboardModal({ filmId, defaultStyleId, isOpen, onClose }: StoryboardModalProps) {
+export function StoryboardModal({
+  filmId,
+  defaultStyleId,
+  styles = [],
+  isOpen,
+  onClose,
+}: StoryboardModalProps) {
   const { t } = useTranslation()
   const storyboard = useStoryboard()
 
@@ -71,7 +81,10 @@ export function StoryboardModal({ filmId, defaultStyleId, isOpen, onClose }: Sto
         <div className="grid grid-cols-2 gap-2">
           <Select<StyleChoice>
             label={t('cinema.settings.style')}
-            options={[{ value: '', label: t('cinema.settings.styleNone') }, ...styleOptions(t)]}
+            options={[
+              { value: '', label: t('cinema.settings.styleNone') },
+              ...styleOptions(styles, t),
+            ]}
             value={styleId}
             onChange={setStyleId}
           />

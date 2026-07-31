@@ -36,14 +36,32 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
-- **`styleOptions` is BUILTIN-only, knowingly** (ADR style-studio, 2026-07-31). It builds from
-  `builtinStyleIdSchema.options`, not the now-open `styleIdSchema` (a `ZodString` has no `.options`).
-  This builder is pure, synchronous and i18n-keyed over a table that ships in the bundle; user styles
-  come from `GET /api/styles` — an async source with its own 4 states and server-authored names that
-  must NOT go through the `cinema.preset.style.<id>` key lookup. Merging the two belongs where the
-  data is fetched (the route that already loads the catalog), not here.
-- `StyleChoice` is now `string | ''` because `StyleId` opened. That is intentional: a shot may HOLD a
-  user style set elsewhere even while this picker still offers only the seven builtins.
+- **`styleOptions` reads the REGISTRY** (ADR style-studio D5, migrated 2026-07-31):
+  `styleOptions(styles, t)` where `styles` is the server's union of builtin rows and the caller's
+  own, injected from the ROUTE as a prop (Cinema must not import `modules/Styles`). The other three
+  axes are still closed enums over bundled tables.
+- **An empty list means "not loaded", NEVER "no styles".** The registry always carries the seven
+  builtins, so there is no honest reading of an empty answer as an empty catalogue — and since that
+  table ships in the bundle, `styleRegistry()` falls back to it. A failed or in-flight
+  `GET /api/styles` costs the user their OWN styles for a moment; it must never cost them the
+  ability to pick a style at all. This is why there is no disabled/skeleton state on this picker.
+- **A builtin is still spelled by i18n; a user style is not.** The server sends a builtin's `name`
+  straight out of `STYLE_PRESETS.label`, and those are hardcoded RUSSIAN. Rendering them is exactly
+  what once left these pickers reading «Аниме» in an English app. So a builtin goes through
+  `cinema.preset.style.<id>`, a user style renders its own name verbatim, and a builtin the SPA has
+  no copy for falls back to the server's name via `defaultValue` rather than painting a raw key.
+  (That fallback is not hypothetical — `comic` shipped without a key until 2026-07-31.)
+- **`Translate` is written as two overloads, not one optional parameter.** i18next's `t` is
+  overloaded the same way, and under `exactOptionalPropertyTypes` an `options?: {...}` signature is
+  not something `TFunction` can satisfy.
+- **`styleRegistry` / `findStyle` are the ONE lookup rule**, shared by the picker, the composed hint
+  and `ShotInspector`'s model recommendation, so the three can never disagree about what a style id
+  means at a given moment.
+- **`resolveStyleFragments` under-reports, never mis-reports.** Before the list lands a builtin still
+  resolves exactly (it is in the bundle) while a user style resolves to `undefined` and is simply
+  absent from the local composed preview. The SERVER applies it regardless: the hint may be
+  incomplete for one request, but it must never show a composition that is not the one being sent.
+- `StyleChoice` is `string | ''` because `StyleId` opened — a uuid is a legal value on a shot.
 
 - Options are built from each enum's `.options` (not `Object.values`) so values
   stay typed as their literal union member and the order is deterministic.

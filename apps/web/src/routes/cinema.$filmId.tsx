@@ -21,6 +21,7 @@ import { FilmEditor } from 'modules/Cinema'
 import { BalanceChip } from 'modules/Credits'
 import { useEntities } from 'modules/Entities'
 import { useCatalog } from 'modules/Generator'
+import { useStyles } from 'modules/Styles'
 import { useTemplates } from 'modules/Templates'
 import { AccountMenu, LangSwitch } from 'shared/ui'
 
@@ -40,6 +41,13 @@ function FilmEditorPage() {
   // A shot's CAST is what makes a film hold together; only id+name travel — the
   // inspector shows a name and sends an id, the photo is the server's business.
   const entities = useEntities()
+  // The style registry (ADR style-studio D5): builtin styles and the ones this
+  // user wrote, unioned server-side. Read HERE for the same reason the catalog
+  // is — Cinema must not import modules/Styles — and handed to FilmEditor, which
+  // fans it out to all three style pickers on this screen (shot inspector,
+  // storyboard, film default). Same ['styles'] cache entry the /styles page
+  // fills, so arriving from there costs no request.
+  const styles = useStyles()
   const castableEntities = (entities.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
 
   // GLOBAL CHROME — composed here because the editor dropped AppShell. Mirrors
@@ -76,6 +84,7 @@ function FilmEditorPage() {
         models={catalog.data?.models ?? []}
         templates={templates.data?.items ?? []}
         entities={castableEntities}
+        styles={styles.data?.items ?? []}
         chrome={chrome}
       />
     </div>

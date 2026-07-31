@@ -40,3 +40,14 @@ flowchart TD
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-07-31 — default-style picker reads the registry
+- Gains `styles?: readonly Style[] | undefined` and renders `styleOptions(styles, t)`.
+  The film's DEFAULT style is what every new shot inherits, so a style the user wrote
+  has to be offerable here (ADR style-studio D5).
+- Reached from TWO places, so both routes now feed it: `CinemaEditorHeader` (edit
+  mode, from `/cinema/$filmId`) and `CinemaLibrary` (create mode, from `/cinema`).
+- The explicit `| undefined` in the prop type is required by `exactOptionalPropertyTypes`
+  — both callers forward a value that may itself be undefined.
+- The `'' → null` conversion on submit is unchanged: the picker widens, the wire wants
+  null for "no default".

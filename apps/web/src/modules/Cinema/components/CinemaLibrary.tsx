@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
+import type { Style } from '@opencreate/contracts'
 import { Button, EmptyState, ErrorState, Skeleton } from 'shared/ui'
 import { useFilms } from '../model/filmsApi'
 import { FilmCard } from './FilmCard'
@@ -15,7 +16,15 @@ import { PlusIcon } from './icons'
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4']
 const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4'
 
-export function CinemaLibrary() {
+export type CinemaLibraryProps = {
+  // The style registry, injected from the route (Cinema must not import
+  // modules/Styles) and handed to the New-film modal, where a film's DEFAULT
+  // style is chosen. Empty while GET /api/styles is in flight — the picker then
+  // falls back to the bundled builtins rather than showing nothing.
+  styles?: readonly Style[]
+}
+
+export function CinemaLibrary({ styles }: CinemaLibraryProps = {}) {
   const { t } = useTranslation()
   const { data, isPending, isError, refetch } = useFilms()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -81,7 +90,12 @@ export function CinemaLibrary() {
       )}
 
       {/* One modal, create mode (film=null); it navigates into the new editor */}
-      <FilmSettingsModal film={null} isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <FilmSettingsModal
+        film={null}
+        styles={styles}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
     </div>
   )
 }
