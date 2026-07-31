@@ -75,9 +75,9 @@ describe('film audio integrity', () => {
   // work (a shot cites a processing generation and shows live status). The
   // property that actually matters — audio must never be silently missing from an
   // export — is held by buildPlan, exercised by the three tests below.
-  it('attaches an audio generation that is still processing', () => {
+  it('attaches an audio generation that is still processing', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedAudioGeneration(db, 'gen-processing', 'processing')
 
     const track = svc.addAudio(USER, film.id, {
@@ -88,11 +88,11 @@ describe('film audio integrity', () => {
     expect(track.generationId).toBe('gen-processing')
   })
 
-  it('still refuses to attach a generation that is not audio', () => {
+  it('still refuses to attach a generation that is not audio', async () => {
     // The type + ownership checks are NOT relaxed — mixing a video file as an
     // audio track would break the mux, and that has nothing to do with timing.
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     db.insert(generation)
       .values({
         id: 'gen-video',
@@ -114,12 +114,12 @@ describe('film audio integrity', () => {
     ).toThrow(/not an audio generation/i)
   })
 
-  it('refuses to RENDER while an attached track is still processing', () => {
+  it('refuses to RENDER while an attached track is still processing', async () => {
     // buildPlan is now the SINGLE enforcement point. A pending track may sit on
     // the timeline, but it may never reach a finished mp4 as silence — the export
     // stops with a message the user can act on.
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedAudioGeneration(db, 'gen-pending', 'processing')
     svc.addAudio(USER, film.id, { kind: 'voiceover', generationId: 'gen-pending' })
@@ -133,9 +133,9 @@ describe('film audio integrity', () => {
     )
   })
 
-  it('refuses to RENDER when an attached track failed', () => {
+  it('refuses to RENDER when an attached track failed', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedAudioGeneration(db, 'gen-failed', 'failed')
     svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-failed' })
@@ -147,18 +147,18 @@ describe('film audio integrity', () => {
     )
   })
 
-  it('attaches a succeeded audio generation', () => {
+  it('attaches a succeeded audio generation', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedAudioGeneration(db, 'gen-ok', 'succeeded')
 
     const track = svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-ok' })
     expect(track.generationId).toBe('gen-ok')
   })
 
-  it('fails the render loudly when an attached track has no file on disk', () => {
+  it('fails the render loudly when an attached track has no file on disk', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     // Succeeded row, but the asset was never written (pruned, expired, or the
     // save lost a race). The old code shrugged and exported a silent mp4.
@@ -170,7 +170,7 @@ describe('film audio integrity', () => {
 
   it('renders when the attached track does have its file', async () => {
     const { db, svc, storage } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedAudioGeneration(db, 'gen-has-file', 'succeeded')
     writeFileSync(storage.localPath('gen-has-file', 'mp3'), 'not really mp3, but it exists')

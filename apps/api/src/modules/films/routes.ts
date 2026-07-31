@@ -100,7 +100,13 @@ export function registerFilmRoutes(
     const user = await app.requireUser(req)
     const parsed = createFilmInputSchema.safeParse(req.body)
     if (!parsed.success) return badInput(reply, parsed.error.issues[0]?.message ?? 'invalid input')
-    return reply.status(201).send(service.createFilm(user.id, parsed.data))
+    // Awaited since the create can now store a cover file. Wrapped in `guard` so
+    // a cover the storage layer refuses surfaces as the service's 400 rather than
+    // an unhandled rejection — and, because the bytes are written before the row,
+    // that refusal leaves no film behind.
+    return guard(reply, async () =>
+      reply.status(201).send(await service.createFilm(user.id, parsed.data)),
+    )
   })
 
   app.get<{ Params: { id: string } }>('/api/films/:id', async (req, reply) => {

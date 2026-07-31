@@ -165,6 +165,9 @@ CREATE TABLE IF NOT EXISTS film (
   -- Which template this film came from (ADR: template-catalog), NULL if hand-made.
   -- No FK: templates are code, not rows — retiring one must leave old films intact.
   template_id TEXT,
+  -- The film's cover picture: the '/media/<uuid>.<ext>' path of an image uploaded
+  -- at create time. NULL = no cover, which is every film written before this.
+  cover_image_path TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

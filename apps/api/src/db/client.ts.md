@@ -140,3 +140,11 @@ Pragma-guarded `ALTER TABLE style ADD COLUMN reference_images_json TEXT`, readin
 NULL is not a gap here, it is the meaning: "this style has nothing attached", which is every row
 written before the amendment. So the EXPAND step is the whole migration — nothing to backfill, no
 contract step, and rolling the code back leaves a column no writer reads.
+
+## Update 2026-07-31 — film.cover_image_path micro-migration
+Pragma-guarded `ALTER TABLE film ADD COLUMN cover_image_path TEXT`, **reusing the `filmColumns` read
+already taken** for `template_id` rather than issuing a second `pragma table_info(film)`.
+
+The film's cover picture (owner request 2026-07-31), stored as the `/media/…` path `saveDataUri`
+returned. NULL is not a gap — it is what every film written before this has: no cover. Expand is the
+whole migration; rolling the code back leaves a column no writer reads.

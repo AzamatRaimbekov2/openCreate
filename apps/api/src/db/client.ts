@@ -139,6 +139,14 @@ export function createDb(path: string) {
   if (!filmColumns.includes('template_id')) {
     sqlite.exec('ALTER TABLE film ADD COLUMN template_id TEXT')
   }
+  //  · film.cover_image_path  the film's cover picture (owner request 2026-07-31),
+  //    stored as the '/media/…' path saveDataUri returned. Additive and nullable,
+  //    and NULL is not a gap — it is what every film written before this HAS: no
+  //    cover. So the expand step is the whole migration, with nothing to backfill.
+  //    Reuses the `filmColumns` read above rather than issuing a second pragma.
+  if (!filmColumns.includes('cover_image_path')) {
+    sqlite.exec('ALTER TABLE film ADD COLUMN cover_image_path TEXT')
+  }
   //  · film_audio.shot_id  which shot a voiceover track belongs to. Without it the
   //                        editor cannot tell whether a shot is already voiced, so
   //                        a second click on "Voice this shot" would append a

@@ -43,7 +43,7 @@ describe('film render lifecycle', () => {
       return { ok: true as const }
     })
     const { svc } = service(fakeRunner)
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     // A title-only shot needs no media file — renders as a card.
     svc.addShot(USER, film.id, { title: { text: 'THE END', position: 'center' }, durationMs: 2000 })
 
@@ -59,7 +59,7 @@ describe('film render lifecycle', () => {
   it('settles failed when ffmpeg reports an error', async () => {
     const fakeRunner = vi.fn(async () => ({ ok: false as const, error: 'boom' }))
     const { svc } = service(fakeRunner)
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '1:1' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '1:1' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'top' }, durationMs: 1500 })
 
     const render = svc.createRender(USER, film.id)
@@ -73,7 +73,7 @@ describe('film render lifecycle', () => {
     // A runner that never resolves simulates a crashed/hung ffmpeg.
     const hang = vi.fn(() => new Promise<{ ok: true } | { ok: false; error: string }>(() => {}))
     const { db, svc } = service(hang)
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
     const render = svc.createRender(USER, film.id)
 
@@ -94,15 +94,15 @@ describe('film render lifecycle', () => {
 // finished mp4 became unreachable from the UI. The film's own detail now carries
 // its latest render, which is what makes recovery possible at all.
 describe('film detail carries the latest render', () => {
-  it('is null for a film that has never been exported', () => {
+  it('is null for a film that has never been exported', async () => {
     const { svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     expect(svc.getFilm(USER, film.id).latestRender).toBeNull()
   })
 
   it('exposes a finished render — the mp4 stays reachable after a reload', async () => {
     const { svc } = service(vi.fn(async () => ({ ok: true as const })))
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
     const render = svc.createRender(USER, film.id)
     await waitTerminal(svc, USER, film.id, render.id)
@@ -116,7 +116,7 @@ describe('film detail carries the latest render', () => {
 
   it('reports the NEWEST render when a film has been exported more than once', async () => {
     const { svc } = service(vi.fn(async () => ({ ok: true as const })))
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
 
     const first = svc.createRender(USER, film.id)
@@ -127,13 +127,13 @@ describe('film detail carries the latest render', () => {
     expect(svc.getFilm(USER, film.id).latestRender?.id).toBe(second.id)
   })
 
-  it('does not leak another user’s render onto a film', () => {
+  it('does not leak another user’s render onto a film', async () => {
     const { db, svc } = service()
     const now = new Date()
     db.insert(user)
       .values({ id: 'user-2', email: 'b@t.co', emailVerified: false, createdAt: now, updatedAt: now })
       .run()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     expect(() => svc.getFilm('user-2', film.id)).toThrow()
   })
 })
@@ -145,7 +145,7 @@ describe('concurrent renders are refused', () => {
   it('refuses a second render while one is still processing', async () => {
     const hang = vi.fn(() => new Promise<{ ok: true } | { ok: false; error: string }>(() => {}))
     const { svc } = service(hang)
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
 
     svc.createRender(USER, film.id)
@@ -158,7 +158,7 @@ describe('concurrent renders are refused', () => {
 
   it('allows a new render once the previous one has settled', async () => {
     const { svc } = service(vi.fn(async () => ({ ok: true as const })))
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
 
     const first = svc.createRender(USER, film.id)

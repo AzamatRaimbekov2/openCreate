@@ -50,7 +50,7 @@ describe('parseStoryboard', () => {
 describe('storyboard.generate', () => {
   it('turns the model response into DRAFT shots carrying the film style + camera preset', async () => {
     const { films } = setup()
-    const film = films.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await films.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     const svc = createStoryboardService({
       anthropicApiKey: 'test',
       films,
@@ -76,7 +76,7 @@ describe('storyboard.generate', () => {
 
   it('is unavailable without an API key', async () => {
     const { films } = setup()
-    const film = films.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await films.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     const svc = createStoryboardService({ anthropicApiKey: null, films })
     await expect(svc.generate(USER, film.id, { script: 'anything at all here' })).rejects.toBeInstanceOf(
       StoryboardUnavailableError,

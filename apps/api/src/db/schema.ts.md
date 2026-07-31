@@ -213,3 +213,15 @@ Two drizzle tables mirroring `CREATOR_DDL` column-for-column (ADR `docs/wiki/dec
   expand step is the whole migration (nothing to backfill, no contract step). Paired with a
   pragma-guarded `ALTER TABLE style ADD COLUMN reference_images_json TEXT` in `client.ts`.
 - `kind` did NOT gain a value: a style is a PACKAGE (fragments AND images at once), not a new kind.
+
+## Update 2026-07-31 — film.cover_image_path
+- `film` += `coverImagePath text('cover_image_path')` (nullable) — the film's cover picture (owner
+  request 2026-07-31), holding the `/media/<uuid>.<ext>` path `saveDataUri` returned.
+- **A path, not bytes and not a generation citation.** A cover is an UPLOADED file, so it is stored
+  the way every other uploaded image is (entity photos, shot/style references) and the column keeps
+  what storage handed back — `toFilmDto` maps it to `coverUrl` by identity.
+- NULL = no cover, which is every film written before this. Nothing to backfill; paired with a
+  pragma-guarded `ALTER TABLE film ADD COLUMN cover_image_path TEXT` in `client.ts` that reuses the
+  existing `filmColumns` read.
+- Deleting a film does NOT delete the file (see `deleteFilm`) — the same harmless-orphan treatment
+  render outputs and detached references already get.

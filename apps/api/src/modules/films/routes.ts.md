@@ -95,3 +95,13 @@ before building — if it had been otherwise, the reasons would have been silent
 
 ## Update 2026-07-21 — 409 for a concurrent render
 `mapDomainError` maps `FilmRenderInProgressError` → 409 `conflict`. `POST /api/films/:id/renders` now answers 409 when the film already has a `processing` render, instead of starting a second ffmpeg job. The SPA branches on the code to say "already exporting" rather than showing it as a failure.
+
+## Update 2026-07-31 — `POST /api/films` awaits, and is guarded
+`createFilm` became async (it can now store a cover file), so the route awaits it — and the call moved
+**inside `guard`**, so a cover the storage layer refuses surfaces as the service's `400
+validation_failed` instead of an unhandled rejection. Because the bytes are written before the row,
+that refusal leaves no film behind.
+
+The body is `createFilmInputSchema`, which since this change accepts a bare `{ title }`
+(`aspectRatio` optional, server-defaulted) and an optional `coverDataUri`. Both are widening: every
+body an older client sends still parses.

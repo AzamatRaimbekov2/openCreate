@@ -207,6 +207,12 @@ export const film = sqliteTable('film', {
   // NULL for a hand-made film. Not an FK: templates are code, not rows — deleting
   // a template from the catalog must leave old films intact, just unlinked.
   templateId: text('template_id'),
+  // The film's cover picture — the '/media/<uuid>.<ext>' path of an image the
+  // user uploaded at create time (owner request 2026-07-31). A PATH, not bytes
+  // and not a generation citation: a cover is an uploaded file, so it is stored
+  // the way every other uploaded image is and the column holds what saveDataUri
+  // handed back. NULL = no cover, which is every film that predates this.
+  coverImagePath: text('cover_image_path'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })

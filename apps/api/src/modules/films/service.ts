@@ -35,6 +35,7 @@ import type {
 } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
 import type { StorageProvider } from '../../storage/local'
+import { InvalidImageDataUriError } from '../../storage/dataUri'
 import { film, filmAudio, filmRender, generation, shot } from '../../db/schema'
 import {
   buildFfmpegArgs,
@@ -163,6 +164,16 @@ export function toShotDto(row: typeof shot.$inferSelect): Shot {
   }
 }
 
+// The ratio a film gets when nobody picked one. It became a decision the SERVER
+// has to make when the create dialog collapsed to "title + cover" (owner request
+// 2026-07-31) and `aspectRatio` went optional on the wire. Named once because
+// TWO paths now have to answer the question — a hand-made film and a templated
+// one — and two literals are two things that can drift apart.
+//
+// 16:9 because a film is a film until its author says otherwise; the ratio is
+// changed on the detail page, where the canvas is actually on screen.
+const DEFAULT_FILM_ASPECT_RATIO = '16:9' as const
+
 export type FilmService = ReturnType<typeof createFilmService>
 
 export function createFilmService({ db, storage, runRender }: Deps) {
@@ -177,6 +188,11 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       aspectRatio: row.aspectRatio,
       defaultStyleId: row.defaultStyleId as Film['defaultStyleId'],
       templateId: row.templateId,
+      // The stored value already IS the public '/media/…' path saveDataUri
+      // returned, so this is identity, not a mapping — the same shape a shot
+      // reference reads back with. NULL → null: a film with no cover, which is
+      // every film that predates the column.
+      coverUrl: row.coverImagePath,
       createdAt: new Date(row.createdAt).toISOString(),
       updatedAt: new Date(row.updatedAt).toISOString(),
     }
@@ -220,19 +236,50 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     db.update(film).set({ updatedAt: new Date() }).where(eq(film.id, filmId)).run()
 
   // ── Films ─────────────────────────────────────────────────────────────────
-  function createFilm(userId: string, input: CreateFilmInput): Film {
+  // ASYNC since the cover arrived (owner request 2026-07-31). It writes a file
+  // now, and a method that does I/O should say so — hiding the await in the route
+  // to keep this signature synchronous would put storage in a layer that, in this
+  // codebase, has never touched it.
+  async function createFilm(userId: string, input: CreateFilmInput): Promise<Film> {
     const id = randomUUID()
     const now = new Date()
+    // THE COVER IS STORED BEFORE THE ROW, and the order is the point: a cover we
+    // cannot keep must leave NO film behind. Insert-then-save would hand the user
+    // a film whose picture silently never arrived — something they would have to
+    // notice and then delete by hand. Failing first means the create simply did
+    // not happen, which is the only honest outcome for "name it and pick a
+    // picture" being one request.
+    //
+    // Under its own media key, independent of the film id: saveDataUri →
+    // parseImageDataUri re-guards the DISK (closed raster mime table, decoded-byte
+    // cap) even though the wire schema already refused svg and URLs. That second
+    // check is the load-bearing one — the wire check only produces a nicer message.
+    let coverImagePath: string | null = null
+    if (input.coverDataUri) {
+      try {
+        coverImagePath = await storage.saveDataUri(input.coverDataUri, randomUUID())
+      } catch (err) {
+        // The client's payload is at fault, so this is a 400 — never a 500
+        // leaking the storage error class out of the service.
+        if (err instanceof InvalidImageDataUriError) throw new FilmValidationError(err.message)
+        throw err
+      }
+    }
     db.insert(film)
       .values({
         id,
         userId,
         title: input.title.trim(),
-        aspectRatio: input.aspectRatio,
+        // THE default, decided here and nowhere else (the wire made this optional
+        // when the create dialog collapsed to "title + cover"). 16:9 because a
+        // film is a film until its author says otherwise, and the ratio is now
+        // changed on the detail page where the canvas is actually visible.
+        aspectRatio: input.aspectRatio ?? DEFAULT_FILM_ASPECT_RATIO,
         defaultStyleId: input.defaultStyleId ?? null,
         // A hand-made film has no template. Only createFromTemplate stamps one —
         // provenance is a fact the server establishes, never a client claim.
         templateId: null,
+        coverImagePath,
         createdAt: now,
         updatedAt: now,
       })
@@ -270,7 +317,11 @@ export function createFilmService({ db, storage, runRender }: Deps) {
           id,
           userId,
           title: input.title.trim(),
-          aspectRatio: input.aspectRatio,
+          // Same default as the hand-made path. Every shipped template supplies a
+          // ratio, so this fallback is unreachable today — but `aspectRatio` is
+          // optional on the wire now, and a shared const is what keeps the two
+          // creation paths from ever answering differently.
+          aspectRatio: input.aspectRatio ?? DEFAULT_FILM_ASPECT_RATIO,
           defaultStyleId: input.defaultStyleId ?? null,
           templateId,
           createdAt: now,
@@ -355,8 +406,11 @@ export function createFilmService({ db, storage, runRender }: Deps) {
 
   function deleteFilm(userId: string, filmId: string): void {
     requireFilm(userId, filmId)
-    // Cascade (schema FKs) removes shots/audio/renders. Render output files under
-    // /media are left to be cleaned by a future sweep — harmless orphans.
+    // Cascade (schema FKs) removes shots/audio/renders. Files under /media — the
+    // render outputs AND the film's uploaded cover — are left to be cleaned by a
+    // future sweep: harmless orphans, the same treatment a detached shot or style
+    // reference gets. Chasing the bytes here would be a delete that can fail
+    // halfway and leave a row pointing at nothing.
     db.delete(film).where(eq(film.id, filmId)).run()
   }
 

@@ -206,3 +206,36 @@ reaper, which releases it.
 
 Tests: `films-render.test.ts` covers `latestRender` null/newest/succeeded and
 ownership, plus refusal-while-processing and release-after-settle.
+
+## Update 2026-07-31 — film cover, and `createFilm` becomes async
+
+Owner request: the create dialog asks for a **title and, optionally, a cover picture**; aspect ratio
+and default style moved to the detail page's settings.
+
+- **`createFilm` is now `async`** and returns `Promise<Film>`. It writes a file, and a method that
+  does I/O should say so. The alternative — resolving the cover in the route to keep this signature
+  synchronous — was rejected because **no route in this codebase touches storage**; storage lives in
+  services universally, and inventing a new pattern to dodge a signature change is the tail wagging
+  the dog. Cost: ~29 direct-service call sites in four test files gained `await` (and their `it`
+  callbacks `async`), all of them mechanical and all caught by the typechecker.
+- **The cover is stored BEFORE the row, and the order is the whole point.** A cover we cannot keep
+  must leave NO film behind. Insert-then-save would hand the user a film whose picture silently never
+  arrived — something they would have to notice and then delete by hand. Pinned by three tests that
+  assert a 400 **and** an empty `film` table.
+- `storage.saveDataUri` → `parseImageDataUri` re-guards the disk (closed raster mime table,
+  decoded-byte cap) even though the wire schema already refused svg and URLs. That second check is
+  the load-bearing one; the wire check only produces a nicer message.
+  `InvalidImageDataUriError` → `FilmValidationError` (400), never a 500 leaking the storage class.
+- **`DEFAULT_FILM_ASPECT_RATIO = '16:9'`** — named once because TWO paths now have to answer "what
+  ratio when nobody picked one": `createFilm` and `createFromTemplate`. Every shipped template
+  supplies a ratio, so the fallback is unreachable there today, but a shared const is what keeps the
+  two from ever drifting. Defaulted on the SERVER rather than via `.default()` in the schema, so one
+  side owns the decision and the client bundle carries no competing opinion.
+- **`toFilmDto.coverUrl` is identity**, not a mapping: the column already holds the public
+  `/media/…` path. NULL → null.
+- **`deleteFilm` does not touch the cover file** — a harmless orphan for a future sweep, the same
+  treatment render outputs and detached shot/style references get. Chasing the bytes here would be a
+  delete that can fail halfway and leave a row pointing at nothing. Pinned by a test that deletes a
+  film and then still fetches its cover from `/media`.
+- Scope: **create only**. No cover on `updateFilmInputSchema` — changing a cover after the fact was
+  not requested (flagged as a possible follow-up).

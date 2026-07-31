@@ -69,11 +69,11 @@ function refusalOf(fn: () => unknown): FilmValidationError {
 }
 
 describe('render refusal reasons — audio', () => {
-  it('reports a still-processing track as audio_processing, naming the track', () => {
+  it('reports a still-processing track as audio_processing, naming the track', async () => {
     // The user attached a voiceover while the TTS job was in flight. Correct
     // instruction: WAIT. It resolves itself.
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedGeneration(db, 'gen-pending', 'audio', 'processing')
     const track = svc.addAudio(USER, film.id, {
@@ -88,10 +88,10 @@ describe('render refusal reasons — audio', () => {
     expect(refusal.subjectId).toBe(track.id)
   })
 
-  it('reports a failed track as audio_failed — a DIFFERENT reason, same throw site', () => {
+  it('reports a failed track as audio_failed — a DIFFERENT reason, same throw site', async () => {
     // Correct instruction: REMOVE. Waiting will never help. This is the split.
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedGeneration(db, 'gen-bad', 'audio', 'failed')
     const track = svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-bad' })
@@ -102,9 +102,9 @@ describe('render refusal reasons — audio', () => {
     expect(refusal.subjectId).toBe(track.id)
   })
 
-  it('reports a vanished audio generation as audio_generation_missing', () => {
+  it('reports a vanished audio generation as audio_generation_missing', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedGeneration(db, 'gen-gone', 'audio', 'succeeded')
     svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-gone' })
@@ -115,9 +115,9 @@ describe('render refusal reasons — audio', () => {
     )
   })
 
-  it('reports a succeeded track whose FILE is gone as audio_media_missing', () => {
+  it('reports a succeeded track whose FILE is gone as audio_media_missing', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedGeneration(db, 'gen-nofile', 'audio', 'succeeded')
     svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-nofile' })
@@ -127,9 +127,9 @@ describe('render refusal reasons — audio', () => {
 })
 
 describe('render refusal reasons — shots', () => {
-  it('reports a still-generating clip as shot_clip_processing, naming the shot', () => {
+  it('reports a still-generating clip as shot_clip_processing, naming the shot', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedGeneration(db, 'gen-run', 'video', 'processing')
     const shot = svc.addShot(USER, film.id, { generationId: 'gen-run', durationMs: 2000 })
 
@@ -140,10 +140,10 @@ describe('render refusal reasons — shots', () => {
     expect(refusal.subjectId).toBe(shot.id)
   })
 
-  it('reports a failed clip as shot_clip_failed — the shot-side split', () => {
+  it('reports a failed clip as shot_clip_failed — the shot-side split', async () => {
     // Same throw site as above, opposite instruction: REGENERATE, do not wait.
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedGeneration(db, 'gen-dead', 'video', 'failed')
     const shot = svc.addShot(USER, film.id, { generationId: 'gen-dead', durationMs: 2000 })
 
@@ -153,9 +153,9 @@ describe('render refusal reasons — shots', () => {
     expect(refusal.subjectId).toBe(shot.id)
   })
 
-  it('reports a vanished clip as shot_clip_missing', () => {
+  it('reports a vanished clip as shot_clip_missing', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedGeneration(db, 'gen-vanish', 'video', 'succeeded')
     svc.addShot(USER, film.id, { generationId: 'gen-vanish', durationMs: 2000 })
     db.delete(generation).run()
@@ -163,18 +163,18 @@ describe('render refusal reasons — shots', () => {
     expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe('shot_clip_missing')
   })
 
-  it('reports an audio clip used as a shot as shot_clip_is_audio', () => {
+  it('reports an audio clip used as a shot as shot_clip_is_audio', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedGeneration(db, 'gen-sound', 'audio', 'succeeded')
     svc.addShot(USER, film.id, { generationId: 'gen-sound', durationMs: 2000 })
 
     expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe('shot_clip_is_audio')
   })
 
-  it('reports a succeeded clip whose FILE is gone as shot_media_missing', () => {
+  it('reports a succeeded clip whose FILE is gone as shot_media_missing', async () => {
     const { db, svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     seedGeneration(db, 'gen-nofile', 'video', 'succeeded')
     svc.addShot(USER, film.id, { generationId: 'gen-nofile', durationMs: 2000 })
 
@@ -183,9 +183,9 @@ describe('render refusal reasons — shots', () => {
 })
 
 describe('render refusal reasons — film', () => {
-  it('reports an empty timeline as film_no_shots, with the film as the subject', () => {
+  it('reports an empty timeline as film_no_shots, with the film as the subject', async () => {
     const { svc } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
 
     const refusal = refusalOf(() => svc.createRender(USER, film.id))
 
@@ -195,11 +195,11 @@ describe('render refusal reasons — film', () => {
 })
 
 describe('a render that CAN proceed', () => {
-  it('does not refuse when every cited clip and track is ready', () => {
+  it('does not refuse when every cited clip and track is ready', async () => {
     // The negative control: without it, a bug that refuses everything would make
     // every test above pass for the wrong reason.
     const { db, svc, storage } = service()
-    const film = svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
+    const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedGeneration(db, 'gen-ok', 'audio', 'succeeded')
     writeFileSync(storage.localPath('gen-ok', 'mp3'), 'exists')

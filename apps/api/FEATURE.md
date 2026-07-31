@@ -163,7 +163,7 @@ and local media storage. TypeScript strict, ESM, SQLite via drizzle-orm/better-s
 | GET | `/api/generations` | ✓ | `?limit` (≤50, default 24) `&cursor` (zod-validated, 400 on garbage); `{ items, nextCursor }` |
 | GET | `/api/generations/:id` | ✓ | doubles as the Runware poll while processing (throttled to 1 provider call / 3s / generation) |
 | DELETE | `/api/generations/:id` | ✓ | 204; removes media file + row; 409 `conflict` while processing |
-| GET/POST | `/api/films` | ✓ | CinemaStudio: list / create film |
+| GET/POST | `/api/films` | ✓ | CinemaStudio: list / create film. Create takes `{ title }` alone — `aspectRatio` is optional (server defaults 16:9) and `coverDataUri` optionally attaches a cover; the bytes are stored BEFORE the row, so a rejected cover (svg/URL/oversize/undecodable → 400) leaves no film behind |
 | GET/PATCH/DELETE | `/api/films/:id` | ✓ | film detail (film+shots+audio) / update / delete |
 | POST/PATCH/DELETE | `/api/films/:id/shots[...]` | ✓ | add / update / delete a shot; `POST …/shots/reorder` |
 | POST | `/api/films/:id/shots/:shotId/split` | ✓ | split a shot at `atMs` (from the shot's own start, `0 < atMs < durationMs`) → updated FilmDetail; one transaction (truncate A + insert B citing the same generation with a shifted trim), charges nothing (the NLE's split-at-playhead) |

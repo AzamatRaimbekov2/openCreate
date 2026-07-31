@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { buildTestApp, registerAndGetCookie } from './helpers/build-test-app'
+import { createDb } from '../src/db/client'
+import { film } from '../src/db/schema'
+
+// A minimal but valid raster image data URI (8-byte PNG signature).
+const PNG = 'data:image/png;base64,iVBORw0KGgo='
+const SVG = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
 
 async function makeFilm(app: Awaited<ReturnType<typeof buildTestApp>>, cookie: string) {
   const res = await app.inject({
@@ -69,6 +75,147 @@ describe('films CRUD', () => {
     expect(del.statusCode).toBe(204)
     const list = await app.inject({ method: 'GET', url: '/api/films', headers: { cookie } })
     expect(list.json().items).toHaveLength(0)
+  })
+})
+
+// The create dialog collapsed to "title + optional cover" (owner, 2026-07-31).
+// Two things have to hold: the ratio the user no longer picks still gets decided
+// (by the server, once), and a cover that cannot be stored must not leave a film
+// behind — the picture is part of the create, not a decoration bolted on after.
+describe('film create: title-only, with an optional cover', () => {
+  it('creates a 16:9 film from a bare title', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'Только название' },
+    })
+    expect(res.statusCode).toBe(201)
+    // The server owns the default — there is one place it is decided.
+    expect(res.json().aspectRatio).toBe('16:9')
+    expect(res.json().coverUrl).toBeNull()
+    expect(res.json().defaultStyleId).toBeNull()
+  })
+
+  it('still honours an explicit aspectRatio — the change is widening', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'Вертикальный', aspectRatio: '9:16', defaultStyleId: 'anime' },
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json().aspectRatio).toBe('9:16')
+    expect(res.json().defaultStyleId).toBe('anime')
+  })
+
+  it('stores a cover and answers its media path — in the create, the list and the detail', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'С обложкой', coverDataUri: PNG },
+    })
+    expect(created.statusCode).toBe(201)
+    // A path we minted, never the bytes back.
+    expect(created.json().coverUrl).toMatch(/^\/media\/.+\.png$/)
+
+    const list = await app.inject({ method: 'GET', url: '/api/films', headers: { cookie } })
+    expect(list.json().items[0].coverUrl).toBe(created.json().coverUrl)
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/films/${created.json().id}`,
+      headers: { cookie },
+    })
+    expect(detail.json().film.coverUrl).toBe(created.json().coverUrl)
+  })
+
+  it('reads an older film — one with no cover — as null rather than missing', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await makeFilm(app, cookie)
+    expect(created.json()).toHaveProperty('coverUrl', null)
+  })
+
+  // The whole reason the bytes are stored BEFORE the row: a cover we cannot keep
+  // must not leave a half-made film the user then has to notice and delete.
+  it('refuses an svg cover with 400 and creates NO film', async () => {
+    const db = createDb(':memory:').db
+    const app = await buildTestApp({ db })
+    const cookie = await registerAndGetCookie(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'Злая обложка', coverDataUri: SVG },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error.code).toBe('validation_failed')
+    // The table is empty — not "a film without a cover".
+    expect(db.select().from(film).all()).toHaveLength(0)
+  })
+
+  it('refuses a cover that is a URL rather than bytes, creating no film', async () => {
+    const db = createDb(':memory:').db
+    const app = await buildTestApp({ db })
+    const cookie = await registerAndGetCookie(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'SSRF', coverDataUri: 'https://evil.example/x.png' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(db.select().from(film).all()).toHaveLength(0)
+  })
+
+  // The wire schema refuses svg first, so this proves the SERVER-side guard is
+  // real on its own: a data URI that passes zod but is not a storable raster
+  // still fails at the disk boundary, and still leaves no row.
+  it('refuses a well-formed data URI the storage layer cannot decode, creating no film', async () => {
+    const db = createDb(':memory:').db
+    const app = await buildTestApp({ db })
+    const cookie = await registerAndGetCookie(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      // Passes `startsWith('data:image/')` and is not svg, but names a mime the
+      // storage layer's closed raster table does not carry.
+      payload: { title: 'Не растр', coverDataUri: 'data:image/tiff;base64,AAAA' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error.code).toBe('validation_failed')
+    expect(db.select().from(film).all()).toHaveLength(0)
+  })
+
+  it('leaves the cover file alone when the film is deleted (the orphan precedent)', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'Удалю', coverDataUri: PNG },
+    })
+    const coverUrl = created.json().coverUrl as string
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/films/${created.json().id}`,
+      headers: { cookie },
+    })
+    expect(del.statusCode).toBe(204)
+    // Still served: deleting a film does not chase its uploaded bytes, the same
+    // way a detached shot/style reference leaves a harmless orphan behind.
+    const media = await app.inject({ method: 'GET', url: coverUrl })
+    expect(media.statusCode).toBe(200)
   })
 })
 

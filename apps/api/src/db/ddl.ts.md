@@ -202,3 +202,10 @@ composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/
   orphan sweep must see them without parsing an open-ended blob.
 - Additive and nullable, so a legacy db file is covered by the pragma-guarded `ALTER TABLE` in
   `client.ts` and a fresh one by this DDL — no backfill, no contract step.
+
+## Update 2026-07-31 — film.cover_image_path
+- `FILM_DDL` `film` table += `cover_image_path TEXT` (nullable) — the `/media/<uuid>.<ext>` path of a
+  cover image uploaded when the film was created (owner request 2026-07-31).
+- Additive and nullable: a fresh db gets it from this DDL, a legacy file from the pragma-guarded
+  `ALTER TABLE` in `client.ts`. NULL is the honest state of every film that predates it, so there is
+  no backfill and no contract step.
