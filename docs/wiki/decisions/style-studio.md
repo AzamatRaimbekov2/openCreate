@@ -163,3 +163,36 @@ erDiagram
 
 Out of scope MVP: публичные/шаримые стили, LoRA-обучение, версии стилей,
 модерация каталога.
+
+## Amendment 2026-07-31 — стиль-пакет: промпт + референсы (accepted)
+
+Владелец: «стили создаём промптами И референсами — удобный пакет стиля».
+Реализуем задел D2 без ломки:
+
+### A1 — Пакет, а не либо/либо
+
+Стиль может нести ОДНОВРЕМЕННО фрагменты и референс-картинки (до 3).
+`kind` остаётся 'prompt' (пакет — это возможность, не новый вид);
+референсы — колонка `reference_images_json` `[{id, path}]`, зеркально
+`shot.reference_images_json` (пути из saveDataUri, raster-only гард).
+
+### A2 — Применение через существующий референс-канал
+
+Резолв стиля возвращает `{ fragment, negative, referenceImagePaths }`.
+generations читает пути → data URI (`readAsDataUri`) → вливает в серверный
+`referenceImages`-канал (тот же, что entity-фото и shot-references), С УЧЁТОМ
+модельных гейтов. Порядок при переполнении maxReferenceImages: сначала
+entity/shot-рефы, стилевые дропаются первыми — стиль амбиентен.
+
+### A3 — Несовместимая модель: рефы дропаются молча
+
+Прецедент владельца 2026-07-24 (shot references): «refs are simply dropped
+silently (no charge) for such models». Фрагменты применяются всегда; рефы —
+только там, где модель умеет (referenceMode / r2v). Никаких отказов.
+
+### A4 — API/UI
+
+`POST /api/styles/:id/references { dataUri }` (201, cap 3) ·
+`DELETE /api/styles/:id/references/:refId` — зеркало shot-references.
+Конструктор: блок «Референсы стиля» — клик/драг/вставка (shared readImageFile),
+тумбы с удалением. Превью-генерация автоматически использует пакет целиком.
