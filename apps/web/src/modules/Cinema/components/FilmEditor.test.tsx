@@ -80,6 +80,7 @@ function makeDetail(shots: Shot[]): FilmDetail {
       aspectRatio: '16:9',
       defaultStyleId: null,
       templateId: null,
+      coverUrl: null,
       createdAt: '2026-07-09T10:00:00.000Z',
       updatedAt: '2026-07-09T10:00:00.000Z',
     },
