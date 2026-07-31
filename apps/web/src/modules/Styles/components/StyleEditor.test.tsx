@@ -136,6 +136,21 @@ it('offers no preview while the style is still being typed', () => {
   expect(screen.queryByRole('button', { name: /generate preview/i })).not.toBeInTheDocument()
 })
 
+it('carries the reference strip once the style exists', () => {
+  renderEditor(styleRow())
+
+  expect(screen.getByRole('group', { name: /style references/i })).toBeInTheDocument()
+})
+
+it('offers no reference strip while the style is still being typed', () => {
+  // A reference is attached to a style BY ID, and one being typed has none —
+  // the same reason the preview button is absent in create mode.
+  renderEditor(null)
+
+  expect(screen.queryByRole('group', { name: /style references/i })).not.toBeInTheDocument()
+  expect(screen.getByText(/create the style first/i)).toBeInTheDocument()
+})
+
 it('prices the preview from the model that will actually run it', async () => {
   renderEditor(styleRow({ recommendedModelId: 'flux-dev' }))
 

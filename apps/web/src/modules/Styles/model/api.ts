@@ -92,6 +92,39 @@ export function useDeleteStyle() {
   })
 }
 
+// The reference half of the style package (ADR style-studio A1/A4). Both writes
+// answer with the WHOLE updated Style, so they absorb exactly like the field
+// writes above — the thumb strip re-renders from the server's own answer and
+// never merges a partial result client-side.
+export function useAddStyleReference() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, dataUri }: { id: string; dataUri: string }) =>
+      api<Style>(`/api/styles/${id}/references`, {
+        method: 'POST',
+        body: JSON.stringify({ dataUri }),
+      }),
+    onSuccess: (updated) =>
+      writeStyles(queryClient, (items) =>
+        items.map((style) => (style.id === updated.id ? updated : style)),
+      ),
+  })
+}
+
+export function useDeleteStyleReference() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    // An unknown refId answers 200 with the unchanged style rather than 404, so
+    // a delete that races another tab is safe to fire and safe to absorb.
+    mutationFn: ({ id, refId }: { id: string; refId: string }) =>
+      api<Style>(`/api/styles/${id}/references/${refId}`, { method: 'DELETE' }),
+    onSuccess: (updated) =>
+      writeStyles(queryClient, (items) =>
+        items.map((style) => (style.id === updated.id ? updated : style)),
+      ),
+  })
+}
+
 // The generation this preview is waiting on. Held as ONE object so the style and
 // its run can never drift apart mid-flight.
 type PendingPreview = {

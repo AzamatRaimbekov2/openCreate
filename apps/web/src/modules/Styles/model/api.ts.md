@@ -89,3 +89,13 @@ flowchart TD
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 — the reference half of the package
+- Adds `useAddStyleReference()` (`POST /api/styles/:id/references { dataUri }`) and
+  `useDeleteStyleReference()` (`DELETE /api/styles/:id/references/:refId`), the two
+  writes behind `StyleReferenceImages` (ADR style-studio A1/A4).
+- Both answer with the WHOLE updated `Style`, so they absorb through the same
+  `writeStyles` replace-in-place the field writes use — the thumb strip re-renders
+  from the server's own row and nothing is merged client-side.
+- A delete of an unknown `refId` answers 200 with the unchanged style rather than
+  404, so a delete that races another tab is safe to fire and safe to absorb.

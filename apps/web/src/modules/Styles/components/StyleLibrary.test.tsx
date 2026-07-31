@@ -110,6 +110,28 @@ it('renders my style with its preview image and an edit affordance', async () =>
   expect(screen.queryByText(/no styles of your own/i)).not.toBeInTheDocument()
 })
 
+it('re-initialises the draft when a different style is opened', async () => {
+  // The editor holds its draft in useState, so without a key the SECOND style
+  // opened would show the FIRST one's text — the bug the Cinema inspector avoids
+  // by keying on shot.id.
+  apiMock.mockResolvedValue({
+    items: [styleRow(), styleRow({ id: 'st2', name: 'Super 8', fragment: 'sun-bleached grain' })],
+  })
+  renderLibrary()
+
+  const first = await screen.findByRole('listitem', { name: /neon noir/i })
+  await userEvent.click(within(first).getByRole('button', { name: /actions/i }))
+  await userEvent.click(within(first).getByRole('menuitem', { name: /edit/i }))
+  expect(screen.getByRole('textbox', { name: /name/i })).toHaveValue('Neon noir')
+  await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+  const second = screen.getByRole('listitem', { name: /super 8/i })
+  await userEvent.click(within(second).getByRole('button', { name: /actions/i }))
+  await userEvent.click(within(second).getByRole('menuitem', { name: /edit/i }))
+
+  expect(screen.getByRole('textbox', { name: /name/i })).toHaveValue('Super 8')
+})
+
 it('asks before deleting — the style disappears from every picker in the app', async () => {
   apiMock.mockResolvedValue({ items: [styleRow()] })
   renderLibrary()

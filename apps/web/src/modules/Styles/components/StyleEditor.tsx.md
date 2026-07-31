@@ -73,3 +73,16 @@ flowchart TD
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 — the package gains its reference strip
+- Edit mode now renders `StyleReferenceImages` under the model `Select`; create
+  mode renders the `styles.references.unsaved` line instead. Same rule as the
+  preview button: a reference is attached to a style BY ID, and one still being
+  typed has none.
+- The strip reads `style.referenceImages` straight off the prop, which
+  `StyleLibrary` now resolves from the LIVE cache by id — a captured row would
+  leave the strip frozen at whatever it held when the modal opened.
+- The editor is now KEYED by `editingId` upstream, which fixes a real bug from
+  681698a: the draft lives in `useState`, so without a key the second style opened
+  showed the first one's text. Keying on the ID (not the row) means a reference
+  upload — which replaces the row — does NOT remount and wipe unsaved typing.

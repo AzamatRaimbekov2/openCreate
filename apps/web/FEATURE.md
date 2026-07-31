@@ -526,6 +526,20 @@ catalog. ADR `docs/wiki/decisions/style-studio.md`.
   server sends its hardcoded Russian `label` as `name`; a user style renders its own
   name verbatim; an id with no SPA copy falls back to the server's name instead of
   painting a raw key.
+- **The style is a PACKAGE, not either/or** (ADR amendment A1/A4): the constructor
+  also carries up to `STYLE_MAX_REFERENCES` (3) reference images through
+  `StyleReferenceImages` — click, drop and paste, all via the shared
+  `readImageFile` gate, thumbs with a per-thumb remove, an `N / 3` counter, and the
+  add tile GONE (not disabled) at the cap. Edit mode only: an image attaches to a
+  style by id. Both writes answer with the whole updated `Style`, so the strip
+  re-renders from the server's own row and nothing is merged client-side.
+- **The reference copy is deliberately non-committal.** The server applies style
+  images through the same channel as entity photos and shot references, WITH the
+  model's gates: dropped silently on a model that takes no references, and trimmed
+  FIRST when the budget is full (entity tags outrank a style — a style is ambient).
+  So the UI says "applied where the model can use them" rather than promising they
+  arrive; a test pins that wording. Fragments always apply; only pictures are
+  conditional.
 
 ## Design references
 

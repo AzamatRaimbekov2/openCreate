@@ -38,20 +38,22 @@ export function StyleLibrary({ models }: StyleLibraryProps) {
   // the modal would die on close and strand a charged run with nothing left to
   // attach it to (see StyleEditor's note).
   const preview = useStylePreview()
-  // null-but-open = create; a style-and-open = edit. One modal, two modes —
-  // the EntityEditor precedent, and for the same reason: identical fields.
-  const [editing, setEditing] = useState<Style | null>(null)
+  // WHICH style is being edited, held as an ID rather than the row itself:
+  // attaching or removing a reference image rewrites that row in the cache, and a
+  // captured object would leave the editor's thumb strip frozen at the contents
+  // it had when the modal opened. null-but-open = create; an id = edit.
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   // The style awaiting confirmation. Held as the whole row so the dialog can
   // name it, and so a list refresh mid-dialog cannot swap which one is meant.
   const [pendingDelete, setPendingDelete] = useState<Style | null>(null)
 
   const openCreate = () => {
-    setEditing(null)
+    setEditingId(null)
     setIsEditorOpen(true)
   }
   const openEdit = (style: Style) => {
-    setEditing(style)
+    setEditingId(style.id)
     setIsEditorOpen(true)
   }
 
@@ -73,6 +75,11 @@ export function StyleLibrary({ models }: StyleLibraryProps) {
 
   const mine = data.items.filter((style) => !style.builtin)
   const builtin = data.items.filter((style) => style.builtin)
+  // Resolved from the LIVE list every render, so a reference the editor just
+  // attached is in the row the editor is showing. null in create mode, and also
+  // if the style vanished underneath us (another tab deleted it) — the editor
+  // then simply opens in create mode rather than rendering a ghost.
+  const editing = editingId === null ? null : (data.items.find((s) => s.id === editingId) ?? null)
 
   const renderTile = (style: Style) => {
     // A deterministic id (not useId — this runs inside a map) so the <li> can
@@ -161,6 +168,13 @@ export function StyleLibrary({ models }: StyleLibraryProps) {
       </section>
 
       <StyleEditor
+        // Keyed so opening a DIFFERENT style re-initialises the draft: the editor
+        // holds its fields in useState, and without this the second style opened
+        // would show the first one's text (the Cinema inspector keys on shot.id
+        // for exactly this reason). The key is the id, not the row, so a
+        // reference upload — which replaces the row — does NOT remount and wipe
+        // whatever the user has typed but not saved.
+        key={editingId ?? 'new'}
         style={editing}
         models={models}
         isOpen={isEditorOpen}

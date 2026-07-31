@@ -490,6 +490,15 @@
       "model": "Recommended model",
       "modelNone": "No recommendation"
     },
+    "references": {
+      "title": "Style references",
+      "add": "Add reference image",
+      "remove": "Remove reference",
+      "previewAlt": "Style reference",
+      "hint": "Click, drop or paste up to {{count}} images.",
+      "ambient": "A hint, applied where the model can use them — some models ignore images.",
+      "unsaved": "Create the style first — then you can attach references."
+    },
     "preview": {
       "cta_one": "Generate preview · {{count}} credit",
       "cta_other": "Generate preview · {{count}} credits",

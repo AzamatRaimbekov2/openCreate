@@ -71,3 +71,17 @@ flowchart TD
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-07-31 — the edited style is resolved live, and the editor is keyed
+- `editing` is no longer a captured `Style` in state; the component holds
+  `editingId` and resolves the row from `data.items` every render. Attaching or
+  removing a reference image rewrites that row in the `['styles']` cache, and a
+  captured object would leave the editor's thumb strip frozen at its open-time
+  contents. A style that vanished underneath us (deleted in another tab) resolves
+  to null, so the editor opens in create mode rather than rendering a ghost.
+- `StyleEditor` is now `key={editingId ?? 'new'}`. This fixes a bug shipped in
+  681698a: the editor holds its fields in `useState` and is rendered permanently
+  (the `Modal` returns null when closed but the component stays mounted), so the
+  SECOND style opened showed the FIRST one's text. The Cinema inspector keys on
+  `shot.id` for exactly this reason. Keying on the ID rather than the row means a
+  reference upload does not remount the editor and discard unsaved typing.

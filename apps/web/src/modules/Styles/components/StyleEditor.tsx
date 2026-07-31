@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import type { CatalogModel, Style } from '@opencreate/contracts'
 import { Button, EnhanceButton, Input, Modal, Select } from 'shared/ui'
 import { PREVIEW_FALLBACK_MODEL_ID, useCreateStyle, useUpdateStyle } from '../model/api'
+import { StyleReferenceImages } from './StyleReferenceImages'
 
 export type StyleEditorProps = {
   // null → create mode; a style → edit mode (prefilled)
@@ -190,6 +191,19 @@ export function StyleEditor({
           value={recommendedModelId}
           onChange={setRecommendedModelId}
         />
+
+        {/* THE OTHER HALF OF THE PACKAGE (ADR style-studio A1): a style may carry
+            fragments AND up to three reference images at the same time. Edit mode
+            only — an image is attached to a style BY ID, and one still being typed
+            has none (the same reason the preview button is absent above). The
+            strip reads `style.referenceImages` straight off the cached row, and
+            both of its writes answer with the whole updated Style, so it never
+            merges a partial result locally. */}
+        {isEdit ? (
+          <StyleReferenceImages styleId={style.id} references={style.referenceImages} />
+        ) : (
+          <p className="text-[11px] text-mist-dim/70">{t('styles.references.unsaved')}</p>
+        )}
 
         {isError ? (
           <span role="alert" className="text-sm text-glow-red">
