@@ -135,3 +135,17 @@ flowchart LR
 - a04eac7 2026-07-06 feat(web): pricing page with per-model credit table (pricing anchor → typed Link)
 - 3305c12 2026-07-07 restyle(web): editorial design system — tokens, fonts, ui kit
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+
+## Update 2026-07-31 — Style Studio entry
+- Nav gains ONE `/styles` typed `Link` (`t('nav.styles')` — "Styles" / «Стили»),
+  identical `navLinkClass` + `activeProps`/`inactiveProps` to every sibling. Nav
+  order is now create · creator · library · cinema · canvas · assets · templates ·
+  souls · entities · **styles** · pricing.
+- **Placed with the two LIBRARIES (after entities), not with Create**: a style is a
+  reusable thing you build once and then PICK everywhere, exactly like a character
+  or an entity. After the registry migration (ADR style-studio D5) the styles a
+  user writes on this page appear in every style picker in the app, which makes it
+  a library screen rather than a creation surface.
+- The whole change is the one `<Link>`; `AppShell` stays presentational and imports
+  nothing from `modules/*` — the route (`_shell.styles.tsx`) does the auth guard and
+  the module composition. Roles/labels unchanged, so `AppShell.test.tsx` is unaffected.

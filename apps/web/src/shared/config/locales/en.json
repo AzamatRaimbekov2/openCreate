@@ -12,7 +12,8 @@
     "canvas": "Canvas",
     "templates": "Templates",
     "soul": "Souls",
-    "assets": "Assets"
+    "assets": "Assets",
+    "styles": "Styles"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -456,6 +457,54 @@
         "detailed": "highly detailed",
         "photoreal": "photorealistic"
       }
+    }
+  },
+  "styles": {
+    "title": "Styles",
+    "subtitle": "A style is two prompt fragments with a name. Write one and it becomes selectable everywhere you pick a style.",
+    "mine": "My styles",
+    "builtinSection": "Built-in",
+    "builtinBadge": "built-in",
+    "noPreview": "No preview yet",
+    "create": {
+      "cta": "New style",
+      "title": "New style",
+      "submit": "Create"
+    },
+    "edit": {
+      "title": "Edit style"
+    },
+    "empty": {
+      "title": "No styles of your own",
+      "description": "The ones below ship with the app. Write your own and it joins them in every style picker."
+    },
+    "field": {
+      "name": "Name",
+      "namePlaceholder": "Neon noir",
+      "fragment": "Style fragment",
+      "fragmentHint": "Written in English — this text is appended to every prompt that uses the style.",
+      "fragmentPlaceholder": "neon noir, rain-slicked streets, hard rim light, deep shadows",
+      "negative": "Never show",
+      "negativeHint": "Optional. What this style must keep out of frame.",
+      "negativePlaceholder": "daylight, pastel colors",
+      "model": "Recommended model",
+      "modelNone": "No recommendation"
+    },
+    "preview": {
+      "cta_one": "Generate preview · {{count}} credit",
+      "cta_other": "Generate preview · {{count}} credits",
+      "running": "Generating preview…",
+      "hint": "Saves your edits, then renders one sample image in this style.",
+      "unsaved": "Create the style first — then you can preview it."
+    },
+    "delete": {
+      "title": "Delete this style?",
+      "description": "Films and shots that already use it keep their setting — they will ask for a style again the next time they generate.",
+      "confirm": "Delete"
+    },
+    "errors": {
+      "name": "Give the style a name.",
+      "fragment": "Describe what this style looks like."
     }
   },
   "cinema": {

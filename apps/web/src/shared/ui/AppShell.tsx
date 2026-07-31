@@ -161,6 +161,18 @@ export function AppShell({
             >
               {t('nav.entities')}
             </Link>
+            {/* Styles sits with the two libraries, not with Create: a style is a
+                reusable thing you build once and then PICK everywhere, exactly
+                like a character or an entity — and after the registry migration
+                the styles a user writes here appear in every style picker. */}
+            <Link
+              to="/styles"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.styles')}
+            </Link>
             <Link
               to="/pricing"
               className={navLinkClass}
