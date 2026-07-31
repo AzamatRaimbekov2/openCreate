@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { createStyleInputSchema, styleSchema, updateStyleInputSchema } from './style'
+import {
+  addStyleReferenceInputSchema,
+  createStyleInputSchema,
+  STYLE_MAX_REFERENCES,
+  styleReferenceImageSchema,
+  styleSchema,
+  updateStyleInputSchema,
+} from './style'
 
 describe('createStyleInputSchema', () => {
   it('accepts a minimal style — name and fragment are the whole constructor', () => {
@@ -66,6 +73,7 @@ describe('styleSchema', () => {
       negative: 'photorealistic',
       recommendedModelId: 'pixverse-v6',
       previewUrl: null,
+      referenceImages: [],
       createdAt: null,
       updatedAt: null,
     })
@@ -82,9 +90,53 @@ describe('styleSchema', () => {
       negative: '',
       recommendedModelId: null,
       previewUrl: '/media/abc.webp',
+      referenceImages: [{ id: 'r1', url: '/media/ref.png' }],
       createdAt: '2026-07-31T00:00:00.000Z',
       updatedAt: '2026-07-31T00:00:00.000Z',
     })
     expect(r.success).toBe(true)
+  })
+
+  // The array is REQUIRED on the wire, like shotSchema.referenceImages: a style
+  // that carries nothing sends [], never null, so no picker null-checks before
+  // it maps. A payload missing the key is a server that forgot to fill it.
+  it('requires the reference array — a package with no images is [], not absent', () => {
+    const base = {
+      id: 'anime',
+      name: 'Аниме',
+      kind: 'prompt',
+      builtin: true,
+      fragment: 'anime style',
+      negative: '',
+      recommendedModelId: null,
+      previewUrl: null,
+      createdAt: null,
+      updatedAt: null,
+    }
+    expect(styleSchema.safeParse(base).success).toBe(false)
+    expect(styleSchema.safeParse({ ...base, referenceImages: null }).success).toBe(false)
+  })
+})
+
+// A style is a PACKAGE (ADR style-studio A1): prompt fragments AND up to three
+// reference images, together. These are the two shapes that carry the second
+// half — the read shape (a path we minted, never bytes) and the upload.
+describe('style reference images', () => {
+  it('caps a style package at three images', () => {
+    expect(STYLE_MAX_REFERENCES).toBe(3)
+  })
+
+  it('reads back an id and a server path, never the bytes', () => {
+    const r = styleReferenceImageSchema.safeParse({ id: 'r1', url: '/media/abc.png' })
+    expect(r.success).toBe(true)
+    expect(styleReferenceImageSchema.safeParse({ id: 'r1' }).success).toBe(false)
+  })
+
+  it('takes the upload as a single data URI — the same shape a shot reference does', () => {
+    expect(addStyleReferenceInputSchema.safeParse({ dataUri: 'data:image/png;base64,iVBOR' }).success).toBe(
+      true,
+    )
+    expect(addStyleReferenceInputSchema.safeParse({ dataUri: '' }).success).toBe(false)
+    expect(addStyleReferenceInputSchema.safeParse({}).success).toBe(false)
   })
 })

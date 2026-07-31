@@ -4,18 +4,24 @@
 
 ## Purpose
 Wire contracts for the **user-built style entity** (ADR `docs/wiki/decisions/style-studio.md`). A style
-is a constructor — two prompt fragments with a name — that the server resolves by id at generation
-time, exactly the way a model resolves against the catalog. This file owns the ROW half of the style
-axis; `presets.ts` owns the builtin half, and the registry answers with the one shape defined here.
+is a constructor — a name, two prompt fragments and up to three reference images — that the server
+resolves by id at generation time, exactly the way a model resolves against the catalog. This file owns
+the ROW half of the style axis; `presets.ts` owns the builtin half, and the registry answers with the
+one shape defined here.
 
 ## What it does (for an AI reader)
 - Responsibilities: define the shape of a style as the API returns it (builtin and user rows unified),
-  and the bounded inputs for creating and patching a user style.
+  the bounded inputs for creating and patching a user style, and the reference-image half of the
+  package (cap constant, read shape, upload shape).
 - Public API / exports:
-  - Schemas: `styleKindSchema`, `styleSchema`, `createStyleInputSchema`, `updateStyleInputSchema`, `styleListSchema`.
-  - Types: `StyleKind`, `Style`, `CreateStyleInput`, `UpdateStyleInput`, `StyleList`.
-- Inputs → Outputs: request bodies for `POST/PATCH /api/styles(/:id)` → validated input; `GET /api/styles`
-  → `{ items: Style[] }` where each item is a builtin OR one of the caller's own rows.
+  - Schemas: `styleKindSchema`, `styleSchema`, `createStyleInputSchema`, `updateStyleInputSchema`,
+    `styleListSchema`, `styleReferenceImageSchema`, `addStyleReferenceInputSchema`.
+  - Constant: `STYLE_MAX_REFERENCES = 3`.
+  - Types: `StyleKind`, `Style`, `CreateStyleInput`, `UpdateStyleInput`, `StyleList`,
+    `StyleReferenceImage`, `AddStyleReferenceInput`.
+- Inputs → Outputs: request bodies for `POST/PATCH /api/styles(/:id)` and
+  `POST /api/styles/:id/references` → validated input; `GET /api/styles` → `{ items: Style[] }` where
+  each item is a builtin OR one of the caller's own rows.
 - Side effects: none. Pure schemas.
 
 ## Dependencies
@@ -30,7 +36,9 @@ flowchart LR
   DB[("style table<br/>user rows")] --> REG
   REG --> LIST["GET /api/styles<br/>styleListSchema"]
   IN["createStyleInput /<br/>updateStyleInput"] --> REG
-  REG -->|"styleId → StyleFragments"| GEN[generations create]
+  UP["addStyleReferenceInput<br/>{ dataUri }"] --> REG
+  REG -->|"styleId → { fragment, negative,<br/>referenceImagePaths }"| GEN[generations create]
+  GEN -->|"readAsDataUri, model gates"| CH["server-only<br/>referenceImages channel"]
   PREV["previewGenerationId<br/>(cites a generation)"] -.->|own+succeeded+image| REG
 ```
 
@@ -54,6 +62,20 @@ flowchart LR
   generation (canvas-mode D1 — cite, never own); the DTO carries the resolved `/media/…` path. A
   preview that was deleted, failed, or never belonged to the caller reads `null` — resolution
   degrades, it never throws and never leaks.
+- **A style is a PACKAGE, not a choice** (amendment A1). `referenceImages` and the fragments coexist on
+  one row and `kind` stays `'prompt'` — the images are a capability of the existing constructor, not a
+  new kind. That is what keeps every style id already stored in a film/shot/template valid.
+- **`referenceImages` is an ARRAY, never null**, like `shotSchema.referenceImages`: a row that predates
+  the column, and every builtin (which has no row at all), reads `[]`. No picker null-checks first.
+- **The read field is `url`, the stored JSON key is `path`.** Deliberate: the value is consumed as an
+  `<img src>` in the constructor's thumbnail strip, so it is named what it is used as. The column
+  (`style.reference_images_json`) mirrors `shot.reference_images_json` exactly — `[{ id, path }]`.
+- **`STYLE_MAX_REFERENCES = 3`, not 5 like a shot.** A style is AMBIENT: it rides along with whatever
+  the shot already tags, and on a model that accepts two references a bigger cap would only ever be
+  trimmed away. One constant so the UI counter and the server refusal cannot drift.
+- **`addStyleReferenceInputSchema` is byte-for-byte the shot's rule** (raster data URI, ≤14MB, svg
+  refused). Wire-level svg refusal is defence in depth, not a replacement: `saveDataUri` re-guards the
+  disk on the server side.
 - Bounds (name ≤60, fragment ≤500, negative ≤300) are declared once as private consts and shared by
   create and update, so a patch can never be a way around them.
 - EN wording is asked for in UI copy, not enforced here: models read English far better, but
