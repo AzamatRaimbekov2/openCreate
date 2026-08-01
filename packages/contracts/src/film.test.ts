@@ -13,6 +13,7 @@ import {
   shotReferenceImageSchema,
   shotSchema,
   splitShotInputSchema,
+  updateFilmInputSchema,
   MAX_SHOT_REFERENCE_IMAGES,
 } from './film'
 
@@ -146,6 +147,56 @@ describe('createFilmInputSchema', () => {
   it('rejects an oversize cover', () => {
     const huge = 'data:image/png;base64,' + 'A'.repeat(14_000_001)
     expect(createFilmInputSchema.safeParse({ title: 'X', coverDataUri: huge }).success).toBe(false)
+  })
+})
+
+// Editing the cover from the film's settings (owner follow-up, 2026-08-02).
+// `coverDataUri` is THREE-VALUED here, which the other patch fields are not, and
+// each value has to be distinguishable from the other two:
+//   a string  → replace the cover with these bytes
+//   null      → remove the cover
+//   absent    → leave whatever is there alone
+// Collapsing null and absent — the easy mistake — would make every PATCH that
+// only renames a film silently wipe its picture.
+describe('updateFilmInputSchema.coverDataUri', () => {
+  it('accepts a raster data URI — replace the cover', () => {
+    const r = updateFilmInputSchema.safeParse({ coverDataUri: PNG })
+    expect(r.success).toBe(true)
+    expect(r.data?.coverDataUri).toBe(PNG)
+  })
+
+  it('accepts null — remove the cover', () => {
+    const r = updateFilmInputSchema.safeParse({ coverDataUri: null })
+    expect(r.success).toBe(true)
+    expect(r.data?.coverDataUri).toBeNull()
+  })
+
+  it('distinguishes absent from null — an unrelated patch must not clear it', () => {
+    const r = updateFilmInputSchema.safeParse({ title: 'Только переименование' })
+    expect(r.success).toBe(true)
+    // Not null: the service branches on `!== undefined`, so the two must not
+    // arrive as the same value.
+    expect(r.data?.coverDataUri).toBeUndefined()
+    expect('coverDataUri' in (r.data ?? {})).toBe(false)
+  })
+
+  it('applies the same image rule as the create — svg, URLs and oversize refused', () => {
+    const svg = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
+    expect(updateFilmInputSchema.safeParse({ coverDataUri: svg }).success).toBe(false)
+    expect(updateFilmInputSchema.safeParse({ coverDataUri: 'https://x/y.png' }).success).toBe(false)
+    const huge = 'data:image/png;base64,' + 'A'.repeat(14_000_001)
+    expect(updateFilmInputSchema.safeParse({ coverDataUri: huge }).success).toBe(false)
+  })
+
+  it('still accepts the patch bodies that existed before — widening', () => {
+    expect(updateFilmInputSchema.safeParse({}).success).toBe(true)
+    expect(
+      updateFilmInputSchema.safeParse({
+        title: 'Новое имя',
+        aspectRatio: '9:16',
+        defaultStyleId: null,
+      }).success,
+    ).toBe(true)
   })
 })
 

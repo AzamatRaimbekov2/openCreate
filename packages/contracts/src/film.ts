@@ -132,6 +132,22 @@ export const updateFilmInputSchema = z
     title: z.string().min(1).max(120),
     aspectRatio: aspectRatioSchema,
     defaultStyleId: styleIdSchema.nullable(),
+    // The cover, editable from the film's settings (owner follow-up 2026-08-02
+    // to the create-time cover). THREE-VALUED, and each value has to stay
+    // distinguishable from the other two:
+    //   a data URI → replace the cover with these bytes
+    //   null       → remove the cover
+    //   absent     → leave whatever is there alone
+    //
+    // `.nullable().optional()` rather than either alone, because collapsing null
+    // into absent is the mistake that matters here: a PATCH that only renames a
+    // film would silently wipe its picture. The service branches on
+    // `!== undefined`, exactly as it already does for defaultStyleId, so the two
+    // must not arrive as the same value.
+    //
+    // Same image rule as everything else on this wire (rasterImageDataUriSchema):
+    // bytes, never a URL, no svg, bounded.
+    coverDataUri: rasterImageDataUriSchema.nullable(),
   })
   .partial()
 export type UpdateFilmInput = z.infer<typeof updateFilmInputSchema>

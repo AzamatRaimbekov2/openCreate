@@ -234,3 +234,24 @@ they are decisions about a film you are already looking at.
   dependency, so it is **flagged, not done**.
 - Scope: **create only**. There is deliberately no cover on `updateFilmInputSchema` — changing a
   cover after the fact was not asked for (noted as a possible follow-up).
+
+## Update 2026-08-02 — `updateFilmInputSchema.coverDataUri` (editing the cover)
+
+Owner follow-up to the create-time cover: the picture is editable from the film's settings.
+
+- **`coverDataUri: rasterImageDataUriSchema.nullable()`** inside the `.partial()`, i.e.
+  `string | null | undefined`. **Three-valued, and each value must stay distinguishable:**
+  | value | meaning |
+  | --- | --- |
+  | a data URI | replace the cover with these bytes |
+  | `null` | remove the cover |
+  | absent | leave whatever is there alone |
+- **Collapsing `null` into absent is the mistake that matters**, which is why the schema is
+  `.nullable()` under `.partial()` rather than `.optional()` alone or a `.default(null)`: a PATCH that
+  only renames a film must not silently wipe its picture. The service branches on `!== undefined`,
+  exactly as it already does for `defaultStyleId`. Pinned by a test asserting that a title-only patch
+  leaves `coverDataUri` `undefined` **and** absent from the parsed object — and mutation-checked
+  (adding `.default(null)` turns that test red).
+- Same image rule as everywhere else on this wire (`rasterImageDataUriSchema`): bytes not URLs, no
+  svg, bounded.
+- Widening: `{}` and every pre-existing patch body still parse.
