@@ -49,10 +49,24 @@ export function useUpdateFilm() {
   return useMutation({
     mutationFn: ({ filmId, input }: { filmId: string; input: UpdateFilmInput }) =>
       api<Film>(`/api/films/${filmId}`, { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: (_film, { filmId }) => {
-      // The list card (title/aspect) and the editor header both read stale copies
-      void queryClient.invalidateQueries({ queryKey: ['films'] })
-      void queryClient.invalidateQueries({ queryKey: filmKey(filmId) })
+    // ABSORB the answer instead of refetching it. PATCH returns the whole Film,
+    // so the two surfaces that render one are written from that response: the
+    // library card and the editor's composite detail. Refetching would throw away
+    // a row we are already holding and put a visible gap between saving a cover
+    // and seeing it — the same discipline the Creator and Styles modules document.
+    onSuccess: (film, { filmId }) => {
+      // Replaced IN PLACE: reordering the shelf under someone who just renamed a
+      // film moves the card they are looking at.
+      queryClient.setQueryData<FilmList>(['films'], (old) =>
+        old
+          ? { ...old, items: old.items.map((row) => (row.id === film.id ? film : row)) }
+          : old,
+      )
+      // The detail is a composite — only its `film` half is this mutation's
+      // business; shots and audio are left exactly as they were.
+      queryClient.setQueryData<FilmDetail>(filmKey(filmId), (old) =>
+        old ? { ...old, film } : old,
+      )
     },
   })
 }

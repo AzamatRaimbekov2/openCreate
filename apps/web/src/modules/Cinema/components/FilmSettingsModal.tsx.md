@@ -75,3 +75,26 @@ flowchart TD
   create-without-cover sends exactly `{title}`, create-with-cover carries `coverDataUri`
   on the same request, the cover can be removed before submit, a non-image is refused
   locally — and edit still offers aspect and style.
+
+## Update 2026-08-02 — the cover is editable, and the partial trap is pinned
+- The cover block now renders in BOTH modes (owner follow-up). Create picks the
+  first one; edit replaces it (the thumb IS the picker) or removes it (✕). The
+  markup is shared on purpose — the affordance is identical, and the only thing
+  that differs is what the draft MEANS on the wire.
+- **The draft is a three-state union, not `string | null`**, and that is the whole
+  point. `PATCH coverDataUri` is three-valued: bytes → replace, null → REMOVE,
+  ABSENT → leave alone. Collapsing "untouched" into null would make every PATCH
+  that merely renames a film silently wipe its picture. So the state names all
+  three — `untouched | replaced(dataUri) | cleared` — and `coverPatch()` is the
+  SINGLE place mapping them to omit / string / null.
+- Verified by injecting the bug rather than trusting the shape: making
+  `untouched` return `{ coverDataUri: null }` turns the rename-only test red with
+  `{"title":"Renamed",…,"coverDataUri":null}`. That test is the most important
+  assertion in the file.
+- **The ✕ is a SIBLING of the thumb's `<label>`, never a child.** A button inside
+  a label triggers the label, so nesting it would open the file picker instead of
+  removing the cover.
+- `shownCover` derives what to display (fresh pick → stored cover → nothing), so
+  the block has no second source of truth about what the user is looking at.
+- Create mode is untouched in behaviour: it still omits the key when no picture
+  was picked rather than sending null, since there is nothing to clear yet.

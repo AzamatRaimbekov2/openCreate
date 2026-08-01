@@ -157,14 +157,78 @@ describe('create mode', () => {
   })
 })
 
-describe('edit mode is unchanged', () => {
+describe('edit mode', () => {
   it('still offers aspect and default style on a real film', async () => {
     renderModal(makeFilm())
     await screen.findByRole('textbox', { name: /^title$/i })
 
     expect(screen.getByText(/aspect ratio/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /default style/i })).toBeInTheDocument()
-    // A cover is chosen at create time; editing one is not part of this dialog
-    expect(screen.queryByRole('group', { name: /cover/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the film’s current cover', async () => {
+    renderModal(makeFilm({ coverUrl: '/media/cover.png' }))
+
+    const thumb = await screen.findByRole('img', { name: /cover/i })
+    expect(thumb).toHaveAttribute('src', '/media/cover.png')
+  })
+
+  // THE PARTIAL TRAP, and the single most important assertion in this file.
+  // `coverDataUri` is three-valued on the wire: bytes replace, null REMOVES, and
+  // an absent key means "leave it alone". So a PATCH that carries an explicit
+  // null for an untouched cover would silently wipe the picture of every film
+  // anyone renames. The key must be absent unless the user touched the image.
+  it('omits coverDataUri entirely when only the title was edited', async () => {
+    apiMock.mockResolvedValue(makeFilm({ title: 'Renamed' }))
+    renderModal(makeFilm({ coverUrl: '/media/cover.png' }))
+
+    const title = await screen.findByRole('textbox', { name: /^title$/i })
+    await userEvent.clear(title)
+    await userEvent.type(title, 'Renamed')
+    await userEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1))
+    const body = String(apiMock.mock.calls[0]?.[1]?.body)
+    expect(body).toContain('"title":"Renamed"')
+    expect(body).not.toContain('coverDataUri')
+  })
+
+  it('sends the new bytes when the cover is replaced', async () => {
+    apiMock.mockResolvedValue(makeFilm())
+    renderModal(makeFilm({ coverUrl: '/media/cover.png' }))
+    await screen.findByRole('textbox', { name: /^title$/i })
+
+    await userEvent.upload(screen.getByLabelText(/replace cover/i), pngFile())
+    await userEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1))
+    expect(String(apiMock.mock.calls[0]?.[1]?.body)).toContain(
+      '"coverDataUri":"data:image/png;base64,',
+    )
+  })
+
+  it('sends an explicit null when the cover is removed', async () => {
+    apiMock.mockResolvedValue(makeFilm({ coverUrl: null }))
+    renderModal(makeFilm({ coverUrl: '/media/cover.png' }))
+    await screen.findByRole('textbox', { name: /^title$/i })
+
+    await userEvent.click(screen.getByRole('button', { name: /remove cover/i }))
+    await userEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1))
+    // null, not absent — this is the one case that MEANS "delete it"
+    expect(String(apiMock.mock.calls[0]?.[1]?.body)).toContain('"coverDataUri":null')
+  })
+
+  it('refuses a non-image locally, with no request', async () => {
+    renderModal(makeFilm({ coverUrl: null }))
+    await screen.findByRole('textbox', { name: /^title$/i })
+
+    fireEvent.drop(screen.getByRole('group', { name: /cover/i }), {
+      dataTransfer: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] },
+    })
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(apiMock).not.toHaveBeenCalled()
   })
 })

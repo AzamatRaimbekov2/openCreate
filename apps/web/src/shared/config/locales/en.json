@@ -543,7 +543,7 @@
         "add": "Add cover image",
         "remove": "Remove cover",
         "hint": "Click, drop or paste an image.",
-        "replace": "Click the picture to replace it."
+        "replace": "Replace cover image"
       }
     },
     "timeline": {

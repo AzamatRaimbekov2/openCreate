@@ -61,10 +61,24 @@ export function FilmSettingsModal({
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(film?.aspectRatio ?? '16:9')
   // '' = no default style; styleOptions(t) carry the enum values
   const [styleId, setStyleId] = useState<StyleChoice>(film?.defaultStyleId ?? '')
-  // The cover, held as a data URI until submit — CREATE mode only. Local because
-  // there is no film to attach it to yet, and because a user who changes their
-  // mind should cost us nothing.
-  const [coverDataUri, setCoverDataUri] = useState<string | null>(null)
+  // The cover, held locally until submit in BOTH modes — nothing is uploaded
+  // while the user is still deciding, and changing their mind costs nothing.
+  //
+  // THREE STATES, and the third one is why this is a union rather than a
+  // `string | null`. On the wire `coverDataUri` means: bytes → replace, null →
+  // REMOVE, absent → leave alone (contracts film.ts). Collapsing "untouched"
+  // into null is the mistake that matters: every PATCH that only renames a film
+  // would silently wipe its picture. So the draft names all three, and
+  // `coverPatch()` below is the single place that maps them onto the wire.
+  //   untouched → the key is omitted
+  //   replaced  → the data URI
+  //   cleared   → an explicit null
+  // In CREATE mode only 'untouched' and 'replaced' occur (there is nothing to
+  // clear yet), and 'untouched' means "no cover", which is why create omits the
+  // key too rather than sending null.
+  const [cover, setCover] = useState<
+    { kind: 'untouched' } | { kind: 'replaced'; dataUri: string } | { kind: 'cleared' }
+  >({ kind: 'untouched' })
   const [coverErrorKey, setCoverErrorKey] = useState<ReadImageError | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
@@ -82,8 +96,22 @@ export function FilmSettingsModal({
       return
     }
     setCoverErrorKey(null)
-    setCoverDataUri(result.dataUri)
+    setCover({ kind: 'replaced', dataUri: result.dataUri })
   }
+
+  // The draft's three states → the wire's three meanings. The ONLY place that
+  // mapping exists, because getting it wrong in a second place is how the
+  // rename-wipes-the-cover bug would come back.
+  const coverPatch = (): { coverDataUri?: string | null } => {
+    if (cover.kind === 'replaced') return { coverDataUri: cover.dataUri }
+    if (cover.kind === 'cleared') return { coverDataUri: null }
+    return {}
+  }
+
+  // What the block should show right now: the freshly picked bytes, else the
+  // film's stored cover, else nothing (an empty dropzone).
+  const shownCover =
+    cover.kind === 'replaced' ? cover.dataUri : cover.kind === 'cleared' ? null : (film?.coverUrl ?? null)
 
   const handleCoverInput = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -110,11 +138,18 @@ export function FilmSettingsModal({
   const handleSubmit = () => {
     if (title.trim().length === 0) return
     if (isEdit) {
-      // '' widens the picker; the wire wants null for "no default"
+      // '' widens the picker; the wire wants null for "no default".
+      // `coverPatch()` contributes the cover key ONLY if the user touched it —
+      // see the draft's three states above.
       updateFilm.mutate(
         {
           filmId: film.id,
-          input: { title: title.trim(), aspectRatio, defaultStyleId: styleId === '' ? null : styleId },
+          input: {
+            title: title.trim(),
+            aspectRatio,
+            defaultStyleId: styleId === '' ? null : styleId,
+            ...coverPatch(),
+          },
         },
         { onSuccess: onClose },
       )
@@ -127,7 +162,9 @@ export function FilmSettingsModal({
     // keeps the request readable in a network log.
     const input: CreateFilmInput = {
       title: title.trim(),
-      ...(coverDataUri === null ? {} : { coverDataUri }),
+      // Same mapping as edit, minus the 'cleared' case that cannot happen here:
+      // create omits the key when no picture was picked rather than sending null.
+      ...(cover.kind === 'replaced' ? { coverDataUri: cover.dataUri } : {}),
     }
     createFilm.mutate(input, {
       // Land the user in the editor of the film they just made
@@ -172,9 +209,16 @@ export function FilmSettingsModal({
               onChange={setStyleId}
             />
           </>
-        ) : (
-          // CREATE ONLY — the cover. A focusable region so a paste lands in scope
-          // and a drop has a target; the picked image stays local until submit.
+        ) : null}
+
+        {/* THE COVER — in BOTH modes since the owner follow-up (2026-08-02).
+            Create picks the first one; edit replaces or removes it. The markup is
+            shared deliberately: the affordance is identical and the only thing
+            that differs is what the draft's three states MEAN on the wire, which
+            is `coverPatch()`'s job, not this block's. A focusable region so a
+            paste lands in scope and a drop has a target; the pick stays local
+            until submit in both modes. */}
+        {
           <div
             role="group"
             aria-label={t('cinema.settings.cover.label')}
@@ -193,7 +237,7 @@ export function FilmSettingsModal({
           >
             <span className="text-xs text-mist-dim">{t('cinema.settings.cover.label')}</span>
 
-            {coverDataUri === null ? (
+            {shownCover === null ? (
               // A real <label> wrapping a sr-only input (the CreateAssetModal
               // pattern): the input carries the accessible name, the dashed plate
               // is the click target.
@@ -209,19 +253,32 @@ export function FilmSettingsModal({
               </label>
             ) : (
               <div className="relative">
-                {/* The cover is CONTENT — a recessed well plate, never frosted.
-                    object-contain so a picked picture is judged whole here; the
-                    library card crops it to the canvas shape instead. */}
-                <Card surface="well" padding="none" className="overflow-hidden">
-                  <img
-                    src={coverDataUri}
-                    alt={t('cinema.settings.cover.label')}
-                    className="max-h-40 w-full object-contain"
+                {/* The thumb is ITSELF the replace target — a label around the
+                    plate, so clicking the picture picks a new one. The ✕ is a
+                    SIBLING of that label, not a child: a button inside a label
+                    triggers the label, so removing would open the file picker. */}
+                <label className="block cursor-pointer">
+                  {/* The cover is CONTENT — a recessed well plate, never frosted.
+                      object-contain so the picture is judged whole here; the
+                      library card crops it to the canvas shape instead. */}
+                  <Card surface="well" padding="none" className="overflow-hidden">
+                    <img
+                      src={shownCover}
+                      alt={t('cinema.settings.cover.label')}
+                      className="max-h-40 w-full object-contain"
+                    />
+                  </Card>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    aria-label={t('cinema.settings.cover.replace')}
+                    className="sr-only"
+                    onChange={handleCoverInput}
                   />
-                </Card>
+                </label>
                 <button
                   type="button"
-                  onClick={() => setCoverDataUri(null)}
+                  onClick={() => setCover({ kind: 'cleared' })}
                   aria-label={t('cinema.settings.cover.remove')}
                   className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-white/10 bg-specimen-red/80 text-[10px] leading-none text-lumen-red transition-colors duration-200 hover:bg-specimen-red focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
                 >
@@ -236,7 +293,7 @@ export function FilmSettingsModal({
               </span>
             ) : null}
           </div>
-        )}
+        }
 
         {isError ? (
           <span role="alert" className="text-sm text-glow-red">
