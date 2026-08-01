@@ -105,3 +105,11 @@ that refusal leaves no film behind.
 The body is `createFilmInputSchema`, which since this change accepts a bare `{ title }`
 (`aspectRatio` optional, server-defaulted) and an optional `coverDataUri`. Both are widening: every
 body an older client sends still parses.
+
+## Update 2026-08-02 — `PATCH /api/films/:id` accepts a cover
+`updateFilm` became async (it can now store a cover file). **The route needed no change**: the call
+was already inside `guard`, whose `fn: () => T | Promise<T>` signature awaits either — which is also
+what maps a refused cover to the service's `400 validation_failed`.
+
+Body is `updateFilmInputSchema`, where `coverDataUri` is three-valued: a data URI replaces the cover,
+`null` clears it, absent leaves it alone.

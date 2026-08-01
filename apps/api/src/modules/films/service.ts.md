@@ -239,3 +239,25 @@ and default style moved to the detail page's settings.
   film and then still fetches its cover from `/media`.
 - Scope: **create only**. No cover on `updateFilmInputSchema` — changing a cover after the fact was
   not requested (flagged as a possible follow-up).
+
+## Update 2026-08-02 — `updateFilm` edits the cover (replace / clear / leave alone)
+
+Owner follow-up to the create-time cover: the picture is editable from the film's settings.
+
+- **`updateFilm` is now `async`** for the same reason `createFilm` is — it writes a file. Only one
+  caller (the PATCH route), and it already went through `guard`, which awaits whatever it is given,
+  so nothing upstream changed and no test call sites moved.
+- **Three branches, and the interesting one is the branch that is not written.** `undefined` falls
+  through untouched, so a patch that only renames a film keeps its picture; `null` sets
+  `cover_image_path = NULL`; a data URI stores new bytes. Collapsing absent into null would make
+  **every rename silently wipe the cover** — data loss nobody would connect to the rename that
+  caused it. Pinned by "KEEPS the cover through a patch that does not mention it" and
+  mutation-checked (replacing the guard with `if (true)` / `if (!coverDataUri)` turns it red).
+- **The bytes are stored BEFORE the row is written**, and here that ordering does more work than it
+  does in `createFilm`: this patch may also carry a `title`, so a cover the storage layer refuses
+  must leave the **entire row** alone. Writing the row first would rename the film and then fail —
+  renamed, un-covered, with an error the user cannot act on. Pinned by a test that sends a new title
+  alongside an undecodable cover and asserts the old title AND the old cover survive.
+- **The OLD file is left on disk** on both replace and clear — a harmless orphan for a future sweep,
+  the same treatment detached shot/style references and render outputs get.
+- `InvalidImageDataUriError` → `FilmValidationError` (400), never a 500.

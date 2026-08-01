@@ -219,6 +219,159 @@ describe('film create: title-only, with an optional cover', () => {
   })
 })
 
+// Editing the cover from the film's settings (owner follow-up, 2026-08-02).
+// The three-valued PATCH field, and the atomicity that makes a bad picture cost
+// the user nothing — not even the rename they sent in the same body.
+describe('film update: replacing and clearing the cover', () => {
+  const withCover = async (app: Awaited<ReturnType<typeof buildTestApp>>, cookie: string) => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/films',
+      headers: { cookie },
+      payload: { title: 'Исходный', coverDataUri: PNG },
+    })
+    return res.json() as { id: string; coverUrl: string }
+  }
+
+  it('replaces the cover with new bytes and answers a different media path', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await withCover(app, cookie)
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+      payload: { coverDataUri: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' },
+    })
+    expect(patched.statusCode).toBe(200)
+    expect(patched.json().coverUrl).toMatch(/^\/media\/.+\.gif$/)
+    expect(patched.json().coverUrl).not.toBe(created.coverUrl)
+
+    // The OLD file is deliberately left behind — a harmless orphan, the same
+    // treatment a detached shot or style reference gets.
+    const old = await app.inject({ method: 'GET', url: created.coverUrl })
+    expect(old.statusCode).toBe(200)
+  })
+
+  it('clears the cover when sent null', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await withCover(app, cookie)
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+      payload: { coverDataUri: null },
+    })
+    expect(patched.statusCode).toBe(200)
+    expect(patched.json().coverUrl).toBeNull()
+  })
+
+  // THE PARTIAL TRAP. If absent and null ever collapse into the same branch,
+  // every rename silently wipes the picture — and nobody would connect the two.
+  it('KEEPS the cover through a patch that does not mention it', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await withCover(app, cookie)
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+      payload: { title: 'Только переименование' },
+    })
+    expect(patched.statusCode).toBe(200)
+    expect(patched.json().title).toBe('Только переименование')
+    expect(patched.json().coverUrl).toBe(created.coverUrl)
+  })
+
+  // Atomicity: the bytes are stored BEFORE the row is written, so a cover the
+  // storage layer refuses must leave the ENTIRE row alone — including a title
+  // that rode along in the same body. A partial update here would be the worst
+  // outcome: renamed, un-covered, and no error the user could act on.
+  it('leaves the whole row untouched — title included — when the cover is refused', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await withCover(app, cookie)
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+      payload: {
+        title: 'Это имя не должно сохраниться',
+        // Passes the wire rule (data:image/, not svg) but names a mime the
+        // storage layer's closed raster table does not carry.
+        coverDataUri: 'data:image/tiff;base64,AAAA',
+      },
+    })
+    expect(patched.statusCode).toBe(400)
+    expect(patched.json().error.code).toBe('validation_failed')
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+    })
+    expect(detail.json().film.title).toBe('Исходный')
+    expect(detail.json().film.coverUrl).toBe(created.coverUrl)
+  })
+
+  it('refuses an svg cover at the wire, changing nothing', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await withCover(app, cookie)
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+      payload: { title: 'Тоже не сохранится', coverDataUri: SVG },
+    })
+    expect(patched.statusCode).toBe(400)
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+    })
+    expect(detail.json().film.title).toBe('Исходный')
+  })
+
+  it('still applies the patch fields that existed before the cover', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const created = await withCover(app, cookie)
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie },
+      payload: { title: 'Переименован', aspectRatio: '9:16', defaultStyleId: 'anime' },
+    })
+    expect(patched.statusCode).toBe(200)
+    expect(patched.json()).toMatchObject({
+      title: 'Переименован',
+      aspectRatio: '9:16',
+      defaultStyleId: 'anime',
+      coverUrl: created.coverUrl,
+    })
+  })
+
+  it("404s another user's film without storing anything", async () => {
+    const app = await buildTestApp()
+    const mine = await registerAndGetCookie(app, 'mine@b.co')
+    const theirs = await registerAndGetCookie(app, 'theirs@b.co')
+    const created = await withCover(app, theirs)
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/films/${created.id}`,
+      headers: { cookie: mine },
+      payload: { coverDataUri: PNG },
+    })
+    expect(patched.statusCode).toBe(404)
+  })
+})
+
 describe('film shots', () => {
   it('adds, updates, reorders, and deletes shots', async () => {
     const app = await buildTestApp()

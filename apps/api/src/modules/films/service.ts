@@ -394,12 +394,40 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     return row ? toRenderDto(row) : null
   }
 
-  function updateFilm(userId: string, filmId: string, input: UpdateFilmInput): Film {
+  // ASYNC since the cover became editable (owner follow-up 2026-08-02), for the
+  // same reason createFilm is: it writes a file now. Only one caller — the PATCH
+  // route — and it already went through `guard`, which awaits whatever it is
+  // given, so nothing upstream changed.
+  async function updateFilm(userId: string, filmId: string, input: UpdateFilmInput): Promise<Film> {
     requireFilm(userId, filmId)
     const patch: Partial<typeof film.$inferInsert> = { updatedAt: new Date() }
     if (input.title !== undefined) patch.title = input.title.trim()
     if (input.aspectRatio !== undefined) patch.aspectRatio = input.aspectRatio
     if (input.defaultStyleId !== undefined) patch.defaultStyleId = input.defaultStyleId
+    // THE COVER IS THREE-VALUED, and all three branches are spelled out because
+    // the interesting one is the branch that is NOT here: `undefined` falls
+    // through untouched, so a patch that only renames the film keeps its picture.
+    // Collapsing absent into null would make every rename silently wipe the
+    // cover — a data loss nobody would connect to the rename that caused it.
+    if (input.coverDataUri !== undefined) {
+      if (input.coverDataUri === null) {
+        // Clear. The stored FILE stays as a harmless orphan for a future sweep,
+        // the same treatment a detached shot/style reference gets.
+        patch.coverImagePath = null
+      } else {
+        // Replace. Stored BEFORE the row is written, exactly as in createFilm,
+        // and here the ordering does more work: this patch may also carry a
+        // title, so a cover the storage layer refuses must leave the ENTIRE row
+        // alone. Writing the row first would rename the film and then fail —
+        // renamed, un-covered, with an error the user cannot act on.
+        try {
+          patch.coverImagePath = await storage.saveDataUri(input.coverDataUri, randomUUID())
+        } catch (err) {
+          if (err instanceof InvalidImageDataUriError) throw new FilmValidationError(err.message)
+          throw err
+        }
+      }
+    }
     db.update(film).set(patch).where(eq(film.id, filmId)).run()
     return toFilmDto(db.select().from(film).where(eq(film.id, filmId)).get()!)
   }
