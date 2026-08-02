@@ -51,6 +51,11 @@ ruvector.db
 memory.db
 
 # --- openCreate workspace ----------------------------------------------------
+# pnpm is the ONLY package manager here (root `packageManager` pins it, the
+# Dockerfile and CI both install with --frozen-lockfile from pnpm-lock.yaml).
+# An npm lockfile is always an accident and would give CI a second, divergent
+# dependency graph to resolve from.
+package-lock.json
 node_modules/
 dist/
 data/
