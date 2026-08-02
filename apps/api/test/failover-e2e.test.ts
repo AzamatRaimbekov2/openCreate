@@ -45,12 +45,12 @@ describe('failover — through the real generation lifecycle', () => {
 
     const app = await buildTestApp({
       videoProviders: {
-        deepinfra: createFailoverProvider([
-          { id: 'deepinfra', provider: dead },
+        segmind: createFailoverProvider([
+          { id: 'segmind', provider: dead },
           { id: 'bytedance', provider: alive },
         ]),
       },
-      deepinfraToken: 'di-key',
+      segmindApiKey: 'sg-key',
       assetHostAllowlist: ['runware.ai', 'deepinfra.com'],
     })
     const cookie = await registerAndGetCookie(app)
@@ -95,12 +95,12 @@ describe('failover — through the real generation lifecycle', () => {
 
     const app = await buildTestApp({
       videoProviders: {
-        deepinfra: createFailoverProvider([
-          { id: 'deepinfra', provider: a },
+        segmind: createFailoverProvider([
+          { id: 'segmind', provider: a },
           { id: 'bytedance', provider: b },
         ]),
       },
-      deepinfraToken: 'di-key',
+      segmindApiKey: 'sg-key',
     })
     const cookie = await registerAndGetCookie(app)
 

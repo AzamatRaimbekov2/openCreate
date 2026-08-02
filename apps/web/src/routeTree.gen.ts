@@ -14,12 +14,14 @@ import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CinemaFilmIdRouteImport } from './routes/cinema.$filmId'
 import { Route as CanvasCanvasIdRouteImport } from './routes/canvas.$canvasId'
+import { Route as ShellVerifyRouteImport } from './routes/_shell.verify'
 import { Route as ShellStylesRouteImport } from './routes/_shell.styles'
 import { Route as ShellPricingRouteImport } from './routes/_shell.pricing'
 import { Route as ShellLibraryRouteImport } from './routes/_shell.library'
 import { Route as ShellEntitiesRouteImport } from './routes/_shell.entities'
 import { Route as ShellCreatorRouteImport } from './routes/_shell.creator'
 import { Route as ShellCreateRouteImport } from './routes/_shell.create'
+import { Route as ShellCompareVideoRouteImport } from './routes/_shell.compare-video'
 import { Route as ShellCompareRouteImport } from './routes/_shell.compare'
 import { Route as ShellTemplatesIndexRouteImport } from './routes/_shell.templates.index'
 import { Route as ShellSoulIndexRouteImport } from './routes/_shell.soul.index'
@@ -53,6 +55,11 @@ const CanvasCanvasIdRoute = CanvasCanvasIdRouteImport.update({
   path: '/canvas/$canvasId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShellVerifyRoute = ShellVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellStylesRoute = ShellStylesRouteImport.update({
   id: '/styles',
   path: '/styles',
@@ -81,6 +88,11 @@ const ShellCreatorRoute = ShellCreatorRouteImport.update({
 const ShellCreateRoute = ShellCreateRouteImport.update({
   id: '/create',
   path: '/create',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellCompareVideoRoute = ShellCompareVideoRouteImport.update({
+  id: '/compare-video',
+  path: '/compare-video',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellCompareRoute = ShellCompareRouteImport.update({
@@ -128,12 +140,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/compare': typeof ShellCompareRoute
+  '/compare-video': typeof ShellCompareVideoRoute
   '/create': typeof ShellCreateRoute
   '/creator': typeof ShellCreatorRoute
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
   '/styles': typeof ShellStylesRoute
+  '/verify': typeof ShellVerifyRoute
   '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/cinema/$filmId': typeof CinemaFilmIdRoute
   '/assets/$assetId': typeof ShellAssetsAssetIdRoute
@@ -148,12 +162,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/compare': typeof ShellCompareRoute
+  '/compare-video': typeof ShellCompareVideoRoute
   '/create': typeof ShellCreateRoute
   '/creator': typeof ShellCreatorRoute
   '/entities': typeof ShellEntitiesRoute
   '/library': typeof ShellLibraryRoute
   '/pricing': typeof ShellPricingRoute
   '/styles': typeof ShellStylesRoute
+  '/verify': typeof ShellVerifyRoute
   '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/cinema/$filmId': typeof CinemaFilmIdRoute
   '/assets/$assetId': typeof ShellAssetsAssetIdRoute
@@ -170,12 +186,14 @@ export interface FileRoutesById {
   '/_shell': typeof ShellRouteWithChildren
   '/login': typeof LoginRoute
   '/_shell/compare': typeof ShellCompareRoute
+  '/_shell/compare-video': typeof ShellCompareVideoRoute
   '/_shell/create': typeof ShellCreateRoute
   '/_shell/creator': typeof ShellCreatorRoute
   '/_shell/entities': typeof ShellEntitiesRoute
   '/_shell/library': typeof ShellLibraryRoute
   '/_shell/pricing': typeof ShellPricingRoute
   '/_shell/styles': typeof ShellStylesRoute
+  '/_shell/verify': typeof ShellVerifyRoute
   '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/cinema/$filmId': typeof CinemaFilmIdRoute
   '/_shell/assets/$assetId': typeof ShellAssetsAssetIdRoute
@@ -192,12 +210,14 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/compare'
+    | '/compare-video'
     | '/create'
     | '/creator'
     | '/entities'
     | '/library'
     | '/pricing'
     | '/styles'
+    | '/verify'
     | '/canvas/$canvasId'
     | '/cinema/$filmId'
     | '/assets/$assetId'
@@ -212,12 +232,14 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/compare'
+    | '/compare-video'
     | '/create'
     | '/creator'
     | '/entities'
     | '/library'
     | '/pricing'
     | '/styles'
+    | '/verify'
     | '/canvas/$canvasId'
     | '/cinema/$filmId'
     | '/assets/$assetId'
@@ -233,12 +255,14 @@ export interface FileRouteTypes {
     | '/_shell'
     | '/login'
     | '/_shell/compare'
+    | '/_shell/compare-video'
     | '/_shell/create'
     | '/_shell/creator'
     | '/_shell/entities'
     | '/_shell/library'
     | '/_shell/pricing'
     | '/_shell/styles'
+    | '/_shell/verify'
     | '/canvas/$canvasId'
     | '/cinema/$filmId'
     | '/_shell/assets/$assetId'
@@ -295,6 +319,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CanvasCanvasIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_shell/verify': {
+      id: '/_shell/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof ShellVerifyRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/styles': {
       id: '/_shell/styles'
       path: '/styles'
@@ -335,6 +366,13 @@ declare module '@tanstack/react-router' {
       path: '/create'
       fullPath: '/create'
       preLoaderRoute: typeof ShellCreateRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/compare-video': {
+      id: '/_shell/compare-video'
+      path: '/compare-video'
+      fullPath: '/compare-video'
+      preLoaderRoute: typeof ShellCompareVideoRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/compare': {
@@ -398,12 +436,14 @@ declare module '@tanstack/react-router' {
 
 interface ShellRouteChildren {
   ShellCompareRoute: typeof ShellCompareRoute
+  ShellCompareVideoRoute: typeof ShellCompareVideoRoute
   ShellCreateRoute: typeof ShellCreateRoute
   ShellCreatorRoute: typeof ShellCreatorRoute
   ShellEntitiesRoute: typeof ShellEntitiesRoute
   ShellLibraryRoute: typeof ShellLibraryRoute
   ShellPricingRoute: typeof ShellPricingRoute
   ShellStylesRoute: typeof ShellStylesRoute
+  ShellVerifyRoute: typeof ShellVerifyRoute
   ShellAssetsAssetIdRoute: typeof ShellAssetsAssetIdRoute
   ShellSoulEntityIdRoute: typeof ShellSoulEntityIdRoute
   ShellAssetsIndexRoute: typeof ShellAssetsIndexRoute
@@ -415,12 +455,14 @@ interface ShellRouteChildren {
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellCompareRoute: ShellCompareRoute,
+  ShellCompareVideoRoute: ShellCompareVideoRoute,
   ShellCreateRoute: ShellCreateRoute,
   ShellCreatorRoute: ShellCreatorRoute,
   ShellEntitiesRoute: ShellEntitiesRoute,
   ShellLibraryRoute: ShellLibraryRoute,
   ShellPricingRoute: ShellPricingRoute,
   ShellStylesRoute: ShellStylesRoute,
+  ShellVerifyRoute: ShellVerifyRoute,
   ShellAssetsAssetIdRoute: ShellAssetsAssetIdRoute,
   ShellSoulEntityIdRoute: ShellSoulEntityIdRoute,
   ShellAssetsIndexRoute: ShellAssetsIndexRoute,

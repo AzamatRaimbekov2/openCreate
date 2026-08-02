@@ -1,6 +1,7 @@
 // apps/web/src/modules/Gallery/components/GenerationCard.test.tsx
 // Behavior (plan Task 17, v3 stage-3 tiles): processing → Progress % + pulsing
-// SQUARE media tile, no <video>; succeeded video → <video controls src> +
+// SQUARE media tile, no <video>; succeeded video → a POSTER plate (no native
+// controls) that opens the full-screen detail sheet, a duration chip, and
 // an overflow menu holding download + delete; failed → danger border +
 // errorMessage + "credits refunded" badge + the same menu; a processing card that
 // polls into a terminal state invalidates the list and the balance; a
@@ -118,30 +119,45 @@ describe('GenerationCard', () => {
     expect(container.querySelector('video')).not.toBeInTheDocument()
   })
 
-  it('succeeded video: renders a playable video, with download and delete in the menu', async () => {
+  // The video plate is a POSTER, not a player (owner request 2026-08-02): the
+  // browser's own control bar over a 300px tile was the ugliest thing in the
+  // grid, and it made the tile the ONLY card you could not click open.
+  it('succeeded video: a poster tile with no native controls, opening the detail sheet', async () => {
     const { container } = renderCard(succeededVideo)
     const video = container.querySelector('video')
-    expect(video).toHaveAttribute('controls')
-    expect(video).toHaveAttribute('src', '/media/gen1.mp4')
+    // The #t=0.1 fragment IS the poster: without it Chrome paints a black
+    // element and the grid becomes a wall of black squares
+    expect(video).toHaveAttribute('src', '/media/gen1.mp4#t=0.1')
+    expect(video).not.toHaveAttribute('controls')
     // The old footer is gone: no cost line, no inline Download link on the card
     expect(screen.queryByText(/1 credit/i)).toBeNull()
     expect(screen.queryByRole('link', { name: /download/i })).toBeNull()
+    // The clip's length rides the plate, so the grid is scannable without hover
+    expect(screen.getByText('5s')).toBeInTheDocument()
 
-    // Both actions live in the overflow menu now
+    // The whole plate opens the full-screen viewer — the same affordance images
+    // have always had
+    await userEvent.click(screen.getByRole('button', { name: /ocean waves at dusk/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('ocean waves at dusk')
+  })
+
+  it('succeeded video: download and delete live in the overflow menu', async () => {
+    renderCard(succeededVideo)
     await openMenu()
     expect(screen.getByRole('menuitem', { name: /download/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
-    // Regenerate is absent without an onRegenerate prop (no composer on screen)
-    expect(screen.queryByRole('menuitem', { name: /regenerate/i })).toBeNull()
+    // Edit is absent without an onRegenerate prop (no composer on screen)
+    expect(screen.queryByRole('menuitem', { name: /^edit$/i })).toBeNull()
     // Terminal item from the list — no polling request
     expect(apiMock).not.toHaveBeenCalled()
   })
 
-  it('offers Regenerate only when the screen can accept a draft', async () => {
+  it('offers Edit only when the screen can accept a draft', async () => {
     const onRegenerate = vi.fn()
     renderCard(succeededVideo, { onRegenerate })
     await openMenu()
-    await userEvent.click(screen.getByRole('menuitem', { name: /regenerate/i }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /^edit$/i }))
     expect(onRegenerate).toHaveBeenCalledWith(expect.objectContaining({ id: succeededVideo.id }))
   })
 
@@ -149,7 +165,9 @@ describe('GenerationCard', () => {
     const { container } = renderCard(failedVideo)
     // v3 triad: failed status = glow-red border on the well
     expect(container.querySelector('.border-glow-red')).toBeInTheDocument()
-    expect(screen.getByText('timeoutProvider')).toBeInTheDocument()
+    // The raw provider string is NOT on the tile any more — see the click test
+    // below. Only our own one-line copy is, so every failed card is the same height.
+    expect(screen.queryByText('timeoutProvider')).not.toBeInTheDocument()
     expect(screen.getByText(/credits refunded/i)).toBeInTheDocument()
     expect(container.querySelector('video')).not.toBeInTheDocument()
     // A FAILED generation must still be deletable — the overflow menu rides on
@@ -160,22 +178,48 @@ describe('GenerationCard', () => {
     expect(screen.queryByRole('menuitem', { name: /download/i })).toBeNull()
   })
 
-  it('failed without a code: localized generic primary, raw text only as the secondary line', () => {
+  it('failed without a code: falls back to the generic localized copy', () => {
     renderCard(failedVideo)
-    // The primary reason is OUR copy — never the raw server string
+    // The reason shown is OUR copy — never the raw server string, at any depth
+    // on the tile itself.
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
-    // The raw provider text may only be the quiet secondary diagnostic line
-    expect(screen.getByText('timeoutProvider')).toHaveClass('text-mist-dim')
+    expect(screen.queryByText('timeoutProvider')).not.toBeInTheDocument()
   })
 
-  it('failed with provider_error: localized provider copy as the primary message', () => {
+  it('failed with provider_error: localized copy on the card, raw detail NOT on the card', () => {
+    // The card is a grid tile. A provider message can run to a paragraph
+    // ("DeepInfra request failed: TypeError (UND_ERR_HEADERS_TIMEOUT)"), and one
+    // long failure used to stretch its row and push every neighbouring tile out of
+    // alignment. The localized reason stays; the raw detail moves behind a click.
     renderCard({
       ...failedVideo,
       errorCode: 'provider_error',
       errorMessage: 'Runware task xyz failed',
     })
     expect(screen.getByText(/provider could not finish/i)).toBeInTheDocument()
-    expect(screen.getByText('Runware task xyz failed')).toHaveClass('text-mist-dim')
+    expect(screen.queryByText('Runware task xyz failed')).not.toBeInTheDocument()
+  })
+
+  it('a failed card is clickable and its detail carries the raw provider message', async () => {
+    const user = userEvent.setup()
+    renderCard({
+      ...failedVideo,
+      errorCode: 'provider_error',
+      errorMessage: 'Runware task xyz failed',
+    })
+    // Discoverability: a tile that hides information must SAY it is openable, or
+    // the detail may as well not exist.
+    await user.click(screen.getByRole('button', { name: /details/i }))
+    expect(await screen.findByText('Runware task xyz failed')).toBeInTheDocument()
+  })
+
+  it('a safety block never leaks its moderation text, not even in the detail', async () => {
+    // The one exception to "raw detail is available on click": moderation strings
+    // are not user copy at any depth (recorded review decision 2026-07-07).
+    const user = userEvent.setup()
+    renderCard(blockedVideo)
+    await user.click(screen.getByRole('button', { name: /details/i }))
+    expect(screen.queryByText('NSFW content detected')).not.toBeInTheDocument()
   })
 
   it('failed with content_blocked: shows the localized safety message, not the raw provider text', () => {

@@ -61,3 +61,12 @@ sequenceDiagram
 
 ## Commits
 - cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend
+
+## Update 2026-08-02 — the plan reads the COMPOSED prompt
+
+- `blockerFor` now calls `composeNodePrompt` instead of reading `node.config.prompt`. The
+  plan has to ask exactly the question `buildRunInput` asks (ADR `canvas-prompt-node` D3),
+  or a node fed by a wired template blocks the whole branch with `'config'` while its own
+  Generate button runs it fine.
+- `RUNNABLE_KINDS` is UNCHANGED (`image`, `video`), so a prompt card can never appear as a
+  priced row — it is furniture, like `character`, `upload` and `note`.

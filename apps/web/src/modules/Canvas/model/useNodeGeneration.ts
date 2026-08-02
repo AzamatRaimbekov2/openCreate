@@ -62,6 +62,47 @@ export function findCharacterParent(
     .find((n) => n !== undefined && n.kind === 'character')
 }
 
+// The shared-prompt wire's other end (ADR canvas-prompt-node). A third lookup
+// beside media and character because a node has three independent input slots
+// (edgeRules enforces one each), and each produces something different: media →
+// inputGenerationId, character → entityRefs, prompt → the text itself.
+export function findPromptParent(
+  nodeId: string,
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+): CanvasNode | undefined {
+  return edges
+    .filter((e) => e.targetNodeId === nodeId)
+    .map((e) => nodes.find((n) => n.id === e.sourceNodeId))
+    .find((n) => n !== undefined && n.kind === 'prompt')
+}
+
+// WHAT THIS NODE'S PROMPT ACTUALLY IS — the one answer, for all three callers
+// (ADR canvas-prompt-node D3): buildRunInput below (the money path), blockerFor
+// in useRunBranch (the plan), and the card's own hint + Generate gating. A
+// second opinion anywhere shows a disabled button over a runnable job, or
+// charges for text the user never read.
+//
+// The join is TEMPLATE first, own text after, single '\n' between, and every
+// part trimmed:
+//  · MERGE, not replace — a template that overwrote the field would make every
+//    child identical, and the point is one shared head plus a variation;
+//  · TEMPLATE FIRST — it is the upstream card, so the composed text reads the
+//    way the board looks, left to right;
+//  · A NEWLINE, not ', ' — inventing punctuation is how a template ending in a
+//    comma yields "neon city,, a fox". Providers treat it as whitespace.
+// Either side may be empty, and then there is no separator at all (a lone '\n'
+// prefix would be a silent leading blank line in every provider call).
+export function composeNodePrompt(
+  node: CanvasNode,
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+): string {
+  const own = node.config.prompt?.trim() ?? ''
+  const template = findPromptParent(node.id, nodes, edges)?.config.prompt?.trim() ?? ''
+  return [template, own].filter((part) => part.length > 0).join('\n')
+}
+
 // Pure: node + graph → the POST body, or null when the node isn't runnable
 // yet (missing prompt/model, or a media parent that has no SUCCEEDED output).
 // The Generate button disables on null — a click can never submit a broken
@@ -76,9 +117,12 @@ export function buildRunInput(
   edges: readonly CanvasEdge[],
   generationStatus: Readonly<Record<string, Generation['status'] | undefined>> = {},
 ): CreateGenerationInput | null {
-  const prompt = node.config.prompt?.trim()
+  // The COMPOSED prompt, never the node's own half: a card fed by a wired
+  // template is runnable with an empty field of its own, and the length guard
+  // has to measure what the server will actually receive.
+  const prompt = composeNodePrompt(node, nodes, edges)
   const modelId = node.config.modelId
-  if (!prompt || prompt.length < 2 || !modelId) return null
+  if (prompt.length < 2 || !modelId) return null
 
   const input: CreateGenerationInput = {
     modelId,

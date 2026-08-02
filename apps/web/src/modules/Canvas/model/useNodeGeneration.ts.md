@@ -58,3 +58,18 @@ sequenceDiagram
 - (fix-wave) fix(canvas): F4 — a wired upload parent disables Generate instead of silently running a plain t2i/t2v
 - 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference
 - cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend
+
+## Update 2026-08-02 — `composeNodePrompt` (the shared-prompt wire)
+
+- New exports: `findPromptParent` (the third parent lookup, beside media and character)
+  and **`composeNodePrompt(node, nodes, edges)`** — the single answer to "what is this
+  node's prompt", used by `buildRunInput` here, `blockerFor` in `useRunBranch`, and the
+  card's hint. ADR `canvas-prompt-node` D3: a second opinion anywhere shows a disabled
+  Generate over a runnable job, or charges for text the user never read.
+- The join is `[template, own].filter(Boolean).join('\n')` — merge (not replace, or every
+  child would be identical), template first (it is the upstream card; the text must read
+  the way the board looks), newline (inventing `', '` is how a template ending in a comma
+  yields `neon city,, a fox`). An empty side contributes no separator.
+- `buildRunInput`'s length guard now measures the COMPOSED text, so a node fed by a
+  template is runnable with an empty field of its own. The character token is prepended to
+  that composed string, so `[[e1]]` still leads what the server receives.

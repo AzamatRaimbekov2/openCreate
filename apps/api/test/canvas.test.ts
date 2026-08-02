@@ -108,6 +108,54 @@ describe('canvas CRUD', () => {
     expect(gone.statusCode).toBe(404)
   })
 
+  // The prompt node (ADR canvas-prompt-node) had NO persistence coverage: it
+  // shipped in contracts and the web half while schema.ts's kind enum still held
+  // the 7 original kinds. Nothing here went red — SQLite's `kind` is bare TEXT —
+  // and only `tsc` caught it, on the insert in modules/canvas/service.ts. This
+  // pins the round-trip so the kind set is exercised through the real save path,
+  // not just through the contract schema.
+  it('persists a prompt node and its shared text through a save/read round-trip', async () => {
+    const app = await buildTestApp()
+    const cookie = await registerAndGetCookie(app)
+    const { id } = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/canvases',
+        headers: { cookie },
+        payload: { title: 'Shared prompt' },
+      })
+    ).json() as { id: string }
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/canvases/${id}`,
+      headers: { cookie },
+      payload: {
+        nodes: [
+          {
+            id: 'p1',
+            kind: 'prompt',
+            position: { x: 0, y: 0 },
+            // The template text lives in the SAME config.prompt field the image
+            // and video nodes use (ADR D1: one field, not two).
+            config: { prompt: 'shot on 35mm, golden hour' },
+            generationIds: [],
+          },
+          NODE,
+        ],
+        edges: [{ id: 'e1', sourceNodeId: 'p1', targetNodeId: 'n1' }],
+      },
+    })
+    expect(patched.statusCode).toBe(200)
+
+    const doc = (
+      await app.inject({ method: 'GET', url: `/api/canvases/${id}`, headers: { cookie } })
+    ).json() as { nodes: { id: string; kind: string; config: { prompt?: string } }[] }
+    const prompt = doc.nodes.find((n) => n.id === 'p1')
+    expect(prompt?.kind).toBe('prompt')
+    expect(prompt?.config.prompt).toBe('shot on 35mm, golden hour')
+  })
+
   it('scopes by owner: a foreign canvas 404s on read, patch and delete', async () => {
     const app = await buildTestApp()
     const owner = await registerAndGetCookie(app, 'owner@x.co')

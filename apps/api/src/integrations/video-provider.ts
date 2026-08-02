@@ -9,7 +9,7 @@
 // `assetUrl` (was videoURL/imageURL), `costUsd` (was cost), `nsfw` (was
 // NSFWContent). A Runware adapter maps the existing RunwareClient 1:1 onto this
 // shape; the wan-runpod adapter maps our self-hosted ComfyUI worker onto it.
-import type { StyleId, VideoProviderId } from '@opencreate/contracts'
+import type { ApiErrorCode, StyleId, VideoProviderId } from '@opencreate/contracts'
 
 export type { VideoProviderId }
 
@@ -84,6 +84,12 @@ export type VideoPollResult =
       // Content-safety flag. The §9.4 gate blocks + refunds when true. A
       // provider with no moderation of its own returns false (documented gap).
       nsfw?: boolean | undefined
+      // The provider's RAW terminal envelope, JSON-stringified. DIAGNOSTICS ONLY —
+      // never user-facing copy, never parsed for behaviour. Populated by adapters
+      // whose response shape is not yet pinned down, so an operator page can show
+      // what actually came back instead of an engineer paying for another render to
+      // find out. Absent everywhere else.
+      raw?: string | undefined
     }
   | {
       status: 'error'
@@ -98,6 +104,17 @@ export type VideoPollResult =
       // user reads differs, and "your portrait was refused" beats "provider
       // error" every time. Absent/false = an ordinary provider failure.
       blocked?: boolean | undefined
+      // Machine-readable category, for surfaces that must render LOCALIZED copy
+      // rather than `message`. Absent → the caller falls back to 'provider_error'.
+      //
+      // Exists because `message` is sanitized but still PROSE: "DeepInfra balance is
+      // empty (HTTP 402)" names a provider and a status code, so a page that prints
+      // it is printing raw server text. The adapter knows the category for certain —
+      // making it say so beats every consumer re-deriving it by matching strings.
+      code?: ApiErrorCode | undefined
+      // Raw terminal envelope — same contract as on the success branch above:
+      // diagnostics only, never rendered as failure copy.
+      raw?: string | undefined
     }
 
 // The whole seam: submit returns an opaque provider job id the service persists

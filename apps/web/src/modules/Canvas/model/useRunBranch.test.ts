@@ -253,6 +253,40 @@ describe('buildBranchPlan', () => {
     expect(plan).toEqual({ ok: false, nodeId: 'n1', reason: 'nothingToRun' })
   })
 
+  // ADR canvas-prompt-node D3: the plan asks the SAME question the run path
+  // asks. A node whose text comes from a wired template is plannable with an
+  // empty field of its own — and a plan that said 'config' there would have put
+  // a blocker on a chain the per-node Generate button happily runs.
+  it('plans a node whose prompt comes from a wired template', () => {
+    const template: CanvasNode = {
+      id: 't1',
+      kind: 'prompt',
+      position: { x: 0, y: 0 },
+      config: { prompt: 'cinematic 35mm, neon' },
+      generationIds: [],
+    }
+    const node: CanvasNode = { ...imageNode('n1'), config: { modelId: 'flux-dev' } }
+    const plan = buildBranchPlan('n1', [template, node], [wire('t1', 'n1')], MODELS, client())
+    expect(plan.ok).toBe(true)
+    if (!plan.ok) return
+    // The template itself is furniture: it never runs and is never priced.
+    expect(plan.nodeIds).toEqual(['n1'])
+    expect(plan.total).toBe(2)
+  })
+
+  it('still blocks on config when the template is wired but empty', () => {
+    const template: CanvasNode = {
+      id: 't1',
+      kind: 'prompt',
+      position: { x: 0, y: 0 },
+      config: { prompt: '' },
+      generationIds: [],
+    }
+    const node: CanvasNode = { ...imageNode('n1'), config: { modelId: 'flux-dev' } }
+    const plan = buildBranchPlan('n1', [template, node], [wire('t1', 'n1')], MODELS, client())
+    expect(plan).toEqual({ ok: false, nodeId: 'n1', reason: 'config' })
+  })
+
   it('reads live statuses out of the shared generation cache', () => {
     // The skip rule depends on the LIVE status of the last run, which only the
     // shared ['generation', id] cache knows.

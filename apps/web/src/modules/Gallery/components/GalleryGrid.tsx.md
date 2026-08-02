@@ -61,3 +61,13 @@ flowchart TD
 - 9ffc310 2026-07-06 feat(web): gallery with 4-state cards and 4s polling of processing items
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+
+## Update 2026-08-02 — `models` pass-through
+
+- New optional prop `models: GalleryModelOption[]` (the same id→name list the filter bar
+  takes). The grid does nothing with it: it hands it to every card and row so the detail
+  viewer can NAME the model. Gallery still never reads the Generator's catalog query — the
+  ROUTE is the seam, as it already was for the filter bar and `onRegenerate`.
+- The two optional pass-throughs are now spread from ONE `passThrough` object, because
+  `exactOptionalPropertyTypes` makes `prop={undefined}` different from an absent prop and
+  three call sites repeating two conditional spreads is where that drifts.

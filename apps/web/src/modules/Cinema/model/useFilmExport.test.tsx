@@ -20,6 +20,7 @@ function makeShot(overrides: Partial<Shot>): Shot {
     entityRefs: [],
     referenceImages: [],
     modelId: null,
+    aspectRatio: null,
     durationMs: 2000,
     trimStartMs: 0,
     transition: 'none',

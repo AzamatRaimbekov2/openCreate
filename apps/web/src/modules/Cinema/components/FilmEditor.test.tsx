@@ -60,6 +60,7 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     entityRefs: [],
     referenceImages: [],
     modelId: null,
+    aspectRatio: null,
     durationMs: 5000,
     trimStartMs: 0,
     transition: 'none',
@@ -114,7 +115,9 @@ function routeApi(detail: FilmDetail, generations: Record<string, Generation> = 
     const match = /\/api\/generations\/([^/?]+)/.exec(path)
     if (match) {
       const found = generations[match[1] ?? '']
-      return found ? (Promise.resolve(found) as never) : (Promise.reject(new Error('gone')) as never)
+      return found
+        ? (Promise.resolve(found) as never)
+        : (Promise.reject(new Error('gone')) as never)
     }
     return Promise.resolve(detail) as never
   })
@@ -142,7 +145,11 @@ function renderEditor() {
     path: '/',
     component: () => <FilmEditor filmId="film1" models={[videoModel]} />,
   })
-  const libraryStub = createRoute({ getParentRoute: () => rootRoute, path: '/cinema', component: () => null })
+  const libraryStub = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/cinema',
+    component: () => null,
+  })
   const router = createRouter({
     routeTree: rootRoute.addChildren([indexRoute, libraryStub]),
     history: createMemoryHistory({ initialEntries: ['/'] }),
@@ -181,8 +188,13 @@ describe('FilmEditor', () => {
     expect(screen.queryByDisplayValue('a fox in the snow')).not.toBeInTheDocument()
   })
 
-  it('keeps the composer at the very BOTTOM of the workbench — below the tracks', async () => {
-    apiMock.mockResolvedValue(makeDetail([makeShot({ id: 'a', prompt: 'a lighthouse in a storm' })]))
+  it('places the composer in the RIGHT column — after the montage in DOM (v8 70/30)', async () => {
+    // v8 layout (owner 2026-07-24): two columns — left 70% montage (preview +
+    // timeline), right 30% composer. The montage column (with the timeline) is
+    // the first grid child, so the composer still FOLLOWS the timeline in the DOM.
+    apiMock.mockResolvedValue(
+      makeDetail([makeShot({ id: 'a', prompt: 'a lighthouse in a storm' })]),
+    )
     renderEditor()
     const composer = await screen.findByRole('region', { name: 'Shot' })
     const timeline = screen.getByRole('region', { name: 'Timeline' })
@@ -191,11 +203,16 @@ describe('FilmEditor', () => {
     ).toBeTruthy()
   })
 
-  it('floats the composer as a FIXED dock so it never consumes column height', async () => {
-    apiMock.mockResolvedValue(makeDetail([makeShot({ id: 'a', prompt: 'a lighthouse in a storm' })]))
+  it('renders the composer as a column, NOT a fixed dock (v8 70/30)', async () => {
+    // The floating bottom dock is retired: the composer lives in an <aside>
+    // right column, in normal flow — never `position: fixed`.
+    apiMock.mockResolvedValue(
+      makeDetail([makeShot({ id: 'a', prompt: 'a lighthouse in a storm' })]),
+    )
     renderEditor()
     const composer = await screen.findByRole('region', { name: 'Shot' })
-    expect(composer.closest('.fixed')).not.toBeNull()
+    expect(composer.closest('.fixed')).toBeNull()
+    expect(composer.closest('aside')).not.toBeNull()
   })
 
   it('keeps the select hint when the film has no shots', async () => {
@@ -208,7 +225,11 @@ describe('FilmEditor', () => {
 describe('FilmEditor — client export', () => {
   it('runs the client pipeline when the film is ready', async () => {
     // A title-card film is renderable with no clip to resolve → ready immediately.
-    routeApi(makeDetail([makeShot({ id: 'a', generationId: null, title: { text: 'The End', position: 'center' } })]))
+    routeApi(
+      makeDetail([
+        makeShot({ id: 'a', generationId: null, title: { text: 'The End', position: 'center' } }),
+      ]),
+    )
     renderEditor()
     await screen.findByRole('button', { name: /render mp4|собрать mp4/i })
 
@@ -258,7 +279,11 @@ describe('FilmEditor — client export', () => {
   it('shows progress while the export is running', async () => {
     exportRef.current.state = 'running'
     exportRef.current.progress = 42
-    routeApi(makeDetail([makeShot({ id: 'a', generationId: null, title: { text: 'Hi', position: 'center' } })]))
+    routeApi(
+      makeDetail([
+        makeShot({ id: 'a', generationId: null, title: { text: 'Hi', position: 'center' } }),
+      ]),
+    )
     renderEditor()
 
     expect(await screen.findByText(/42%/)).toBeInTheDocument()
@@ -267,7 +292,11 @@ describe('FilmEditor — client export', () => {
   it('cancels a running export cleanly', async () => {
     exportRef.current.state = 'running'
     exportRef.current.progress = 10
-    routeApi(makeDetail([makeShot({ id: 'a', generationId: null, title: { text: 'Hi', position: 'center' } })]))
+    routeApi(
+      makeDetail([
+        makeShot({ id: 'a', generationId: null, title: { text: 'Hi', position: 'center' } }),
+      ]),
+    )
     renderEditor()
 
     await userEvent.click(await screen.findByRole('button', { name: /cancel|отмен/i }))
@@ -276,17 +305,28 @@ describe('FilmEditor — client export', () => {
 
   it('shows a calm message and disables export where it is unsupported', async () => {
     exportRef.current.isSupported = false
-    routeApi(makeDetail([makeShot({ id: 'a', generationId: null, title: { text: 'Hi', position: 'center' } })]))
+    routeApi(
+      makeDetail([
+        makeShot({ id: 'a', generationId: null, title: { text: 'Hi', position: 'center' } }),
+      ]),
+    )
     renderEditor()
 
-    expect(await screen.findByText(/can't export video here|не умеет экспортировать/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/can't export video here|не умеет экспортировать/i),
+    ).toBeInTheDocument()
     expect(exportButton()).toBeDisabled()
   })
 
   it('offers a jump to the blocking shot, and selects it', async () => {
     routeApi(
       makeDetail([
-        makeShot({ id: 'a', orderIndex: 1, generationId: null, title: { text: 'Intro', position: 'center' } }),
+        makeShot({
+          id: 'a',
+          orderIndex: 1,
+          generationId: null,
+          title: { text: 'Intro', position: 'center' },
+        }),
         makeShot({ id: 'b', orderIndex: 2, generationId: 'gen-b', prompt: 'second' }),
       ]),
       { 'gen-b': gen({ id: 'gen-b', status: 'processing' }) },

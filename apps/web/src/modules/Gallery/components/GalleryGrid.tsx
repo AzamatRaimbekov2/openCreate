@@ -9,6 +9,7 @@ import { Button, EmptyState, ErrorState, Skeleton } from 'shared/ui'
 import { useGenerations } from '../model/generationsApi'
 import type { GalleryView, GridSize } from '../model/viewSettings'
 import { GRID_SIZE_CLASSES, useViewSettings } from '../model/viewSettings'
+import type { GalleryModelOption } from './GalleryFilterBar'
 import { GenerationCard } from './GenerationCard'
 import { GenerationRow } from './GenerationRow'
 
@@ -26,8 +27,12 @@ export type GalleryGridProps = {
   // would point at itself, so the page can turn it off
   hasCreateCta?: boolean
   // Refill the composer from a generation. Passed straight down to every card /
-  // row; absent on /library, where the Regenerate action then does not appear.
+  // row; absent on /library, where the Edit action then does not appear.
   onRegenerate?: (generation: Generation) => void
+  // The catalog's id→name pairs (the same list the filter bar takes), injected
+  // by the route. Passed down so the detail viewer can NAME the model instead of
+  // printing its id — Gallery itself never reads the Generator's catalog query.
+  models?: GalleryModelOption[]
 }
 
 // Static keys for the fixed skeleton row — index keys are banned even here
@@ -43,13 +48,20 @@ type GalleryItemsProps = {
   view: GalleryView
   gridSize: GridSize
   onRegenerate?: ((generation: Generation) => void) | undefined
+  models?: GalleryModelOption[] | undefined
 }
 
 // The three shapes of the same feed. Split out of GalleryGrid so the 4-states
 // logic above (loading/error/empty/data) stays readable and does not grow a
 // three-way branch inside its own return.
-function GalleryItems({ items, view, gridSize, onRegenerate }: GalleryItemsProps) {
+function GalleryItems({ items, view, gridSize, onRegenerate, models }: GalleryItemsProps) {
   const { t } = useTranslation()
+  // exactOptionalPropertyTypes: the two optional pass-throughs are spread, never
+  // handed down as an explicit `undefined` (which is not the same as absent)
+  const passThrough = {
+    ...(onRegenerate ? { onRegenerate } : {}),
+    ...(models ? { models } : {}),
+  }
 
   if (view === 'table') {
     return (
@@ -93,11 +105,7 @@ function GalleryItems({ items, view, gridSize, onRegenerate }: GalleryItemsProps
           </thead>
           <tbody>
             {items.map((generation) => (
-              <GenerationRow
-                key={generation.id}
-                generation={generation}
-                {...(onRegenerate ? { onRegenerate } : {})}
-              />
+              <GenerationRow key={generation.id} generation={generation} {...passThrough} />
             ))}
           </tbody>
         </table>
@@ -113,10 +121,7 @@ function GalleryItems({ items, view, gridSize, onRegenerate }: GalleryItemsProps
       <ul className="-mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto px-2 pb-2">
         {items.map((generation) => (
           <li key={generation.id} className="w-[min(85vw,32rem)] shrink-0 snap-center">
-            <GenerationCard
-              generation={generation}
-              {...(onRegenerate ? { onRegenerate } : {})}
-            />
+            <GenerationCard generation={generation} {...passThrough} />
           </li>
         ))}
       </ul>
@@ -127,7 +132,7 @@ function GalleryItems({ items, view, gridSize, onRegenerate }: GalleryItemsProps
     <ul className={`grid gap-4 ${GRID_SIZE_CLASSES[gridSize]}`}>
       {items.map((generation) => (
         <li key={generation.id}>
-          <GenerationCard generation={generation} {...(onRegenerate ? { onRegenerate } : {})} />
+          <GenerationCard generation={generation} {...passThrough} />
         </li>
       ))}
     </ul>
@@ -140,6 +145,7 @@ export function GalleryGrid({
   aspectRatio = null,
   hasCreateCta = true,
   onRegenerate,
+  models,
 }: GalleryGridProps) {
   const { t } = useTranslation()
   // Display preference, not filter state — it outlives the visit (persisted)
@@ -211,7 +217,13 @@ export function GalleryGrid({
 
   return (
     <div className="flex flex-col gap-6">
-      <GalleryItems items={items} view={view} gridSize={gridSize} onRegenerate={onRegenerate} />
+      <GalleryItems
+        items={items}
+        view={view}
+        gridSize={gridSize}
+        onRegenerate={onRegenerate}
+        models={models}
+      />
       {hasNextPage ? (
         <Button
           variant="ghost"

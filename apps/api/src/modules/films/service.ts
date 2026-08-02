@@ -153,6 +153,7 @@ export function toShotDto(row: typeof shot.$inferSelect): Shot {
       ? (JSON.parse(row.referenceImagesJson) as ShotReferenceImage[])
       : [],
     modelId: row.modelId,
+    aspectRatio: row.aspectRatio,
     durationMs: row.durationMs,
     trimStartMs: row.trimStartMs,
     transition: row.transition,
@@ -470,6 +471,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         // has one branch instead of two.
         entityRefsJson: input.entityRefs?.length ? JSON.stringify(input.entityRefs) : null,
         modelId: input.modelId ?? null,
+        aspectRatio: input.aspectRatio ?? null,
         // Default a 3s slot so a freshly-added shot has a real timeline length.
         durationMs: input.durationMs ?? 3000,
         trimStartMs: input.trimStartMs ?? 0,
@@ -511,6 +513,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     if (input.entityRefs !== undefined)
       patch.entityRefsJson = input.entityRefs.length ? JSON.stringify(input.entityRefs) : null
     if (input.modelId !== undefined) patch.modelId = input.modelId
+    if (input.aspectRatio !== undefined) patch.aspectRatio = input.aspectRatio
     if (input.durationMs !== undefined) patch.durationMs = input.durationMs
     if (input.trimStartMs !== undefined) patch.trimStartMs = input.trimStartMs
     if (input.transition !== undefined) patch.transition = input.transition

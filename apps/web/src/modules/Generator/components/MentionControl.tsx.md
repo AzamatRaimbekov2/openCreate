@@ -22,7 +22,7 @@ flowchart LR
 ```
 
 ## Key decisions / gotchas
--
+- 2026-07-24: `TaggableEntity` widened with `imageUrl?: string | null` — consumed by the new inline `@` picker (`MentionAutocomplete`) for thumbnails; THIS chip control ignores it. MentionControl itself is unchanged (chips + `@ add` button remain for removal/visibility alongside the inline picker).
 
 ## Commits
 - _no commit yet_

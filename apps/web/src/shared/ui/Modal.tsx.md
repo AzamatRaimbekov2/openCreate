@@ -81,3 +81,14 @@ flowchart LR
 - da1318e 2026-07-06 feat(web): credits balance chip + transactions modal (overlay aria-hidden → role=presentation a11y fix)
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
 - 9db4082 2026-07-07 fix(web): modal focus trap + escape/restore
+
+## Update 2026-08-02 — a third size: `full` (the viewer)
+
+- `size` gains `'full'` → `h-[92dvh] max-w-[96rem]`. Note it sets a HEIGHT, not just a
+  width: the sheet is a flex column, and a two-pane child (media stage + information
+  column) needs a definite height to divide. With only the existing `max-h-[92dvh]` the
+  stage collapses to its content and the column's own scroller never engages.
+- Added for `GenerationDetail`'s full-screen viewer (owner request "модалка на весь
+  экран"). `md`/`lg` are unchanged, so no existing sheet moved.
+- Still `w-full` inside the overlay's `px-4`, so on a narrow viewport `full` is simply
+  "the whole screen minus the gutter" — the same silhouette, no separate mobile branch.

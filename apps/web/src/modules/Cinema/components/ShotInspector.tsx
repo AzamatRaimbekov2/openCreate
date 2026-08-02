@@ -22,8 +22,8 @@
 // selection re-initialises cleanly — no useEffect sync). Generate is chained
 // through onSuccess (no floating async) so the shot is saved before the
 // composed request is built.
-import { useRef, useState } from 'react'
-import type { KeyboardEvent, PointerEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent, KeyboardEvent, PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   AspectRatio,
@@ -39,9 +39,22 @@ import type {
 import { applyPromptPreset, transitionSchema } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { deriveEntityRefs, entityPlaceholderToken, nextPlaceholder } from 'shared/libs/mentions'
+// The "@" protocol's shared halves — the same caret math + popup the /create
+// composer speaks, so tagging works identically in both prompts.
+import { applyMention, findActiveMention } from 'shared/libs/mentionQuery'
+import type { ActiveMention } from 'shared/libs/mentionQuery'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { presentationFor } from 'shared/libs/modelPresentation'
-import { Button, EnhanceButton, GLASS_SURFACE, ProviderMark, Select } from 'shared/ui'
+import {
+  Button,
+  EnhanceButton,
+  GLASS_SURFACE,
+  MentionAutocomplete,
+  ProviderMark,
+  Select,
+  toast,
+} from 'shared/ui'
+import { useDeleteShotReference } from '../model/shotReferencesApi'
 import { useUpdateShot } from '../model/shotsApi'
 import { useGenerateShotClip, useShotGeneration } from '../model/shotGeneration'
 import { useShotFailureToast } from '../model/shotFailureToast'
@@ -50,14 +63,15 @@ import { useGenerateVoiceover } from '../model/voiceoverApi'
 import {
   SHOT_DURATIONS_SECONDS,
   draftToPreset,
-  findStyle,
   hasAnyPreset,
+  findStyle,
   presetToDraft,
   resolveStyleFragments,
 } from '../model/presetOptions'
 import type { PresetDraft } from '../model/presetOptions'
 import type { CastableEntity } from './ShotCastField'
-import { ShotCastField } from './ShotCastField'
+import { MAX_CAST, ShotCastField } from './ShotCastField'
+import { MakeCharacterModal } from './MakeCharacterModal'
 import { ShotReferenceImages } from './ShotReferenceImages'
 import { InspectorSection } from './InspectorSection'
 import { ModelPickerModal } from './ModelPickerModal'
@@ -97,6 +111,15 @@ export type ShotInspectorProps = {
 // The drawer the toolbar toggles can open above the prompt (one at a time —
 // two open panels would push the textarea off the dock)
 type DockPanel = 'cast' | 'voice' | 'more'
+
+// A row the inline "@" picker can offer. TWO kinds, because the shot has two
+// photo-backed things worth tagging: a CHARACTER (splices its [[eN]] token
+// immediately) and an ATTACHED PHOTO (must be NAMED first — the server composes
+// a name into the prompt, and a raw picture has none; its imageUrl is the
+// /media path the naming modal previews).
+type MentionRow =
+  | { kind: 'entity'; id: string; name: string; imageUrl: string | null }
+  | { kind: 'photo'; id: string; name: string; imageUrl: string }
 
 // The only crossfade lengths we offer — short enough that a 4s shot survives one
 const CROSSFADE_MS = [300, 500, 800] as const
@@ -208,13 +231,21 @@ export function ShotInspector({
   const handlePromptDragEnd = () => setPromptDrag(null)
   const [prompt, setPrompt] = useState(shot.prompt)
   const [preset, setPreset] = useState<PresetDraft>(presetToDraft(shot.promptPreset))
+  // The user's FREE model choice. It stays the user's even while a style is
+  // shadowing it (see activeModelId below) — a lock must be reversible without
+  // costing the user the pick they made before it.
   const [modelId, setModelId] = useState(() => initialModelId(shot, videoModels, styles))
+  // This shot's own generation shape. null = no opinion → the film canvas, which
+  // is what every shot did before this control existed.
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio | null>(shot.aspectRatio)
   const [seconds, setSeconds] = useState(String(nearestSeconds(shot.durationMs)))
   const [transition, setTransition] = useState<Transition>(shot.transition)
   const [transitionMs, setTransitionMs] = useState(String(shot.transitionMs || 500))
   const [hasTitle, setHasTitle] = useState(shot.title !== null)
   const [titleText, setTitleText] = useState(shot.title?.text ?? '')
-  const [titlePosition, setTitlePosition] = useState<TitlePosition>(shot.title?.position ?? 'center')
+  const [titlePosition, setTitlePosition] = useState<TitlePosition>(
+    shot.title?.position ?? 'center',
+  )
   const [hasVoice, setHasVoice] = useState(shot.voiceover !== null)
   const [voiceText, setVoiceText] = useState(shot.voiceover?.text ?? '')
   const [voiceId, setVoiceId] = useState(shot.voiceover?.voice ?? voices[0] ?? '')
@@ -231,16 +262,193 @@ export function ShotInspector({
     const placeholder = nextPlaceholder(cast)
     // The token goes into the TEXT — that is where a tag lives. The user can move
     // it, or delete it to untag, and no separate bookkeeping has to notice.
-    setPrompt((text) => `${text}${text && !text.endsWith(' ') ? ' ' : ''}${entityPlaceholderToken(placeholder)}`)
+    setPrompt(
+      (text) =>
+        `${text}${text && !text.endsWith(' ') ? ' ' : ''}${entityPlaceholderToken(placeholder)}`,
+    )
     setCast((refs) => [...refs, { placeholder, entityId }])
   }
 
   const removeCharacter = (placeholder: string) => {
-    setPrompt((text) => text.replace(entityPlaceholderToken(placeholder), '').replace(/\s{2,}/g, ' ').trim())
+    setPrompt((text) =>
+      text
+        .replace(entityPlaceholderToken(placeholder), '')
+        .replace(/\s{2,}/g, ' ')
+        .trim(),
+    )
     setCast((refs) => refs.filter((ref) => ref.placeholder !== placeholder))
   }
 
-  const model = videoModels.find((m) => m.id === modelId)
+  // ── Inline "@" mention picker ─────────────────────────────────────────────
+  // The same "@" protocol as the /create composer (owner report 2026-07-24:
+  // typing "@" here did nothing — the machinery lived only in ChatComposer).
+  // `mention` is the active "@query" at the caret (null = picker closed);
+  // `mentionIndex` the keyboard-highlighted row.
+  const [mention, setMention] = useState<ActiveMention | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  // Where the caret must land AFTER a token splice — a controlled textarea
+  // otherwise jumps it to the end. A ref, not state: the splice already
+  // re-renders via setPrompt, so mutating this must not trigger another.
+  const caretTargetRef = useRef<number | null>(null)
+  // The photo row the user picked, held while its naming modal is open. The
+  // "@query" span is captured HERE because opening the modal blurs the textarea
+  // (which closes the picker) — the splice happens later, on create, against
+  // this span. The prompt cannot change meanwhile: the modal traps focus.
+  const [photoPick, setPhotoPick] = useState<{
+    refId: string
+    imageUrl: string
+    span: ActiveMention
+    caret: number
+  } | null>(null)
+  const deleteReference = useDeleteShotReference()
+
+  // Once the spliced prompt has rendered, park the caret past the token. Keyed
+  // on the prompt so it fires exactly on the change that carried the splice.
+  useEffect(() => {
+    if (caretTargetRef.current === null) return
+    const el = promptRef.current
+    if (el) {
+      el.focus()
+      el.setSelectionRange(caretTargetRef.current, caretTargetRef.current)
+    }
+    caretTargetRef.current = null
+  }, [prompt])
+
+  const closeMention = () => {
+    setMention(null)
+    setMentionIndex(0)
+  }
+
+  // Every keystroke recomputes the active "@query" from the NEW value + caret,
+  // so the picker opens on "@", filters as the user types, closes on whitespace.
+  const handlePromptChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value
+    setPrompt(value)
+    setMention(findActiveMention(value, event.target.selectionStart ?? value.length))
+    setMentionIndex(0)
+  }
+
+  // Tags whose token is still in the text — the ONE derivation the cast field,
+  // the reference budget and the picker below all share.
+  const liveCast = deriveEntityRefs(prompt, cast)
+  // Rows the "@" picker offers: characters not yet in this shot's cast, then
+  // the attached photos (numbered — they have no name until the user gives one;
+  // the thumbnail is the row's real face either way).
+  const mentionItems: MentionRow[] = [
+    ...entities
+      .filter((e) => !liveCast.some((ref) => ref.entityId === e.id))
+      .map((e) => ({ kind: 'entity' as const, id: e.id, name: e.name, imageUrl: e.imageUrl ?? null })),
+    ...shot.referenceImages.map((ref, index) => ({
+      kind: 'photo' as const,
+      id: ref.id,
+      name: t('cinema.mention.photo', { n: index + 1 }),
+      imageUrl: ref.path,
+    })),
+  ]
+  // Wan r2v's cast ceiling closes the picker outright: a character row would be
+  // one tag too many, and a photo row CONVERTS into a tag — same ceiling.
+  const atMentionCap = liveCast.length >= MAX_CAST
+  const mentionMatches =
+    mention && !atMentionCap
+      ? mentionItems.filter((item) => item.name.toLowerCase().includes(mention.query.toLowerCase()))
+      : []
+  const mentionOpen = mention !== null && !atMentionCap && mentionItems.length > 0
+
+  // Splice `token` over an "@query" span and park the caret after it.
+  const spliceMentionToken = (span: ActiveMention, caret: number, token: string) => {
+    const next = applyMention(prompt, span, caret, token)
+    setPrompt(next.text)
+    caretTargetRef.current = next.caret
+  }
+
+  const selectMentionItem = (id: string) => {
+    if (!mention) return
+    const caret = promptRef.current?.selectionStart ?? prompt.length
+    const item = mentionItems.find((row) => row.id === id)
+    if (!item) return
+    if (item.kind === 'entity') {
+      // Same registration as addCharacter, but the token lands AT THE CARET —
+      // the user is typing a sentence around it, not appending a chip.
+      const placeholder = nextPlaceholder(cast)
+      setCast((refs) => [...refs, { placeholder, entityId: item.id }])
+      spliceMentionToken(mention, caret, entityPlaceholderToken(placeholder))
+    } else {
+      // A raw photo has no name to compose into the prompt — capture the span
+      // and ask for one (the PersonIcon bridge, entered from the keyboard).
+      setPhotoPick({ refId: item.id, imageUrl: item.imageUrl, span: mention, caret })
+    }
+    closeMention()
+  }
+
+  // The picked photo got its name: the fresh character replaces the raw ref —
+  // tag it where the "@" was typed, DELETE the ref (the image would otherwise
+  // be sent twice: anonymously AND as the character's photo), and confirm. The
+  // same shot-level effects as ShotReferenceImages' PersonIcon bridge.
+  const handlePhotoNamed = (entityId: string) => {
+    if (!photoPick) return
+    const placeholder = nextPlaceholder(cast)
+    setCast((refs) => [...refs, { placeholder, entityId }])
+    spliceMentionToken(photoPick.span, photoPick.caret, entityPlaceholderToken(placeholder))
+    deleteReference.mutate({ filmId, shotId: shot.id, refId: photoPick.refId })
+    toast.success({ title: t('cinema.shotRef.makeCharacterDone') })
+    setPhotoPick(null)
+  }
+
+  // While the picker is open it OWNS arrows/enter/tab/esc — Enter must pick a
+  // row, never type a newline under the popup. With the picker closed this
+  // handler does nothing: the cinema prompt keeps its plain-textarea Enter.
+  const handlePromptKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mentionOpen) return
+    if (mentionMatches.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setMentionIndex((index) => (index + 1) % mentionMatches.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setMentionIndex((index) => (index - 1 + mentionMatches.length) % mentionMatches.length)
+        return
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault()
+        const picked = mentionMatches[mentionIndex] ?? mentionMatches[0]
+        if (picked) selectMentionItem(picked.id)
+        return
+      }
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeMention()
+    }
+  }
+
+  // ── The style's model lock ────────────────────────────────────────────────
+  // A style whose registry row names a `recommendedModelId` has ALREADY made the
+  // model decision — that pairing is the style's whole point ("это и так под
+  // капотом настроено для удобства", owner 2026-08-02). While such a style is
+  // active the model picker is not a choice, so it must not pretend to be one.
+  //
+  // DERIVED, NOT SYNCED. initialModelId() runs once at mount and could never
+  // follow a style picked afterwards. Recomputing here every render is what makes
+  // the lock live — and it is a pure function of (styles, preset, videoModels),
+  // so a useEffect writing into state would be the wrong tool twice over (it
+  // would also destroy the user's own pick, see below).
+  //
+  // A recommendation this catalog cannot serve is NOT a lock: pinning the picker
+  // to a model that is not in the list would leave the user staring at a dead
+  // control with no model at all.
+  const activeStyle = preset.styleId ? findStyle(styles, preset.styleId) : undefined
+  const lockedModelId =
+    activeStyle?.recommendedModelId && videoModels.some((m) => m.id === activeStyle.recommendedModelId)
+      ? activeStyle.recommendedModelId
+      : null
+  // What the composer DISPLAYS and GENERATES with. The lock SHADOWS `modelId`,
+  // it never overwrites it — clear the style and the user's own pick is still
+  // there, instead of being silently replaced by the recommendation.
+  const activeModelId = lockedModelId ?? modelId
+
+  const model = videoModels.find((m) => m.id === activeModelId)
   const isBusy = update.isPending || generate.isPending
   const canGenerate = prompt.trim().length >= 2 && model !== undefined && !isBusy
   // The exact positive prompt the server will build — shown (in the expand
@@ -267,11 +475,17 @@ export function ShotInspector({
     promptPreset: hasAnyPreset(preset) ? draftToPreset(preset) : null,
     // Only the LIVE cast: derived from the text, one source of truth.
     entityRefs: deriveEntityRefs(promptText, cast),
-    modelId: modelId || null,
+    // The EFFECTIVE model — a locked style's recommendation is what this shot
+    // will actually render with, so it is what the row must remember.
+    modelId: activeModelId || null,
+    // Sent unconditionally: null is itself a meaningful value here ("clear the
+    // override, inherit the film's aspect"), not an absence.
+    aspectRatio,
     durationMs: Number(seconds) * 1000,
     transition,
     transitionMs: transition === 'crossfade' ? Number(transitionMs) : 0,
-    title: hasTitle && titleText.trim() ? { text: titleText.trim(), position: titlePosition } : null,
+    title:
+      hasTitle && titleText.trim() ? { text: titleText.trim(), position: titlePosition } : null,
     voiceover: buildVoiceover(),
     // Persist the INTENT even if the current model cannot honour it — the flag
     // only reaches a generation request through composeShotClipInput, which
@@ -328,6 +542,10 @@ export function ShotInspector({
             // clip would generate against the shot as it was BEFORE this edit.
             entityRefs: deriveEntityRefs(promptText, cast),
             durationMs: Number(seconds) * 1000,
+            // The aspect draft too: composeShotClipInput reads shot.aspectRatio
+            // to decide the shape, and the pre-edit value would generate the
+            // clip in the shape the user just changed away from.
+            aspectRatio,
             // The audio draft too: composeShotClipInput reads shot.audio, and
             // generating from the pre-edit value would bill the wrong price.
             audio: audioOn,
@@ -375,150 +593,159 @@ export function ShotInspector({
     // gone. Opaque steel: the prompt must stay readable over anything.
     <section
       aria-label={t('cinema.inspector.title')}
-      className="flex w-full flex-col rounded-2xl border border-white/10 bg-steel"
+      // v8: the composer FILLS its right column (owner request 2026-07-24, "чат
+      // на всю высоту") — `flex-1 min-h-0` stretches the section to the column
+      // height; the prompt zone below grows and the control bar stays pinned at
+      // the bottom. Standalone (tests) there is no flex parent, so it just sizes
+      // to content — the same as before.
+      className="flex min-h-0 w-full flex-1 flex-col rounded-2xl border border-white/10 bg-steel"
     >
-        {/* Drawer — one panel at a time above the prompt, scrolling inside
+      {/* Drawer — one panel at a time above the prompt, scrolling inside
             itself past 40svh so the dock never swallows the stage */}
-        {openPanel !== null ? (
-          <div className="max-h-[40svh] overflow-y-auto border-b border-white/10 p-3">
-            {/* The attach drawer holds BOTH reference affordances, sharing the
+      {openPanel !== null ? (
+        <div className="max-h-[40svh] overflow-y-auto border-b border-white/10 p-3">
+          {/* The attach drawer holds BOTH reference affordances, sharing the
                 budget of 5: ShotCastField TAGS a known character; below it
                 ShotReferenceImages attaches an ARBITRARY picture (click / drop /
                 paste). entityRefCount is the LIVE tag count (derived from the
                 prompt, same as ShotCastField shows), so the two controls agree on
                 how much of the budget is spent. */}
-            {openPanel === 'cast' ? (
-              <div className="flex flex-col gap-4">
-                <InspectorSection legend={t('cinema.cast.title')}>
-                  <ShotCastField
-                    entities={entities}
-                    prompt={prompt}
-                    cast={cast}
-                    onAdd={addCharacter}
-                    onRemove={removeCharacter}
-                    modelSupportsReferences={Boolean(model?.referenceMode)}
-                  />
-                </InspectorSection>
-                <InspectorSection legend={t('cinema.shotRef.title')}>
-                  <ShotReferenceImages
-                    filmId={filmId}
-                    shotId={shot.id}
-                    references={shot.referenceImages}
-                    entityRefCount={deriveEntityRefs(prompt, cast).length}
-                    modelSupportsReferences={Boolean(model?.referenceMode)}
-                  />
-                </InspectorSection>
-              </div>
-            ) : null}
-
-            {openPanel === 'voice' && ttsModel ? (
-              <ShotVoiceoverField
-                isEnabled={hasVoice}
-                onToggle={() => setHasVoice((prev) => !prev)}
-                text={voiceText}
-                onTextChange={setVoiceText}
-                voice={voiceId}
-                onVoiceChange={setVoiceId}
-                voices={voices}
-                credits={ttsModel.credits}
-                isVoiced={isVoiced}
-                onGenerate={handleVoice}
-                isGenerating={isVoicing}
+          {openPanel === 'cast' ? (
+            // No section captions (owner request 2026-07-24): the visible
+            // "Персонажи" / "Референс-картинки" legends are gone — just the
+            // controls. Accessible names survive without them: ShotReferenceImages
+            // has its OWN role=group aria-label, and the toolbar toggle names the
+            // whole drawer for AT.
+            <div className="flex flex-col gap-4">
+              <ShotCastField
+                entities={entities}
+                prompt={prompt}
+                cast={cast}
+                onAdd={addCharacter}
+                onRemove={removeCharacter}
               />
-            ) : null}
+              <ShotReferenceImages
+                filmId={filmId}
+                shotId={shot.id}
+                references={shot.referenceImages}
+                entityRefCount={liveCast.length}
+                // "Make character from this reference" auto-tags the new entity in
+                // the prompt — same append-a-[[eN]]-token path as ShotCastField.
+                onCharacterCreated={addCharacter}
+              />
+            </div>
+          ) : null}
 
-            {openPanel === 'more' ? (
-              <div className="flex flex-col gap-4">
-                {/* Look: the four structured preset axes (server-composed) */}
-                <InspectorSection legend={t('cinema.inspector.sections.look')}>
-                  <PresetPickers
-                    value={preset}
-                    onChange={(patch) => setPreset((prev) => ({ ...prev, ...patch }))}
-                    styles={styles}
-                  />
-                </InspectorSection>
+          {openPanel === 'voice' && ttsModel ? (
+            <ShotVoiceoverField
+              isEnabled={hasVoice}
+              onToggle={() => setHasVoice((prev) => !prev)}
+              text={voiceText}
+              onTextChange={setVoiceText}
+              voice={voiceId}
+              onVoiceChange={setVoiceId}
+              voices={voices}
+              credits={ttsModel.credits}
+              isVoiced={isVoiced}
+              onGenerate={handleVoice}
+              isGenerating={isVoicing}
+            />
+          ) : null}
 
-                {/* Clip mechanics that are NOT everyday dials (model/duration
+          {openPanel === 'more' ? (
+            <div className="flex flex-col gap-4">
+              {/* Look: the four structured preset axes (server-composed) */}
+              <InspectorSection legend={t('cinema.inspector.sections.look')}>
+                <PresetPickers
+                  value={preset}
+                  onChange={(patch) => setPreset((prev) => ({ ...prev, ...patch }))}
+                  styles={styles}
+                  aspectRatio={aspectRatio}
+                  onAspectRatioChange={setAspectRatio}
+                />
+              </InspectorSection>
+
+              {/* Clip mechanics that are NOT everyday dials (model/duration
                     live on the toolbar): how the shot transitions in */}
-                <InspectorSection legend={t('cinema.inspector.sections.clip')}>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select<Transition>
-                      label={t('cinema.inspector.transition')}
-                      options={transitionSchema.options.map((value) => ({
-                        value,
-                        label: t(`cinema.transition.${value}`),
-                      }))}
-                      value={transition}
-                      onChange={setTransition}
-                    />
-                    {/* The length only exists for a crossfade — never a dead control */}
-                    {transition === 'crossfade' ? (
-                      <Select
-                        label={t('cinema.inspector.transitionMs')}
-                        options={CROSSFADE_MS.map((ms) => ({ value: String(ms), label: `${ms} ms` }))}
-                        value={transitionMs}
-                        onChange={setTransitionMs}
-                      />
-                    ) : null}
-                  </div>
-                </InspectorSection>
-
-                {/* Title card: optional overlay, disclosed by its own toggle */}
-                <InspectorSection legend={t('cinema.inspector.sections.title')}>
-                  <ShotTitleField
-                    isEnabled={hasTitle}
-                    onToggle={() => setHasTitle((prev) => !prev)}
-                    text={titleText}
-                    onTextChange={setTitleText}
-                    position={titlePosition}
-                    onPositionChange={setTitlePosition}
+              <InspectorSection legend={t('cinema.inspector.sections.clip')}>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select<Transition>
+                    label={t('cinema.inspector.transition')}
+                    options={transitionSchema.options.map((value) => ({
+                      value,
+                      label: t(`cinema.transition.${value}`),
+                    }))}
+                    value={transition}
+                    onChange={setTransition}
                   />
-                </InspectorSection>
+                  {/* The length only exists for a crossfade — never a dead control */}
+                  {transition === 'crossfade' ? (
+                    <Select
+                      label={t('cinema.inspector.transitionMs')}
+                      options={CROSSFADE_MS.map((ms) => ({ value: String(ms), label: `${ms} ms` }))}
+                      value={transitionMs}
+                      onChange={setTransitionMs}
+                    />
+                  ) : null}
+                </div>
+              </InspectorSection>
 
-                {/* The composed prompt the model will actually receive */}
-                {composedHint ? (
-                  <p className="rounded-lg bg-abyss px-3 py-2 text-xs text-mist-dim">
-                    <span className="text-mist-dim/70">{t('cinema.inspector.willSee')} </span>
-                    {composedHint}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+              {/* Title card: optional overlay, disclosed by its own toggle */}
+              <InspectorSection legend={t('cinema.inspector.sections.title')}>
+                <ShotTitleField
+                  isEnabled={hasTitle}
+                  onToggle={() => setHasTitle((prev) => !prev)}
+                  text={titleText}
+                  onTextChange={setTitleText}
+                  position={titlePosition}
+                  onPositionChange={setTitlePosition}
+                />
+              </InspectorSection>
 
-        {/* The prompt's resize grip, on the TOP edge (v6.2): the dock is pinned
+              {/* The composed prompt the model will actually receive */}
+              {composedHint ? (
+                <p className="rounded-lg bg-abyss px-3 py-2 text-xs text-mist-dim">
+                  <span className="text-mist-dim/70">{t('cinema.inspector.willSee')} </span>
+                  {composedHint}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* The prompt's resize grip, on the TOP edge (v6.2): the dock is pinned
             to the viewport bottom, so a bigger field can only grow UPWARD —
             native resize-y grew by dragging DOWN, exactly the wrong direction,
             which is why it is gone. Drag up = grow, drag down = shrink, arrows
             mirror it, double-click returns to auto-grow. Same keyboard-operable
             separator anatomy as the timeline's height edge. */}
-        <div
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label={t('cinema.inspector.promptResize')}
-          aria-valuemin={MIN_PROMPT_H}
-          aria-valuemax={MAX_PROMPT_H}
-          // State only, never the ref: render must not read the DOM (hooks
-          // rule). Until the user takes over, AT hears the auto floor — the
-          // first interaction snaps this to the real measured height.
-          aria-valuenow={promptHeight ?? MIN_PROMPT_H}
-          tabIndex={0}
-          onKeyDown={handlePromptGripKeyDown}
-          onPointerDown={handlePromptDragStart}
-          onPointerMove={handlePromptDragMove}
-          onPointerUp={handlePromptDragEnd}
-          onPointerCancel={handlePromptDragEnd}
-          onDoubleClick={() => setPromptHeight(null)}
-          className="group flex h-3 cursor-row-resize touch-none items-center justify-center focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
-        >
-          <span
-            aria-hidden="true"
-            className="h-1 w-10 rounded-full bg-white/10 transition-colors duration-200 group-hover:bg-white/25 group-focus-visible:bg-white/25"
-          />
-        </div>
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={t('cinema.inspector.promptResize')}
+        aria-valuemin={MIN_PROMPT_H}
+        aria-valuemax={MAX_PROMPT_H}
+        // State only, never the ref: render must not read the DOM (hooks
+        // rule). Until the user takes over, AT hears the auto floor — the
+        // first interaction snaps this to the real measured height.
+        aria-valuenow={promptHeight ?? MIN_PROMPT_H}
+        tabIndex={0}
+        onKeyDown={handlePromptGripKeyDown}
+        onPointerDown={handlePromptDragStart}
+        onPointerMove={handlePromptDragMove}
+        onPointerUp={handlePromptDragEnd}
+        onPointerCancel={handlePromptDragEnd}
+        onDoubleClick={() => setPromptHeight(null)}
+        className="group flex h-3 cursor-row-resize touch-none items-center justify-center focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+      >
+        <span
+          aria-hidden="true"
+          className="h-1 w-10 rounded-full bg-white/10 transition-colors duration-200 group-hover:bg-white/25 group-focus-visible:bg-white/25"
+        />
+      </div>
 
-        {/* The prompt — the dock's whole face, as an iOS-glass plate: the kit's
+      {/* The prompt — the dock's whole face, as an iOS-glass plate: the kit's
             GLASS_SURFACE gives the translucent white wash, the backdrop
             blur/saturate, the bright specular TOP edge (the no-gradient
             "reflection") and the inner glass ring — one recipe with Card/Modal,
@@ -526,178 +753,228 @@ export function ShotInspector({
             (field-sizing-content follows the text, capped 30svh) until the user
             takes over via the grip above — then the explicit height wins and
             the auto classes step aside so they cannot fight it. */}
-        {/* The field is `relative` so the AI-enhance affordance can dock in its
+      {/* The field is `relative` so the AI-enhance affordance can dock in its
             bottom-right corner (Higgsfield's arrangement). pr-12 reserves the
             corner so a long prompt never runs under the icon; the enhance/undo
             is just another setPrompt, so the resize grip and cast tokens are
             untouched. */}
-        <div className="relative mx-2">
-          <textarea
-            rows={1}
-            ref={promptRef}
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder={t('cinema.inspector.promptPlaceholder')}
-            aria-label={t('cinema.inspector.prompt')}
-            style={promptHeight !== null ? { height: `${promptHeight}px` } : undefined}
-            className={`${GLASS_SURFACE} ${
-              promptHeight === null ? 'field-sizing-content max-h-[30svh]' : 'resize-none'
-            } w-full min-h-10 rounded-xl border px-3 py-2.5 pr-12 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
+      <div className="relative mx-2 min-h-0 flex-1">
+        {/* The inline "@" picker. Anchored INSIDE the prompt plate's bottom-left
+              (not bottom-full like /create): this plate is tall — a fresh prompt
+              types at its TOP, so the popup overlays empty glass, never the line
+              being written. */}
+        {mentionOpen ? (
+          <MentionAutocomplete
+            items={mentionMatches}
+            activeIndex={mentionIndex}
+            label={t('cinema.mention.pickerLabel')}
+            emptyText={t('cinema.mention.noMatches')}
+            className="absolute bottom-2 left-2 z-20"
+            onSelect={selectMentionItem}
+            onHover={setMentionIndex}
           />
-          <div className="absolute bottom-2 right-2">
-            <EnhanceButton value={prompt} onEnhanced={setPrompt} />
-          </div>
-        </div>
-
-        {/* Status strip: the clip's lifecycle + the newest action failure, keyed
-            off the machine code — never raw server text (design.md §9) */}
-        {shot.generationId !== null || actionErrorCode !== null ? (
-          <div className="flex flex-col gap-1 px-4 pb-1.5">
-            <ShotClipStatus
-              status={clip.data?.status}
-              progress={clip.data?.progress ?? null}
-              hasClip={shot.generationId !== null}
-            />
-            {actionErrorCode !== null ? (
-              <p role="alert" className="text-xs text-glow-red">
-                {t(errorCodeMessageKey(actionErrorCode))}
-              </p>
-            ) : null}
-          </div>
         ) : null}
+        <textarea
+          rows={1}
+          ref={promptRef}
+          value={prompt}
+          onChange={handlePromptChange}
+          onKeyDown={handlePromptKeyDown}
+          // Close the picker when focus leaves the textarea. Option clicks use
+          // onMouseDown+preventDefault, so they fire BEFORE this blur.
+          onBlur={closeMention}
+          placeholder={t('cinema.inspector.promptPlaceholder')}
+          aria-label={t('cinema.inspector.prompt')}
+          style={promptHeight !== null ? { height: `${promptHeight}px` } : undefined}
+          // Full-height column (v8): with no manual override the prompt now
+          // FILLS the space the section gives it (`h-full`) instead of
+          // auto-sizing to the text and capping at 30svh — the chat-input
+          // posture the owner asked for. A manual grip drag still wins (the
+          // explicit `promptHeight` style + `resize-none`).
+          className={`${GLASS_SURFACE} ${
+            promptHeight === null ? 'h-full resize-none' : 'resize-none'
+          } w-full min-h-10 rounded-xl border px-3 py-2.5 pr-12 text-sm text-mist placeholder:text-mist-dim/60 focus-visible:border-portal focus-visible:outline-none`}
+        />
+        <div className="absolute bottom-2 right-2">
+          <EnhanceButton value={prompt} onEnhanced={setPrompt} />
+        </div>
+      </div>
 
-        {/* Toolbar: quick pickers + icon toggles left, actions right. Label-less
+      {/* Status strip: the clip's lifecycle + the newest action failure, keyed
+            off the machine code — never raw server text (design.md §9) */}
+      {shot.generationId !== null || actionErrorCode !== null ? (
+        <div className="flex flex-col gap-1 px-4 pb-1.5">
+          <ShotClipStatus
+            status={clip.data?.status}
+            progress={clip.data?.progress ?? null}
+            hasClip={shot.generationId !== null}
+          />
+          {actionErrorCode !== null ? (
+            <p role="alert" className="text-xs text-glow-red">
+              {t(errorCodeMessageKey(actionErrorCode))}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Toolbar: quick pickers + icon toggles left, actions right. Label-less
             since the v6.1 pass (owner request): the model chip and the slider
             carry aria-labels for AT, but the visible captions are gone — the
             controls explain themselves and the row stays one line tall. */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Model trigger: a chip wearing the CURRENT choice (brand mark +
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Model trigger: a chip wearing the CURRENT choice (brand mark +
                 name); the real decision surface is the big ModelPickerModal —
                 a model is a purchase, and a purchase deserves the full table
                 (logo, tier, provider, description, tariff), not a rail Select. */}
-            <button
-              type="button"
-              aria-label={t('cinema.inspector.model')}
-              onClick={() => setIsModelOpen(true)}
-              className="flex min-h-8 max-w-44 items-center gap-2 rounded-full border border-white/10 bg-steel px-2.5 text-left text-xs text-mist transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
-            >
-              <span className="grid size-4 shrink-0 place-items-center text-mist">
-                <ProviderMark provider={presentationFor(modelId).provider} className="size-4" />
-              </span>
-              <span className="min-w-0 truncate">
-                {model ? model.name : t('cinema.inspector.noModel')}
-              </span>
-              {/* Decorative chevron — same voice as the account menu trigger */}
-              <span aria-hidden="true" className="text-[10px] text-mist-dim">
-                ▾
-              </span>
-            </button>
+          {/* Locked while a recommending style is active: the style already
+                chose, so the chip reports the choice instead of offering one.
+                Dimmed + explained by title, the same disabled voice the audio
+                toggle below uses when a model has no sound. */}
+          <button
+            type="button"
+            aria-label={t('cinema.inspector.model')}
+            title={
+              lockedModelId
+                ? t('cinema.inspector.modelLocked', { style: activeStyle?.name ?? '' })
+                : undefined
+            }
+            disabled={lockedModelId !== null}
+            onClick={() => setIsModelOpen(true)}
+            className="flex min-h-8 max-w-44 items-center gap-2 rounded-full border border-white/10 bg-steel px-2.5 text-left text-xs text-mist transition-colors duration-200 hover:bg-ridge focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="grid size-4 shrink-0 place-items-center text-mist">
+              <ProviderMark provider={presentationFor(activeModelId).provider} className="size-4" />
+            </span>
+            <span className="min-w-0 truncate">
+              {model ? model.name : t('cinema.inspector.noModel')}
+            </span>
+            {/* Decorative chevron — same voice as the account menu trigger */}
+            <span aria-hidden="true" className="text-[10px] text-mist-dim">
+              ▾
+            </span>
+          </button>
 
-            {/* Duration: a stepped range over the editorial stops (2/3/5/8/10s),
+          {/* Duration: a stepped range over the editorial stops (2/3/5/8/10s),
                 not an option menu (owner request). The INDEX is the slider value
                 so every notch is a real, priceable stop; aria-valuetext speaks
                 the seconds, the chip beside it shows them. */}
-            <div className="flex items-center gap-1.5">
-              <input
-                type="range"
-                min={0}
-                max={SHOT_DURATIONS_SECONDS.length - 1}
-                step={1}
-                value={Math.max(0, SHOT_DURATIONS_SECONDS.findIndex((s) => String(s) === seconds))}
-                onChange={(event) => {
-                  const stop = SHOT_DURATIONS_SECONDS[Number(event.target.value)]
-                  if (stop !== undefined) setSeconds(String(stop))
-                }}
-                aria-label={t('cinema.inspector.duration')}
-                aria-valuetext={t('cinema.shot.seconds', { count: Number(seconds) })}
-                className="w-24 accent-glow-amber"
-              />
-              <span className="w-8 shrink-0 text-xs text-mist">
-                {t('cinema.shot.seconds', { count: Number(seconds) })}
-              </span>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="range"
+              min={0}
+              max={SHOT_DURATIONS_SECONDS.length - 1}
+              step={1}
+              value={Math.max(
+                0,
+                SHOT_DURATIONS_SECONDS.findIndex((s) => String(s) === seconds),
+              )}
+              onChange={(event) => {
+                const stop = SHOT_DURATIONS_SECONDS[Number(event.target.value)]
+                if (stop !== undefined) setSeconds(String(stop))
+              }}
+              aria-label={t('cinema.inspector.duration')}
+              aria-valuetext={t('cinema.shot.seconds', { count: Number(seconds) })}
+              className="w-24 accent-glow-amber"
+            />
+            <span className="w-8 shrink-0 text-xs text-mist">
+              {t('cinema.shot.seconds', { count: Number(seconds) })}
+            </span>
+          </div>
 
-            {/* Native generation audio — a STATE toggle, not a drawer opener:
+          {/* Native generation audio — a STATE toggle, not a drawer opener:
                 amber = this clip will be generated with the model's own
                 soundtrack (and the film keeps it). The label carries the price
                 (×2 on switchable models — money never hides); disabled with an
                 explanatory title when the model has no audio at all. */}
-            <button
-              type="button"
-              aria-pressed={audioOn}
-              aria-label={
-                model?.nativeAudio === 'switchable'
-                  ? t('cinema.inspector.audioX2')
-                  : t('cinema.inspector.audio')
-              }
-              title={model?.nativeAudio ? undefined : t('cinema.inspector.audioNone')}
-              disabled={!model?.nativeAudio}
-              onClick={() => setAudioOn((prev) => !prev)}
-              className={`${TOOL} disabled:cursor-not-allowed disabled:opacity-40 ${
-                audioOn && model?.nativeAudio ? TOOL_ON : TOOL_OFF
-              }`}
-            >
-              <SpeakerIcon />
-            </button>
+          <button
+            type="button"
+            aria-pressed={audioOn}
+            aria-label={
+              model?.nativeAudio === 'switchable'
+                ? t('cinema.inspector.audioX2')
+                : t('cinema.inspector.audio')
+            }
+            title={model?.nativeAudio ? undefined : t('cinema.inspector.audioNone')}
+            disabled={!model?.nativeAudio}
+            onClick={() => setAudioOn((prev) => !prev)}
+            className={`${TOOL} disabled:cursor-not-allowed disabled:opacity-40 ${
+              audioOn && model?.nativeAudio ? TOOL_ON : TOOL_OFF
+            }`}
+          >
+            <SpeakerIcon />
+          </button>
 
-            {/* Icon toggles: each opens its drawer; amber while open (the
+          {/* Icon toggles: each opens its drawer; amber while open (the
                 selection tint). aria-pressed carries the state for AT. */}
+          <button
+            type="button"
+            aria-pressed={openPanel === 'cast'}
+            aria-label={t('cinema.cast.title')}
+            onClick={() => togglePanel('cast')}
+            className={`${TOOL} ${openPanel === 'cast' ? TOOL_ON : TOOL_OFF}`}
+          >
+            <PaperclipIcon />
+          </button>
+          {ttsModel ? (
             <button
               type="button"
-              aria-pressed={openPanel === 'cast'}
-              aria-label={t('cinema.cast.title')}
-              onClick={() => togglePanel('cast')}
-              className={`${TOOL} ${openPanel === 'cast' ? TOOL_ON : TOOL_OFF}`}
+              aria-pressed={openPanel === 'voice'}
+              aria-label={t('cinema.voiceover.toggle')}
+              onClick={toggleVoicePanel}
+              className={`${TOOL} ${openPanel === 'voice' ? TOOL_ON : TOOL_OFF}`}
             >
-              <PaperclipIcon />
+              <MicIcon />
             </button>
-            {ttsModel ? (
-              <button
-                type="button"
-                aria-pressed={openPanel === 'voice'}
-                aria-label={t('cinema.voiceover.toggle')}
-                onClick={toggleVoicePanel}
-                className={`${TOOL} ${openPanel === 'voice' ? TOOL_ON : TOOL_OFF}`}
-              >
-                <MicIcon />
-              </button>
-            ) : null}
-            <button
-              type="button"
-              aria-pressed={openPanel === 'more'}
-              aria-label={t('cinema.inspector.more')}
-              onClick={() => togglePanel('more')}
-              className={`${TOOL} ${openPanel === 'more' ? TOOL_ON : TOOL_OFF}`}
-            >
-              <ExpandIcon />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSave}
-              isLoading={update.isPending && !generate.isPending}
-            >
-              {t('cinema.inspector.save')}
-            </Button>
-            <Button size="sm" onClick={handleGenerate} isLoading={isBusy} disabled={!canGenerate}>
-              <SparkIcon />
-              {t('cinema.inspector.generate')}
-            </Button>
-          </div>
+          ) : null}
+          <button
+            type="button"
+            aria-pressed={openPanel === 'more'}
+            aria-label={t('cinema.inspector.more')}
+            onClick={() => togglePanel('more')}
+            className={`${TOOL} ${openPanel === 'more' ? TOOL_ON : TOOL_OFF}`}
+          >
+            <ExpandIcon />
+          </button>
         </div>
 
-        {/* The big model picker behind the trigger chip above */}
-        <ModelPickerModal
-          isOpen={isModelOpen}
-          onClose={() => setIsModelOpen(false)}
-          models={videoModels}
-          value={modelId}
-          onChange={setModelId}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSave}
+            isLoading={update.isPending && !generate.isPending}
+          >
+            {t('cinema.inspector.save')}
+          </Button>
+          <Button size="sm" onClick={handleGenerate} isLoading={isBusy} disabled={!canGenerate}>
+            <SparkIcon />
+            {t('cinema.inspector.generate')}
+          </Button>
+        </div>
+      </div>
+
+      {/* The big model picker behind the trigger chip above */}
+      <ModelPickerModal
+        isOpen={isModelOpen}
+        onClose={() => setIsModelOpen(false)}
+        models={videoModels}
+        // The EFFECTIVE model is what the dialog shows as current; onChange
+        // still writes the user's own state, which the lock only shadows.
+        value={activeModelId}
+        onChange={setModelId}
+      />
+
+      {/* Naming dialog for a photo picked in the "@" picker — the PersonIcon
+            bridge entered from the keyboard. Closing without a name leaves the
+            typed "@query" in the prompt untouched. */}
+      {photoPick ? (
+        <MakeCharacterModal
+          imageUrl={photoPick.imageUrl}
+          onClose={() => setPhotoPick(null)}
+          onCreated={handlePhotoNamed}
         />
+      ) : null}
     </section>
   )
 }

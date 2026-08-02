@@ -35,6 +35,24 @@ describe('rate limiting', () => {
     expect(() => apiErrorSchema.parse(body)).not.toThrow()
   })
 
+  it('auth session reads (GET) are not starved by the strict sign-in bucket', async () => {
+    const app = await buildTestApp()
+    // The SPA polls get-session on every route change / window focus. Well above
+    // the strict POST bucket of 10 — reads only consume the global 300.
+    for (let i = 0; i < 25; i++) {
+      const res = await app.inject({ method: 'GET', url: '/api/auth/get-session' })
+      expect(res.statusCode).toBe(200)
+    }
+    // And the read traffic must NOT have consumed the sign-in budget: the very
+    // next credential attempt still reaches the auth handler (not 429).
+    const signInRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/email',
+      payload: { email: 'nobody@example.com', password: 'wrong-password' },
+    })
+    expect(signInRes.statusCode).not.toBe(429)
+  })
+
   it('POST /api/generations is strictly limited: the 21st submit in a minute gets 429', async () => {
     const app = await buildTestApp()
     const cookie = await registerAndGetCookie(app)

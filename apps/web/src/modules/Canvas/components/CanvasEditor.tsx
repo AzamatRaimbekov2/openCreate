@@ -17,6 +17,7 @@ import {
   type Connection,
   type Edge,
   type EdgeChange,
+  type FinalConnectionState,
   type Node,
   type NodeChange,
   type NodeTypes,
@@ -25,14 +26,16 @@ import {
 // standing as the font packages. React Flow cannot draw wires without it.
 import '@xyflow/react/dist/style.css'
 import type { CanvasNodeKind } from '@opencreate/contracts'
+import { toast } from 'shared/ui'
 import type { CanvasEntityOption, CanvasModelOption } from '../model/types'
-import { canConnect } from '../model/edgeRules'
+import { canConnect, edgeRefusalMessageKey } from '../model/edgeRules'
 import { useCanvasStore } from '../model/canvasStore'
 import { ImageNode } from './ImageNode'
 import { VideoNode } from './VideoNode'
 import { UploadNode } from './UploadNode'
 import { EntityNode } from './EntityNode'
 import { NoteNode } from './NoteNode'
+import { PromptNode } from './PromptNode'
 import { NODE_KIND_MIME, NodePalette } from './NodePalette'
 
 // Module scope on purpose: a nodeTypes object rebuilt per render makes React
@@ -42,6 +45,7 @@ const nodeTypes: NodeTypes = {
   video: VideoNode,
   upload: UploadNode,
   character: EntityNode,
+  prompt: PromptNode,
   note: NoteNode,
 }
 
@@ -172,6 +176,36 @@ function EditorInner({ models, entities }: EditorProps) {
     },
     [storeNodes, storeEdges, addEdge],
   )
+  // SAY WHY (owner report 2026-08-02, "привязка промт узлов чета не работает").
+  // A refused wire was a NON-EVENT: `isValidConnection` returns false, React Flow
+  // never fires `onConnect`, the line snaps back, and nothing on screen explains
+  // it — so a rule working exactly as designed (a second prompt into a node that
+  // already has one) is indistinguishable from a broken feature.
+  //
+  // This is the only hook that fires on a REFUSED drop, and it fires on every
+  // drag end, so it filters hard: a release over empty canvas is a CANCEL, not a
+  // refusal, and must stay silent (`toNode === null`); a release the graph
+  // accepted is already handled above (`isValid`). A toast, not an inline error:
+  // nothing failed and nothing is blocked — it is the transient, non-blocking
+  // surface (design.md §9). One `dedupeKey`, so a user poking at the same
+  // illegal target five times gets one live toast, not five.
+  const onConnectEnd = useCallback(
+    (_event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+      if (state.isValid) return
+      const from = state.fromNode?.id
+      const to = state.toNode?.id
+      if (!from || !to) return
+      const verdict = canConnect(from, to, storeNodes, storeEdges)
+      // Defensive: React Flow can only reach here when the connection was
+      // refused, but if the two ever disagreed, silence beats a false alarm.
+      if (verdict.ok) return
+      toast.info({
+        title: t(edgeRefusalMessageKey(verdict.reason)),
+        dedupeKey: 'canvas-edge-refused',
+      })
+    },
+    [storeNodes, storeEdges, t],
+  )
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -226,7 +260,15 @@ function EditorInner({ models, entities }: EditorProps) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onConnectEnd={onConnectEnd}
           isValidConnection={isValidConnection}
+          // The handles are 14px dots on a 288px card, and the default 20px
+          // snap radius meant a wire only took if you released almost exactly
+          // on one — the second half of "привязка не работает". 80px lets the
+          // user aim at the EDGE of the target card, which is what people
+          // actually do; it is still far short of the ~150px that would let a
+          // release near one node reach its neighbour's port.
+          connectionRadius={80}
           // The camera is part of the document: the owner reopens where they left.
           onMoveEnd={(_event, viewport) => setViewport(viewport)}
           defaultViewport={useCanvasStore.getState().viewport}

@@ -15,6 +15,8 @@ import { createComfyClient } from './integrations/runpod/comfy-client'
 import { createArkClient } from './integrations/bytedance/ark-client'
 import { createDashscopeClient } from './integrations/alibaba/dashscope-client'
 import { createDeepinfraClient } from './integrations/deepinfra/deepinfra-client'
+import { createKieClient } from './integrations/kie/kie-video'
+import { createSegmindClient } from './integrations/segmind/segmind-video'
 import { createFailoverProvider } from './integrations/failover-provider'
 import type { VideoProvider, VideoProviderId } from './integrations/video-provider'
 import type { Mesh3dProvider } from './integrations/mesh-provider'
@@ -42,6 +44,7 @@ import { registerAsset3dRoutes } from './modules/assets3d/routes'
 import { createPromptEnhanceService } from './modules/prompt/enhance'
 import { registerPromptRoutes } from './modules/prompt/routes'
 import { registerCompareRoutes } from './modules/compare/routes'
+import type { CompareChannel } from './modules/compare/routes'
 import { createCanvasService } from './modules/canvas/service'
 import { registerCanvasRoutes } from './modules/canvas/routes'
 import { createStyleService } from './modules/styles/service'
@@ -100,6 +103,27 @@ export type AppDeps = {
   // empty array is meaningful too — it is the "nothing configured" case, which
   // must answer with a clean provider_error rather than crash a turn.
   creatorBrains?: Brain[]
+  // Hidden /compare-video cost page: the two RAW Seedance 2.0 channels it races.
+  // Deliberately NOT read from `videoProviders` — the production registry wraps
+  // DeepInfra in a failover chain, and a measurement that silently ran on the
+  // FALLBACK would report the wrong provider's price with total confidence. This
+  // page must talk to each pipe directly or not at all.
+  //
+  // Optional: derived from config below. Tests inject scripted providers so the
+  // suite never spends provider money on a question it already knows the answer to.
+  compareVideoChannels?: {
+    deepinfra?: VideoProvider
+    kie?: VideoProvider
+    segmind?: VideoProvider
+  }
+  // Poll cadence + give-up deadline for that page, so a test can drive the loop to
+  // its timeout branch in milliseconds instead of six real minutes.
+  comparePollIntervalMs?: number
+  compareDeadlineMs?: number
+  // Which channels the cost page runs. Absent → the production default below, which
+  // is currently kie ALONE (the DeepInfra account is at zero and its panel could
+  // only repeat the same 402). Tests override it to pin the filtering.
+  compareChannels?: readonly CompareChannel[]
 }
 
 // Errors thrown by modules can carry an HTTP status + our stable ApiError code
@@ -236,6 +260,10 @@ export async function buildApp(deps: AppDeps) {
   // whole condition.
   if (deps.config.dashscopeApiKey !== null) configuredProviders.add('alibaba')
   if (deps.config.deepinfraToken !== null) configuredProviders.add('deepinfra')
+  // Segmind gates seedance-2-0 now that the catalog routes it there. Without the key
+  // the model must vanish from /api/catalog rather than sit there as a broken option:
+  // a listed model whose backend cannot run is worse than an absent one.
+  if (deps.config.segmindApiKey !== null) configuredProviders.add('segmind')
   // Catalog is public (no requireUser): pricing must render before sign-in.
   registerCatalogRoutes(app, configuredProviders)
   // The core (Task 10): generation lifecycle service gets the db + provider +
@@ -284,6 +312,29 @@ export async function buildApp(deps: AppDeps) {
     // Failover happens at SUBMIT ONLY, and never on a content refusal. Both rules
     // are money rules; failover-provider.ts explains what each one costs to get
     // wrong.
+    // seedance-2-0 routes HERE as of 2026-08-02. Segmind leads the chain because it
+    // is the only channel whose published rate survived a real invoice: a 15s/1080p
+    // render billed $5.12 against a $5.10 prediction, i.e. $7.02/M versus the $7.00
+    // they advertise. DeepInfra advertises the same $7.00 and bills a measured $7.70.
+    //
+    // DeepInfra stays SECOND rather than being deleted: it is 9% dearer but proven,
+    // and a chain that drops to it costs pennies more than one that fails outright.
+    // ByteDance stays third — it can only answer once a $30.10 pack is bought, so
+    // until then it fails fast and costs nothing to keep.
+    segmind: createFailoverProvider(
+      [
+        {
+          id: 'segmind',
+          provider: createSegmindClient({ apiKey: deps.config.segmindApiKey, log: app.log }),
+        },
+        { id: 'deepinfra', provider: createDeepinfraClient({ apiKey: deps.config.deepinfraToken }) },
+        { id: 'bytedance', provider: arkClient },
+      ],
+      {
+        onFailover: ({ from, to, reason }) =>
+          app.log.warn({ event: 'provider.failover', from, to, reason }, 'video provider failed over'),
+      },
+    ),
     deepinfra: createFailoverProvider(
       [
         { id: 'deepinfra', provider: createDeepinfraClient({ apiKey: deps.config.deepinfraToken }) },
@@ -430,7 +481,41 @@ export async function buildApp(deps: AppDeps) {
   // Qwen-Image-Max channel that bypasses the credit ledger — see the module's
   // header for why it is not a generation. Same optional-secret discipline as
   // the enhancer: with no token the route answers 502 provider_error.
-  registerCompareRoutes(app, { deepinfraToken: deps.config.deepinfraToken })
+  //
+  // The same module also serves /api/compare/video: ONE prompt, Seedance 2.0, raced
+  // through DeepInfra and kie.ai at byte-identical settings, reporting each side's
+  // own billed figure. Both channels are constructed RAW here (no failover wrapper —
+  // see AppDeps.compareVideoChannels), and a channel whose key is unset degrades to
+  // an error panel so the operator can still measure the half they have.
+  registerCompareRoutes(app, {
+    deepinfraToken: deps.config.deepinfraToken,
+    deepinfraProvider:
+      deps.compareVideoChannels?.deepinfra ??
+      createDeepinfraClient({ apiKey: deps.config.deepinfraToken }),
+    kieProvider:
+      deps.compareVideoChannels?.kie ?? createKieClient({ apiKey: deps.config.kieApiKey }),
+    // `log` is passed ONLY here, and only for Segmind: its success envelope has never
+    // been observed (the owner asked that no credits be spent proving it), so the
+    // adapter logs the raw body the first time its tolerant readers miss. Without
+    // that, the first paid run would teach us nothing and would have to be repeated.
+    segmindProvider:
+      deps.compareVideoChannels?.segmind ??
+      createSegmindClient({ apiKey: deps.config.segmindApiKey, log: app.log }),
+    ...(deps.comparePollIntervalMs !== undefined
+      ? { videoPollIntervalMs: deps.comparePollIntervalMs }
+      : {}),
+    ...(deps.compareDeadlineMs !== undefined ? { videoDeadlineMs: deps.compareDeadlineMs } : {}),
+    // segmind + kie (owner decision 2026-08-02). Both accounts are funded; DeepInfra
+    // sits at zero, and a panel that can only ever render the same "balance is empty"
+    // error is noise on a page whose whole job is to report measurements. Put
+    // `'deepinfra'` back in this array once it is topped up — nothing else changes.
+    // ALL THREE enabled server-side; the REQUEST narrows from here. /compare-video
+    // races whichever are listed, /verify sends exactly one. DeepInfra stays in the
+    // list despite its empty balance: on the verify page an operator may legitimately
+    // want to see its 402 — and the intersection rule means nothing can widen past
+    // this array, so listing a channel is what makes it selectable, not automatic.
+    channels: deps.compareChannels ?? ['segmind', 'deepinfra', 'kie'],
+  })
   // Canvas Mode (ADR canvas-mode): the node-graph aggregate that CITES
   // generations — CRUD only, zero money code; node runs arrive as ordinary
   // POST /api/generations from the SPA. `storage` is wired for the ONE thing

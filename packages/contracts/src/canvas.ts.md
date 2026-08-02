@@ -87,3 +87,13 @@ flowchart LR
 
 - 11a0e97 feat(canvas): wire contracts for the node-graph aggregate
 - (fix-wave) fix(canvas): I1 — correct the id-uniqueness comment (ids are global PKs, not canvas-scoped)
+
+## Update 2026-08-02 — `prompt` joins the node-kind union
+
+- `canvasNodeKindSchema` gains `'prompt'` (ADR `canvas-prompt-node` D1): a card holding
+  shared prompt text that several image/video nodes read through a wire.
+- **This enum value is the ENTIRE server change** the feature needs. The text lives in the
+  existing `config.prompt` (already capped at 2000), and `canvas/service.ts` stores `kind`
+  as opaque text it never interprets — no table, no endpoint, no migration.
+- Reusing `config.prompt` instead of a second field is deliberate: one bound, and a
+  template can be swapped for an image node's prompt without a shape change.

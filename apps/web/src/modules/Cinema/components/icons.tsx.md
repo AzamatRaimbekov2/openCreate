@@ -13,9 +13,10 @@ look ragged. Never OS emoji (they paint their own palette and break the triad).
 - Responsibilities: presentational icons only, no logic.
 - Public API / exports: `PlayIcon`, `PauseIcon`, `PlusIcon`, `TrashIcon`,
   `DownloadIcon`, `ChevronLeftIcon`, `ChevronRightIcon`, `SparkIcon`,
-  `TextCardIcon`, `MusicIcon`, `MicIcon`, `SpeakerIcon`, `PaperclipIcon`,
-  `ExpandIcon`, `ZoomInIcon`, `ZoomOutIcon`, `ScissorsIcon`, `StoryboardIcon` —
-  each `{ className?: string }`.
+  `TextCardIcon`, `MusicIcon`, `MicIcon`, `SpeakerIcon`, `PersonIcon`,
+  `PaperclipIcon`, `ExpandIcon`, `ZoomInIcon`, `ZoomOutIcon`, `ScissorsIcon`,
+  `PaletteIcon`, `FrameIcon`, `StoryboardIcon` — each `{ className?: string }`,
+  except `FrameIcon`, which also takes the `ratio` it must draw.
 - Inputs → Outputs: className → an `aria-hidden` SVG.
 - Side effects: none.
 
@@ -51,6 +52,22 @@ flowchart LR
 - Added `ScissorsIcon` (two blades + a cut line) for the timeline's split-at-
   playhead control. Same 24-grid / 1.5 stroke.
 
+## Update 2026-07-24 — make-character icon
+- Added `PersonIcon` (a head + shoulders bust) for the "make a character from this
+  reference" affordance on an attached shot-reference thumbnail. Same 24-grid /
+  1.5 stroke as the set.
+
+## Update 2026-08-02 — composer look chips (palette + frame)
+- Added `PaletteIcon` (the shot's STYLE — a painter's palette, deliberately not a
+  wand: `SparkIcon` already means "generate") and `FrameIcon` for the new
+  icon-only look controls in the composer's drawer (`PresetPickers`).
+- `FrameIcon` is the one icon in this file that is NOT purely decorative in the
+  usual sense: it takes `ratio: '16:9' | '1:1' | '9:16' | null` and DRAWS that
+  rectangle, so an icon-only trigger still shows its own value with no text
+  label. `null` (inherit the film canvas) draws the frame DASHED — a shape that
+  is not this shot's own decision. Rect geometry is hand-tuned per ratio rather
+  than computed, because a computed 9:16 box is an illegible sliver at 16px.
+
 ## Commits
 
-- _no commit yet_
+- 373b51f 2026-07-23 feat(cinema,assets3d,prompt): NLE editor + client export, 3D assets wizard, prompt enhancer, session fixes

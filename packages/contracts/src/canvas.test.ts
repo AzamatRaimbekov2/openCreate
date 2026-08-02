@@ -22,7 +22,19 @@ describe('canvasNodeSchema', () => {
     expect(canvasNodeSchema.safeParse(NODE).success).toBe(true)
   })
   it('accepts every MVP kind', () => {
-    for (const kind of ['image', 'video', 'upload', 'character', 'upscale', 'remove-bg', 'note']) {
+    for (const kind of [
+      'image',
+      'video',
+      'upload',
+      'character',
+      'upscale',
+      'remove-bg',
+      'note',
+      // The shared-prompt card (ADR canvas-prompt-node D1). It reuses
+      // config.prompt rather than adding a field: the server stores `kind` as
+      // opaque text, so this enum value is the entire wire change.
+      'prompt',
+    ]) {
       expect(canvasNodeSchema.safeParse({ ...NODE, kind, config: {} }).success).toBe(true)
     }
   })

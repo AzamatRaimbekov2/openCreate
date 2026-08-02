@@ -31,13 +31,16 @@ import { useCanvasStore } from './canvasStore'
 import {
   absorbGeneration,
   buildRunInput,
+  composeNodePrompt,
   findCharacterParent,
   findMediaParent,
   shouldRetrySubmit,
 } from './useNodeGeneration'
 
-// Kinds that a branch can actually execute. `character`, `upload` and `note`
-// never run — they are graph furniture, not jobs (spec §4 node table).
+// Kinds that a branch can actually execute. `character`, `upload`, `prompt` and
+// `note` never run — they are graph furniture, not jobs (spec §4 node table;
+// the prompt card joins that list by ADR canvas-prompt-node D5, which is why it
+// can never appear as a priced row in the plan).
 const RUNNABLE_KINDS: readonly CanvasNodeKind[] = ['image', 'video']
 
 // Poll cadence and ceiling, matching the per-node poller (Generator rules): a
@@ -135,8 +138,11 @@ function blockerFor(
   generationStatus: Readonly<Record<string, Generation['status'] | undefined>>,
   planned: ReadonlySet<string>,
 ): BranchBlockReason | null {
-  const prompt = node.config.prompt?.trim()
-  if (!prompt || prompt.length < 2 || !node.config.modelId) return 'config'
+  // The COMPOSED prompt (ADR canvas-prompt-node D3) — the plan must ask exactly
+  // the question buildRunInput asks, or a node fed by a wired template blocks
+  // the whole branch while its own Generate button runs it fine.
+  const prompt = composeNodePrompt(node, nodes, edges)
+  if (prompt.length < 2 || !node.config.modelId) return 'config'
 
   const characterParent = findCharacterParent(node.id, nodes, edges)
   if (characterParent && !characterParent.config.entityId) return 'character'

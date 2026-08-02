@@ -15,6 +15,7 @@ import type { Generation } from '@opencreate/contracts'
 import { Badge, Menu } from 'shared/ui'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { useLiveGeneration } from '../model/generationsApi'
+import type { GalleryModelOption } from './GalleryFilterBar'
 import { GenerationDetail } from './GenerationDetail'
 import { DotsIcon } from './icons'
 import { useGenerationActions } from './useGenerationActions'
@@ -24,11 +25,16 @@ export type GenerationRowProps = {
   generation: Generation
   // Refill the composer from this generation (injected by the route)
   onRegenerate?: (generation: Generation) => void
+  // Catalog id→name pairs, injected by the route. The row's own model CELL
+  // keeps the id (it is what the filter matches on, and a table is for
+  // comparing exact settings); the names go to the detail viewer this row
+  // opens, which is prose rather than a data grid.
+  models?: GalleryModelOption[]
 }
 
 const CELL = 'px-3 py-2 align-middle text-sm text-mist'
 
-export function GenerationRow({ generation: seed, onRegenerate }: GenerationRowProps) {
+export function GenerationRow({ generation: seed, onRegenerate, models }: GenerationRowProps) {
   const { t, i18n } = useTranslation()
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const { generation } = useLiveGeneration(seed)
@@ -131,6 +137,7 @@ export function GenerationRow({ generation: seed, onRegenerate }: GenerationRowP
           <GenerationDetail
             generation={generation}
             {...(onRegenerate ? { onRegenerate } : {})}
+            {...(models ? { models } : {})}
             isOpen={isDetailOpen}
             onClose={() => setIsDetailOpen(false)}
           />

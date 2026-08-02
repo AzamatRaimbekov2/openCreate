@@ -6,12 +6,17 @@
 // PATCH from persisting megabytes.
 import { z } from 'zod'
 
-// The 7 MVP node kinds (owner-locked in the 2026-07-29 brainstorm).
+// The 7 MVP node kinds (owner-locked in the 2026-07-29 brainstorm), plus
+// 'prompt' (ADR canvas-prompt-node, 2026-08-02): a card holding prompt text
+// that several image/video nodes share through a wire. It is the ENTIRE server
+// change that feature needs — `config.prompt` already exists and the canvas
+// service stores `kind` as opaque text it never interprets.
 export const canvasNodeKindSchema = z.enum([
   'image',
   'video',
   'upload',
   'character',
+  'prompt',
   'upscale',
   'remove-bg',
   'note',
@@ -33,6 +38,10 @@ export type CanvasViewport = z.infer<typeof canvasViewportSchema>
 // the contract: strings capped, unknown keys dropped by the shape below
 // (z.object strips unknown keys by default in zod 4).
 export const canvasNodeConfigSchema = z.object({
+  // image/video: the node's own prompt. PROMPT node: the shared template text
+  // its wired children prepend (ADR canvas-prompt-node D1 — one field, not two,
+  // so a template can be dragged into an image node's shoes and back without a
+  // migration, and every prompt-shaped bound stays one number).
   prompt: z.string().max(2000).optional(),
   modelId: z.string().max(80).optional(),
   aspectRatio: z.enum(['16:9', '1:1', '9:16']).optional(),

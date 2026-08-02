@@ -5,25 +5,20 @@
 // arrive from the route (the cross-module seam), split here into the video/audio
 // lists the child surfaces need.
 //
-// v7 LAYOUT — a real NLE workbench (owner request 2026-07-16):
-//   * The editor is ONE viewport-height column with NO page scroll: a STAGE on
-//     top (title row · export status strip · preview) that scrolls internally,
-//     and the TRACKS panel (video lane + audio lane) pinned at the bottom.
-//     The COMPOSER is not in the column at all — it is a position:fixed DOCK
-//     on the viewport's bottom edge (owner directive 2026-07-17: the chat must
-//     not consume screen height; its growth overlays instead of squeezing).
-//   * The timeline moved back DOWN, but as tracks, not a strip: shot tiles are
-//     laid out proportionally to their duration and the film's audio (music
-//     beds, voiceovers) renders as a lane directly beneath the footage — see
-//     Timeline.tsx. The standalone «Звук» card is gone; adding music/voice
-//     lives in the timeline's «+» dialog.
-//   * Export lives in the header's ⋯ menu; RenderBar is a transient status
-//     strip on the stage that exists only while a render is starting/running/
-//     finished. FilmEditor owns the kick-off + poll because the menu (hide
-//     while in flight) and the strip must read ONE state.
-// Panels are `Card` (design.md v4); the module no longer hand-rolls a PANEL
-// class string, which is what made the player, the export button and the track
-// list read with identical weight.
+// v8 LAYOUT — 70/30 two-column workbench (owner request 2026-07-24, "2 блока в
+// ряд"). The v7 fixed bottom-dock composer is RETIRED. Under the 44px top bar,
+// `<main>` holds a two-column grid:
+//   * LEFT 70% (the MONTAGE): the PreviewPlayer grows to fill the height (with
+//     the transient export strip above it, scrolling inside) over the TRACKS
+//     panel (video + audio lanes — see Timeline.tsx). This is the "кадры,
+//     монтажный блок".
+//   * RIGHT 30% (the COMPOSER INPUT): the selected shot's editor (ShotInspector)
+//     — the prompt field + model/duration/cast/generate. This is the "инпут где
+//     промтом создаём фильмы". It scrolls vertically if the form is tall.
+// No page scroll: `main` is `overflow-hidden` and each column owns its overflow;
+// the grid fills the height via a flex chain (a % `h-full` would not resolve
+// against a flex-grown parent). Export state stays owned here (the header CTA and
+// the RenderBar strip read one truth). Panels are `Card` (design.md v4).
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -100,12 +95,27 @@ export type FilmEditorProps = {
 // Tightened 28→24 (owner 2026-07-22): the old clearance left a visible empty
 // band between the tracks and the composer. If the tracks ever tuck UNDER the
 // collapsed dock, nudge this back up a step.
-const EDITOR_COLUMN = 'flex h-[calc(100svh-76px)] min-h-0 flex-col gap-3 pb-24'
-// The padded workbench canvas UNDER the full-bleed top bar. The route now hands
-// FilmEditor the whole width (no <main> of its own), so the horizontal gutter
-// lives here — matching the fixed dock's px-4 xl:px-6 so the composer stays
-// aligned with the column edges.
-const EDITOR_MAIN = 'w-full px-4 py-4 xl:px-6'
+// v8 LAYOUT — 70/30 two-column workbench (owner request 2026-07-24, "2 блока в
+// ряд"): the floating bottom dock is RETIRED. `<main>` fills the height under the
+// 44px top bar and holds a two-column grid — LEFT 70% is the MONTAGE (preview
+// over the timeline), RIGHT 30% is the composer INPUT where you write the shot's
+// prompt. No page scroll: each column owns its own overflow.
+// `flex flex-col` + `flex-1` so the grid below fills the height via flex-grow —
+// a percentage `h-full` would NOT resolve here (main's own height comes from
+// flex-grow, and % heights need an explicit parent height). `overflow-hidden`
+// contains any child overflow so the PAGE never scrolls horizontally.
+const EDITOR_MAIN = 'flex min-h-0 w-full flex-1 flex-col overflow-hidden px-4 py-4 xl:px-6'
+// The two-column grid: single column below `lg`, 70/30 at `lg`+. `flex-1` (not
+// `h-full`) makes it fill main's height reliably; `min-h-0`/`min-w-0` let the
+// columns shrink so their content scrolls internally instead of the page.
+const EDITOR_GRID = 'grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[7fr_3fr]'
+// LEFT 70% — the montage: a preview that grows (scrolls inside) over the timeline.
+const MONTAGE_COL = 'flex min-h-0 min-w-0 flex-col gap-3'
+// RIGHT 30% — the composer input column. `flex flex-col` so the ShotInspector
+// inside fills the FULL height (owner request 2026-07-24 "чат на всю высоту"):
+// it stretches to the column and manages its own internal scroll (the drawer
+// caps at 40svh, the prompt grows, the controls stay pinned at the bottom).
+const COMPOSER_COL = 'flex min-h-0 min-w-0 flex-col'
 
 export function FilmEditor({
   filmId,
@@ -177,13 +187,14 @@ export function FilmEditor({
       <>
         {header}
         <main className={EDITOR_MAIN}>
-          <div className={EDITOR_COLUMN}>
-            <div className="flex min-h-0 flex-1 flex-col gap-3">
-              <Skeleton className="aspect-video max-h-[42svh] w-full" />
+          <div className={EDITOR_GRID}>
+            {/* LEFT 70% silhouette: preview over tracks */}
+            <div className={MONTAGE_COL}>
+              <Skeleton className="min-h-0 w-full flex-1" />
+              <Skeleton className="h-32 w-full shrink-0" />
             </div>
-            {/* Tracks silhouette only — the composer is a fixed dock outside the
-                column flow, so the skeleton reserves nothing for it */}
-            <Skeleton className="h-32 w-full shrink-0" />
+            {/* RIGHT 30% silhouette: the composer column */}
+            <Skeleton className="hidden h-full w-full lg:block" />
           </div>
         </main>
       </>
@@ -226,81 +237,78 @@ export function FilmEditor({
     <>
       {header}
       <main className={EDITOR_MAIN}>
-        <div className={EDITOR_COLUMN}>
-          {/* STAGE — scrolls inside itself: the transient export status strip,
-              then the preview. The title/export controls moved UP to the top bar
-              (CinemaEditorHeader); the workbench below never moves. */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
-            <RenderBar
-              state={exp.state}
-              progress={exp.progress}
-              blockedMessage={exp.blockedMessage}
-              // Naming the shot is most of the fix; letting the user GO there is the
-              // rest. Selection already lives in this component and drives both the
-              // composer and the tile highlight, so this is a one-line affordance.
-              onShowSubject={jumpToBlockedShot ? () => setSelectedShotId(jumpToBlockedShot) : null}
-              unsupportedMessage={exp.unsupportedMessage}
-              onCancel={exp.onCancel}
-              onRetry={exp.onRetry}
+        <div className={EDITOR_GRID}>
+          {/* LEFT 70% — THE MONTAGE: the preview (SHRINKS to fit — object-contain
+              letterboxes) over the timeline, both inside 100svh with NO scroll
+              (owner request 2026-07-24). No overflow-y-auto: the preview gives up
+              height to the tracks instead of scrolling. */}
+          <div className={MONTAGE_COL}>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+              <RenderBar
+                state={exp.state}
+                progress={exp.progress}
+                blockedMessage={exp.blockedMessage}
+                // Naming the shot is most of the fix; letting the user GO there is the
+                // rest. Selection already lives in this component and drives both the
+                // composer and the tile highlight, so this is a one-line affordance.
+                onShowSubject={
+                  jumpToBlockedShot ? () => setSelectedShotId(jumpToBlockedShot) : null
+                }
+                unsupportedMessage={exp.unsupportedMessage}
+                onCancel={exp.onCancel}
+                onRetry={exp.onRetry}
+              />
+              <PreviewPlayer shots={data.shots} />
+            </div>
+
+            {/* The tracks: video lane (duration-proportional tiles) with the film's
+              audio lane directly beneath — see Timeline.tsx (v7). Receives the
+              EFFECTIVE selection (default-first included), so the highlighted
+              tile always matches the shot the composer is editing. */}
+            <Timeline
+              film={data}
+              audioModels={audioModels}
+              musicPrompt={musicPrompt}
+              selectedShotId={selectedShot?.id ?? null}
+              onSelectShot={setSelectedShotId}
+              onOpenStoryboard={() => setIsStoryboardOpen(true)}
             />
-            <PreviewPlayer shots={data.shots} />
           </div>
 
-          {/* The tracks: video lane (duration-proportional tiles) with the film's
-            audio lane directly beneath — see Timeline.tsx (v7). Receives the
-            EFFECTIVE selection (default-first included), so the highlighted
-            tile always matches the shot the composer is editing. */}
-          <Timeline
-            film={data}
-            audioModels={audioModels}
-            musicPrompt={musicPrompt}
-            selectedShotId={selectedShot?.id ?? null}
-            onSelectShot={setSelectedShotId}
-            onOpenStoryboard={() => setIsStoryboardOpen(true)}
-          />
-
-          <StoryboardModal
-            filmId={filmId}
-            defaultStyleId={data.film.defaultStyleId}
-            styles={styles}
-            isOpen={isStoryboardOpen}
-            onClose={() => setIsStoryboardOpen(false)}
-          />
+          {/* RIGHT 30% — THE COMPOSER INPUT: write the selected shot's prompt +
+              its model/duration/cast/generate. Moved out of the retired fixed
+              bottom dock into a real column (owner request 2026-07-24). */}
+          <aside className={COMPOSER_COL}>
+            {selectedShot ? (
+              // Keyed by shot.id so a new selection re-inits the draft
+              <ShotInspector
+                key={selectedShot.id}
+                filmId={filmId}
+                shot={selectedShot}
+                filmAspect={filmAspect}
+                videoModels={videoModels}
+                ttsModel={ttsModel}
+                entities={entities}
+                styles={styles}
+                startMs={selectedStartMs}
+                isVoiced={isSelectedVoiced}
+              />
+            ) : (
+              <p className="rounded-2xl border border-white/10 bg-steel px-4 py-2.5 text-xs text-mist-dim">
+                {t('cinema.inspector.selectHint')}
+              </p>
+            )}
+          </aside>
         </div>
       </main>
 
-      {/* THE DOCK — position:fixed to the viewport bottom (owner directive
-          2026-07-17: the chat must not CONSUME screen height). Out of flow,
-          its growth (drawers, prompt resize — both extend UPWARD) overlays the
-          tracks/stage instead of squeezing them; the column above reserves only
-          the collapsed height (pb-28). z-40 floats over the workbench but under
-          Modal's z-50 sheets. The wrapper is click-through (pointer-events-none)
-          with the same horizontal padding as the route canvas (px-4 xl:px-6),
-          so the dock stays aligned with the column edges; the dock itself
-          re-enables pointer events. */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4 xl:px-6">
-        <div className="pointer-events-auto">
-          {selectedShot ? (
-            // Keyed by shot.id so a new selection re-inits the draft
-            <ShotInspector
-              key={selectedShot.id}
-              filmId={filmId}
-              shot={selectedShot}
-              filmAspect={filmAspect}
-              videoModels={videoModels}
-              ttsModel={ttsModel}
-              entities={entities}
-              styles={styles}
-              startMs={selectedStartMs}
-              isVoiced={isSelectedVoiced}
-            />
-          ) : (
-            <p className="rounded-2xl border border-white/10 bg-steel px-4 py-2.5 text-xs text-mist-dim">
-              {t('cinema.inspector.selectHint')}
-            </p>
-          )}
-        </div>
-      </div>
+      <StoryboardModal
+        filmId={filmId}
+        defaultStyleId={data.film.defaultStyleId}
+        styles={styles}
+        isOpen={isStoryboardOpen}
+        onClose={() => setIsStoryboardOpen(false)}
+      />
     </>
   )
 }

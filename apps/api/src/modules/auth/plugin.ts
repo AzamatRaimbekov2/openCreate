@@ -8,7 +8,7 @@
 // (and light-my-request's mocked sockets in tests make that worse). Rebuilding a
 // web Request from the parsed body is the approach better-auth documents for
 // Fastify. Behavior contract = test/auth.test.ts.
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { Auth } from './auth'
 
 export type SessionUser = { id: string; email: string; name: string | null }
@@ -39,31 +39,36 @@ function toWebRequest(req: FastifyRequest): Request {
 }
 
 export async function registerAuth(app: FastifyInstance, auth: Auth) {
+  const handler = async (req: FastifyRequest, reply: FastifyReply) => {
+    const response = await auth.handler(toWebRequest(req))
+    reply.status(response.status)
+    response.headers.forEach((value, key) => {
+      const k = key.toLowerCase()
+      // set-cookie must NOT go through forEach: undici folds multiple cookies
+      // into one comma-joined string, which browsers mis-parse. getSetCookie()
+      // below preserves them as separate headers. content-length is dropped so
+      // Fastify recomputes it for the re-read body.
+      if (k === 'set-cookie' || k === 'content-length') return
+      reply.header(key, value)
+    })
+    const cookies = response.headers.getSetCookie()
+    if (cookies.length > 0) reply.header('set-cookie', cookies)
+    reply.send(response.body ? await response.text() : null)
+  }
+
+  // Two routes, two buckets. POST is the credential stuffing / signup-spam
+  // surface — 10/min per IP is plenty for a human and a wall for scripts. GET
+  // must NOT share that bucket: the SPA reads get-session on every route
+  // change/focus and Google lands on GET /callback/google — one strict shared
+  // bucket let session polling starve sign-in (and the OAuth callback) with
+  // 429s. Reads carry no credentials, so the global 300/min is the right wall.
   app.route({
-    method: ['GET', 'POST'],
+    method: ['POST'],
     url: '/api/auth/*',
-    // Strict rate bucket (ops hardening): auth endpoints are the credential
-    // stuffing / signup-spam surface — 10/min per IP is plenty for a human
-    // (sign-in + session + a retry or two) and a wall for scripts. Read by the
-    // @fastify/rate-limit plugin registered in app.ts BEFORE this route.
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-    handler: async (req, reply) => {
-      const response = await auth.handler(toWebRequest(req))
-      reply.status(response.status)
-      response.headers.forEach((value, key) => {
-        const k = key.toLowerCase()
-        // set-cookie must NOT go through forEach: undici folds multiple cookies
-        // into one comma-joined string, which browsers mis-parse. getSetCookie()
-        // below preserves them as separate headers. content-length is dropped so
-        // Fastify recomputes it for the re-read body.
-        if (k === 'set-cookie' || k === 'content-length') return
-        reply.header(key, value)
-      })
-      const cookies = response.headers.getSetCookie()
-      if (cookies.length > 0) reply.header('set-cookie', cookies)
-      reply.send(response.body ? await response.text() : null)
-    },
+    handler,
   })
+  app.route({ method: ['GET'], url: '/api/auth/*', handler })
 
   app.decorate('requireUser', async (req: FastifyRequest): Promise<SessionUser> => {
     // Only the cookie matters for session lookup — forward it verbatim.

@@ -101,7 +101,8 @@ export function createShotSplitService({ db, films }: { db: Db; films: SplitFilm
 
       // B continues the SAME clip past the cut. It copies what describes the FOOTAGE:
       //  · generationId — the same source clip (a split cites, it does not generate),
-      //  · prompt / promptPreset / modelId — how that clip was (or would be) made,
+      //  · prompt / promptPreset / modelId / aspectRatio — how that clip was (or
+      //    would be) made,
       //  · audio — the clip's native-audio flag is a property of the CLIP, and B plays
       //    the same clip, so its window carries the same soundtrack behaviour.
       // It deliberately does NOT copy what belongs to A's MOMENT (owner-approved):
@@ -122,6 +123,7 @@ export function createShotSplitService({ db, films }: { db: Db; films: SplitFilm
           entityRefsJson: null,
           referenceImagesJson: null,
           modelId: a.modelId,
+          aspectRatio: a.aspectRatio,
           durationMs: a.durationMs - atMs,
           trimStartMs: a.trimStartMs + atMs,
           transition: 'none',

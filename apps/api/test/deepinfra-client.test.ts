@@ -29,10 +29,25 @@ import {
 
 const KEY = 'di-test'
 
-const fetchMock = vi.fn()
+// The adapter calls undici's OWN fetch, not the global one — it is the only fetch
+// that accepts the npm Agent carrying our disabled headersTimeout (Node's built-in
+// fetch is a separate undici instance and rejects that Agent outright). So the stub
+// has to live on the MODULE, not on globalThis: `vi.stubGlobal('fetch', …)` would
+// now intercept nothing and every test here would fire real network calls.
+//
+// `vi.hoisted` because vi.mock is lifted above the imports, so the mock function has
+// to exist before them.
+const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }))
+vi.mock('undici', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('undici')>()
+  // Agent stays REAL: the adapter constructs one at module load, and a fake would
+  // hide a constructor-argument mistake (the exact class of bug that made the first
+  // version of this fix break every call).
+  return { ...actual, fetch: fetchMock }
+})
+
 beforeEach(() => {
   fetchMock.mockReset()
-  vi.stubGlobal('fetch', fetchMock)
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -164,6 +179,45 @@ describe('deepinfra — submit', () => {
     const r = await client.poll(providerJobId)
     expect(r.status).toBe('error')
   })
+
+  it('KEEPS the cause code of a fetch failure — the name alone is not diagnosable', async () => {
+    // The bug this pins, measured on a real paid render (2026-07-31): a 15s clip
+    // died at 305.1s and reported only `TypeError`. undici names EVERY network-layer
+    // failure `TypeError: fetch failed` and hides the reason on `cause.code`, so a
+    // plain timeout was indistinguishable from a DNS failure or a reset connection —
+    // three problems with three different fixes. It took a second paid run to learn
+    // which one it was.
+    const failure = new TypeError('fetch failed') as TypeError & { cause: { code: string } }
+    failure.cause = { code: 'UND_ERR_HEADERS_TIMEOUT' }
+    fetchMock.mockRejectedValue(failure)
+
+    const client = createDeepinfraClient({ apiKey: KEY })
+    const { providerJobId } = await client.submit(t2v)
+    await settle()
+
+    const r = await client.poll(providerJobId)
+    expect(r.status).toBe('error')
+    expect(r.status === 'error' && r.message).toContain('UND_ERR_HEADERS_TIMEOUT')
+  })
+
+  it('carries only the cause CODE, never its message (which can quote a URL)', async () => {
+    const failure = new TypeError('fetch failed') as TypeError & {
+      cause: { code: string; message: string }
+    }
+    failure.cause = {
+      code: 'ECONNRESET',
+      message: 'socket hang up while POSTing https://api.deepinfra.com/v1/inference/x?token=secret',
+    }
+    fetchMock.mockRejectedValue(failure)
+
+    const client = createDeepinfraClient({ apiKey: KEY })
+    const { providerJobId } = await client.submit(t2v)
+    await settle()
+
+    const r = await client.poll(providerJobId)
+    expect(r.status === 'error' && r.message).toContain('ECONNRESET')
+    expect(r.status === 'error' && r.message).not.toContain('token=secret')
+  })
 })
 
 describe('deepinfra — poll (the in-process job map)', () => {
@@ -204,7 +258,23 @@ describe('deepinfra — poll (the in-process job map)', () => {
     await settle()
     const r = await client.poll(providerJobId)
     expect(r.status).toBe('error')
-    if (r.status === 'error') expect(r.message).not.toContain('12345')
+    if (r.status === 'error') {
+      expect(r.message).not.toContain('12345')
+      // 402 is the one upstream status an operator meets routinely and can fix in
+      // half a minute, so it must SAY so. A bare "DeepInfra HTTP 402" is accurate
+      // and useless — it reads as a provider outage rather than an empty wallet,
+      // which is a wrong diagnosis that costs an afternoon.
+      expect(r.message).toMatch(/balance/i)
+    }
+  })
+
+  it('does NOT invent a balance story for other HTTP failures', async () => {
+    stubFetch(500, { detail: 'internal' })
+    const client = createDeepinfraClient({ apiKey: KEY })
+    const { providerJobId } = await client.submit(t2v)
+    await settle()
+    const r = await client.poll(providerJobId)
+    expect(r.status === 'error' && r.message).toBe('DeepInfra HTTP 500')
   })
 
   // A jobId nobody submitted (or one lost to a restart) must SETTLE, not spin: a

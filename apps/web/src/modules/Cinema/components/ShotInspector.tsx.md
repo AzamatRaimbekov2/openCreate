@@ -207,6 +207,57 @@ error surfacing, money-path guards) unchanged.
   NOT block attaching, just notes the model won't use them until you switch to
   Wan 2.7). Generation is untouched — the server re-sends stored references.
 
+## Update 2026-07-24 — stripped captions + gating from the cast drawer
+- The cast drawer no longer passes `modelSupportsReferences` to `ShotCastField` /
+  `ShotReferenceImages` — both stopped rendering model-gating copy (owner request).
+- Second pass (owner request): the cast drawer also DROPPED its two
+  `InspectorSection` legends — the visible "Персонажи" and "Референс-картинки"
+  captions are gone; the two controls now render bare inside a plain
+  `flex-col gap-4` div. Accessible names survive: `ShotReferenceImages` has its own
+  `role=group` aria-label, and the toolbar paperclip toggle still names the drawer
+  via `cinema.cast.title`. `InspectorSection` is still imported (the "more" panel
+  uses it). `model` remains used (generate, model chip, nativeAudio) — nothing
+  orphaned. The provider-capability gate stays in `composeShotClipInput` (money
+  path), untouched.
+
+## Update 2026-07-24 — make a character from an attached reference
+- `ShotReferenceImages` now takes a required `onCharacterCreated` prop, wired here
+  to the existing `addCharacter` — so when the user turns an attached reference
+  into a character, the fresh entity is auto-@mentioned in the prompt (the same
+  append-a-`[[eN]]`-token path the cast field uses). No other change to the shot
+  draft or money path.
+
+## Update 2026-07-24 — inline "@" mention picker in the prompt
+- Owner report: "@" in the cinema chat did nothing — the machinery lived only in
+  ChatComposer. The prompt textarea now speaks the SAME protocol via the shared
+  halves: caret math from `shared/libs/mentionQuery` (moved out of Generator),
+  popup from `shared/ui` `MentionAutocomplete` (also moved; strings + anchor are
+  props now). State: `mention` (active "@query"), `mentionIndex`, `caretTargetRef`
+  (+ a caret-restore effect keyed on `prompt`), `photoPick`.
+- The picker offers TWO row kinds (`MentionRow`): characters not yet in the live
+  cast (thumbnails come from the new optional `CastableEntity.imageUrl`, derived
+  by the route) and the shot's ATTACHED photos, labeled `cinema.mention.photo`
+  ("Фото N", thumbnail = the ref's /media path).
+- Selecting a CHARACTER registers a placeholder (same as `addCharacter`) but
+  splices `[[eN]]` AT THE CARET via `applyMention`. Selecting a PHOTO captures the
+  "@query" span + caret into `photoPick` and opens `MakeCharacterModal` (a raw
+  picture has no NAME for the server to compose); on create it tags the fresh
+  entity at the recorded span, DELETEs the raw ref (`useDeleteShotReference` — the
+  image must not be sent twice) and toasts `makeCharacterDone` — the same
+  shot-level effects as ShotReferenceImages' PersonIcon bridge. Closing the modal
+  without a name leaves the typed "@query" untouched.
+- Keyboard contract while open: arrows cycle, Enter/Tab pick, Escape closes; the
+  handler is inert when the picker is closed (the cinema prompt keeps its
+  plain-textarea Enter — no submit-on-Enter here). Blur closes the picker (row
+  clicks use onMouseDown+preventDefault so they land first). The picker is CLOSED
+  outright at the `MAX_CAST` (5) ceiling — a photo row converts INTO a tag, so
+  both kinds hit the same ceiling.
+- The popup anchors INSIDE the prompt plate's bottom-left (`absolute bottom-2
+  left-2`), not `bottom-full` like /create: this plate is tall, a fresh prompt
+  types at its TOP, so the popup overlays empty glass, never the line being
+  written. New i18n: `cinema.mention.{pickerLabel,noMatches,photo}` (en+ru).
+  Tested: tag-at-caret + PATCH body, photo→name→tag + ref DELETE, Escape.
+
 ## Commits
 - _no commit yet_
 
@@ -227,6 +278,53 @@ error surfacing, money-path guards) unchanged.
   bundled builtins. So the picker stays full, a builtin's fragment still resolves
   exactly, and only a user style's fragment is briefly missing from the hint —
   UNDER-reporting, never mis-reporting. The server composes it either way.
+
+## Update 2026-08-02 — per-shot aspect + the style's model lock
+
+**1. New draft state: `aspectRatio: AspectRatio | null`** (seeded from
+`shot.aspectRatio`, edited by the new aspect chip in `PresetPickers`).
+- It rides `buildPatch()` UNCONDITIONALLY. `null` is not an absence here, it is the
+  value "clear the override, inherit the film's canvas" — the same reasoning as
+  `modelId: … || null`, minus the `''` sentinel, since the state is already nullable.
+- It is also copied into `generateWithPrompt`'s `draftShot`, beside `durationMs` and
+  `audio`, because `composeShotClipInput` reads `shot.aspectRatio` to decide the
+  request shape. Without that copy a freshly-changed aspect would generate the clip
+  in the shape the user just moved away from — the same class of bug the `audio`
+  copy exists to prevent.
+- The render still scales/pads every shot to the film canvas, so this only decides
+  the shape of the RAW clip (e.g. a native 9:16 insert inside a 16:9 film).
+
+**2. The style's model LOCK** — three derived values, no `useEffect`:
+```
+activeStyle    = preset.styleId ? findStyle(styles, preset.styleId) : undefined
+lockedModelId  = activeStyle?.recommendedModelId, if the catalog offers it — else null
+activeModelId  = lockedModelId ?? modelId
+```
+- **Why derived and not synced.** `initialModelId()` runs once in `useState(() => …)`
+  and could never follow a style picked afterwards; the owner asked for the pairing
+  to hold LIVE. It is a pure function of `(styles, preset.styleId, videoModels)`, so
+  an effect writing into state would be the wrong tool — and would also destroy the
+  user's own pick (below).
+- **The lock SHADOWS, it does not overwrite.** `modelId`/`setModelId` remain the
+  user's free choice (still seeded by `initialModelId`, still what `ModelPickerModal`
+  writes). Clearing the style hands their pick straight back instead of leaving them
+  with the recommendation — pinned by a test that hand-picks a model, applies a
+  locking style, drops it, and expects the hand-pick.
+- Everything that DISPLAYS or SPENDS reads `activeModelId`: the `model` lookup (so
+  `canGenerate`, the audio toggle's capability check and the generate call all agree),
+  the trigger's `ProviderMark`, `buildPatch`'s `modelId`, and `ModelPickerModal`'s
+  `value`. The row remembers the model it will actually render with.
+- **A recommendation the catalog does not offer is NOT a lock** — pinning the picker
+  to an absent model would leave a dead control and no model at all.
+- The trigger gains `disabled={lockedModelId !== null}` + `disabled:opacity-40
+  disabled:cursor-not-allowed` (the audio toggle's disabled voice) and a `title` of
+  `cinema.inspector.modelLocked` naming the style. `ModelPickerModal` needed no
+  change: it simply never opens while the trigger is disabled.
+
+New i18n (en+ru): `cinema.inspector.{styleHint,aspect,aspectAuto,aspectHint,modelLocked}`.
+Tested in `ShotInspector.test.tsx`: override saved / cleared to null / reaches the
+POST body, lock disables + explains + follows the style live + restores the free pick
++ ignores an unusable recommendation.
 - `resolveBuiltinStyle` is no longer imported here; the one lookup rule lives in
   `../model/presetOptions` so the picker, the hint and the model recommendation
   cannot disagree about what a style id means at a given moment.

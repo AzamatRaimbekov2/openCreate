@@ -255,6 +255,14 @@ export const shotSchema = z.object({
   // AND is what lets a template pin a tier: "this eight-beat drama runs on
   // veo-3-1-fast" is a per-shot fact, and there was nowhere to write it down.
   modelId: z.string().nullable(),
+  // The frame shape THIS shot generates at — an override on the film's canvas
+  // aspect. null = "no opinion": the composer generates at the film's aspect
+  // (or the nearest the chosen model supports), exactly the behaviour before
+  // this field existed. The FINAL render still scales/pads every shot to the
+  // film canvas regardless of this value (composeShotClipInput's own comment) —
+  // this only changes the shape the raw clip is generated in, e.g. a native
+  // 9:16 clip inside a 16:9 film.
+  aspectRatio: aspectRatioSchema.nullable(),
   // How long this shot occupies the timeline, in ms. For a video source this is
   // the trimmed length; for image/title it is the display duration.
   durationMs: z.number().int().positive(),
@@ -288,6 +296,10 @@ export const createShotInputSchema = z.object({
   // Validated against the live catalog by the service (must be a video model),
   // not by an enum here — model ids are catalog data, not wire constants.
   modelId: z.string().max(80).nullable().optional(),
+  // See shotSchema.aspectRatio. Optional/nullable on the way in, same shape as
+  // modelId: absent on create (defaults null), and null is a legal PATCH value
+  // ("clear the override, go back to the film's aspect").
+  aspectRatio: aspectRatioSchema.nullable().optional(),
   durationMs: z.number().int().positive().max(60_000).optional(),
   trimStartMs: z.number().int().min(0).optional(),
   transition: transitionSchema.optional(),

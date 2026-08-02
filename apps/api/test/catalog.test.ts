@@ -112,7 +112,11 @@ describe('GET /api/catalog', () => {
   // 'bytedance' stays in the list even though NO catalog model uses it today: the
   // provider is still registered and still tested (ark-client.test.ts), and the
   // gate must keep working for the day the pack is bought and `provider` flips back.
-  const optionalProviders = ['wan-runpod', 'bytedance', 'alibaba', 'deepinfra']
+  // Every provider whose models must VANISH from the catalog when its key is unset.
+  // 'segmind' joined on 2026-08-02 when seedance-2-0 moved there: a listed model
+  // whose backend cannot run is worse than an absent one — the user picks it, pays,
+  // and gets a provider_error.
+  const optionalProviders = ['wan-runpod', 'bytedance', 'alibaba', 'deepinfra', 'segmind']
 
   it('is public and lists only Runware models when both optional backends are off', async () => {
     // buildTestApp defaults comfyBaseUrl AND arkApiKey to null.
@@ -140,19 +144,32 @@ describe('GET /api/catalog', () => {
     expect(body.models.some((m) => m.provider === 'alibaba')).toBe(false)
   })
 
-  it('lists Seedance 2.0 only when DEEPINFRA_TOKEN IS configured', async () => {
+  // Seedance 2.0 moved DeepInfra -> Segmind on 2026-08-02. The move was driven by
+  // one measurement: a 15s/1080p render billed $5.12 on Segmind against a $5.10
+  // prediction (0.4% off), pinning them at $7.02/M — while DeepInfra publishes the
+  // same $7.00/M and bills a MEASURED $7.70/M. Same weights, 9% cheaper, and the
+  // only channel whose price card matched its invoice.
+  it('lists Seedance 2.0 only when SEGMIND_API_KEY IS configured', async () => {
     const off = await buildTestApp()
     const offBody = (await off.inject({ method: 'GET', url: '/api/catalog' })).json() as {
       models: Array<{ id: string }>
     }
     expect(offBody.models.some((m) => m.id === 'seedance-2-0')).toBe(false)
 
-    const on = await buildTestApp({ deepinfraToken: 'di-key' })
+    // The OLD key must no longer be enough — otherwise the row would keep listing
+    // itself while pointing at a provider the catalog no longer routes to.
+    const oldKeyOnly = await buildTestApp({ deepinfraToken: 'di-key' })
+    const oldBody = (await oldKeyOnly.inject({ method: 'GET', url: '/api/catalog' })).json() as {
+      models: Array<{ id: string }>
+    }
+    expect(oldBody.models.some((m) => m.id === 'seedance-2-0')).toBe(false)
+
+    const on = await buildTestApp({ segmindApiKey: 'sg-key' })
     const onBody = (await on.inject({ method: 'GET', url: '/api/catalog' })).json() as {
       models: Array<{ id: string; provider?: string }>
     }
     const seedance = onBody.models.find((m) => m.id === 'seedance-2-0')
-    expect(seedance?.provider).toBe('deepinfra')
+    expect(seedance?.provider).toBe('segmind')
     expect(onBody.models.some((m) => m.provider === 'wan-runpod')).toBe(false)
   })
 
@@ -168,6 +185,8 @@ describe('GET /api/catalog', () => {
       models: Array<{ id: string; provider?: string }>
     }
     expect(body.models.some((m) => m.provider === 'bytedance')).toBe(false)
+    // Still true after the Segmind move: the row is gated by SEGMIND_API_KEY now,
+    // and ARK_API_KEY only puts ByteDance in the failover chain behind it.
     expect(body.models.some((m) => m.id === 'seedance-2-0')).toBe(false)
   })
 
@@ -178,6 +197,8 @@ describe('GET /api/catalog', () => {
       dashscopeApiKey: 'ds-key',
       dashscopeWorkspaceId: 'ws-1',
       deepinfraToken: 'di-key',
+      // seedance-2-0 is gated by THIS key since the Segmind move.
+      segmindApiKey: 'sg-key',
     })
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     const body = res.json() as { models: Array<{ provider?: string }> }
@@ -234,22 +255,25 @@ describe('face policy — Seedance 2.0 must never be reference-capable', () => {
   })
 })
 
-describe('seedance 2.0 — routed through DeepInfra, not the blocked direct channel', () => {
+describe('seedance 2.0 — routed through Segmind, the only channel whose price card held', () => {
   const m = getModel('seedance-2-0')
 
-  // The direct ByteDance channel answers `ModelNotOpen` and renders nothing until
-  // the account buys a resource pack — $30.10 minimum, 90-day expiry,
-  // non-refundable, and not purchasable in their console at all. This row was
-  // listed and dead. DeepInfra runs the SAME model at the SAME price with no pack.
-  it('routes to the deepinfra provider (the direct ByteDance channel needs a paid pack)', () => {
+  // History, because it explains the shape of the failover chain behind this row.
+  // The DIRECT ByteDance channel answers `ModelNotOpen` until the account buys a
+  // $30.10 resource pack, so the row was listed and dead; it moved to DeepInfra,
+  // which ran it — but a real invoice then showed DeepInfra billing $7.70/M while
+  // advertising $7.00/M. Segmind advertises $7.00/M and BILLED $7.02/M on a live
+  // 15s/1080p render ($5.12 against a $5.10 prediction). Same weights, 9% cheaper,
+  // and the only one of five surveyed channels that charged what it published.
+  it('routes to the segmind provider', () => {
     expect(m).toBeDefined()
-    expect(m!.type === 'video' && m!.provider).toBe('deepinfra')
+    expect(m!.type === 'video' && m!.provider).toBe('segmind')
   })
 
-  it("carries DeepInfra's PATH-shaped model id behind the synthetic AIR prefix", () => {
-    // Their ids are paths, not slugs — which is why the shared AIR regex now admits
-    // `/`. The `deepinfra:` half is ours and the adapter strips it.
-    expect(m!.air).toBe('deepinfra:ByteDance/Seedance-2.0')
+  it("carries Segmind's endpoint slug behind the synthetic AIR prefix", () => {
+    // The remainder after `segmind:` IS the last path segment of their endpoint
+    // (POST /v2/seedance-2.0), so a typo here 404s mid-render rather than at boot.
+    expect(m!.air).toBe('segmind:seedance-2.0')
   })
 
   // Same model, same manufacturer, same policy: the 2.0 series refuses any input

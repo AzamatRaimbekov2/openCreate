@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { requireSession } from 'modules/Auth'
 import { GalleryFilterChips, GalleryGrid } from 'modules/Gallery'
 import type { GalleryFilter } from 'modules/Gallery'
+import { useCatalog } from 'modules/Generator'
 
 export const Route = createFileRoute('/_shell/library')({
   beforeLoad: () => requireSession(),
@@ -21,6 +22,16 @@ function LibraryPage() {
   // Page-local UI state — deliberately NOT in a store: leaving and returning
   // to the library should always start from "All"
   const [filter, setFilter] = useState<GalleryFilter>('all')
+  // The SAME ['catalog'] cache entry the composer uses — one fetch per session,
+  // and this screen has no composer at all. It is read for ONE reason: the
+  // detail viewer names the model that made a result, and Gallery may not
+  // import the Generator's catalog query itself (cross-module law), so the
+  // route is the seam — exactly as /create does it for the filter bar.
+  const catalog = useCatalog()
+  const modelOptions = (catalog.data?.models ?? []).map((model) => ({
+    id: model.id,
+    name: model.name,
+  }))
 
   return (
     // Full-bleed like /create — both are gallery workbenches and share the
@@ -32,7 +43,9 @@ function LibraryPage() {
         {t('gallery.title')}
       </h1>
       <GalleryFilterChips value={filter} onChange={setFilter} />
-      <GalleryGrid filter={filter} />
+      {/* No onRegenerate: there is no composer on this screen, so the Edit
+          action correctly does not appear in the menus here */}
+      <GalleryGrid filter={filter} models={modelOptions} />
     </main>
   )
 }

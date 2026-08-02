@@ -250,6 +250,12 @@ export const shot = sqliteTable('shot', {
   // the model was transient inspector state — re-selecting a shot forgot which
   // model made its clip, and a template had nowhere to pin its tier.
   modelId: text('model_id'),
+  // The frame shape THIS shot generates at, overriding the film's own aspectRatio
+  // column above; NULL = no opinion (generate at the film's aspect, or the
+  // nearest the chosen model supports — unchanged from before this column
+  // existed). The render still scales/pads every shot to the film canvas
+  // regardless, so this only changes the shape the raw clip is generated in.
+  aspectRatio: text('aspect_ratio', { enum: ['16:9', '1:1', '9:16'] }),
   // Milliseconds — the timeline unit. Video shot plays [trimStart, trimStart+duration).
   durationMs: integer('duration_ms').notNull(),
   trimStartMs: integer('trim_start_ms').notNull().default(0),
@@ -419,8 +425,13 @@ export const canvasNode = sqliteTable('canvas_node', {
   canvasId: text('canvas_id')
     .notNull()
     .references(() => canvas.id, { onDelete: 'cascade' }),
+  // Mirrors canvasNodeKindSchema in contracts — 'prompt' (ADR canvas-prompt-node)
+  // landed there first, and this list is what makes the insert in canvas/service.ts
+  // type-check. The column itself is a bare TEXT with no CHECK (see CANVAS_DDL),
+  // so widening the kind set is a type change only: no migration, and old rows
+  // stay readable.
   kind: text('kind', {
-    enum: ['image', 'video', 'upload', 'character', 'upscale', 'remove-bg', 'note'],
+    enum: ['image', 'video', 'prompt', 'upload', 'character', 'upscale', 'remove-bg', 'note'],
   }).notNull(),
   positionJson: text('position_json').notNull(),
   // Saved editor state, opaque to the server (runs re-validate at /generations).

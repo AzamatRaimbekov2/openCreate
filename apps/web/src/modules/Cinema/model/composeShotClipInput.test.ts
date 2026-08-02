@@ -22,6 +22,7 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     // never null, exactly like entityRefs above.
     referenceImages: [],
     modelId: null,
+    aspectRatio: null,
     durationMs: 6000,
     trimStartMs: 0,
     transition: 'none',
@@ -110,6 +111,26 @@ describe('composeShotClipInput', () => {
     // The film is 1:1 but the video model only offers 16:9 / 9:16
     const input = composeShotClipInput(makeShot(), videoModel, '1:1')
     expect(input.aspectRatio).toBe('16:9')
+  })
+
+  // THE SHOT MAY OVERRIDE THE CANVAS. A vertical insert inside a 16:9 film is a
+  // real editorial choice; the render still scales/pads every clip to the film
+  // canvas, so the override only changes the shape the RAW clip is generated in.
+  it('lets the shot own aspect win over the film canvas', () => {
+    const input = composeShotClipInput(makeShot({ aspectRatio: '9:16' }), videoModel, '16:9')
+    expect(input.aspectRatio).toBe('9:16')
+  })
+
+  it('falls back to the model first ratio when the shot override is unsupported', () => {
+    // The shot asks for 1:1; this model only offers 16:9 / 9:16 — same rescue as
+    // an unsupported FILM aspect, never a request the model would reject.
+    const input = composeShotClipInput(makeShot({ aspectRatio: '1:1' }), videoModel, '9:16')
+    expect(input.aspectRatio).toBe('16:9')
+  })
+
+  it('inherits the film canvas when the shot has no override', () => {
+    const input = composeShotClipInput(makeShot({ aspectRatio: null }), videoModel, '9:16')
+    expect(input.aspectRatio).toBe('9:16')
   })
 
   // THE CAST IS THE FILM. Drop this on the floor and every shot invents a new

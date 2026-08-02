@@ -26,3 +26,12 @@ flowchart LR
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-08-02 — PencilIcon + PlayIcon in, RegenerateIcon out
+
+- `PencilIcon` (stroked, 24-grid, 1.5) leads the renamed **Edit** action; the old
+  `RegenerateIcon` refresh loop was DELETED, not parked — nothing referenced it after the
+  rename, and the design system does not keep glyphs "just in case" (design.md §10).
+- `PlayIcon` is the one FILLED glyph in the file: it is painted over a frame of real
+  footage on the video poster plate, where a 1.5px outline reads as noise rather than as
+  an affordance. It is decoration (`aria-hidden`) — the plate's button carries the name.

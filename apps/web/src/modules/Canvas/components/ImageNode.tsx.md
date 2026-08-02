@@ -54,3 +54,15 @@ flowchart TD
 - 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference
 - 40c54d1 2026-07-30 feat(canvas-web): enhance sparkle on every node prompt field
 - cfd1df7 2026-07-30 feat(canvas-web): run branch — toposorted queue behind one confirmed spend
+
+## Update 2026-08-02 — the card says the SHARED half out loud
+
+- With a prompt card wired in, the textarea holds only this node's own line while the run
+  submits template + own. So a `line-clamp-2` mist-dim line above the field restates the
+  shared half in the order it will be sent (`canvas.node.promptTemplateApplied`).
+  Without it the user reads "a fox" and pays for "cinematic 35mm, neon⏎a fox".
+- The hint reads `findPromptParent(...)?.config.prompt`; the RUN reads the same text
+  through `composeNodePrompt` inside `buildRunInput`, so the card cannot advertise one
+  text and submit another.
+- Generate's gating is unchanged in shape but different in effect: `buildRunInput` now
+  measures the COMPOSED prompt, so an empty own field with a wired template is runnable.

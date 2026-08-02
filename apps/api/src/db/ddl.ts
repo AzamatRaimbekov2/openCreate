@@ -202,6 +202,11 @@ CREATE TABLE IF NOT EXISTS shot (
   -- The catalog model this shot generates with; NULL = no opinion. Persisting it
   -- is what lets a template pin its price/quality tier onto every shot.
   model_id TEXT,
+  -- The frame shape THIS shot generates at, overriding the film's canvas aspect;
+  -- NULL = no opinion (generate at the film's aspect, or the nearest the chosen
+  -- model supports — unchanged from before this column existed). The render
+  -- still scales/pads every shot to the film canvas regardless of this value.
+  aspect_ratio TEXT,
   duration_ms INTEGER NOT NULL,
   trim_start_ms INTEGER NOT NULL DEFAULT 0,
   transition TEXT NOT NULL DEFAULT 'none',

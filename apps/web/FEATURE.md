@@ -75,7 +75,14 @@ react-hook-form + zod, i18next.
   slider, generation-audio speaker toggle, icon-toggled drawers: cast · spoken
   line · expand; the FIRST shot is selected by default, so the composer is on
   screen the moment the editor opens — a tile click still moves the
-  selection). The TRACKS panel wears no chrome row (no title, no size select —
+  selection). The expand drawer's LOOK row is two ICON CHIPS with tooltips
+  (2026-08-02, owner request): the STYLE, and the shot's OWN aspect ratio — a new
+  per-shot override whose glyph draws the actual frame (dashed = "as in the film",
+  the default; the render pads every clip to the film canvas either way, so this
+  only shapes the RAW generation). Picking a style whose catalog row recommends a
+  model LOCKS the model chip to that model — live, explained by tooltip, and
+  shadowing rather than overwriting the user's own pick, which returns the moment
+  the style is cleared. The TRACKS panel wears no chrome row (no title, no size select —
   height via the drag/keyboard separator; the "+" trigger is a dashed
   icon+label tile riding the video lane after the last shot):
   a second-ruler that doubles as a SCRUB SLIDER, the VIDEO lane (shot tiles as
@@ -143,8 +150,27 @@ react-hook-form + zod, i18next.
   5: `ShotCastField` TAGS a known character, and below it `ShotReferenceImages`
   attaches ANY picture — click / drag-drop / paste (Cmd/Ctrl+V), each through the
   shared `readImageFile` gate → `useAddShotReference` → a `well` thumbnail grid
-  (removable by id). It never blocks attaching on a model without `referenceMode`;
-  it just shows honest "switch to Wan 2.7" copy. Shot generation composes a
+  (removable by id). A fourth source, "attach from gallery" (`ShotGalleryPicker`
+  over `useMyImageGenerations`), lets the user pick one of their OWN finished
+  images; its `/media` URL is fetched → data-URI'd → the SAME add POST (no new
+  endpoint). Each attached thumbnail also offers "make character" (`PersonIcon` →
+  `MakeCharacterModal`): the picture becomes a named, reusable `Entity` (created via
+  `/api/entities` + its image, reusing the entity system — no backend change) that is
+  auto-`@`-mentioned in the prompt, and its raw ref is dropped so the image is never
+  sent twice. It never blocks attaching on a model without `referenceMode`, and shows
+  NO model-gating copy — the "switch to Wan 2.7" / "cannot hold a character" lines and
+  the "Персонажи"/"Референс-картинки" section captions were all removed 2026-07-24 at
+  the owner's request; refs are simply dropped silently (no charge) for such models.
+  The shot prompt also speaks the INLINE `@` protocol (2026-07-24, owner report "@
+  didn't work in the cinema chat"): typing `@` pops the shared `MentionAutocomplete`
+  (moved to `shared/ui`; caret math `shared/libs/mentionQuery`) listing cast-able
+  characters (with their reference-photo thumbnails — the route now derives
+  `imageUrl` for `CastableEntity`) AND the shot's attached photos ("Фото N"). A
+  character splices its `[[eN]]` token at the caret; a photo first opens
+  `MakeCharacterModal` (a name is what the server composes into the prompt), then
+  tags the fresh character at the recorded `@` span and deletes the raw ref.
+  Closed at the `MAX_CAST` (5) ceiling.
+  Shot generation composes a
   **structured** `promptPreset`, POSTs `/api/generations`, links the clip, then
   polls (stored references are re-sent by the server every generate).
   The module has NO cross-module imports: the catalog is read at the route (the
@@ -271,14 +297,18 @@ src/
 │   │                           # singleton + init/reset per route param), useCanvasDoc
 │   │                           # (the debounced full-document autosave), api (typed
 │   │                           # /api/canvases + uploads), useNodeGeneration
-│   │                           # (buildRunInput → POST /api/generations, then the
+│   │                           # (composeNodePrompt = template ⏎ own — THE one
+│   │                           # prompt answer for run/plan/UI; buildRunInput →
+│   │                           # POST /api/generations, then the
 │   │                           # shared ['generation', id] poll), useRunBranch
 │   │                           # (pure toposort + itemized price, then the
 │   │                           # sequential submit/poll queue); components/:
 │   │                           # CanvasEditor (React Flow shell — RF objects DERIVED
 │   │                           # from the store, changes written back), NodePalette,
 │   │                           # NodeShell + ImageNode/VideoNode/UploadNode/
-│   │                           # EntityNode (character, output-only, never runs)/NoteNode,
+│   │                           # EntityNode (character, output-only, never runs)/
+│   │                           # PromptNode (the SHARED prompt — output-only, never
+│   │                           # runs; its text merges into every wired child)/NoteNode,
 │   │                           # VersionStrip, RunBranchDialog, CanvasLibrary
 │   │                           # (public: CanvasEditor, CanvasLibrary; catalog AND
 │   │                           # character library fed from the route, both memoized)

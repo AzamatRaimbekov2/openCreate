@@ -40,3 +40,9 @@ flowchart LR
 
 ## Update 2026-07-16 — role additionalField
 - `user.additionalFields.role` (`string`, default `'user'`, `input:false`): surfaces `role` on session/user objects for the SPA and future admin gates. `input:false` is the wall — a signup payload can never name its own role; the only `super_admin` writer is the dev-only seed `dev-admin.ts`.
+
+## Update 2026-07-24 — Google links to existing password accounts (account.accountLinking)
+- Live bug: Google sign-in with the email of an existing password account dead-ended on better-auth's `/api/auth/error` page with `account_not_linked`. Root cause (better-auth 1.6.23 `oauth2/link-account.mjs`): linking is refused when `requireLocalEmailVerified` (default **true**) meets a local user with `emailVerified=false` — and this app has NO email-verification flow, so EVERY password user is unverified forever; `trustedProviders` also defaults to `[]`.
+- Fix: `account.accountLinking = { trustedProviders: ['google'], requireLocalEmailVerified: false }`. Google verifies its emails (trusted-provider pattern per better-auth docs); the local-verified wall is dropped because there is no email infra to ever satisfy it. After linking, better-auth flips the user's `emailVerified` to true when the provider email matches.
+- Accepted tradeoff (documented in-code): with no local verification, someone who pre-registers a password account on an email they don't own could be linked to by that email's real Google owner. Revisit if an email-verification flow ever lands.
+- Pinned by `test/auth.test.ts` ("Google may link to an existing email+password account").

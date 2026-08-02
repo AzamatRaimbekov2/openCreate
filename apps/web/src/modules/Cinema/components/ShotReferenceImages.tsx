@@ -5,13 +5,20 @@
 // drawer: that control TAGS a known character (the fox is the same fox across
 // shots); this one attaches an arbitrary "make it look like these" picture.
 //
-// THREE inputs, ONE gate: click-to-upload, drag-and-drop onto this area, and
-// paste (Cmd/Ctrl+V of a screenshot) all route the file through the shared
+// THREE upload inputs, ONE gate: click-to-upload, drag-and-drop onto this area,
+// and paste (Cmd/Ctrl+V of a screenshot) all route the file through the shared
 // readImageFile gate (shared/libs — one type/size check for the whole app) and
 // then POST the data URI. The just-attached thumbnail renders from the server
 // /media path off the refetched shot (the add hook invalidates the film detail),
 // never the client data URI — the path is the honest source of truth and is what
 // the model will actually receive at generate time.
+//
+// A FOURTH source, "attach from gallery" (ShotGalleryPicker): the user picks one
+// of their OWN finished images. That media is already ours and was validated when
+// it was generated, so it does NOT re-run readImageFile — instead we fetch the
+// /media bytes → read them into a data URI → hit the identical add path. So a
+// gallery pick and a file upload land as the same request; no new endpoint, no
+// client-trusted URL on the wire.
 //
 // THE SHARED BUDGET OF 5: entity tags + attached images cap at
 // MAX_SHOT_REFERENCE_IMAGES together (Wan 2.7 r2v's own ceiling). We disable the
@@ -23,21 +30,34 @@
 // prompt textarea or anywhere else on the page is never hijacked. Being element-
 // scoped, there is NO document listener to leak.
 //
-// HONEST CAPABILITY COPY: reference images only affect the output on a model with
-// referenceMode (among video, only Wan 2.7 "Cinema"). If the shot's model has
-// none we do NOT block attaching — the images persist and pay off the moment the
-// user switches — we just say so, calmly, instead of the character-centric
-// "cannot hold a character" that confused people.
+// NO MODEL-GATING COPY (owner request 2026-07-24): we never tell the user "this
+// model doesn't use reference images / switch to Wan". Attaching is always
+// available; whether the refs reach the provider is the money path's decision
+// (composeShotClipInput drops them silently, no charge, for a model without
+// referenceMode) — the UI just lets the user attach and stays quiet.
+//
+// MAKE-CHARACTER BRIDGE (2026-07-24): each attached thumbnail carries a second,
+// quiet affordance — turn THIS picture into a named, reusable character. It opens
+// MakeCharacterModal, which (via makeCharacterApi) creates an Entity and attaches
+// the picture as its reference photo. On success we do three things here, because
+// they are shot-level: DELETE the raw ref (so the same image is not sent twice —
+// once anonymously and once as the character's photo), call onCharacterCreated so
+// the composer auto-@mentions the fresh character, and toast the confirmation.
+// The entity system is reused as-is; there is NO backend change.
 import { useRef, useState } from 'react'
 import type { ChangeEvent, ClipboardEvent, DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MAX_SHOT_REFERENCE_IMAGES } from '@opencreate/contracts'
 import type { ShotReferenceImage } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
+import { blobToDataUri } from 'shared/libs/blobToDataUri'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import { readImageFile } from 'shared/libs/readImageFile'
-import { Card, Skeleton } from 'shared/ui'
+import { Card, Skeleton, toast } from 'shared/ui'
 import { useAddShotReference, useDeleteShotReference } from '../model/shotReferencesApi'
+import { MakeCharacterModal } from './MakeCharacterModal'
+import { ShotGalleryPicker } from './ShotGalleryPicker'
+import { PersonIcon } from './icons'
 
 export type ShotReferenceImagesProps = {
   filmId: string
@@ -49,9 +69,10 @@ export type ShotReferenceImagesProps = {
   // LIVE tagged-character count — shares the budget of 5 with the images, so the
   // "N / 5" and the cap reflect what ShotCastField shows in the same drawer.
   entityRefCount: number
-  // Whether the selected model actually consumes references (has referenceMode).
-  // false → we still allow attaching, but show the calm switch-to-Wan notice.
-  modelSupportsReferences: boolean
+  // Auto-@mention a freshly-made character: called with the new entity id after
+  // "make character" succeeds. Wired to ShotInspector.addCharacter, which appends
+  // the entity's [[eN]] token to the prompt and registers the mention.
+  onCharacterCreated: (entityId: string) => void
 }
 
 export function ShotReferenceImages({
@@ -59,7 +80,7 @@ export function ShotReferenceImages({
   shotId,
   references,
   entityRefCount,
-  modelSupportsReferences,
+  onCharacterCreated,
 }: ShotReferenceImagesProps) {
   const { t } = useTranslation()
   const add = useAddShotReference()
@@ -70,6 +91,14 @@ export function ShotReferenceImages({
   const [localErrorKey, setLocalErrorKey] = useState<string | null>(null)
   // Drag-over highlight only — never a layout shift, just a portal ring
   const [isDragging, setIsDragging] = useState(false)
+  // "Attach from gallery" modal visibility. The picker is mounted ONLY while
+  // this is true, so its generations query is lazy (mounting this control fires
+  // no gallery request; the sibling shot tests stay untouched).
+  const [isPickerOpen, setIsPickerOpen] = useState(false)
+  // The reference currently being turned into a character (null = the make-
+  // character modal is closed). Holding the whole ref, not just its id, keeps its
+  // /media path for the modal preview and its id for the post-success delete.
+  const [characterRef, setCharacterRef] = useState<ShotReferenceImage | null>(null)
 
   const used = entityRefCount + references.length
   const atCap = used >= MAX_SHOT_REFERENCE_IMAGES
@@ -84,6 +113,25 @@ export function ShotReferenceImages({
     }
     setLocalErrorKey(null)
     add.mutate({ filmId, shotId, dataUri: result.dataUri })
+  }
+
+  // Gallery pick: the URL is one of the user's OWN /media images. Pull the
+  // bytes, read them into a data URI, and POST through the very same add path —
+  // so the picker never needs its own endpoint and no client-trusted URL reaches
+  // the wire. A failed fetch/read reuses the ONE localized notice the region
+  // already renders (galleryError = "couldn't load that image").
+  const handlePickFromGallery = async (url: string) => {
+    setIsPickerOpen(false)
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`media fetch ${response.status}`)
+      const dataUri = await blobToDataUri(await response.blob())
+      setLocalErrorKey(null)
+      add.mutate({ filmId, shotId, dataUri })
+    } catch {
+      // Never surface the raw fetch/read error — one calm, localized line.
+      setLocalErrorKey('cinema.shotRef.galleryError')
+    }
   }
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -158,11 +206,6 @@ export function ShotReferenceImages({
         </span>
       </div>
 
-      {/* Honest capability copy — a calm note, NOT an error and NOT a block. */}
-      {!modelSupportsReferences ? (
-        <p className="text-xs text-mist-dim">{t('cinema.shotRef.modelHint')}</p>
-      ) : null}
-
       {/* The thumbnail grid + the add tile. Media sits in a `well` Card (the
           recessed plate reserved for user media, design.md) — never frosted. */}
       <div className="flex flex-wrap gap-2">
@@ -184,6 +227,18 @@ export function ShotReferenceImages({
               className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-white/10 bg-specimen-red/80 text-[10px] leading-none text-lumen-red transition-colors duration-200 hover:bg-specimen-red focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
             >
               ✕
+            </button>
+            {/* Make-character: the quiet neutral counterpart to the red remove,
+                on the OPPOSITE (bottom-left) corner so the two hit targets never
+                overlap. Always offered — converting swaps a raw ref for a tag, so
+                it is budget-neutral and stays available even at the cap. */}
+            <button
+              type="button"
+              onClick={() => setCharacterRef(ref)}
+              aria-label={t('cinema.shotRef.makeCharacter')}
+              className="absolute -bottom-1.5 -left-1.5 flex size-5 items-center justify-center rounded-full border border-white/10 bg-steel text-mist-dim transition-colors duration-200 hover:bg-ridge hover:text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            >
+              <PersonIcon className="size-3" />
             </button>
           </div>
         ))}
@@ -210,6 +265,22 @@ export function ShotReferenceImages({
             </span>
           </label>
         ) : null}
+
+        {/* Gallery trigger — same dashed tile as "+", opens the picker of the
+            user's own images. Icon-only, so the aria-label carries the full
+            intent. Hidden at the cap exactly like the add tile. */}
+        {!atCap ? (
+          <button
+            type="button"
+            onClick={() => setIsPickerOpen(true)}
+            aria-label={t('cinema.shotRef.gallery')}
+            className="grid size-16 cursor-pointer place-items-center rounded-2xl border border-dashed border-white/15 text-mist-dim transition-colors duration-200 hover:border-white/30 hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+          >
+            <span aria-hidden="true" className="text-lg leading-none">
+              ▦
+            </span>
+          </button>
+        ) : null}
       </div>
 
       {/* Empty: no images yet and room to add — the discoverability hint that
@@ -223,6 +294,32 @@ export function ShotReferenceImages({
         <p role="alert" className="text-xs text-glow-red">
           {t(noticeKey)}
         </p>
+      ) : null}
+
+      {/* Mounted only while open, so the gallery query is lazy. void() the async
+          pick: its outcome surfaces through mutation state, not the click. */}
+      {isPickerOpen ? (
+        <ShotGalleryPicker
+          onClose={() => setIsPickerOpen(false)}
+          onPick={(url) => void handlePickFromGallery(url)}
+        />
+      ) : null}
+
+      {/* Make-character dialog — mounted only while a ref is selected. On success
+          the shot-level effects live HERE (the modal only creates the entity):
+          drop the raw ref so the image is not sent twice, auto-@mention the new
+          character, confirm with a toast, then close. */}
+      {characterRef ? (
+        <MakeCharacterModal
+          imageUrl={characterRef.path}
+          onClose={() => setCharacterRef(null)}
+          onCreated={(entityId) => {
+            del.mutate({ filmId, shotId, refId: characterRef.id })
+            onCharacterCreated(entityId)
+            toast.success({ title: t('cinema.shotRef.makeCharacterDone') })
+            setCharacterRef(null)
+          }}
+        />
       ) : null}
     </div>
   )

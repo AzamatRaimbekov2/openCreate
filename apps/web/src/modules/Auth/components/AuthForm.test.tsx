@@ -42,7 +42,9 @@ function renderForm() {
 beforeEach(() => {
   signInEmail.mockReset().mockResolvedValue({ data: null, error: null })
   signUpEmail.mockReset().mockResolvedValue({ data: null, error: null })
-  signInSocial.mockReset()
+  // Social sign-in resolves like the email actions: { error } is awaited and
+  // surfaced in the banner (success normally navigates the page away).
+  signInSocial.mockReset().mockResolvedValue({ data: null, error: null })
   // Default: Google disabled (server hasn't wired creds) → no button.
   useAuthConfigMock.mockReset().mockReturnValue({ data: { googleEnabled: false } })
 })
@@ -68,6 +70,39 @@ describe('AuthForm', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'password123')
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     expect(signInEmail).toHaveBeenCalledWith({ email: 'a@b.co', password: 'password123' })
+  })
+
+  it('expands a bare username to <name>@dev.local in dev builds', async () => {
+    // The dev super-admin is admin@dev.local / "admin", but the muscle memory
+    // (and Chrome's saved credential) is a bare "admin" — which zod rejected as
+    // an invalid email, so the request never even left the browser and login
+    // looked broken. In dev, a value with no "@" means the local dev domain.
+    renderForm()
+    await userEvent.type(screen.getByLabelText('Email'), 'admin')
+    await userEvent.type(screen.getByLabelText('Password'), 'admin')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(signInEmail).toHaveBeenCalledWith({ email: 'admin@dev.local', password: 'admin' })
+  })
+
+  it('leaves a real email untouched in dev (the "@" rule only fires without one)', async () => {
+    renderForm()
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@dev.local')
+    await userEvent.type(screen.getByLabelText('Password'), 'admin')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(signInEmail).toHaveBeenCalledWith({ email: 'admin@dev.local', password: 'admin' })
+  })
+
+  it('does NOT expand a bare username in production builds', async () => {
+    // The affordance is a dev convenience and must never ship: in prod a bare
+    // username stays invalid and is rejected by the same zod rule as before.
+    vi.stubEnv('DEV', false)
+    renderForm()
+    await userEvent.type(screen.getByLabelText('Email'), 'admin')
+    await userEvent.type(screen.getByLabelText('Password'), 'admin')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const alerts = await screen.findAllByRole('alert')
+    expect(alerts.map((a) => a.textContent).join(' ')).toMatch(/enter a valid email/i)
+    expect(signInEmail).not.toHaveBeenCalled()
   })
 
   it('shows a localized server error in an alert region on failed login', async () => {
@@ -221,5 +256,21 @@ describe('AuthForm', () => {
     renderForm()
     await userEvent.click(screen.getByRole('button', { name: /google/i }))
     expect(signInSocial).toHaveBeenCalledWith(expect.objectContaining({ provider: 'google' }))
+  })
+
+  it('shows a localized alert when Google sign-in fails instead of doing nothing', async () => {
+    // The live bug: a failed social request (rate limit / misconfig) was
+    // swallowed by a fire-and-forget call — the button looked dead. The error
+    // must land in the same role="alert" banner as email sign-in failures.
+    useAuthConfigMock.mockReturnValue({ data: { googleEnabled: true } })
+    signInSocial.mockResolvedValue({
+      data: null,
+      error: { code: undefined, message: 'Too many requests', status: 429 },
+    })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: /google/i }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not complete the action/i)
+    expect(alert).not.toHaveTextContent('Too many requests')
   })
 })

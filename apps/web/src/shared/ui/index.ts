@@ -38,6 +38,11 @@ export type { ModalProps } from './Modal'
 // Action menu (fires and forgets) — the counterpart to Select (chooses and keeps)
 export { Menu } from './Menu'
 export type { MenuItem, MenuProps } from './Menu'
+// The inline "@" mention popup — shared by the /create composer and the Cinema
+// shot composer (strings and anchor arrive as props; caret math lives in
+// shared/libs/mentionQuery)
+export { MentionAutocomplete } from './MentionAutocomplete'
+export type { MentionAutocompleteProps, MentionItem } from './MentionAutocomplete'
 export { LangSwitch } from './LangSwitch'
 export { NotFoundPage } from './NotFoundPage'
 export { OfflineOverlay } from './OfflineOverlay'

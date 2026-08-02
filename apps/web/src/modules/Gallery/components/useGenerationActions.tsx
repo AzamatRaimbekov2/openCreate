@@ -2,12 +2,14 @@
 // THE action set for one generation — the single source of truth for what a user
 // can do with a result, and under what conditions.
 //
-// WHY A MODULE AND NOT INLINE BUTTONS: the same four actions surface in two very
-// different shapes — the card's overflow menu (rows of text) and the detail
-// view's icon rail. If each rendered its own list, they would drift: an action
+// WHY A MODULE AND NOT INLINE BUTTONS: the same four actions surface in three
+// places — the card's overflow menu, the table row's menu, and the detail
+// viewer's menu. If each rendered its own list, they would drift: an action
 // added to one, an availability rule fixed in the other, and eventually Download
 // appears on a failed generation in exactly one place. Here, availability and
-// behaviour are decided once; the two views only choose how to paint them.
+// behaviour are decided once; the views only choose where to hang the trigger.
+// (Since 2026-08-02 all three paint the SAME shape — a ⋯ menu. The detail
+// view's icon rail is gone: it put Delete one stray click from the media.)
 //
 // It also owns the two pieces of state an action can carry: the delete
 // confirmation dialog (a paid generation never dies in one click) and the
@@ -22,7 +24,7 @@ import type { Generation } from '@opencreate/contracts'
 import { Button, Modal } from 'shared/ui'
 import type { MenuItem } from 'shared/ui'
 import { useDeleteGeneration } from '../model/generationsApi'
-import { CheckIcon, DownloadIcon, PromptIcon, RegenerateIcon, TrashIcon } from './icons'
+import { CheckIcon, DownloadIcon, PencilIcon, PromptIcon, TrashIcon } from './icons'
 
 export type UseGenerationActionsArgs = {
   generation: Generation
@@ -89,9 +91,15 @@ export function useGenerationActions({ generation, onRegenerate }: UseGeneration
 
   const actions: MenuItem[] = [
     {
+      // The id stays 'regenerate' — GenerationDetail keys its "close the sheet
+      // after this one" rule off it, and the wire never saw this string. Only
+      // the LABEL changed (2026-08-02): "Regenerate" described an outcome the
+      // action does not produce. It loads the prompt + model back into the
+      // composer and stops there; the user edits and decides whether to spend.
+      // Calling that "Regenerate" made a free action look like a paid one.
       id: 'regenerate',
-      label: t('gallery.actions.regenerate'),
-      icon: <RegenerateIcon />,
+      label: t('gallery.actions.edit'),
+      icon: <PencilIcon />,
       // No composer on this screen, or nothing to re-run
       isAvailable: Boolean(onRegenerate),
       onSelect: () => onRegenerate?.(generation),

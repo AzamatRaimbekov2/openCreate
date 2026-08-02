@@ -6,12 +6,39 @@
 // all (it lives on a marketing page). DeepInfra resells the same model at the same
 // price, with no activation, no prepay and no minimum.
 //
-// SAME PRICE — verified, not assumed. Their headline "$4.30 / 1M tokens" is the
-// WITH-VIDEO-INPUT rate; their own pricing string reads "$4.3/M with video, $7/M
+// THE COLUMN TRAP still holds: their headline "$4.30 / 1M tokens" is the
+// WITH-VIDEO-INPUT rate, and their pricing string reads "$4.3/M with video, $7/M
 // without for 480p and 780p; $4.7/M with video, $7.7/M without for 1080p". We send
-// text or an image, never a video, so we are on the $7/M row — which is exactly
-// ByteDance's own $0.0070/1k. Nobody is cheaper here; the win is that nobody has
-// to buy anything first.
+// text or an image, never a video, so we are always on a "without" row — never the
+// headline one.
+//
+// ── WHICH "without" row, THOUGH: MEASURED, AND NOT THE ONE ADVERTISED ────────
+// This header used to assert we sat on the $7/M row because we buy 720p. That was
+// read off their price page and is FALSE in practice. Three receipts, all 16:9 =
+// 1280×720 (the `hd` profile is pinned), all with the SAME token density of
+// ~21 660 tok/s — so the only variable left is the rate:
+//
+//   2026-07-21 20:51 · 10s · $1.51830 · 216 900 tok (implied) → $7.00/M
+//   2026-07-22 10:47 · 15s · $2.50173 · 324 900 tok (implied) → $7.70/M
+//   2026-07-31       · 15s · $2.50173 · 324 900 tok (OBSERVED) → $7.70/M
+//
+// The rate rose ~10% inside FOURTEEN HOURS on 2026-07-21/22, and has been stable
+// since (the last two receipts match to the cent). The first two token counts are
+// implied from cost ÷ rate; only the third was read off `out_tokens` directly, and
+// its clip was verified 1280×720 by parsing the delivered MP4's `tkhd` box rather
+// than trusting the request — so this is not us accidentally buying 1080p.
+//
+// The first two rows come from the app's own ledger (`generation` table); the third
+// from a direct call. Per-second cost therefore depends on DURATION-era, not on
+// duration itself: $0.15183/s before the rise, $0.16678/s after.
+//
+// CONSEQUENCE FOR THE LEDGER: `seedance-2-0` sells at 26 credits/s = $0.26/s, so
+// the margin is 1.56× (was 1.72×), not the ~2× the catalogue targets elsewhere.
+// Left ALONE deliberately — repricing a live model is an owner decision, not a
+// side effect of a measurement. Flagged here so the next person sees it.
+//
+// The reason to be here is unchanged: DeepInfra needs no activation, no prepay and
+// no $30.10 pack. It is no longer safe to call it "the same price as ByteDance".
 //
 // ── THE HARD PART: THEY HAVE NO POLLING ENDPOINT ─────────────────────────────
 // DeepInfra's inference API is SYNCHRONOUS (one HTTP call blocks for the whole
@@ -32,6 +59,7 @@
 // verification) is the correct long-term answer; this is the honest one that works
 // today, and it is confined to this file.
 import { randomUUID } from 'node:crypto'
+import { Agent, fetch as undiciFetch } from 'undici'
 import type { VideoPollResult, VideoProvider, VideoSubmitInput } from '../video-provider'
 
 // Sanitized provider error, shaped like RunwareError/ArkError/DashscopeError so
@@ -55,6 +83,23 @@ export class DeepinfraError extends Error {
 }
 
 const BASE = 'https://api.deepinfra.com/v1/inference'
+
+// ── WHY THIS DISPATCHER EXISTS (measured, not theorised) ─────────────────────
+// `REQUEST_TIMEOUT_MS` below says 10 minutes because this request BLOCKS for the
+// whole render. That budget was fiction: Node's built-in fetch is undici, and
+// undici applies its OWN `headersTimeout` of 300 000 ms before any AbortSignal is
+// consulted. A synchronous DeepInfra render sends no response headers until the
+// clip is finished, so every generation longer than five minutes died at exactly
+// 300s with `TypeError: fetch failed` — the AbortSignal never got a turn.
+//
+// Measured on a real 15s Seedance 2.0 job (2026-07-31): failed at 305.1s, and the
+// error carried nothing but the name `TypeError`, which is why it read as a
+// mystery crash rather than a timeout.
+//
+// Both timers are disabled (0 = off) so the AbortSignal is genuinely the single
+// deadline, exactly as the header above always claimed. This is NOT a compare-page
+// concern: it governs every paid Seedance 2.0 generation in the product.
+const dispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0 })
 
 // A whole render happens inside ONE request here, so this is not a control-plane
 // timeout like the other adapters' 30s — it has to outlast the generation itself.
@@ -193,6 +238,21 @@ export function createDeepinfraClient(opts: DeepinfraOptions = {}): VideoProvide
   return { submit, poll }
 }
 
+// Turns an opaque `TypeError: fetch failed` into something an operator can act on.
+// undici nests the real reason one level down on `cause.code`; a timeout, a reset
+// connection and a DNS failure are indistinguishable without it, and they call for
+// three different fixes. Returns ONLY the machine code (never `cause.message`,
+// which can quote a request URL carrying a query string).
+function describeFetchFailure(err: unknown): string {
+  if (!(err instanceof Error)) return 'network error'
+  const cause = (err as { cause?: unknown }).cause
+  const code =
+    typeof cause === 'object' && cause !== null && 'code' in cause
+      ? (cause as { code?: unknown }).code
+      : undefined
+  return typeof code === 'string' ? `${err.name} (${code})` : err.name
+}
+
 // One synchronous inference call, folded into the neutral poll union. Never throws
 // for a provider outcome — an unreachable DeepInfra, a 402, a moderation refusal
 // and a successful render all come back as a VideoPollResult the service knows how
@@ -202,9 +262,14 @@ async function runInference(
   apiKey: string,
   body: unknown,
 ): Promise<VideoPollResult> {
-  let res: Response
+  // undici's OWN fetch, NOT the global one. Measured, not assumed: Node's built-in
+  // fetch is a SEPARATE undici instance, so handing it an Agent from the npm package
+  // is rejected outright with `UND_ERR_INVALID_ARG` — i.e. the obvious version of
+  // this fix silently breaks every DeepInfra call instead of lengthening its timeout.
+  // The npm `fetch` accepts the npm `Agent`, and only that pairing works.
+  let res: Awaited<ReturnType<typeof undiciFetch>>
   try {
-    res = await fetch(url, {
+    res = await undiciFetch(url, {
       method: 'POST',
       headers: {
         // lowercase 'bearer' is what their own curl example sends
@@ -213,11 +278,20 @@ async function runInference(
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      // See the `dispatcher` definition above: without it undici's own 300s
+      // headersTimeout kills every render longer than five minutes.
+      dispatcher,
     })
   } catch (err) {
     return {
       status: 'error',
-      message: `DeepInfra request failed: ${err instanceof Error ? err.name : 'network error'}`,
+      // The NAME ALONE is not diagnosable: undici reports every network-layer
+      // failure as `TypeError: fetch failed` and hides the real reason on `cause`
+      // (UND_ERR_HEADERS_TIMEOUT, ECONNRESET, ENOTFOUND…). Dropping it turned a
+      // plain timeout into an unexplained crash that took a paid render to
+      // diagnose. The cause CODE is a network constant — it names no account, no
+      // balance and no key — so it is safe to carry into the sanitized message.
+      message: `DeepInfra request failed: ${describeFetchFailure(err)}`,
     }
   }
 
@@ -226,6 +300,23 @@ async function runInference(
   if (!res.ok) {
     // Their `detail` can name an account id or a balance; it never reaches the
     // browser. The user sees the mapped provider_error copy.
+    //
+    // 402 is called out by name because it is the ONE upstream status an operator
+    // meets routinely and can fix in thirty seconds — DeepInfra answers it the
+    // moment the account balance hits zero, which is exactly what a run of
+    // expensive renders produces. "DeepInfra HTTP 402" is technically accurate and
+    // tells nobody to go top up; saying so costs one line and no secret (the status
+    // code is ours, not their prose).
+    if (res.status === 402) {
+      return {
+        status: 'error',
+        message: 'DeepInfra balance is empty (HTTP 402) — top up the account',
+        // The category, stated rather than left for a caller to guess from the
+        // prose above. A UI renders localized copy from THIS; the message is for
+        // logs.
+        code: 'insufficient_credits',
+      }
+    }
     return { status: 'error', message: `DeepInfra HTTP ${res.status}` }
   }
 

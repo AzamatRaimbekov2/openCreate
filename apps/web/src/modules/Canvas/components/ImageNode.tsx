@@ -17,6 +17,7 @@ import {
   buildRunInput,
   findCharacterParent,
   findMediaParent,
+  findPromptParent,
   useNodeGeneration,
   useRunNode,
 } from '../model/useNodeGeneration'
@@ -118,6 +119,10 @@ export function GenerationNode({
   const blockedByModel =
     hasCharacterWire &&
     data.models.some((m) => m.id === node.config.modelId && m.referenceMode == null)
+  // The shared half, when a prompt card is wired in. Read for the hint only —
+  // the RUN reads it through composeNodePrompt inside buildRunInput, so the
+  // card can never advertise one text and submit another.
+  const promptTemplate = findPromptParent(node.id, nodes, edges)?.config.prompt?.trim()
   const runInput = buildRunInput(node, nodes, edges, generationStatus)
   const canRun = runInput !== null && !blockedByModel
   const duration = node.config.duration ?? model?.durationOptions?.[0]
@@ -243,6 +248,18 @@ export function GenerationNode({
           `nodrag` on BOTH: React Flow must not start a canvas drag from a form
           field, and its hit test walks ancestors, so the class on the button's
           wrapper covers the button itself. */}
+      {/* A wired template is INVISIBLE in this field — the textarea holds only
+          this node's own half — and what gets submitted is the two joined. So
+          the card says the shared half out loud, above the field, in the order
+          it will be sent (ADR canvas-prompt-node D2). Without this line the
+          user reads "a fox" and pays for "cinematic 35mm, neon⏎a fox".
+          line-clamp-2: a 2000-character template must not grow the card. */}
+      {promptTemplate ? (
+        <p className="mb-1 line-clamp-2 text-[11px] leading-4 text-mist-dim">
+          {t('canvas.node.promptTemplateApplied', { text: promptTemplate })}
+        </p>
+      ) : null}
+
       <div className="relative mb-2">
         <textarea
           value={node.config.prompt ?? ''}

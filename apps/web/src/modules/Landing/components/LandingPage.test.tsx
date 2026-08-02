@@ -70,6 +70,15 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: /see pricing/i })).toHaveAttribute('href', '/pricing')
   })
 
+  it('features the mascot as the hero visual', async () => {
+    renderLanding('/login')
+    // The mascot is the hero's main figure now (owner brief: media-first).
+    // Query by its accessible name so we assert a MEANINGFUL image, not chrome.
+    const mascot = await screen.findByRole('img', { name: /openCreate mascot/i })
+    expect(mascot).toBeInTheDocument()
+    expect(mascot).toHaveAttribute('src', expect.stringContaining('mascot'))
+  })
+
   it('renders the decorative ascii-sphere canvas behind the hero', async () => {
     renderLanding('/login')
     await screen.findByRole('heading', { level: 1 })

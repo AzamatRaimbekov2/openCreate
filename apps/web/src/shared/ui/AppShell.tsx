@@ -63,13 +63,22 @@ export function AppShell({
         {/* Full-bleed bar: app chrome spans the viewport (tool UI, not a
             centered reading column) — the page canvas below matches its gutter */}
         <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-6 py-1.5 xl:px-10">
-          {/* Mono wordmark "openCreate·" doubles as the home link. The trailing
-              middle dot is the brand's cursor — portal blue and aria-hidden so
-              the accessible name stays "openCreate". */}
+          {/* Mono wordmark "openCreate·" doubles as the home link. The circular
+              mascot mark leads the lockup; the trailing middle dot is the brand's
+              cursor — portal blue and aria-hidden so the accessible name stays
+              "openCreate". */}
           <Link
             to="/"
-            className="rounded-lg text-base font-medium text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
+            className="inline-flex items-center gap-2 rounded-lg text-base font-medium text-white focus-visible:ring-2 focus-visible:ring-portal focus-visible:outline-none"
           >
+            <img
+              src="/logo-mark.png"
+              alt=""
+              aria-hidden="true"
+              width={24}
+              height={24}
+              className="h-6 w-6 rounded-full object-cover ring-1 ring-white/10"
+            />
             openCreate
             <span aria-hidden="true" className="text-portal">
               ·

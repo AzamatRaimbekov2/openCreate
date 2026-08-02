@@ -38,8 +38,10 @@ function FilmEditorPage() {
   // music the format wants, which pre-fills the audio panel. Cached staleTime:
   // Infinity, so this is shared with /templates and costs nothing on revisit.
   const templates = useTemplates()
-  // A shot's CAST is what makes a film hold together; only id+name travel — the
-  // inspector shows a name and sends an id, the photo is the server's business.
+  // A shot's CAST is what makes a film hold together. id+name+thumbnail travel:
+  // the inspector shows a name and sends an id, and its inline "@" picker shows
+  // the character's primary reference photo (the face IS the row's meaning when
+  // the user is tagging "photos") — same derivation as routes/_shell.create.tsx.
   const entities = useEntities()
   // The style registry (ADR style-studio D5): builtin styles and the ones this
   // user wrote, unioned server-side. Read HERE for the same reason the catalog
@@ -48,7 +50,11 @@ function FilmEditorPage() {
   // storyboard, film default). Same ['styles'] cache entry the /styles page
   // fills, so arriving from there costs no request.
   const styles = useStyles()
-  const castableEntities = (entities.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
+  const castableEntities = (entities.data?.items ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    imageUrl: e.images.find((image) => image.id === e.primaryImageId)?.url ?? e.images[0]?.url ?? null,
+  }))
 
   // GLOBAL CHROME — composed here because the editor dropped AppShell. Mirrors
   // routes/_shell.tsx: normalize better-auth's optional name to the shell's null

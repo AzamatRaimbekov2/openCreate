@@ -28,6 +28,7 @@ const baseShot = {
   promptPreset: null,
   entityRefs: [],
   modelId: null,
+  aspectRatio: null,
   durationMs: 3000,
   trimStartMs: 0,
   transition: 'none' as const,

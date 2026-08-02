@@ -27,18 +27,22 @@ export function nearestDuration(options: number[], seconds: number): number {
   return best
 }
 
-// Build the generation request for one shot. The film's canvas aspect wins when
-// the model supports it, otherwise we fall back to the model's first ratio (the
-// render scales/pads every shot to the film canvas anyway). Duration is only a
+// Build the generation request for one shot. The SHOT's own aspect override wins
+// when set, else the film's canvas aspect; either way the model's own supported
+// list wins if neither is offered (fall back to its first ratio). The override
+// only changes the shape the RAW clip is generated in — the render scales/pads
+// every shot to the film canvas regardless, so a vertical insert inside a 16:9
+// film is a legal editorial choice and never a broken export. Duration is only a
 // video dimension; image models carry none.
 export function composeShotClipInput(
   shot: Shot,
   model: CatalogModel,
   filmAspect: AspectRatio,
 ): CreateGenerationInput {
-  const aspectRatio = model.aspectRatios.includes(filmAspect)
-    ? filmAspect
-    : (model.aspectRatios[0] ?? filmAspect)
+  const target = shot.aspectRatio ?? filmAspect
+  const aspectRatio = model.aspectRatios.includes(target)
+    ? target
+    : (model.aspectRatios[0] ?? target)
 
   const input: CreateGenerationInput = {
     modelId: model.id,

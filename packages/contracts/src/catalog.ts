@@ -73,6 +73,12 @@ export const videoProviderSchema = z.enum([
   'bytedance',
   'alibaba',
   'deepinfra',
+  // Segmind — the CHEAPEST verified Seedance channel. Added 2026-08-02 after a live
+  // 15s/1080p render billed $5.12 against a $5.10 prediction (0.4%), which pins their
+  // rate at $7.02/M — the flat rate they publish, and 9% under DeepInfra's MEASURED
+  // $7.70/M. Note the asymmetry that made this worth switching for: DeepInfra's own
+  // price page promises $7.00/M and bills $7.70; Segmind promises $7.00 and bills it.
+  'segmind',
 ])
 export type VideoProviderId = z.infer<typeof videoProviderSchema>
 

@@ -106,6 +106,12 @@ export type TestAppOverrides = {
   // enhancer HTTP tests keep both this and deepinfraToken null so the endpoint
   // answers provider_error (success is a service-level test with an injected chain).
   groqApiKey?: string | null
+  // kie.ai on/off: default null (off), so the third Seedance channel's catalog models
+  // stay hidden and no suite can reach a real balance by accident. A routing test that
+  // asserts the channel is LISTED sets this to a dummy string.
+  kieApiKey?: string | null
+  // Segmind on/off: default null (off), same contract as the others.
+  segmindApiKey?: string | null
   // Modular 3D Assets analyze (ADR modular-3d-assets): the Claude-vision part
   // suggestion gates on this key exactly like storyboard. Default null → the
   // /analyze route answers 502 provider_error (the wizard still works by hand),
@@ -127,6 +133,19 @@ export type TestAppOverrides = {
   // path underneath stays real (fakeRunware + the real ledger), which is what
   // makes "no provider call, balance unchanged" meaningful evidence.
   creatorBrains?: import('../../src/modules/creator/brain').Brain[]
+  // /compare-video channels (hidden Seedance 2.0 cost page). Scripted here for the
+  // same reason the creator brains are: the endpoint's real backends bill actual
+  // money per call, and a suite that spends $1.50 to re-learn a known price is a
+  // recurring tax on running the tests.
+  compareVideoChannels?: { deepinfra?: VideoProvider; kie?: VideoProvider; segmind?: VideoProvider }
+  // Poll cadence / deadline for that page. Tests set the interval to 0 to keep the
+  // loop deterministic, and shrink the deadline to exercise the timeout branch.
+  comparePollIntervalMs?: number
+  compareDeadlineMs?: number
+  // Which channels the cost page actually runs. Absent → both, which is what most
+  // of the suite asserts; a test passes ['kie'] to pin that a parked channel is
+  // never even called.
+  compareChannels?: readonly ('segmind' | 'deepinfra' | 'kie')[]
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -139,6 +158,21 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
     storage: createLocalStorage(storageDir, overrides.assetHostAllowlist ?? ['runware.ai']),
     runware: overrides.runware ?? (fakeRunware() as unknown as RunwareClient),
     ...(overrides.videoProviders ? { videoProviders: overrides.videoProviders } : {}),
+    ...(overrides.compareVideoChannels
+      ? { compareVideoChannels: overrides.compareVideoChannels }
+      : {}),
+    ...(overrides.comparePollIntervalMs !== undefined
+      ? { comparePollIntervalMs: overrides.comparePollIntervalMs }
+      : {}),
+    ...(overrides.compareDeadlineMs !== undefined
+      ? { compareDeadlineMs: overrides.compareDeadlineMs }
+      : {}),
+    // BOTH by default here, deliberately unlike production (which currently runs kie
+    // alone because the DeepInfra account is empty). The suite has to keep exercising
+    // the full two-channel path — identical settings, failure isolation, concurrency
+    // — or parking a channel for billing reasons would silently delete that coverage
+    // and nobody would notice until it was restored.
+    compareChannels: overrides.compareChannels ?? ['deepinfra', 'kie'],
     ...(overrides.meshProvider ? { meshProvider: overrides.meshProvider } : {}),
     ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
     // Presence matters, not truthiness: `[]` is the meaningful "nothing
@@ -158,6 +192,10 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       deepinfraToken: overrides.deepinfraToken ?? null,
       // Prompt enhancer's free fallback LLM; null → dropped from the chain.
       groqApiKey: overrides.groqApiKey ?? null,
+      // kie.ai Seedance channel; null → provider unconfigured, so its catalog models
+      // stay hidden and no test can accidentally reach a real balance.
+      kieApiKey: overrides.kieApiKey ?? null,
+      segmindApiKey: overrides.segmindApiKey ?? null,
       // CinemaStudio + Modular 3D Assets config: null → no LLM-backed features in
       // tests (storyboard AND assets3d analyze both answer 502 provider_error).
       anthropicApiKey: overrides.anthropicApiKey ?? null,

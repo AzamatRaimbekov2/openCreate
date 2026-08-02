@@ -133,6 +133,13 @@ export function createDb(path: string) {
   if (!shotColumns.includes('reference_images_json')) {
     sqlite.exec('ALTER TABLE shot ADD COLUMN reference_images_json TEXT')
   }
+  //  · shot.aspect_ratio  a per-shot override of the film's canvas aspect (owner
+  //    request: pick the generation shape per shot, e.g. a native 9:16 clip inside
+  //    a 16:9 film). Additive and nullable — every pre-existing shot reads NULL,
+  //    meaning "no opinion, use the film's aspect", exactly its old behaviour.
+  if (!shotColumns.includes('aspect_ratio')) {
+    sqlite.exec('ALTER TABLE shot ADD COLUMN aspect_ratio TEXT')
+  }
   const filmColumns = (sqlite.pragma('table_info(film)') as Array<{ name: string }>).map(
     (column) => column.name,
   )

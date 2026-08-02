@@ -52,8 +52,10 @@ flowchart TD
   announces itself is a panel, not a stage. Screen readers still get the name.
 - No polling here — the mounted `ShotThumb`s own the `['generation', id]` poll;
   this only reads the fresher answer from cache.
-- No crossfade compositing / wasm — deliberately (ADR). The caveat line says the
-  preview is approximate.
+- No crossfade compositing / wasm — deliberately (ADR). The preview is approximate.
+- The "preview is an approximation" caveat LINE was REMOVED from the control row
+  (owner request 2026-07-23 — read as noise). The `cinema.preview.approx` i18n key
+  stays in both locales (keys-intact rule) though no longer rendered.
 
 ## Update 2026-07-15 — v5 canvas cap
 - The canvas is capped at `max-h-[42svh]`: uncapped, a 16:9 canvas in the ~1000px stage

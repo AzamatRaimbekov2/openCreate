@@ -44,6 +44,8 @@ flowchart LR
   AL -->|email taken| SW[Sign in link] -->|onSwitchToLogin| LM[login mode remount]
   SI & SU -->|success| INV[invalidate 'me'] --> RT[login route redirects]
   G[Google button — authConfig.googleEnabled] --> SO[signIn.social]
+  SO -->|error| MAP
+  SO -->|success| NAV[full-page redirect to Google]
 ```
 
 ## Key decisions / gotchas
@@ -92,6 +94,33 @@ flowchart LR
 
 ## Update 2026-07-16 — login/register password validation split
 - `loginSchema.password` is now `min(1)` (just "typed something"): the server verifies against the stored hash, and better-auth enforces its 8-char minimum on sign-UP only. The old `min(8)` on login was stricter than the API and locked out credentials that legitimately bypass the signup rule — the dev-only `admin@dev.local`/`admin` seed being the live case. `registerSchema` keeps the real `min(8)` (mirrors better-auth sign-up).
+
+## Update 2026-07-24 — Google sign-in failures surface in the banner
+- `handleGoogleSignIn` now AWAITS `signIn.social(...)` and routes `{ error }` through the same `mapServerError` → `serverError` banner as email sign-in. Previously it was fire-and-forget (`void`), so a failed request (the live case: 429 from the shared auth rate bucket, since split server-side in `apps/api/src/modules/auth/plugin.ts`) left the button looking dead — no navigation, no message. On success the page navigates away, so the banner only ever renders for failures. The button's `onClick` wraps the async handler (`() => void handleGoogleSignIn()`) to keep the handler prop synchronous.
+
+## Update 2026-07-28 — bare username expands to `@dev.local` in DEV builds
+- `loginSchema.email` changed from `z.email(...)` to
+  `z.string().transform(expandDevUsername).pipe(z.email('auth.errors.email'))`.
+  `expandDevUsername(v)` returns `` `${v}@dev.local` `` when
+  `import.meta.env.DEV && v.length > 0 && !v.includes('@')`, else `v` unchanged.
+- WHY: the dev super-admin credential is `admin@dev.local` / `"admin"`
+  (`apps/api/src/modules/auth/dev-admin.ts`), but the muscle memory — and the
+  credential Chrome saves the first time someone types it — is a bare `admin`.
+  The email rule rejected that CLIENT-SIDE, so no request ever reached the API:
+  the user saw only "введите корректный email" and concluded sign-in was broken
+  while the backend was healthy (verified: `POST /api/auth/sign-in/email` with
+  `admin@dev.local`/`admin` → 200). This fixes the INPUT, not the validation.
+- transform-then-`pipe`, not `refine`/`superRefine`: the expansion must run
+  BEFORE the email check, and `zodResolver` hands the TRANSFORMED value to
+  `onSubmit`, so `signIn.email` receives `admin@dev.local` with the submit
+  handler unchanged. Input and output types are both `string`, so
+  `AuthFormValues` and the RHF generics are untouched.
+- Gated on `import.meta.env.DEV` → statically dead in a production bundle; a bare
+  username stays invalid in prod. Asserted in BOTH directions by
+  `AuthForm.test.tsx` (dev expansion, real email untouched, and a
+  `vi.stubEnv('DEV', false)` case proving prod still rejects it).
+- `registerSchema` inherits the piped email via `.extend()`, so registration
+  behaves identically — one rule, no mode-dependent validation.
 
 ## Update 2026-07-23 — Google button is RUNTIME-gated (ADR google-oauth)
 - The Google button visibility moved from the build-time `import.meta.env.VITE_GOOGLE_AUTH === '1'` flag to `useAuthConfig().data?.googleEnabled` — the SERVER's real config via `GET /api/auth/config` (`modules/Auth/model/authConfig.ts`). This kills the drift where the button could appear without the backend provider wired (or vice-versa). While the query is loading (`data === undefined`) the button stays hidden. `handleGoogleSignIn` (`signIn.social({ provider: 'google', callbackURL: '/create' })`) is unchanged. The orphaned `VITE_GOOGLE_AUTH` ambient type was removed from `@types/global.d.ts`. Tests mock `../model/authConfig` instead of stubbing the env flag.

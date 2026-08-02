@@ -38,9 +38,21 @@ export type MenuProps = {
   align?: 'start' | 'end'
   // Extra classes for the trigger button
   triggerClassName?: string
+  // Native hover tooltip on the trigger. For an ICON-ONLY trigger this is not
+  // decoration: `label` gives AT the name, but a sighted pointer user has only
+  // the glyph — the tooltip is where "what does this do, and what is it set to
+  // right now" gets said. Omit it when the trigger already carries visible text.
+  title?: string
 }
 
-export function Menu({ label, items, children, align = 'end', triggerClassName = '' }: MenuProps) {
+export function Menu({
+  label,
+  items,
+  children,
+  align = 'end',
+  triggerClassName = '',
+  title,
+}: MenuProps) {
   const baseId = useId()
   const menuId = `${baseId}-menu`
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -134,6 +146,10 @@ export function Menu({ label, items, children, align = 'end', triggerClassName =
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
         aria-label={label}
+        // aria-label names it for AT; title is the POINTER half of the same
+        // sentence. Both, never one — an icon trigger with only aria-label is
+        // silent to everyone using a mouse.
+        title={title}
         onClick={() => {
           setActiveIndex(0)
           setIsOpen((prev) => !prev)
@@ -152,8 +168,12 @@ export function Menu({ label, items, children, align = 'end', triggerClassName =
           aria-label={label}
           onKeyDown={handleKeyDown}
           // Opaque steel panel with a real shadow: this floats over user media,
-          // where a translucent surface would make the labels unreadable
-          className={`absolute top-full z-40 mt-1.5 min-w-44 rounded-lg border border-white/10 bg-steel p-1.5 shadow-2xl shadow-black/50 ${
+          // where a translucent surface would make the labels unreadable.
+          // Capped + internally scrollable at the kit's Select height: a menu of
+          // ACTIONS is always short, but the same popup now backs value lists the
+          // user can grow without limit (their own styles), and an uncapped panel
+          // would run past the bottom of whatever scroll container holds it.
+          className={`absolute top-full z-40 mt-1.5 max-h-[22rem] min-w-44 overflow-y-auto rounded-lg border border-white/10 bg-steel p-1.5 shadow-2xl shadow-black/50 ${
             align === 'end' ? 'right-0' : 'left-0'
           }`}
         >

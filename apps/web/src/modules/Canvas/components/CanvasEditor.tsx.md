@@ -84,3 +84,11 @@ flowchart TD
   node-kind lookup inside the `rfEdges` memo — which, since per-frame drags
   change `storeNodes` identity, would rebuild every edge object sixty times a
   second unless it is done carefully.
+
+## Update 2026-08-02 — `prompt: PromptNode` in the type map
+
+- One line in the module-scope `nodeTypes` map (rebuilding that object per render would
+  re-register and remount every node on every keystroke — the comment above it stands).
+- Nothing else changed: the prompt card needs no `data` (no catalog, no character list),
+  and its wire legality is decided by `edgeRules`, which the editor already calls on drag
+  and on drop.

@@ -53,7 +53,20 @@ export function NodeShell({
   const { t } = useTranslation()
   return (
     <div className={`w-72 rounded-2xl border bg-steel p-3 shadow-glass ${STATUS_BORDER[status]}`}>
-      {hasInput ? <Handle type="target" position={Position.Left} className="!bg-portal" /> : null}
+      {/* 14px, not React Flow's default 8px (owner report 2026-08-02): a wire
+          has to be GRABBED from this dot and DROPPED on another one, and an 8px
+          target at 100% zoom — smaller still when the board is zoomed out — is
+          below any reasonable pointer accuracy. The ring in the void colour
+          keeps the dot reading as a small port against the card's edge rather
+          than as a bead sitting on top of it. Paired with the editor's
+          `connectionRadius={80}`, which forgives the near miss. */}
+      {hasInput ? (
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!h-3.5 !w-3.5 !border-2 !border-void !bg-portal"
+        />
+      ) : null}
       <header className="mb-2 flex items-center justify-between gap-2">
         <span className="truncate text-xs font-medium text-white">{title}</span>
         {/* The WORD carries the status; the border repeats it for glanceability */}
@@ -64,7 +77,11 @@ export function NodeShell({
       </header>
       {children}
       {hasOutput ? (
-        <Handle type="source" position={Position.Right} className="!bg-glow-green" />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!h-3.5 !w-3.5 !border-2 !border-void !bg-glow-green"
+        />
       ) : null}
     </div>
   )

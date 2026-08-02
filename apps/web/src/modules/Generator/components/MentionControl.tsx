@@ -11,8 +11,10 @@ import { Menu } from 'shared/ui'
 import type { EntityRef } from '@opencreate/contracts'
 import { deriveEntityRefs } from '../model/mentions'
 
-// The minimum an entity needs to be taggable here — id to reference, name to show
-export type TaggableEntity = { id: string; name: string }
+// The minimum an entity needs to be taggable — id to reference, name to show, and
+// an optional reference-image thumbnail the inline "@" picker renders (this chip
+// control ignores it; see MentionAutocomplete).
+export type TaggableEntity = { id: string; name: string; imageUrl?: string | null }
 
 export type MentionControlProps = {
   // Taggable entities (route-injected). Empty while the library is empty.

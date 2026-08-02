@@ -17,6 +17,7 @@ function makeShot(overrides: Partial<Shot>): Shot {
     entityRefs: [],
     referenceImages: [],
     modelId: null,
+    aspectRatio: null,
     durationMs: 4000,
     trimStartMs: 0,
     transition: 'none',

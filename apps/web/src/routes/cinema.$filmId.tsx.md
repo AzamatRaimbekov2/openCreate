@@ -60,6 +60,12 @@ flowchart LR
   2026-07-23 that padding lives INSIDE `FilmEditor`'s `<main>` (the route hands it the full
   width so the top bar can be full-bleed).
 
+## Update 2026-07-24 — cast entities carry thumbnails
+- `castableEntities` now derives `imageUrl` (primary image → first image → null),
+  the same mapping `_shell.create.tsx` uses — ShotInspector's inline "@" picker
+  shows the character's face next to its name. Still only plain data crosses the
+  seam; Cinema keeps not importing modules/Entities.
+
 ## Commits
 
 - _no commit yet_

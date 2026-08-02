@@ -75,3 +75,13 @@ flowchart LR
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+
+## Update 2026-07-24 — taggableEntities now carry a thumbnail
+- `taggableEntities` mapping now also derives `imageUrl` (the entity's `primaryImageId` image, else first image, else null) so the composer's new inline `@` picker can show reference-image thumbnails. Still the cross-module seam (route reads `useEntities`, Generator never imports `modules/Entities`).
+
+## Update 2026-08-02 — the catalog names also reach the gallery
+
+- `GalleryGrid` now receives `models={modelOptions}` — the SAME array already handed to
+  `GalleryFilterBar`, no extra fetch (one `['catalog']` cache entry). It travels down to
+  the detail viewer, which names the model that produced a result instead of printing its
+  id. The route stays the only place that knows both modules exist.

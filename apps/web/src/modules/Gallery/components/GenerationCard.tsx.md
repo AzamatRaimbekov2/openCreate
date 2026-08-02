@@ -147,3 +147,24 @@ flowchart TD
 - dd795f7 2026-07-07 fix(web): delete confirmation dialog for generations
 - 74f4c59 2026-07-07 fix(web): polling bounds + stalled/error card states
 - cc81faa 2026-07-07 fix(web): localized generation errors
+
+## Update 2026-08-02 — the video plate is a POSTER, not a player
+
+- Owner request: "карточку видео сделай более красивой по вёрстке… при нажатии на видео
+  пусть будет модалка на весь экран". The succeeded-video branch dropped
+  `<video controls>` for a plate that behaves exactly like the image plate.
+- What the inline player cost, all three real: (1) the browser's own grey control bar was
+  the one piece of chrome in the grid the design system does not own; (2) a video with
+  controls swallows the click, so a clip was the ONLY card that could not be opened —
+  watching a 9:16 clip meant watching it letterboxed inside a 300px square; (3) `controls`
+  is a focus stop, so Tab walked the player's internals before reaching the card actions.
+- The plate now: `preload="metadata"` + a **`#t=0.1` media fragment** (the poster — without
+  the fragment Chrome paints a BLACK element; verified in the running app), `muted`,
+  `playsInline`, `object-cover`, `pointer-events-none`, `aria-hidden` + `tabIndex={-1}`.
+  Over it, a centred `void/60` play disc (decorative) and a bottom-left duration chip
+  (`gallery.seconds`), then the whole tile is one `<button aria-label={prompt}>` opening
+  the full-screen viewer. Hover lifts the plate ≤0.5 (`motion-safe`), as images do.
+- `object-cover` replaces the old letterboxing: the grid stays a grid of squares, and the
+  honest full frame is one click away — the exact bargain the image plate already made.
+- New optional prop `models` (`GalleryModelOption[]`, injected by the route): passed
+  straight to `GenerationDetail`, which names the model instead of printing its id.

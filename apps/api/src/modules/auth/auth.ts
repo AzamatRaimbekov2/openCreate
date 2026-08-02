@@ -36,6 +36,22 @@ export function createAuth(db: Db, config: AppConfig, log?: MoneyLog) {
       config.googleClientId && config.googleClientSecret
         ? { google: { clientId: config.googleClientId, clientSecret: config.googleClientSecret } }
         : {},
+    account: {
+      // Google sign-in with the email of an existing password account must LINK,
+      // not die on better-auth's error page with account_not_linked.
+      accountLinking: {
+        // Google verifies its emails — linking on a verified provider email is
+        // the documented trusted-provider pattern.
+        trustedProviders: ['google'],
+        // This app has NO email-verification flow, so every password user stays
+        // emailVerified=false forever — better-auth's default
+        // requireLocalEmailVerified=true wall would refuse Google linking for
+        // ALL of them. Accepted tradeoff (no email infra exists to verify
+        // against): someone who pre-registers a password account on an email
+        // they don't own could be linked to by that email's real Google owner.
+        requireLocalEmailVerified: false,
+      },
+    },
     user: {
       // creditsBalance lives on better-auth's user table; input:false forbids
       // clients from setting it at signup — only the ledger mutates it.

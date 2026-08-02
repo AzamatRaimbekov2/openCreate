@@ -339,13 +339,23 @@ export const CATALOG: CatalogModel[] = [
     // and not even purchasable inside the console (it lives on a marketing page).
     // That wall is why this row was dead.
     //
-    // DeepInfra resells the SAME model at the SAME price with no activation, no
-    // prepay and no minimum. Their headline "$4.30/M tokens" is the WITH-VIDEO-INPUT
-    // rate; their own pricing string reads "$4.3/M with video, $7/M without for
-    // 480p and 780p". We send text or an image, never a video, so we pay $7/M —
-    // which IS ByteDance's own $0.0070/1k. Nobody is cheaper; the win is that
-    // nobody has to buy anything first. The 130-credit price therefore stands
-    // unchanged (~42% margin against $0.756).
+    // DeepInfra resells the same model with no activation, no prepay and no
+    // minimum. Their headline "$4.30/M tokens" is the WITH-VIDEO-INPUT rate; we send
+    // text or an image, never a video, so we are always on a "without" row.
+    //
+    // WHICH row was wrong here. This comment used to claim $7/M ("the same price as
+    // ByteDance") and a ~42% margin. The ledger says otherwise — three 720p receipts
+    // at the SAME token density (~21 660 tok/s), so only the rate varies:
+    //   2026-07-21 20:51 · 10s · $1.51830 → $7.00/M → $0.15183/s
+    //   2026-07-22 10:47 · 15s · $2.50173 → $7.70/M → $0.16678/s
+    //   2026-07-31       · 15s · $2.50173 → $7.70/M (out_tokens 324 900 observed,
+    //                                       file verified 1280×720 via MP4 `tkhd`)
+    // The rate rose ~10% within fourteen hours on 21/22 July and is stable since.
+    //
+    // At 26 credits/s the 5s clip sells for $1.30 against $0.8339 of cost: margin
+    // 1.56×, not the 1.72× this table was built on. PRICE LEFT UNCHANGED on
+    // purpose — repricing a live model is an owner decision, not a side effect of
+    // a measurement. See deepinfra-client.ts for both receipts.
     //
     // The ark-client stays: if the pack is ever bought, flipping `provider` back is
     // a one-word change, and its tests already pin the wire contract.
@@ -359,14 +369,26 @@ export const CATALOG: CatalogModel[] = [
     type: 'video',
     name: 'Auteur',
     providerLabel: 'Seedance 2.0 · ByteDance',
-    air: 'deepinfra:ByteDance/Seedance-2.0',
+    // SEGMIND, not DeepInfra (owner decision 2026-08-02). The AIR carries the
+    // synthetic `segmind:` prefix; the adapter strips it and the remainder IS the
+    // endpoint's last path segment (POST /v2/seedance-2.0).
+    //
+    // WHY THE SWITCH, in one number: a live 15s/1080p render billed $5.12 where the
+    // prediction said $5.10 — 0.4% off, which pins Segmind at $7.02/M against the
+    // $7.00 they publish. DeepInfra publishes the same $7.00 and bills a MEASURED
+    // $7.70. Same model, same ByteDance weights, 9% cheaper, and the only one of the
+    // five surveyed channels whose price card survived contact with an invoice.
+    //
+    // The failover chain in app.ts keeps DeepInfra and the direct ByteDance channel
+    // behind it, so an outage here degrades instead of failing.
+    air: 'segmind:seedance-2.0',
     tier: 'premium',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],
     durationOptions: [5, 10, 15],
     creditsByDuration: { '5': 130, '10': 260, '15': 390 },
     resolutionProfile: 'hd',
-    provider: 'deepinfra',
+    provider: 'segmind',
   },
   {
     // CinemaStudio audio — voiceover (TTS). Runware audioInference, verified to

@@ -12,8 +12,9 @@ one place CinemaStudio decides what the model is asked to make.
 
 - Responsibilities: forward the shot's own `prompt` and its **structured**
   `promptPreset` untouched (the server composes — ADR §3, never flatten
-  fragments into `prompt`); resolve the request `aspectRatio` against the film
-  canvas; snap a video model's `duration` to an offered option.
+  fragments into `prompt`); resolve the request `aspectRatio` against the shot's
+  own override, then the film canvas; snap a video model's `duration` to an
+  offered option.
 - Public API / exports:
   - `composeShotClipInput(shot, model, filmAspect): CreateGenerationInput`
   - `nearestDuration(options, seconds): number`
@@ -31,7 +32,7 @@ one place CinemaStudio decides what the model is asked to make.
 
 ```mermaid
 flowchart LR
-  SHOT[Shot: prompt + promptPreset + durationMs] --> C[composeShotClipInput]
+  SHOT[Shot: prompt + promptPreset + durationMs + aspectRatio?] --> C[composeShotClipInput]
   MODEL[CatalogModel: type/aspectRatios/durationOptions] --> C
   ASPECT[film aspectRatio] --> C
   C --> OUT[CreateGenerationInput\nmodelId, prompt, aspectRatio,\npromptPreset?, duration?]
@@ -45,9 +46,10 @@ flowchart LR
 - `promptPreset` key is OMITTED when the shot has none — `exactOptionalPropertyTypes`
   forbids `promptPreset: undefined`, and an absent preset composes to the plain
   prompt anyway.
-- Aspect: the film canvas wins when the model supports it, else the model's first
-  ratio (`noUncheckedIndexedAccess` fallback → `filmAspect`). The render scales/
-  pads every shot to the canvas regardless.
+- Aspect precedence: `shot.aspectRatio ?? filmAspect`, then the model's first
+  ratio when that target is not on the model's list (`noUncheckedIndexedAccess`
+  fallback → the target). The render scales/pads every shot to the canvas
+  regardless, so the override only decides the shape of the RAW clip.
 - `duration` is video-only; snapped to the nearest `durationOptions` value because
   a video model prices per that list and rejects arbitrary seconds.
 
@@ -56,6 +58,14 @@ flowchart LR
   declares `nativeAudio` — a stale shot flag must never 400 a request (the API
   refuses unsupported audio before charging) or double a price on a model that
   cannot sing. Covered by three new cases in composeShotClipInput.test.ts.
+
+## Update 2026-08-02 — per-shot aspect override
+- `shot.aspectRatio` (nullable, new in contracts) now wins over `filmAspect`.
+  `null` = "no opinion" → today's behaviour exactly (inherit the film canvas), so
+  every existing shot composes byte-identically. An override the model does not
+  offer takes the same rescue path an unsupported film aspect always took.
+- Set from the composer's new per-shot aspect control (`PresetPickers`), and
+  carried into the generate-time `draftShot` by `ShotInspector`.
 
 ## Commits
 

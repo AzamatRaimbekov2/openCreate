@@ -258,3 +258,32 @@ model's own soundtrack, end to end:
   ×2 on switchable models, disabled with an explanatory title where no switch exists.
   `shot.audio` persists the intent; `composeShotClipInput` forwards it only when the
   chosen model declares the capability.
+
+## Addendum 2026-08-02 — per-shot aspect, icon look controls, style→model lock
+
+The composer's look controls stop being a row of labelled dropdowns (owner request:
+«два контрола иконками, с тултипами понятными чтобы было понятно что они делают»).
+
+- **A shot may override the film's canvas.** New `shot.aspectRatio` (`'16:9' | '1:1' |
+  '9:16' | null`, nullable through contracts / DDL / drizzle / service, copied by
+  `shot-split` alongside `modelId`). `null` = NO OPINION → the film's aspect, byte-for-
+  byte today's behaviour, so no existing shot changes. `composeShotClipInput` now
+  resolves `shot.aspectRatio ?? filmAspect`, then falls back to the model's first ratio
+  exactly as an unsupported film aspect always did. **This only decides the shape of the
+  RAW clip** — the render still scales/pads every shot to the film canvas, so a native
+  9:16 insert inside a 16:9 film is an editorial choice, never a broken export.
+- **Style and aspect become ICON CHIPS** (`Menu` chip-dropdowns, design.md §13.3 — the
+  current value is checked in the popup), keeping their place in the expand drawer's
+  "Look" section. Nothing moved out of the drawer; framing/motion/quality stay `Select`s.
+  Because the triggers carry no text they carry BOTH an `aria-label` and a `title` (the
+  new §8 rule): a glyph is silent to a pointer user otherwise. The aspect glyph IS its
+  value — `FrameIcon` draws the actual rectangle, dashed when the shot inherits — and
+  amber marks the one state worth spotting: this clip deviates from the film.
+- **A style that recommends a model now LOCKS it.** While the active style's registry row
+  names a `recommendedModelId` the catalog offers, that model is the effective one and
+  the model chip is disabled with a `title` naming the style — the pairing is what the
+  style is for ("это и так под капотом настроено"). Derived every render (no `useEffect`),
+  so it follows the style picker live rather than only at shot creation, and it SHADOWS
+  the user's own `modelId` instead of overwriting it: clear the style and their pick is
+  back. A recommendation the catalog cannot serve is no lock at all — a pinned-to-absent
+  model would be a dead control with nothing selected.

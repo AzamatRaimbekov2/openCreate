@@ -122,6 +122,21 @@ const envSchema = z.object({
   // provider_error. `|| null` normalizes '' → null (not configured) below. A free
   // key comes from console.groq.com.
   GROQ_API_KEY: z.string().optional(),
+  // kie.ai API key — a THIRD Seedance channel (ADR: kie-seedance-channel). Same
+  // treatment as the other optional providers: unset keeps boot healthy and hides
+  // its models from /api/catalog. Its value is Seedance 1.5 Pro SILENT, measured at
+  // $0.0175/s against Runware's $0.0523/s for the same clip — and a real polling
+  // endpoint, which DeepInfra lacks. NOT for Seedance 2.0: kie.ai is dearer there
+  // ($0.205/s vs a measured $0.1518/s). `|| null` normalizes '' → null below.
+  KIE_API_KEY: z.string().optional(),
+  // Segmind API key — the CHEAPEST surveyed channel for Seedance 2.0 (2026-08-02).
+  // Every channel bills the same token count, so only the rate per million differs:
+  // Segmind holds a FLAT $7.00/M on every resolution, where ByteDance itself charges
+  // $7.70/M at 1080p and DeepInfra bills a measured $7.70/M even at 720p. That makes
+  // 1080p here cheaper than buying from the manufacturer, with no $29.40 resource
+  // pack. Same optional-secret discipline as the others: unset keeps boot healthy
+  // and hides its models from /api/catalog. `|| null` normalizes '' → null below.
+  SEGMIND_API_KEY: z.string().optional(),
   // Anthropic API key for the CinemaStudio script→storyboard feature. OPTIONAL,
   // same treatment as COMFY_BASE_URL / Google OAuth: unset keeps boot healthy —
   // the /storyboard endpoint then returns a clean provider_error instead of
@@ -180,6 +195,12 @@ export type AppConfig = {
   // Groq API key — the prompt enhancer's FREE fallback LLM; null when unset (Groq is
   // simply dropped from the enhancer's provider chain, boot stays healthy).
   groqApiKey: string | null
+  // kie.ai key for the third Seedance channel; null when unset (provider disabled,
+  // its catalog models hidden, boot stays healthy).
+  kieApiKey: string | null
+  // Segmind key for the cheapest Seedance 2.0 channel; null when unset (provider
+  // disabled, its models hidden from the catalog).
+  segmindApiKey: string | null
   // Anthropic key for the storyboard feature; null when unset (feature disabled,
   // boot stays healthy).
   anthropicApiKey: string | null
@@ -228,6 +249,11 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
   // `|| null`: an empty string in .env means "not configured", so Groq stays out of
   // the enhancer chain rather than joining it with a blank key.
   const groqApiKey = e.GROQ_API_KEY || null
+  // `|| null`: an empty KIE_API_KEY in .env means "not configured", so the channel
+  // stays dark rather than joining the registry with a blank key and failing every
+  // submit — the exact trap the provider gating exists to prevent.
+  const kieApiKey = e.KIE_API_KEY || null
+  const segmindApiKey = e.SEGMIND_API_KEY || null
   const dashscopeConfigured = Boolean(e.DASHSCOPE_API_KEY && e.DASHSCOPE_WORKSPACE_ID)
   const dashscopeApiKey = dashscopeConfigured ? (e.DASHSCOPE_API_KEY ?? null) : null
   const dashscopeWorkspaceId = dashscopeConfigured ? (e.DASHSCOPE_WORKSPACE_ID ?? null) : null
@@ -263,7 +289,9 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     // wan-runpod pod's /view host is folded in below so its finished mp4s pass
     // the SSRF gate — driven entirely by COMFY_BASE_URL, so pointing at a new
     // pod is one env edit with no allowlist bookkeeping.
-    assetHostAllowlist: withDeepinfraHost(
+    assetHostAllowlist: withSegmindHost(
+      withKieHost(
+      withDeepinfraHost(
       withDashscopeHost(
       withArkHost(
         withComfyHost(
@@ -277,6 +305,10 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
         dashscopeApiKey,
       ),
       deepinfraToken,
+      ),
+      kieApiKey,
+      ),
+      segmindApiKey,
     ),
     assetFetchTimeoutMs: e.ASSET_FETCH_TIMEOUT_MS,
     assetMaxBytes: e.ASSET_MAX_BYTES,
@@ -287,6 +319,8 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     dashscopeWorkspaceId,
     deepinfraToken,
     groqApiKey,
+    kieApiKey,
+    segmindApiKey,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.
     anthropicApiKey: e.ANTHROPIC_API_KEY || null,
@@ -363,4 +397,40 @@ function withDeepinfraHost(allowlist: string[], deepinfraToken: string | null): 
   return allowlist.includes(DEEPINFRA_ASSET_HOST)
     ? allowlist
     : [...allowlist, DEEPINFRA_ASSET_HOST]
+}
+
+// Where kie.ai serves a finished clip. Back to the ByteDance/Alibaba trap rather
+// than DeepInfra's convenience: their API is `api.kie.ai` but the mp4 lands on
+// `tempfile.aiquickdraw.com` — an unrelated domain, observed on the live
+// verification run 2026-07-30. Allowlisting `kie.ai` would pass the SSRF gate for
+// zero real downloads and fail every one of them.
+//
+// Their URL expires after 24 HOURS, so storage.saveFromUrl copying it out is not an
+// optimization — it is the only reason the asset survives at all.
+export const KIE_ASSET_HOST = 'tempfile.aiquickdraw.com'
+
+// Where Segmind serves a finished clip. EVIDENCE, not a guess: their own 404 body
+// calls `api.segmind.com/v1/requests/{id}` the OUTPUT endpoint ("Output for this
+// request ID … Not Found"), and the submit envelope returns that URL as `poll_url`.
+//
+// NOT YET CONFIRMED against a successful render, because no paid generation has run
+// through the production path. Every other provider here serves files from a host
+// UNRELATED to its API (kie.ai → tempfile.aiquickdraw.com, ByteDance → *.volces.com),
+// so Segmind may well redirect to a CDN too. The adapter logs the real host on its
+// first success (`event: segmind.asset_host`) — read that line and add the host here
+// if it differs, rather than widening the allowlist speculatively.
+export const SEGMIND_ASSET_HOST = 'api.segmind.com'
+
+// Folded in ONLY when the provider is configured; the download surface stays closed
+// by default, exactly like the hosts above.
+function withSegmindHost(allowlist: string[], segmindApiKey: string | null): string[] {
+  if (!segmindApiKey) return allowlist
+  return allowlist.includes(SEGMIND_ASSET_HOST) ? allowlist : [...allowlist, SEGMIND_ASSET_HOST]
+}
+
+// Folded in ONLY when the provider is configured; the download surface stays closed
+// by default, exactly like the four hosts above.
+function withKieHost(allowlist: string[], kieApiKey: string | null): string[] {
+  if (!kieApiKey) return allowlist
+  return allowlist.includes(KIE_ASSET_HOST) ? allowlist : [...allowlist, KIE_ASSET_HOST]
 }

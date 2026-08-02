@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildTestApp } from './helpers/build-test-app'
+import { createAuth } from '../src/modules/auth/auth'
+import { createDb } from '../src/db/client'
+import type { AppConfig } from '../src/config'
 
 async function register(app: Awaited<ReturnType<typeof buildTestApp>>) {
   const res = await app.inject({
@@ -31,5 +34,30 @@ describe('auth', () => {
     const res = await app.inject({ method: 'GET', url: '/api/me' })
     expect(res.statusCode).toBe(401)
     expect(res.json().error.code).toBe('unauthorized')
+  })
+
+  it('Google may link to an existing email+password account (no local email verification exists)', () => {
+    // The live bug: Google sign-in with the email of an existing password
+    // account died on better-auth's error page with account_not_linked. Root
+    // cause (better-auth 1.6.x oauth2/link-account): requireLocalEmailVerified
+    // defaults to TRUE, and this app has NO email-verification flow — every
+    // password user stays emailVerified=false forever, so linking was refused
+    // for ALL of them. The instance must trust google (its emails are verified
+    // by Google) and drop the local-verified wall.
+    // createAuth only reads the auth-related config fields — a focused stub
+    // keeps this a unit test (same cast idiom as the provider fakes).
+    const { db } = createDb(':memory:')
+    const auth = createAuth(db, {
+      betterAuthSecret: 'test-secret-test-secret-test-secret',
+      betterAuthUrl: 'http://localhost:8787',
+      trustedOrigins: ['http://localhost:5173'],
+      googleClientId: 'test-client-id',
+      googleClientSecret: 'test-client-secret',
+      signupBonusCredits: 200,
+    } as unknown as AppConfig)
+    expect(auth.options.account?.accountLinking).toMatchObject({
+      trustedProviders: ['google'],
+      requireLocalEmailVerified: false,
+    })
   })
 })

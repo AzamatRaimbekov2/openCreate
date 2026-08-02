@@ -33,3 +33,10 @@ flowchart LR
 ## Commits
 - bcb3148 2026-07-30 feat(canvas-web): editor shell, palette, library, routes
 - 87c6d3c 2026-07-30 feat(canvas-web): character node — a Soul character as a wired reference
+
+## Update 2026-08-02 — `prompt` (glyph `¶`) enters the rail
+
+- Placed between `character` and `note`, not next to `note`: `prompt` and `character` are
+  the same ROLE — furniture with an output port that feeds a producer — while a note has
+  no port at all. The rail's stated order (producers → what feeds them → annotation) is
+  what decides the position, not the order the kinds were built in.

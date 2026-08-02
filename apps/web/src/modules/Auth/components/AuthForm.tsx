@@ -18,12 +18,36 @@ import { useAuthConfig } from '../model/authConfig'
 
 type AuthMode = 'login' | 'register'
 
+// DEV-ONLY affordance: a value with no "@" is treated as a local dev username
+// and expanded to the domain the seeded super-admin lives on
+// (admin -> admin@dev.local).
+//
+// WHY: the dev admin's credential is admin@dev.local / "admin"
+// (modules/auth/dev-admin.ts), but the muscle memory — and whatever Chrome
+// saved the first time someone typed it — is a bare "admin". The email rule
+// below rejected that BEFORE any request left the browser, so the form showed
+// only "enter a valid email" and sign-in looked broken while the API was
+// perfectly healthy. Expanding here fixes the input, not the validation.
+//
+// Gated on import.meta.env.DEV so the whole branch is statically dead in a
+// production bundle: prod keeps the strict rule and a bare username stays
+// invalid, which the tests assert in both directions. Read INSIDE the function
+// (not at module scope) so the flag is evaluated per-validation.
+const expandDevUsername = (value: string) =>
+  import.meta.env.DEV && value.length > 0 && !value.includes('@')
+    ? `${value}@dev.local`
+    : value
+
 // Zod = the single source of truth for validation. Messages are i18n KEYS —
 // translated where rendered so the copy follows the active locale live.
 const loginSchema = z.object({
   // Present in both modes so the inferred type is identical; login ignores it
   name: z.string(),
-  email: z.email('auth.errors.email'),
+  // transform-then-pipe, NOT a plain refine: the expansion must happen BEFORE
+  // the email check (otherwise "admin" fails validation and never reaches it),
+  // and the resolver hands the TRANSFORMED value to onSubmit — so the auth
+  // client receives admin@dev.local without the submit handler knowing.
+  email: z.string().transform(expandDevUsername).pipe(z.email('auth.errors.email')),
   // Login only requires SOMETHING typed: the server verifies against the
   // stored hash, and better-auth enforces its 8-char minimum on sign-UP, not
   // sign-in. Mirroring min(8) here was stricter than the API and locked out
@@ -160,9 +184,16 @@ function AuthFields({ mode, onSwitchToLogin }: { mode: AuthMode; onSwitchToLogin
     await queryClient.invalidateQueries({ queryKey: ['me'] })
   }
 
-  const handleGoogleSignIn = () => {
-    // Full-page OAuth redirect; better-auth brings the user back to /create
-    void signIn.social({ provider: 'google', callbackURL: '/create' })
+  const handleGoogleSignIn = async () => {
+    setServerError(null)
+    // Full-page OAuth redirect; better-auth brings the user back to /create.
+    // On success the page navigates away — but a FAILED request (rate limit,
+    // network, misconfig) resolves here with { error }, and swallowing it made
+    // the button look dead. Same localized banner as email sign-in.
+    const result = await signIn.social({ provider: 'google', callbackURL: '/create' })
+    if (result.error) {
+      setServerError(mapServerError({ code: result.error.code, status: result.error.status }, mode))
+    }
   }
 
   return (
@@ -230,7 +261,7 @@ function AuthFields({ mode, onSwitchToLogin }: { mode: AuthMode; onSwitchToLogin
           (GET /api/auth/config). Runtime-driven so it can never drift from the
           backend provider (ADR google-oauth). */}
       {authConfig?.googleEnabled ? (
-        <Button variant="ghost" onClick={handleGoogleSignIn}>
+        <Button variant="ghost" onClick={() => void handleGoogleSignIn()}>
           {t('auth.google')}
         </Button>
       ) : null}

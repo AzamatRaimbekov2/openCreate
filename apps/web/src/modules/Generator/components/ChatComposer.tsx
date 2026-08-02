@@ -21,12 +21,26 @@
 // field. The API derives resolution from (model tier × aspect) — there is no
 // wire field to carry either, and no upscale step in the pipeline. Rendering
 // them would be a lie the backend cannot honor. See resolutionFor().
-import { useEffect, useState } from 'react'
-import type { ClipboardEvent, DragEvent, KeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent, ClipboardEvent, DragEvent, KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatResolution, resolutionFor } from '@opencreate/contracts'
 import { readImageFile } from 'shared/libs/readImageFile'
-import { Button, EmptyState, EnhanceButton, ErrorState, GLASS_FLOATING, Select, Skeleton } from 'shared/ui'
+// The "@" protocol's shared halves (moved out of this module 2026-07-24 so the
+// Cinema shot composer can speak it too): the pure caret math from shared/libs,
+// the presentational popup from the kit.
+import { applyMention, findActiveMention } from 'shared/libs/mentionQuery'
+import type { ActiveMention } from 'shared/libs/mentionQuery'
+import {
+  Button,
+  EmptyState,
+  EnhanceButton,
+  ErrorState,
+  GLASS_FLOATING,
+  MentionAutocomplete,
+  Select,
+  Skeleton,
+} from 'shared/ui'
 import { useCatalog } from '../model/catalogApi'
 import { useCreateGeneration } from '../model/createGeneration'
 import {
@@ -82,6 +96,31 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
   const [isDraggingImage, setIsDraggingImage] = useState(false)
   const [attachErrorKey, setAttachErrorKey] = useState<string | null>(null)
 
+  // Inline "@" mention picker state (hooks BEFORE the early returns). `mention`
+  // is the active "@query" at the caret (null = picker closed); `mentionIndex` is
+  // the keyboard-highlighted row; `caretTarget` is where the caret must land
+  // AFTER a token splice (a controlled textarea otherwise jumps it to the end).
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [mention, setMention] = useState<ActiveMention | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  // Where the caret must land AFTER a token splice. A REF, not state: mutating it
+  // triggers no render (the splice already re-renders via setPrompt), and it
+  // sidesteps the "no setState in effect" rule the state version tripped.
+  const caretTargetRef = useRef<number | null>(null)
+
+  // Once the spliced prompt has rendered, move the caret past the token (a
+  // controlled textarea otherwise snaps it to the end). Keyed on the prompt so it
+  // fires exactly on the change that carried the splice.
+  useEffect(() => {
+    if (caretTargetRef.current === null) return
+    const el = textareaRef.current
+    if (el) {
+      el.focus()
+      el.setSelectionRange(caretTargetRef.current, caretTargetRef.current)
+    }
+    caretTargetRef.current = null
+  }, [state.prompt])
+
   // Loading: mirror the bar's silhouette so the feed above never jumps
   if (catalog.isPending) {
     return (
@@ -121,6 +160,49 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
   // list narrows to reference-capable models — a model that ignores the tag
   // would silently bill the user for a stranger (enforced again by the API).
   const hasMention = deriveEntityRefs(state.prompt, state.mentions).length > 0
+
+  // ── Inline "@" mention picker ──────────────────────────────────────────────
+  // v1 sends ONE reference (contract cap), so once a tag is live the inline
+  // picker stays closed — the same rule the @-button obeys. Matches are the
+  // library entries whose name contains the text typed after the "@".
+  const atMentionCap = hasMention
+  const mentionMatches =
+    mention && !atMentionCap
+      ? taggableEntities.filter((entity) =>
+          entity.name.toLowerCase().includes(mention.query.toLowerCase()),
+        )
+      : []
+  // Open whenever a query is active and the library is non-empty (an empty
+  // filter still shows the "no matches" row rather than silently swallowing "@").
+  const mentionOpen = mention !== null && !atMentionCap && taggableEntities.length > 0
+
+  const closeMention = () => {
+    setMention(null)
+    setMentionIndex(0)
+  }
+
+  // Tag from the inline picker: register the mention and splice its [[eN]] token
+  // exactly where the "@query" sits (caret-accurate), then park the caret past it.
+  const selectMention = (entityId: string) => {
+    if (!mention) return
+    const caret = textareaRef.current?.selectionStart ?? state.prompt.length
+    const token = state.addMention(entityId)
+    const next = applyMention(state.prompt, mention, caret, token)
+    state.setPrompt(next.text)
+    closeMention()
+    caretTargetRef.current = next.caret
+  }
+
+  // Every keystroke recomputes the active "@query" from the NEW value + caret, so
+  // the picker opens on "@", filters as the user types, and closes on whitespace.
+  const handlePromptChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value
+    const caret = event.target.selectionStart ?? value.length
+    state.setPrompt(value)
+    const capped = deriveEntityRefs(value, state.mentions).length > 0
+    setMention(capped ? null : findActiveMention(value, caret))
+    setMentionIndex(0)
+  }
 
   // Insert a tag: register the mention, append its token to the prompt. Appended
   // (not inserted at caret) to stay dependency-free — the token is opaque, so its
@@ -187,6 +269,33 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
   // this the composer looks like a chat box and behaves like a form, which is
   // the single most jarring thing a chat-shaped input can do.
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    // When the inline "@" picker is open it OWNS the arrow/enter/tab/esc keys —
+    // Enter must pick an entity, never submit the generation.
+    if (mentionOpen && mentionMatches.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setMentionIndex((index) => (index + 1) % mentionMatches.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setMentionIndex((index) => (index - 1 + mentionMatches.length) % mentionMatches.length)
+        return
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault()
+        const picked = mentionMatches[mentionIndex] ?? mentionMatches[0]
+        if (picked) selectMention(picked.id)
+        return
+      }
+    }
+    // Escape closes the picker whether or not it has matches.
+    if (mentionOpen && event.key === 'Escape') {
+      event.preventDefault()
+      closeMention()
+      return
+    }
+    // Chat contract: Enter submits, Shift+Enter breaks the line.
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       handleSubmit()
@@ -226,17 +335,33 @@ export function ChatComposer({ taggableEntities = [] }: ChatComposerProps) {
           so nesting a second bordered box inside it would read as a box in a
           box. One row tall (rows=1) keeps the pill small; it grows only when
           the user shift+enters. */}
-      <div className="flex items-center gap-2">
+      {/* relative: anchors the inline "@" mention popup, which opens UPWARD from
+          the input row (the composer is a bottom dock — a list below is off-screen). */}
+      <div className="relative flex items-center gap-2">
+        {mentionOpen ? (
+          <MentionAutocomplete
+            items={mentionMatches}
+            activeIndex={mentionIndex}
+            label={t('generator.mention.pickerLabel')}
+            emptyText={t('generator.mention.noMatches')}
+            onSelect={selectMention}
+            onHover={setMentionIndex}
+          />
+        ) : null}
         {/* Attachment sits INSIDE the input row, iOS-style, only where the
             model can actually take an image */}
         {model?.supportsImageInput ? (
           <AttachImage value={state.inputImage} onChange={state.setInputImage} />
         ) : null}
         <textarea
+          ref={textareaRef}
           rows={1}
           value={state.prompt}
-          onChange={(event) => state.setPrompt(event.target.value)}
+          onChange={handlePromptChange}
           onKeyDown={handleKeyDown}
+          // Close the picker when focus leaves the textarea. Option clicks use
+          // onMouseDown+preventDefault, so they fire BEFORE this blur.
+          onBlur={closeMention}
           aria-label={t('generator.prompt.label')}
           placeholder={t('generator.prompt.placeholder')}
           className="max-h-32 min-h-11 flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-base text-mist placeholder:text-mist-dim/60 focus:outline-none"

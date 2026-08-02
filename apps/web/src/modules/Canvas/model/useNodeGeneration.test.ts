@@ -7,7 +7,7 @@
 // character's name + description where the tag sits.
 import { describe, expect, it } from 'vitest'
 import type { CanvasEdge, CanvasNode } from '@opencreate/contracts'
-import { buildRunInput } from './useNodeGeneration'
+import { buildRunInput, composeNodePrompt } from './useNodeGeneration'
 
 const imageNode = (id: string, generationIds: string[] = []): CanvasNode => ({
   id,
@@ -25,10 +25,49 @@ const characterNode = (id: string, entityId?: string): CanvasNode => ({
   generationIds: [],
 })
 
+const promptNode = (id: string, prompt: string): CanvasNode => ({
+  id,
+  kind: 'prompt',
+  position: { x: 0, y: 0 },
+  config: { prompt },
+  generationIds: [],
+})
+
 const wire = (sourceNodeId: string, targetNodeId: string): CanvasEdge => ({
   id: `e-${sourceNodeId}-${targetNodeId}`,
   sourceNodeId,
   targetNodeId,
+})
+
+// The shared-prompt wire (ADR canvas-prompt-node D2/D3). ONE function answers
+// "what is this node's prompt" for the run path, the branch plan and the card —
+// a second opinion anywhere is a disabled button over a runnable job, or a
+// charge for text the user never saw.
+describe('composeNodePrompt', () => {
+  it('is the node’s own prompt when nothing is wired', () => {
+    const node = imageNode('n1')
+    expect(composeNodePrompt(node, [node], [])).toBe('a fox')
+  })
+
+  it('puts the TEMPLATE first and the node’s own text after it', () => {
+    const tpl = promptNode('t1', 'cinematic 35mm, neon')
+    const node = imageNode('n1')
+    expect(composeNodePrompt(node, [tpl, node], [wire('t1', 'n1')])).toBe(
+      'cinematic 35mm, neon\na fox',
+    )
+  })
+
+  it('is the template ALONE when the node has no own text', () => {
+    const tpl = promptNode('t1', 'cinematic 35mm, neon')
+    const node: CanvasNode = { ...imageNode('n1'), config: { modelId: 'flux-dev' } }
+    expect(composeNodePrompt(node, [tpl, node], [wire('t1', 'n1')])).toBe('cinematic 35mm, neon')
+  })
+
+  it('is the own text alone when the wired template is empty (no stray newline)', () => {
+    const tpl = promptNode('t1', '   ')
+    const node = imageNode('n1')
+    expect(composeNodePrompt(node, [tpl, node], [wire('t1', 'n1')])).toBe('a fox')
+  })
 })
 
 describe('buildRunInput', () => {
@@ -166,5 +205,42 @@ describe('buildRunInput', () => {
   it('omits entityRefs entirely when no character is wired', () => {
     const input = buildRunInput(imageNode('n1'), [imageNode('n1')], [])
     expect(input && 'entityRefs' in input).toBe(false)
+  })
+
+  it('submits the COMPOSED prompt when a template is wired', () => {
+    const tpl = promptNode('t1', 'cinematic 35mm, neon')
+    const node = imageNode('n1')
+    const input = buildRunInput(node, [tpl, node], [wire('t1', 'n1')])
+    expect(input?.prompt).toBe('cinematic 35mm, neon\na fox')
+  })
+
+  it('is runnable on the TEMPLATE alone — an empty own field is no longer a blocker', () => {
+    // The length guard now runs against the composed text (ADR D3). Before this,
+    // a node fed by a perfectly good template sat behind a disabled Generate.
+    const tpl = promptNode('t1', 'cinematic 35mm, neon')
+    const node: CanvasNode = { ...imageNode('n1'), config: { modelId: 'flux-dev' } }
+    expect(buildRunInput(node, [tpl, node], [wire('t1', 'n1')])?.prompt).toBe(
+      'cinematic 35mm, neon',
+    )
+  })
+
+  it('still refuses when template AND own text are both empty', () => {
+    const tpl = promptNode('t1', '')
+    const node: CanvasNode = { ...imageNode('n1'), config: { modelId: 'flux-dev' } }
+    expect(buildRunInput(node, [tpl, node], [wire('t1', 'n1')])).toBeNull()
+  })
+
+  it('prepends the character token to the COMPOSED prompt, not to the node’s half', () => {
+    // The token must lead what the server actually receives; prepending it to the
+    // node's own text would bury it in the middle of the template + own join.
+    const tpl = promptNode('t1', 'cinematic 35mm')
+    const character = characterNode('ch1', 'ent1')
+    const node = imageNode('n1')
+    const input = buildRunInput(
+      node,
+      [tpl, character, node],
+      [wire('t1', 'n1'), wire('ch1', 'n1')],
+    )
+    expect(input?.prompt).toBe('[[e1]] cinematic 35mm\na fox')
   })
 })

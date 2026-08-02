@@ -37,4 +37,4 @@ flowchart LR
 
 ## Commits
 
-- _no commit yet_
+- c5fe185 feat(compare): скрытая страница /compare — FLUX dev vs Nano Banana Pro vs Qwen Image Max

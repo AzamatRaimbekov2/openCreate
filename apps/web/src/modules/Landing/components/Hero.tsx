@@ -1,11 +1,12 @@
 // apps/web/src/modules/Landing/components/Hero.tsx
 // Landing hero (v3 Stage 2 "Bioluminescent Terminal"): a FULL-VIEWPORT stage
-// with the animated ASCII ellipsoid behind centered content — the big mono
+// with the animated ASCII ellipsoid behind centered content — the MASCOT figure
+// (the brand's face, owner brief 2026-07-24: media-first), the big mono
 // wordmark, the quiet kicker, the whisper-weight mono display headline (weight
 // 400 with exactly ONE portal-blue accent word), the approved claims line in
 // mist, and the two specimen-pill CTAs: GREEN "start creating" (THE create
-// action) + AMBER "see pricing" (explore tint). The text IS the hero — the
-// sphere is transparent atmosphere, not a photo. Copy rules: ONLY the verified
+// action) + AMBER "see pricing" (explore tint). The mascot leads now — the
+// sphere dimmed to faint atmosphere behind it. Copy rules: ONLY the verified
 // claims, never a blanket "cheaper than everything" line.
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -46,9 +47,25 @@ export function Hero({ ctaTo }: HeroProps) {
     // never cut the CTAs off); everything centers over the sphere
     <section className="relative flex min-h-svh flex-col items-center justify-center px-6 py-24">
       {/* The generative visual: fills the whole stage behind the copy.
-          pointer-events-none keeps text selection and CTA clicks unobstructed. */}
-      <AsciiSphere className="pointer-events-none absolute inset-0 h-full w-full" />
-      <div className="relative flex max-w-3xl flex-col items-center gap-7 text-center">
+          pointer-events-none keeps text selection and CTA clicks unobstructed.
+          Dimmed to 60% now that the mascot is the focal figure — the sphere
+          stays as faint atmosphere behind it, not a competing subject. */}
+      <AsciiSphere className="pointer-events-none absolute inset-0 h-full w-full opacity-60" />
+      <div className="relative flex max-w-3xl flex-col items-center gap-6 text-center">
+        {/* The mascot IS the hero now (owner brief, 2026-07-24: media-first).
+            A recessed abyss media well + hairline — the design system's plate
+            treatment for artwork — sized responsively so the CTAs stay near the
+            fold. The dark nebula key art bleeds into the void by design. */}
+        <figure className="w-[clamp(11rem,26vw,18rem)] overflow-hidden rounded-2xl border border-white/10 bg-abyss">
+          <img
+            src="/hero-mascot.jpg"
+            alt={t('landing.heroMascotAlt')}
+            width={900}
+            height={900}
+            fetchPriority="high"
+            className="aspect-square h-full w-full object-cover"
+          />
+        </figure>
         {/* The centered mono wordmark — the brand plate of the hero (the
             masthead carries no wordmark on the landing; this IS it). The
             portal middle dot is the brand cursor, decorative as everywhere. */}

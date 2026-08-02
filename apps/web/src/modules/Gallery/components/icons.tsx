@@ -3,9 +3,12 @@
 // the design system keeps a closed icon triad, and an emoji would render in the
 // platform's own palette, breaking the surface ladder wherever it lands.
 //
-// One file because these five are one family: they appear together in the card's
-// overflow menu and again as the detail view's icon rail, and they must be drawn
-// on the same 24-unit grid with the same 1.5 stroke or the rail looks ragged.
+// One file because they are one family: they appear together in the card's
+// overflow menu and again in the detail viewer's menu, and they must be drawn
+// on the same 24-unit grid with the same 1.5 stroke or the menu looks ragged.
+// PlayIcon is the odd one out — it is not an ACTION but the affordance painted
+// over a video poster, so it is the only FILLED glyph here (a hollow triangle
+// disappears against moving footage).
 
 const STROKE = {
   viewBox: '0 0 24 24',
@@ -51,12 +54,25 @@ export function PromptIcon({ className = 'size-4' }: { className?: string }) {
   )
 }
 
-// Regenerate = a closed refresh loop
-export function RegenerateIcon({ className = 'size-4' }: { className?: string }) {
+// Edit = a pencil. The action it leads used to be called "Regenerate" and wore
+// a refresh loop (deleted with this change — nothing referenced it afterwards),
+// which promised something it never did: the action re-fills the composer and
+// waits for the user; nothing is regenerated until they submit.
+export function PencilIcon({ className = 'size-4' }: { className?: string }) {
   return (
     <svg {...STROKE} className={className}>
-      <path d="M20 12a8 8 0 1 1-2.3-5.6" />
-      <path d="M20 4v5h-5" />
+      <path d="M4 20h4l10-10a2.8 2.8 0 0 0-4-4L4 16v4Z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  )
+}
+
+// The play affordance over a video poster — FILLED, not stroked: it sits on top
+// of a frame of real footage, where a 1.5px outline reads as noise
+export function PlayIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M8 5.5v13l11-6.5-11-6.5Z" />
     </svg>
   )
 }

@@ -14,13 +14,17 @@ export const NODE_KIND_MIME = 'application/x-opencreate-node-kind'
 // The rail lists only kinds that DO something today — a button for a node that
 // cannot act is a promise the product does not keep. `character` joins here with
 // ADR phase 3: it now picks a real Soul character and feeds it downstream.
-// Ordered by the shape of a chain: what produces media, then what identifies a
-// subject, then the annotation that never runs.
+// Ordered by the shape of a chain: what produces media, then what FEEDS a
+// producer (the subject, then the shared prompt), then the annotation that
+// never runs. `prompt` sits beside `character` rather than next to `note`
+// because the two are the same role — furniture with an output port — while a
+// note has no port at all.
 const PALETTE: { kind: CanvasNodeKind; glyph: string }[] = [
   { kind: 'image', glyph: '▣' },
   { kind: 'video', glyph: '▶' },
   { kind: 'upload', glyph: '⇧' },
   { kind: 'character', glyph: '☺' },
+  { kind: 'prompt', glyph: '¶' },
   { kind: 'note', glyph: '✎' },
 ]
 

@@ -42,3 +42,17 @@ flowchart TD
 
 ## Commits
 - 1779f0c 2026-07-30 feat(canvas-web): @xyflow/react + pure edge rules
+
+## Update 2026-08-02 — a THIRD slot: `prompt`
+
+- Sockets are now media · character · prompt, each with its own capacity table. A
+  `prompt` source may reach `image` and `video` (cap 1 each) and nothing else — an
+  operation node has no prompt to prepend to.
+- **Cap 1 and not more:** with two templates the composed word order would be whatever
+  the edge array happened to hold, and a prompt whose order depends on click history is
+  not a promise the product can keep. The second wire is refused at drag time.
+- The slot-of-a-source rule was DUPLICATED (once in the verdict, once in the occupancy
+  count) and read `kind === 'character' ? 'character' : 'media'` in both places — adding a
+  third slot is exactly when that drifts, so both now call one `slotOf()` and index one
+  `CAP_BY_SLOT` table.
+- A prompt node takes no input, so it is absent from every capacity table as a TARGET.

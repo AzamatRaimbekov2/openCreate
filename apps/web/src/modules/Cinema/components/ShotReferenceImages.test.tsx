@@ -7,9 +7,9 @@
 //   * the attached refs render as a removable thumbnail grid (DELETE by id);
 //   * the shared budget of 5 (entity tags + images) hides the add affordance;
 //   * a server 400 and a client-side type/size reject both surface LOCALIZED copy,
-//     never raw text — and a rejected file fires NO request;
-//   * a model without referenceMode does NOT block attaching — it shows a calm
-//     switch-to-Wan notice.
+//     never raw text — and a rejected file fires NO request.
+// NOTE: there is NO model-gating copy any more (owner request 2026-07-24) — the
+// component never tells the user a model "doesn't use reference images".
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -28,7 +28,7 @@ const apiMock = vi.mocked(api)
 type RenderOptions = {
   references?: ShotReferenceImage[]
   entityRefCount?: number
-  modelSupportsReferences?: boolean
+  onCharacterCreated?: (entityId: string) => void
 }
 
 function renderRefs(options: RenderOptions = {}) {
@@ -40,7 +40,7 @@ function renderRefs(options: RenderOptions = {}) {
         shotId="shot1"
         references={options.references ?? []}
         entityRefCount={options.entityRefCount ?? 0}
-        modelSupportsReferences={options.modelSupportsReferences ?? true}
+        onCharacterCreated={options.onCharacterCreated ?? vi.fn()}
       />
     </QueryClientProvider>,
   )
@@ -48,8 +48,22 @@ function renderRefs(options: RenderOptions = {}) {
 
 const pngFile = () => new File(['fake-bytes'], 'shot.png', { type: 'image/png' })
 
+// A minimal succeeded IMAGE generation — the picker's select() reads only
+// id/type/status/mediaUrls, so we mock exactly those (the api mock is untyped).
+const imageGeneration = (id: string, url: string) => ({
+  id,
+  type: 'image',
+  status: 'succeeded',
+  mediaUrls: [url],
+})
+
 beforeEach(() => {
   apiMock.mockReset()
+})
+
+afterEach(() => {
+  // The gallery-pick test stubs global fetch — never let it leak to a sibling
+  vi.unstubAllGlobals()
 })
 
 describe('ShotReferenceImages', () => {
@@ -143,13 +157,110 @@ describe('ShotReferenceImages', () => {
     )
   })
 
-  it('lets you attach even when the model ignores references, with a calm switch-to-Wan notice', () => {
-    renderRefs({ modelSupportsReferences: false })
+  it('never shows model-gating copy — attaching is always offered, no switch-to-Wan nag', () => {
+    // Owner request 2026-07-24: the "this model doesn't use reference images —
+    // switch to Wan" line is GONE. The add affordance is always present; the
+    // component says nothing about the model's capability.
+    renderRefs()
 
-    // Honest capability copy — NOT the character-centric "cannot hold a character"
-    expect(screen.getByText(/wan 2\.7/i)).toBeInTheDocument()
-    // …and it is NOT a hard block: the add affordance is still there
+    expect(screen.queryByText(/wan 2\.7/i)).toBeNull()
+    expect(screen.queryByText(/switch to|use reference images/i)).toBeNull()
     expect(screen.getByLabelText(/attach image/i)).toBeInTheDocument()
+  })
+
+  it('attaches an image picked from the gallery as a data URI POST', async () => {
+    // Two channels through the one api mock: the gallery LIST (GET) and the
+    // reference ATTACH (POST). Branch on the path so both resolve in one test.
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/generations')) {
+        return Promise.resolve({ items: [imageGeneration('g1', '/media/g1.png')], nextCursor: null })
+      }
+      return Promise.resolve({ referenceImages: [{ id: 'r1', path: '/media/r1.png' }] })
+    })
+    // The pick fetches the /media bytes → blob → data URI. Stub fetch to hand
+    // back a small PNG blob (jsdom's FileReader reads its type into the URI).
+    const blob = new Blob(['png-bytes'], { type: 'image/png' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(blob) }),
+    )
+    renderRefs()
+
+    // Open the picker, wait for the thumbnail, pick it.
+    await userEvent.click(screen.getByRole('button', { name: /attach from gallery/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /attach this image/i }))
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/films/film1/shots/shot1/references',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    )
+    const postCall = apiMock.mock.calls.find(
+      ([path]) => path === '/api/films/film1/shots/shot1/references',
+    )
+    expect(JSON.parse(String(postCall?.[1]?.body)).dataUri).toMatch(/^data:image\//)
+  })
+
+  it('turns an attached reference into a named character and auto-tags it', async () => {
+    const onCharacterCreated = vi.fn()
+    // Three channels through the one api mock, branched by path + method: the
+    // character SHELL (POST /entities), its reference PHOTO (POST /entities/:id/
+    // images), and the raw ref DELETE (so the image is never sent twice).
+    apiMock.mockImplementation((path: string, init?: RequestInit) => {
+      if (path === '/api/entities' && init?.method === 'POST') {
+        return Promise.resolve({ id: 'e1', kind: 'character', name: 'Fox', primaryImageId: null })
+      }
+      if (path === '/api/entities/e1/images' && init?.method === 'POST') {
+        return Promise.resolve({ id: 'e1', kind: 'character', name: 'Fox', primaryImageId: 'img1' })
+      }
+      return Promise.resolve({ referenceImages: [] })
+    })
+    // The create fetches the /media bytes → blob → data URI (jsdom's FileReader
+    // reads the blob's type into the URI).
+    const blob = new Blob(['png-bytes'], { type: 'image/png' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(blob) }),
+    )
+    renderRefs({ references: [{ id: 'r1', path: '/media/r1.png' }], onCharacterCreated })
+
+    await userEvent.click(screen.getByRole('button', { name: /make character/i }))
+    await userEvent.type(screen.getByLabelText(/character name/i), 'Fox')
+    await userEvent.click(screen.getByRole('button', { name: /^create$/i }))
+
+    // 1. The character shell is created with kind=character and the typed name.
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/entities',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    )
+    const createCall = apiMock.mock.calls.find(
+      ([path, init]) => path === '/api/entities' && (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(JSON.parse(String((createCall?.[1] as RequestInit).body))).toMatchObject({
+      kind: 'character',
+      name: 'Fox',
+    })
+
+    // 2. Its reference photo is attached as an upload data URI.
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/entities/e1/images',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    )
+    const imageCall = apiMock.mock.calls.find(([path]) => path === '/api/entities/e1/images')
+    expect(JSON.parse(String((imageCall?.[1] as RequestInit).body)).dataUri).toMatch(/^data:image\//)
+
+    // 3. The raw shot ref is removed and the new character is handed back to be
+    //    @-mentioned in the prompt.
+    await waitFor(() => expect(onCharacterCreated).toHaveBeenCalledWith('e1'))
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/films/film1/shots/shot1/references/r1',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
   })
 
   it('renders each attached ref with its own remove control', () => {

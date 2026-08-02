@@ -55,7 +55,13 @@ function CreatePage() {
   // The composer's mention picker taggable list. Read HERE so Generator never
   // imports modules/Entities — the route is the seam (as with onRegenerate).
   const entitiesQuery = useEntities()
-  const taggableEntities = (entitiesQuery.data?.items ?? []).map((e) => ({ id: e.id, name: e.name }))
+  // imageUrl = the entity's primary reference image (the "attached picture" the
+  // inline "@" picker shows as a thumbnail); falls back to its first image, or null.
+  const taggableEntities = (entitiesQuery.data?.items ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    imageUrl: e.images.find((image) => image.id === e.primaryImageId)?.url ?? e.images[0]?.url ?? null,
+  }))
   const modelOptions = (catalog.data?.models ?? []).map((model) => ({
     id: model.id,
     name: model.name,
@@ -90,6 +96,9 @@ function CreatePage() {
           aspectRatio={filters.aspectRatio}
           hasCreateCta={false}
           onRegenerate={prefillDraft}
+          // The same id→name list the filter bar takes; the detail viewer uses
+          // it to NAME the model that made a result instead of printing its id
+          models={modelOptions}
         />
       </section>
 

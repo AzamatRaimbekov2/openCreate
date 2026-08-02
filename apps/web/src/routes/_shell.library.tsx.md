@@ -54,3 +54,12 @@ flowchart LR
 - 01c29ab 2026-07-06 feat(web): app shell with nav, balance, language switch (moved under `_shell` layout)
 - cb228e3 2026-07-07 restyle(web): editorial app shell, auth, generator, gallery
 - 252ab38 2026-07-07 restyle(web): terminal design system — cosmic void tokens, jetbrains mono, specimen pills + docs
+
+## Update 2026-08-02 — the library reads the catalog too (names, not ids)
+
+- The route now calls `useCatalog()` from `modules/Generator` and passes
+  `models={modelOptions}` to `GalleryGrid`. It has no composer, so this is the ONE reason
+  it reads the catalog: the generation detail viewer names the model that made a result.
+  Same `['catalog']` cache entry as every other screen — one fetch per session.
+- Still no `onRegenerate` here: with no composer on the screen, the Edit action correctly
+  never appears in the menus.

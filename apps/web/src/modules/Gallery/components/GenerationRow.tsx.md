@@ -26,3 +26,10 @@ flowchart LR
 
 ## Commits
 - _no commit yet_
+
+## Update 2026-08-02 — `models` reaches the row's detail viewer
+
+- New optional `models` prop, forwarded to `GenerationDetail` only. The row's own MODEL
+  CELL still prints `modelId`: a table exists to compare exact settings, and the id is
+  what the filter matches on. The viewer the row opens is prose, so it gets the name.
+- The row's ⋯ menu now reads "Edit" where it read "Regenerate" (see useGenerationActions).

@@ -23,8 +23,10 @@ import type { EntityRef } from '@opencreate/contracts'
 import { deriveEntityRefs } from 'shared/libs/mentions'
 import { Menu } from 'shared/ui'
 
-// The minimum an entity needs to be castable here — id to reference, name to show
-export type CastableEntity = { id: string; name: string }
+// The minimum an entity needs to be castable — id to reference, name to show,
+// and an optional reference-photo thumbnail the composer's inline "@" picker
+// renders (THIS field ignores it; the picker is where a face beats a name).
+export type CastableEntity = { id: string; name: string; imageUrl?: string | null }
 
 // Wan 2.7 r2v's own ceiling. Enforced in the contract too; mirrored here so the
 // "add" affordance simply disappears at the cap instead of offering a click that
@@ -43,20 +45,9 @@ export type ShotCastFieldProps = {
   onAdd: (entityId: string) => void
   // Drop a character and strip her token from the prompt
   onRemove: (placeholder: string) => void
-  // False when the chosen model cannot use references at all — the control then
-  // explains itself rather than letting the user tag a character the model would
-  // silently ignore (and charge for).
-  modelSupportsReferences: boolean
 }
 
-export function ShotCastField({
-  entities,
-  prompt,
-  cast,
-  onAdd,
-  onRemove,
-  modelSupportsReferences,
-}: ShotCastFieldProps) {
+export function ShotCastField({ entities, prompt, cast, onAdd, onRemove }: ShotCastFieldProps) {
   const { t } = useTranslation()
 
   // LIVE tags only — derived from the text, never from bookkeeping.
@@ -87,13 +78,11 @@ export function ShotCastField({
           </span>
         ))}
 
-        {/* Four states, and each says something DIFFERENT — a single disabled
-            button would leave the user guessing which of them they are in. */}
-        {!modelSupportsReferences && active.length === 0 ? (
-          <span className="text-xs text-mist-dim">{t('cinema.cast.unsupported')}</span>
-        ) : entities.length === 0 ? (
-          <span className="text-xs text-mist-dim">{t('cinema.cast.empty')}</span>
-        ) : atCap || taggable.length === 0 ? null : (
+        {/* No captions or hints (owner request 2026-07-24): no "no characters
+            yet" text either. Just the add menu when there is something to tag;
+            otherwise the row is empty. Whether a reference reaches the provider is
+            composeShotClipInput's call. */}
+        {atCap || taggable.length === 0 ? null : (
           <Menu
             label={t('cinema.cast.add')}
             align="start"
@@ -109,14 +98,6 @@ export function ShotCastField({
           </Menu>
         )}
       </div>
-
-      {/* The tag is live but the model cannot honour it: a warning, not a silent
-          drop. Generating here would charge full price for a stranger. */}
-      {!modelSupportsReferences && active.length > 0 ? (
-        <p role="alert" className="text-xs text-glow-red">
-          {t('cinema.cast.unsupportedWarning')}
-        </p>
-      ) : null}
     </div>
   )
 }

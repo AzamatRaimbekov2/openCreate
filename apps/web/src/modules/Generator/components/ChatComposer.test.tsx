@@ -42,6 +42,16 @@ function renderComposer() {
   )
 }
 
+type Taggable = { id: string; name: string; imageUrl?: string | null }
+function renderComposerWith(taggableEntities: Taggable[]) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ChatComposer taggableEntities={taggableEntities} />
+    </QueryClientProvider>,
+  )
+}
+
 const pngFile = () => new File(['fake-bytes'], 'screenshot.png', { type: 'image/png' })
 
 beforeEach(() => {
@@ -101,5 +111,50 @@ describe('ChatComposer image attach (paste + drop)', () => {
     // No attach affordance, and the store stays clean
     expect(screen.queryByLabelText(/animate an image/i)).toBeNull()
     expect(useGeneratorStore.getState().inputImage).toBeNull()
+  })
+})
+
+describe('ChatComposer inline @ mention picker', () => {
+  const boran: Taggable = { id: 'e-1', name: 'Boran', imageUrl: null }
+
+  it('opens a listbox of entities when you type @', async () => {
+    renderComposerWith([boran])
+    const textarea = await screen.findByRole('textbox')
+    fireEvent.change(textarea, { target: { value: '@', selectionStart: 1 } })
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Boran/ })).toBeInTheDocument()
+  })
+
+  it('filters the list by the text typed after @', async () => {
+    renderComposerWith([boran, { id: 'e-2', name: 'Zara' }])
+    const textarea = await screen.findByRole('textbox')
+    fireEvent.change(textarea, { target: { value: '@bo', selectionStart: 3 } })
+    expect(screen.getByRole('option', { name: /Boran/ })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Zara/ })).toBeNull()
+  })
+
+  it('inserts the entity token and registers the mention on select', async () => {
+    renderComposerWith([boran])
+    const textarea = await screen.findByRole('textbox')
+    fireEvent.change(textarea, { target: { value: '@Bo', selectionStart: 3 } })
+    // onMouseDown is what selects (keeps textarea focus) — mirror it in the test
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Boran/ }))
+    expect(useGeneratorStore.getState().prompt).toContain('[[e1]]')
+    expect(useGeneratorStore.getState().mentions).toEqual([{ placeholder: 'e1', entityId: 'e-1' }])
+  })
+
+  it('Enter picks the highlighted entity instead of submitting', async () => {
+    renderComposerWith([boran])
+    const textarea = await screen.findByRole('textbox')
+    fireEvent.change(textarea, { target: { value: '@Bo', selectionStart: 3 } })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(useGeneratorStore.getState().prompt).toContain('[[e1]]')
+  })
+
+  it('does not open when the entity library is empty', async () => {
+    renderComposerWith([])
+    const textarea = await screen.findByRole('textbox')
+    fireEvent.change(textarea, { target: { value: '@', selectionStart: 1 } })
+    expect(screen.queryByRole('listbox')).toBeNull()
   })
 })

@@ -164,9 +164,16 @@ Three drizzle tables mirroring `CANVAS_DDL` column-for-column (ADR `docs/wiki/de
   `'{"x":0,"y":0,"zoom":1}'`), `createdAt`/`updatedAt` (`timestamp_ms`). `updatedAt` exists because the
   list is ordered by it — a canvas is a document you return to, so "recently worked on" is the useful
   order, unlike `asset3d`/`film` list ordering by creation.
-- **`canvasNode`** — `id`, `canvasId` (→ `canvas`, cascade), `kind` (drizzle `enum` over the 7 MVP
+- **`canvasNode`** — `id`, `canvasId` (→ `canvas`, cascade), `kind` (drizzle `enum` over the node
   kinds, TS-level only — the column is plain TEXT), `positionJson`, `configJson` (default `'{}'`),
   `generationIdsJson` (default `'[]'`), `uploadUrl` (nullable; upload nodes only).
+  - **`kind` must mirror `canvasNodeKindSchema` in contracts, and only the type checker enforces
+    that.** `'prompt'` (ADR `canvas-prompt-node`, 2026-08-02) shipped in contracts and the web half
+    while this list still held the 7 original kinds — 862 API tests stayed green because SQLite
+    accepts any TEXT, and the failure surfaced only as `TS2769` on the insert in
+    `modules/canvas/service.ts`. Widening the set is a **type change only**: no CHECK constraint in
+    `CANVAS_DDL`, so no migration, and old rows stay readable. When a kind is added to contracts,
+    add it here in the same change.
 - **`canvasEdge`** — `id`, `canvasId` (→ `canvas`, cascade), `sourceNodeId`, `targetNodeId`.
 - **Citations are bare `text()` — NO `.references()`** on the ids inside `generationIdsJson` (they are
   a JSON array, not a column) and none on the edge endpoints. The only cascading edges are the owner

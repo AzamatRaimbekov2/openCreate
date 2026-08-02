@@ -204,8 +204,6 @@ export function PreviewPlayer({ shots }: PreviewPlayerProps) {
               })}
             </span>
           ) : null}
-          {/* Honest caveat — the render is authoritative */}
-          <p className="ml-auto text-xs text-mist-dim/70">{t('cinema.preview.approx')}</p>
         </div>
       </section>
     </Card>

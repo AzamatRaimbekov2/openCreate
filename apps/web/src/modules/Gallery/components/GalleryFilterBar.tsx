@@ -12,7 +12,7 @@
 // just reads as an inconsistency.
 import { useTranslation } from 'react-i18next'
 import type { AspectRatio } from '@opencreate/contracts'
-import { Select } from 'shared/ui'
+import { Button, Select } from 'shared/ui'
 import type { GalleryFilter } from './GalleryGrid'
 
 // A model as the feed needs it — id to match generations, name to show.
@@ -44,8 +44,21 @@ const ASPECT_OPTIONS: AspectRatio[] = ['16:9', '1:1', '9:16']
 // from an unset filter — one representation of "no filter", not two.
 const ANY = ''
 
+// The "nothing selected" shape. Kept next to the bar rather than imported from the
+// route: the reset button below has to know what empty MEANS, and a second copy of
+// that definition drifting from the route's INITIAL_FILTERS would produce a reset
+// that quietly leaves one dropdown set.
+const EMPTY_FILTERS: GalleryFilters = { type: 'all', modelId: null, aspectRatio: null }
+
 export function GalleryFilterBar({ value, onChange, models }: GalleryFilterBarProps) {
   const { t } = useTranslation()
+
+  // Derived, never state: a `useState` mirror of "is anything filtered" would be a
+  // second source of truth that can disagree with the props it was computed from.
+  const isFiltered =
+    value.type !== EMPTY_FILTERS.type ||
+    value.modelId !== null ||
+    value.aspectRatio !== null
 
   return (
     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-3">
@@ -84,6 +97,25 @@ export function GalleryFilterBar({ value, onChange, models }: GalleryFilterBarPr
           onChange({ ...value, aspectRatio: aspectRatio === ANY ? null : aspectRatio })
         }
       />
+
+      {/* CONDITIONAL, and that is the whole design. All three controls are
+          dropdowns whose "any" option is easy to miss, so a narrowed feed reads as
+          an empty one and the way back is not obvious. A single reset fixes that —
+          but shown permanently it would be a control that does nothing on most
+          visits, which is exactly how people learn to stop seeing it.
+
+          Ghost variant and last in the row: it is the escape hatch, not a peer of
+          the filters themselves. `self-end` keeps its baseline on the selects,
+          which carry a label above their control. */}
+      {isFiltered ? (
+        <Button
+          variant="ghost"
+          onClick={() => onChange(EMPTY_FILTERS)}
+          className="col-span-2 self-end sm:col-span-1"
+        >
+          {t('gallery.filter.reset')}
+        </Button>
+      ) : null}
     </div>
   )
 }

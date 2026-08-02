@@ -23,8 +23,8 @@
       "args": ["tsx", "packages/mcp/src/index.ts"],
       "env": {
         "OPENCREATE_BASE_URL": "${OPENCREATE_BASE_URL:-http://localhost:8787}",
-        "OPENCREATE_EMAIL": "${OPENCREATE_EMAIL}",
-        "OPENCREATE_PASSWORD": "${OPENCREATE_PASSWORD}"
+        "OPENCREATE_EMAIL": "${OPENCREATE_EMAIL:-admin@dev.local}",
+        "OPENCREATE_PASSWORD": "${OPENCREATE_PASSWORD:-admin}"
       },
       "autoStart": false
     }

@@ -66,7 +66,11 @@ export type ModalProps = {
   role?: 'dialog' | 'alertdialog'
   // Sheet width. 'lg' is for media: a portrait image in a max-w-lg sheet is a
   // stamp, and the user opened the detail view precisely to stop squinting.
-  size?: 'md' | 'lg'
+  // 'full' is the VIEWER: the sheet also takes a fixed 92dvh HEIGHT, because a
+  // two-pane viewer (media stage + information column) needs a height its panes
+  // can divide — with only a max-height the stage collapses to its content and
+  // the column's scroller never engages.
+  size?: 'md' | 'lg' | 'full'
   // Frosted-glass sheet instead of the opaque steel one. Only for surfaces whose
   // CONTENT is the hero (the media detail view) — never for text dialogs, where
   // a busy backdrop bleeding through the copy is just harder to read.
@@ -78,6 +82,11 @@ export type ModalProps = {
 const SIZE_CLASS = {
   md: 'max-w-lg',
   lg: 'max-w-5xl',
+  // The viewer: as wide as the viewport allows AND as tall as the sheet may be.
+  // h-[92dvh] is not decoration — it is what gives a two-pane child a definite
+  // height to split, so the media stage can grow while the information column
+  // scrolls beside it instead of both stretching the sheet.
+  full: 'h-[92dvh] max-w-[96rem]',
 } as const
 
 // The frosted recipe and its opaque baseline now live in ONE place (surfaces.ts)

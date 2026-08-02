@@ -1,7 +1,9 @@
 {
   "name": "opencreate",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter @opencreate/api --filter @opencreate/web dev",
     "lint": "pnpm -r lint",
@@ -10,5 +12,8 @@
     "build": "pnpm -r build",
     "start": "NODE_ENV=production node --enable-source-maps apps/api/dist/index.js"
   },
-  "packageManager": "pnpm@11.8.0"
+  "packageManager": "pnpm@11.8.0",
+  "devDependencies": {
+    "@claude-flow/memory": "^3.0.0-alpha.21"
+  }
 }

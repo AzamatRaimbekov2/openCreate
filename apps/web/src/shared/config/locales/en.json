@@ -272,7 +272,8 @@
       "model": "Model",
       "anyModel": "Any model",
       "aspect": "Aspect",
-      "anyAspect": "Any aspect"
+      "anyAspect": "Any aspect",
+      "reset": "Clear filters"
     },
     "empty": {
       "title": "No generations yet",
@@ -297,7 +298,18 @@
       "cancel": "Cancel"
     },
     "detail": {
-      "title": "Generation details"
+      "title": "Generation details",
+      "info": "About this generation",
+      "prompt": "Prompt",
+      "model": "Model",
+      "type": "Type",
+      "aspect": "Format",
+      "duration": "Duration",
+      "cost": "Cost",
+      "created": "Created",
+      "play": "Play",
+      "open": "Details",
+      "errorDetail": "Provider response"
     },
     "cost_one": "{{count}} credit",
     "cost_other": "{{count}} credits",
@@ -327,8 +339,10 @@
       "label": "Actions",
       "regenerate": "Regenerate",
       "prompt": "Copy prompt",
-      "promptCopied": "Copied"
-    }
+      "promptCopied": "Copied",
+      "edit": "Edit"
+    },
+    "seconds": "{{value}}s"
   },
   "pricing": {
     "kicker": "The index",
@@ -629,7 +643,12 @@
       "audio": "Generation audio",
       "audioX2": "Generation audio (2× price)",
       "audioNone": "This model has no audio",
-      "promptResize": "Prompt height"
+      "promptResize": "Prompt height",
+      "styleHint": "Style — a visual preset the server blends into the prompt at generation time",
+      "aspect": "Shot aspect ratio",
+      "aspectAuto": "Same as film",
+      "aspectHint": "This shot's generation shape — overrides the film's canvas only for this clip",
+      "modelLocked": "Model is set automatically for the “{{style}}” style"
     },
     "preview": {
       "title": "Preview",
@@ -1135,7 +1154,8 @@
       "video": "Video",
       "upload": "Upload",
       "character": "Character",
-      "note": "Note"
+      "note": "Note",
+      "prompt": "Prompt"
     },
     "status": {
       "idle": "idle",
@@ -1167,7 +1187,12 @@
       "characterModelHint": "This model cannot hold a character — pick another.",
       "version": "v{{index}} / {{count}}",
       "prevVersion": "Previous version",
-      "nextVersion": "Next version"
+      "nextVersion": "Next version",
+      "promptTemplatePlaceholder": "A prompt every wired node shares…",
+      "promptTemplateUnwired": "Wire it into an image or video node",
+      "promptTemplateFeeds_one": "feeds {{count}} node",
+      "promptTemplateFeeds_other": "feeds {{count}} nodes",
+      "promptTemplateApplied": "Shared prompt: {{text}}"
     },
     "runBranch": {
       "title": "Run branch",
@@ -1180,6 +1205,17 @@
         "character": "A character is wired into this chain, but nobody is cast yet.",
         "parent": "An input in this chain cannot produce an image yet.",
         "nothingToRun": "This branch is already up to date — nothing to run."
+      }
+    },
+    "edge": {
+      "refused": {
+        "self": "A node cannot feed itself",
+        "unknown": "That node is no longer on the board",
+        "noOutput": "This node has nothing to pass on",
+        "noInput": "That node does not take this kind of input",
+        "duplicate": "These two are already connected",
+        "capacity": "That node already has one — remove it first",
+        "cycle": "That would make a loop"
       }
     }
   },

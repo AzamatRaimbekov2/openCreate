@@ -137,6 +137,17 @@ export function SpeakerIcon({ className = 'size-4' }: { className?: string }) {
   )
 }
 
+// Person = "make a character from this reference" — a head + shoulders bust, the
+// same subject the cast tool tags. Sits on an attached reference thumbnail.
+export function PersonIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+    </svg>
+  )
+}
+
 // Paperclip = attach a reference (the shot composer's cast tool)
 export function PaperclipIcon({ className = 'size-4' }: { className?: string }) {
   return (
@@ -189,6 +200,50 @@ export function ZoomOutIcon({ className = 'size-4' }: { className?: string }) {
       <circle cx="11" cy="11" r="7" />
       <path d="M21 21l-4.3-4.3" />
       <path d="M8 11h6" />
+    </svg>
+  )
+}
+
+// Palette = the shot's STYLE (the visual preset the server blends into the
+// prompt). A painter's palette, not a magic wand: a style says how the shot
+// LOOKS, while the wand next to it (SparkIcon) already means "generate".
+export function PaletteIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg {...STROKE} className={className}>
+      <path d="M12 3a9 9 0 1 0 0 18c1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-1 .8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.3-9-7.3Z" />
+      <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="11.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="10" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+// The shot's generation FRAME. The glyph is the value: it draws the actual
+// rectangle the clip will be generated in, so the control shows its own setting
+// without a text label (the trigger is icon-only — see PresetPickers). `null`
+// (inherit the film canvas) draws a dashed frame: a shape that is not this
+// shot's own decision.
+export function FrameIcon({
+  ratio,
+  className = 'size-4',
+}: {
+  // The ratio to draw; null = "as in the film" (dashed, no opinion of its own)
+  ratio: '16:9' | '1:1' | '9:16' | null
+  className?: string
+}) {
+  // Rect geometry per ratio on the shared 24-unit grid, centred. Hand-tuned
+  // rather than computed: at 16px a computed 9:16 box is a hairline sliver, so
+  // each shape is drawn at the size that stays legible at icon scale.
+  const box =
+    ratio === '1:1'
+      ? { x: 5.5, y: 5.5, width: 13, height: 13 }
+      : ratio === '9:16'
+        ? { x: 7.5, y: 3.5, width: 9, height: 17 }
+        : { x: 2.5, y: 6.5, width: 19, height: 11 }
+
+  return (
+    <svg {...STROKE} className={className}>
+      <rect {...box} rx="2" strokeDasharray={ratio === null ? '3 2.5' : undefined} />
     </svg>
   )
 }
