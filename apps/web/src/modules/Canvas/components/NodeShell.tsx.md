@@ -36,3 +36,14 @@ flowchart LR
 ## Commits
 - f7268e3 2026-07-30 feat(canvas-web): node components — image/video/upload/note, version strip
 - (fix-wave) fix(canvas): I5 — NodeShell shows live progress % next to the processing status word
+
+## Update 2026-08-03 — the ports became grabbable
+
+- React Flow's default handle is 8px. A wire must be GRABBED from one and DROPPED on
+  another, and the punishment for missing was not "nothing": the press lands on the PANE,
+  so the board PANS away under the cursor. Reproduced live before the fix — that is the
+  whole of "привязка не работает".
+- The Handle is now a transparent 24px hit area (`!size-6 !border-0 !bg-transparent`)
+  wearing a 12px `pointer-events-none` dot as its child: the target grew, the design did
+  not. Ring in the void colour so the dot still reads as a port on the card's edge.
+- Paired with `connectionRadius={80}` in `CanvasEditor`, which forgives the DROP side.

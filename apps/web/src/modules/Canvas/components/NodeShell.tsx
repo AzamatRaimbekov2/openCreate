@@ -53,19 +53,24 @@ export function NodeShell({
   const { t } = useTranslation()
   return (
     <div className={`w-72 rounded-2xl border bg-steel p-3 shadow-glass ${STATUS_BORDER[status]}`}>
-      {/* 14px, not React Flow's default 8px (owner report 2026-08-02): a wire
-          has to be GRABBED from this dot and DROPPED on another one, and an 8px
-          target at 100% zoom — smaller still when the board is zoomed out — is
-          below any reasonable pointer accuracy. The ring in the void colour
-          keeps the dot reading as a small port against the card's edge rather
-          than as a bead sitting on top of it. Paired with the editor's
-          `connectionRadius={80}`, which forgives the near miss. */}
+      {/* THE PORT IS A 24px HIT AREA WEARING A 12px DOT (owner report
+          2026-08-02: "привязка не работает"). React Flow's default port is 8px,
+          and a wire has to be GRABBED from one and DROPPED on another — at 8px
+          that is below pointer accuracy, and the punishment for a miss is not
+          "nothing": a press that lands beside the port hits the PANE, so the
+          board pans away under the cursor. Reproduced live before this change.
+          So the Handle itself is transparent and big (`size-6`, no border, no
+          fill), and the dot the user sees is a child element with
+          `pointer-events-none` — the target grew, the design did not. Paired
+          with the editor's `connectionRadius={80}`, which forgives the drop. */}
       {hasInput ? (
         <Handle
           type="target"
           position={Position.Left}
-          className="!h-3.5 !w-3.5 !border-2 !border-void !bg-portal"
-        />
+          className="!flex !size-6 !items-center !justify-center !border-0 !bg-transparent"
+        >
+          <span className="pointer-events-none block size-3 rounded-full border-2 border-void bg-portal" />
+        </Handle>
       ) : null}
       <header className="mb-2 flex items-center justify-between gap-2">
         <span className="truncate text-xs font-medium text-white">{title}</span>
@@ -80,8 +85,10 @@ export function NodeShell({
         <Handle
           type="source"
           position={Position.Right}
-          className="!h-3.5 !w-3.5 !border-2 !border-void !bg-glow-green"
-        />
+          className="!flex !size-6 !items-center !justify-center !border-0 !bg-transparent"
+        >
+          <span className="pointer-events-none block size-3 rounded-full border-2 border-void bg-glow-green" />
+        </Handle>
       ) : null}
     </div>
   )

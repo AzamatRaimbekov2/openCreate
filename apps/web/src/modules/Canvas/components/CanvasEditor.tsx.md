@@ -92,3 +92,17 @@ flowchart TD
 - Nothing else changed: the prompt card needs no `data` (no catalog, no character list),
   and its wire legality is decided by `edgeRules`, which the editor already calls on drag
   and on drop.
+
+## Update 2026-08-03 — a refused wire now SAYS why, and the drop is forgiving
+
+- New `onConnectEnd`: the only hook that fires on a REFUSED drop (when
+  `isValidConnection` says no, React Flow never fires `onConnect` — the line just snaps
+  back in silence). It re-runs `canConnect` for the reason and raises ONE deduped
+  `toast.info` with the localized copy. Filters hard: a release over empty canvas is a
+  CANCEL (`toNode === null`) and stays quiet; an accepted connection returns early.
+- `connectionRadius={80}` (default 20): the ports are 12px dots on a 288px card, and the
+  default radius meant a wire only took if you released almost exactly on one. 80px lets
+  the user aim at the card's EDGE — still far short of the ~150px that would let a release
+  near one node reach its neighbour's port.
+- Verified live (2026-08-03) on board `c9c7e45a`: prompt → video connects on a normal
+  drag; repeating it refuses and the toast reads «Эти два уже соединены».

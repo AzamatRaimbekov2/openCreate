@@ -56,3 +56,15 @@ flowchart TD
   third slot is exactly when that drifts, so both now call one `slotOf()` and index one
   `CAP_BY_SLOT` table.
 - A prompt node takes no input, so it is absent from every capacity table as a TARGET.
+
+## Update 2026-08-03 — the refusal became a CODE the UI can speak
+
+- `Verdict.reason` was an English sentence ("only 1 prompt input allowed") and BOTH call
+  sites threw it away, so an intentional refusal was indistinguishable from a broken
+  feature (owner report: "привязка промт узлов чета не работает" — it was a second prompt
+  into a node that already had one).
+- It is now the `EdgeRefusal` union — `self · unknown · noOutput · noInput · duplicate ·
+  capacity · cycle` — plus `edgeRefusalMessageKey(code)` → `canvas.edge.refused.<code>`.
+  A code, not prose, because the UI must render OUR localized copy (design.md §9). The
+  mapper is a template rather than a lookup table so it is total by construction.
+- `CanvasEditor.onConnectEnd` is the consumer: it toasts the localized reason.
