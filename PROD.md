@@ -18,12 +18,12 @@ commit `.env`; it is git- and docker-ignored.
 | `LOG_LEVEL` | no | `info` | `fatal…trace`/`silent`. Structured pino JSON on stdout — read with `docker compose logs -f`. |
 | `SIGNUP_BONUS_CREDITS` | no | `200` | Credits granted through the ledger on signup. |
 | `WEB_ORIGIN` | no | `http://localhost:5173` | Only relevant when the SPA is served from a *different* origin than the API. Single-origin prod can ignore it (set `TRUSTED_ORIGINS` instead). |
-| `API_PORT` | no | `8787` | Keep `8787` inside the container — compose maps `8787:8787` and the healthcheck follows this var. |
+| `API_PORT` / `PORT` | no | `8787` | Keep `8787` inside the container — compose maps `8787:8787` and the healthcheck follows this var. Read in order `API_PORT → PORT → 8787`, so a managed platform that injects `PORT` works with nothing set; an empty value counts as unset (it would otherwise bind a random port and look healthy while being unreachable). |
 | `DATABASE_PATH` | no | `./data/opencreate.db` | Resolves to `/app/data/opencreate.db` (inside the `./data` volume). |
 | `STORAGE_DIR` | no | `./data/media` | Downloaded generation assets, served at `/media/*`. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | no | – | Set both to enable Google OAuth; empty/unset keeps it disabled. |
 | `ASSET_HOST_ALLOWLIST` | no | `runware.ai` | SSRF gate: host suffixes the server may download assets from (https only, redirects refused). Widen only if the provider changes CDNs. |
-| `TRUST_PROXY` | proxy deploys: yes | unset (no trust) | Behind the reverse proxy below, set `TRUST_PROXY=true` — otherwise every user shares the proxy's IP and ONE rate-limit bucket (one attacker's 10 requests/min lock everyone out of sign-in). Values: `true` (trust `X-Forwarded-For`; the proxy **must overwrite** the inbound header, see below), or a comma list of trusted peer addresses/CIDRs/keywords (e.g. `loopback,uniquelocal` — safest, covers the docker bridge). Leave unset when the container is exposed directly: a client-forged `X-Forwarded-For` must never be honored. |
+| `TRUST_PROXY` | proxy deploys: yes | unset (no trust) | Behind the reverse proxy below, set `TRUST_PROXY=true` — otherwise every user shares the proxy's IP and ONE rate-limit bucket (one attacker's 10 requests/min lock everyone out of sign-in). Values: `true` (trust `X-Forwarded-For`; the proxy **must overwrite** the inbound header, see below), or a comma list of trusted peer addresses/CIDRs/keywords (e.g. `loopback,uniquelocal` — safest, covers the docker bridge). Leave unset when the container is exposed directly: a client-forged `X-Forwarded-For` must never be honored. On a **managed platform** (Railway et al.) use a **hop count**, `TRUST_PROXY=1`: there is no stable edge address to allowlist, and `true` would trust an `X-Forwarded-For` entry the client can prepend itself. |
 | `NODE_ENV` | – | forced `production` by compose | Enables single-origin SPA serving. |
 
 ## First run

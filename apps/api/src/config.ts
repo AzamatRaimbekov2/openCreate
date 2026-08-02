@@ -42,13 +42,32 @@ export function loadEnvFromFile(path?: string): void {
   }
 }
 
+// A port that may legitimately be absent. `z.coerce.number()` turns '' into 0,
+// so a blank platform variable would otherwise mean "bind port 0" (a random
+// free port) — the process would look healthy and be unreachable. Mapping ''
+// to undefined lets the next source in the chain answer instead. int/positive
+// makes a nonsense value fail at BOOT rather than at first request.
+const optionalPort = z.preprocess(
+  (v) => (v === '' || v === undefined ? undefined : v),
+  z.coerce.number().int().positive().optional(),
+)
+
 // zod v4: z.url() is the non-deprecated replacement for z.string().url().
 const envSchema = z.object({
   RUNWARE_API_KEY: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url().default('http://localhost:8787'),
   WEB_ORIGIN: z.url().default('http://localhost:5173'),
-  API_PORT: z.coerce.number().default(8787),
+  // Listening port. TWO sources because managed platforms (ADR
+  // railway-deployment) inject `PORT` and expect the process to use it, while
+  // this app has always read `API_PORT` — honoring only one of them turns a
+  // healthy container into a 502 behind the platform's router, with nothing in
+  // the logs to explain it. API_PORT wins when both are set: an operator who
+  // typed it meant it. Neither set → 8787, the port EXPOSEd by the Dockerfile.
+  // An EMPTY value counts as absent (a dashboard variable left blank) rather
+  // than coercing to port 0, which would bind a random port and look "up".
+  API_PORT: optionalPort,
+  PORT: optionalPort,
   DATABASE_PATH: z.string().default('./data/opencreate.db'),
   STORAGE_DIR: z.string().default('./data/media'),
   SIGNUP_BONUS_CREDITS: z.coerce.number().int().default(200),
@@ -209,9 +228,11 @@ export type AppConfig = {
   assetFetchTimeoutMs: number
   assetMaxBytes: number
   // Fastify trustProxy value: false = never trust proxy headers (default),
-  // true = trust X-Forwarded-For from any peer, string = fastify/proxy-addr
-  // address/CIDR/keyword list of peers whose headers are trusted.
-  trustProxy: boolean | string
+  // true = trust X-Forwarded-For from any peer, number = trust exactly N hops
+  // counted back from the socket peer (the managed-platform form — see
+  // parseTrustProxy), string = fastify/proxy-addr address/CIDR/keyword list of
+  // peers whose headers are trusted.
+  trustProxy: boolean | number | string
 }
 
 // TRUST_PROXY env → fastify trustProxy. Default-deny: only an explicit opt-in
@@ -221,10 +242,22 @@ export type AppConfig = {
 // restricts trust to the proxy's own address so even an appended inbound
 // X-Forwarded-For chain resolves to the real client (proxy-addr walks from the
 // socket peer and stops at the first untrusted hop).
-function parseTrustProxy(raw: string | undefined): boolean | string {
+function parseTrustProxy(raw: string | undefined): boolean | number | string {
   const value = raw?.trim() ?? ''
   if (value === '' || value.toLowerCase() === 'false') return false
   if (value.toLowerCase() === 'true') return true
+  // A bare non-negative integer is a HOP COUNT, not an address — the form a
+  // managed platform needs (ADR railway-deployment R3), where the edge's
+  // internal address is neither knowable nor stable, so there is nothing to
+  // allowlist. proxy-addr walks the X-Forwarded-For chain from the socket peer
+  // inward and stops after N hops: exactly the edge's own contribution is
+  // trusted, and any entries the CLIENT prepended are ignored. That closes the
+  // gap `true` leaves open — `true` believes the leftmost entry, which is
+  // client-controlled whenever the proxy appends instead of overwriting.
+  // Matched strictly on digits so '10.0.0.1', '1.5' and '-1' stay address
+  // lists: proxy-addr reads the two forms completely differently, and a
+  // silently mistyped one would be a security change, not a config typo.
+  if (/^\d+$/.test(value)) return Number(value)
   return value
 }
 
@@ -262,7 +295,8 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     betterAuthSecret: e.BETTER_AUTH_SECRET,
     betterAuthUrl: e.BETTER_AUTH_URL,
     webOrigin: e.WEB_ORIGIN,
-    port: e.API_PORT,
+    // Explicit API_PORT → platform-injected PORT → the Dockerfile's EXPOSE.
+    port: e.API_PORT ?? e.PORT ?? 8787,
     databasePath: e.DATABASE_PATH,
     storageDir: e.STORAGE_DIR,
     signupBonusCredits: e.SIGNUP_BONUS_CREDITS,

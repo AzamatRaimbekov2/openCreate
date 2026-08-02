@@ -148,6 +148,46 @@ describe('loadConfig production settings', () => {
     expect(cfg.trustProxy).toBe('127.0.0.1,10.0.0.0/8')
   })
 
+  // TRUST_PROXY as a HOP COUNT (ADR railway-deployment R3). On a managed
+  // platform there is no address to allowlist — the edge's internal IP is not
+  // knowable or stable — and the other two forms are both wrong there:
+  // unset puts every user in ONE rate-limit bucket (the edge's address), and
+  // `true` trusts the LEFTMOST X-Forwarded-For entry, which a client can forge
+  // outright if the edge APPENDS rather than overwrites. A hop count is the
+  // form that fits: proxy-addr walks the chain from the socket peer inward and
+  // stops after N hops, so exactly the edge's own contribution is trusted and
+  // anything the client prepended is ignored.
+  it('parses a numeric TRUST_PROXY as a fastify hop count', () => {
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: '1' }).trustProxy).toBe(1)
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: ' 2 ' }).trustProxy).toBe(2)
+  })
+
+  it('keeps non-numeric and negative TRUST_PROXY values as address lists, not hop counts', () => {
+    // '10.0.0.1' must NOT become a number — it is an address, and proxy-addr
+    // reads the two forms completely differently.
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: '10.0.0.1' }).trustProxy).toBe('10.0.0.1')
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: 'loopback' }).trustProxy).toBe('loopback')
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: '-1' }).trustProxy).toBe('-1')
+    expect(loadConfig({ ...baseEnv, TRUST_PROXY: '1.5' }).trustProxy).toBe('1.5')
+  })
+
+  // PORT (ADR railway-deployment R2). Managed platforms inject PORT and expect
+  // the process to listen on it; this app has always read API_PORT. Honouring
+  // both — API_PORT first, since an operator who sets it means it — removes a
+  // failure mode that presents as a 502 in front of a perfectly healthy
+  // container.
+  it('defaults the port to 8787 when neither API_PORT nor PORT is set', () => {
+    expect(loadConfig({ ...baseEnv }).port).toBe(8787)
+  })
+
+  it('falls back to the platform-injected PORT when API_PORT is absent', () => {
+    expect(loadConfig({ ...baseEnv, PORT: '3000' }).port).toBe(3000)
+  })
+
+  it('lets an explicit API_PORT win over an injected PORT', () => {
+    expect(loadConfig({ ...baseEnv, API_PORT: '8787', PORT: '3000' }).port).toBe(8787)
+  })
+
   // wan-runpod self-host provider (ADR: wan-selfhost-video-provider). The pod's
   // ComfyUI base URL is optional so the app boots without it (the wan-2-2 model
   // is listed but a submit returns a clean provider_error). When set, the pod's

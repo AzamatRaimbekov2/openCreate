@@ -24,7 +24,7 @@ flowchart LR
 
 ## Key decisions / gotchas
 - `GOOGLE_CLIENT_ID || null` (not `??`): empty string in `.env.example` means "not configured" → Google provider stays disabled.
-- `BETTER_AUTH_SECRET` must be ≥32 chars; `API_PORT`/`SIGNUP_BONUS_CREDITS` use `z.coerce.number()` since env values are strings.
+- `BETTER_AUTH_SECRET` must be ≥32 chars; `API_PORT`/`PORT`/`SIGNUP_BONUS_CREDITS` use `z.coerce.number()` since env values are strings (the two port vars via `optionalPort` — see the 2026-08-02 section).
 - `process.loadEnvFile` NEVER overrides already-set real env vars (verified empirically) — platform-injected env always wins over the file; a missing file is a silent no-op (`try/catch`), so production needs no `.env` at all.
 - `LOG_LEVEL` is an allowlisted pino level enum (default `info`); tests build their config with `silent` so suites stay quiet.
 - `webDistPath`: relative values resolve against the PACKAGE root (`fileURLToPath(new URL('..', import.meta.url))` — apps/api from both `src/` and the bundled `dist/`), NOT cwd: `pnpm start` runs from the repo root while `pnpm dev` runs from apps/api, and `../web/dist` must mean apps/web/dist in both.
@@ -33,6 +33,25 @@ flowchart LR
 - `assetHostAllowlist` (SSRF, review finding): host suffixes `storage.saveFromUrl` may fetch — provider asset URLs arrive in PROVIDER RESPONSES, so downloads are default-deny-locked to Runware's domain; a provider/CDN change is an env edit (`ASSET_HOST_ALLOWLIST`), not code. Consumed by `index.ts` → `createLocalStorage(dir, allowlist, limits)`.
 - `assetFetchTimeoutMs` / `assetMaxBytes` (download limits, review finding): hard deadline for the WHOLE asset download and max bytes counted while streaming — a stalled provider stream must not hang a settlement forever, and an oversized body must not fill the disk that also holds the SQLite db. Defaults (120s / 512MB) mirror `storage/local.ts`'s exported constants so an unset env keeps behavior identical. Consumed by `index.ts` → `createLocalStorage(..., { fetchTimeoutMs, maxBytes })`. Pinned by `test/env-loading.test.ts` + `test/storage.test.ts`.
 - `trustProxy` (rate-limit attribution, review finding): `parseTrustProxy(TRUST_PROXY)` — unset/empty/`'false'` → `false` (default-deny: direct-exposure deploys must never honor a client-forged `X-Forwarded-For`), `'true'` → `true` (trust the header from any peer — the proxy MUST then overwrite the inbound header), anything else passes through verbatim as fastify/proxy-addr address/CIDR/keyword list (e.g. `127.0.0.1`, `loopback,uniquelocal` — the safer shape: proxy-addr walks from the socket peer and stops at the first untrusted hop, so appended inbound XFF chains still resolve to the real client). Without it, PROD.md's reverse proxy makes `req.ip` always loopback → ALL users share one rate-limit bucket (auth-lockout DoS). Consumed by `app.ts` → Fastify `trustProxy`. Pinned by `test/env-loading.test.ts` + `test/rate-limit.test.ts`.
+
+## Key decisions (2026-08-02) — managed-platform readiness (ADR `railway-deployment`)
+- **`port` has two sources**: `API_PORT ?? PORT ?? 8787`. Managed platforms inject `PORT` and expect
+  the process to listen on it; this app has always read `API_PORT`. Honoring only one turns a healthy
+  container into a 502 behind the platform router with nothing in the logs. `API_PORT` wins when both
+  are set — an operator who typed it meant it. Both go through the shared `optionalPort`
+  preprocessor: **empty string counts as absent**, because `z.coerce.number()` turns `''` into `0`
+  and binding port 0 picks a RANDOM free port — the process would look up and be unreachable.
+  `int().positive()` makes a nonsense value fail at boot instead of at first request.
+- **`trustProxy` gained a HOP-COUNT form** (`TRUST_PROXY=1` → `1`, a number). On a managed platform
+  neither of the other two forms is safe: unset puts every user in ONE rate-limit bucket (the edge's
+  address — the auth-lockout DoS), and `'true'` believes the LEFTMOST `X-Forwarded-For` entry, which
+  is client-controlled whenever the edge APPENDS instead of overwriting — an attacker then picks a
+  fresh bucket per request. There is no address to allowlist either: the edge's internal IP is
+  neither knowable nor stable. A hop count is the form that fits — proxy-addr walks the chain from
+  the socket peer inward, stops after N hops, and ignores anything the client prepended.
+  Matched strictly on `/^\d+$/` so `'10.0.0.1'`, `'1.5'` and `'-1'` stay ADDRESS LISTS: proxy-addr
+  reads the two forms completely differently, so a loose match would be a silent security change.
+  `AppConfig.trustProxy` is now `boolean | number | string`. Pinned by `test/env-loading.test.ts`.
 
 ## Key decisions (2026-07-09)
 - COMFY_BASE_URL accepts URL | empty-string | absent (`z.union([z.url(), z.literal("")]).optional()`): the shipped `.env`/.env.example set it empty (self-host off), and plain `z.url().optional()` rejected empty → boot crash. Empty is normalized to null (not configured) downstream.
