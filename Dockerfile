@@ -29,7 +29,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# No BuildKit cache mount for the pnpm store: Railway's builder rejects any
+# cache id that is not prefixed with its own `s/<service id>` cacheKey, and it
+# forbids variables inside the id — so a portable id does not exist. The layer
+# cache above (manifests copied before sources) is what makes repeat builds
+# fast anyway; the store cache would only help when the lockfile itself changes.
+RUN pnpm install --frozen-lockfile
 COPY packages ./packages
 COPY apps ./apps
 # api: tsc type gate + esbuild bundle → apps/api/dist/index.js
@@ -42,8 +47,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --prod --frozen-lockfile --filter @opencreate/api...
+RUN pnpm install --prod --frozen-lockfile --filter @opencreate/api...
 
 # ---- runtime -----------------------------------------------------------------
 FROM node:22-slim AS runtime
@@ -63,7 +67,12 @@ COPY --from=build /app/apps/web/dist ./apps/web/dist
 # SQLite db + downloaded media live under /app/data (bind-mount it; see
 # docker-compose.yml). Owned by the unprivileged `node` user (uid 1000).
 RUN mkdir -p /app/data && chown node:node /app/data
-USER node
+# The entrypoint re-asserts that ownership at boot for hosts that mount the
+# volume as root, then drops to `node` itself — so there is no USER directive
+# here: PID 1 needs the privilege for exactly one chown (railway-deployment R1).
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 EXPOSE 8787
 # node's global fetch — the slim image has no curl/wget.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

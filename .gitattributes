@@ -1,0 +1,3 @@
+# Shell scripts are executed inside Linux containers — a CRLF checkout on a
+# Windows clone would break the shebang, so pin them regardless of core.autocrlf.
+*.sh text eol=lf

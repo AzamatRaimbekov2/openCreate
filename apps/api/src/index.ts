@@ -25,5 +25,10 @@ const storage = createLocalStorage(config.storageDir, config.assetHostAllowlist,
 // closure and never exposes it (tests always inject a fake instead).
 const runware = createRunwareClient({ apiKey: config.runwareApiKey })
 const app = await buildApp({ config, db, storage, runware })
-await app.listen({ port: config.port, host: '0.0.0.0' })
+// `::` and not `0.0.0.0`: a managed platform health-checks the container over
+// its own internal network, and Railway's is IPv6 — an IPv4-only listener is a
+// container that boots, logs happily and is never reachable, which reads as a
+// 502 with no error anywhere. Dual-stack by default (ipv6Only is off), so this
+// still accepts IPv4 callers: docker compose and local runs are unchanged.
+await app.listen({ port: config.port, host: '::' })
 console.log(`api on :${config.port}`)
