@@ -26,7 +26,7 @@ import type { VideoProvider, VideoProviderId } from './integrations/video-provid
 import type { Mesh3dProvider } from './integrations/mesh-provider'
 import type { StorageProvider } from './storage/local'
 import { createAuth } from './modules/auth/auth'
-import { seedDevAdmin } from './modules/auth/dev-admin'
+import { seedDevAdmin, seedSuperAdmin } from './modules/auth/dev-admin'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
@@ -257,6 +257,20 @@ export async function buildApp(deps: AppDeps) {
   // per-test, and 'production' can never match.
   if (deps.config.nodeEnv === 'development') {
     await seedDevAdmin(deps.db, auth, deps.config.signupBonusCredits, app.log)
+  }
+  // The DEPLOYMENT's super-admin, and the second gate is deliberately different in
+  // kind from the first: dev's admin is gated on the ENVIRONMENT because its
+  // password is in the source, this one is gated on an operator having supplied a
+  // password at all. No env vars, no account — on a public deployment that is the
+  // only safe default, and it is why this line has no 'production' check: the
+  // credential itself is the permission.
+  if (deps.config.superAdmin) {
+    await seedSuperAdmin(
+      deps.db,
+      auth,
+      { ...deps.config.superAdmin, name: 'Super Admin' },
+      app.log,
+    )
   }
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)

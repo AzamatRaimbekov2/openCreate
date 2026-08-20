@@ -148,6 +148,21 @@ const envSchema = z.object({
   // endpoint, which DeepInfra lacks. NOT for Seedance 2.0: kie.ai is dearer there
   // ($0.205/s vs a measured $0.1518/s). `|| null` normalizes '' → null below.
   KIE_API_KEY: z.string().optional(),
+  // The super-admin this deployment seeds at boot: the `super_admin` role and an
+  // effectively unlimited credit floor.
+  //
+  // IT LIVES IN THE ENVIRONMENT BECAUSE THE REPOSITORY IS PUBLIC. The dev admin
+  // below is a fixed credential printed in the source — fine on a laptop, and
+  // catastrophic on a deployment anyone can reach: the password would be on GitHub
+  // and the account it opens can spend the operator's money at every provider. So a
+  // deployment gets no default at all. An operator names the account, or there is
+  // no account.
+  //
+  // The minimum is 16 and not better-auth's 8 because the seed writes the password
+  // hash DIRECTLY (dev-admin.ts explains why), so better-auth's own signup check
+  // never runs on it — and this is the one account with no spending ceiling.
+  SUPER_ADMIN_EMAIL: z.email().optional(),
+  SUPER_ADMIN_PASSWORD: z.string().min(16).optional(),
   // Where OUR stored media is reachable from the PUBLIC internet. Only needed by
   // providers that fetch reference images by URL instead of taking the bytes
   // inline — kie.ai's Seedream is the first (its schema rejects a data URI).
@@ -241,6 +256,9 @@ export type AppConfig = {
   // kie.ai key for the third Seedance channel; null when unset (provider disabled,
   // its catalog models hidden, boot stays healthy).
   kieApiKey: string | null
+  // Both halves or neither (see loadSuperAdminConfig). null = this deployment
+  // seeds no super-admin, which is the right default for anything public.
+  superAdmin: { email: string; password: string } | null
   // Absolute, no trailing slash. '/media/<key>.<ext>' appended to it is a URL a
   // provider can GET.
   mediaPublicBaseUrl: string
@@ -352,6 +370,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
   const dashscopeConfigured = Boolean(e.DASHSCOPE_API_KEY && e.DASHSCOPE_WORKSPACE_ID)
   const dashscopeApiKey = dashscopeConfigured ? (e.DASHSCOPE_API_KEY ?? null) : null
   const dashscopeWorkspaceId = dashscopeConfigured ? (e.DASHSCOPE_WORKSPACE_ID ?? null) : null
+  const superAdmin = loadSuperAdminConfig(e)
   const r2 = loadR2Config(e)
   return {
     runwareApiKey: e.RUNWARE_API_KEY,
@@ -422,6 +441,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     deepinfraToken,
     groqApiKey,
     kieApiKey,
+    superAdmin,
     segmindApiKey,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.
@@ -510,6 +530,25 @@ function withDeepinfraHost(allowlist: string[], deepinfraToken: string | null): 
 // Their URL expires after 24 HOURS, so storage.saveFromUrl copying it out is not an
 // optimization — it is the only reason the asset survives at all.
 export const KIE_ASSET_HOST = 'tempfile.aiquickdraw.com'
+
+// Both halves or neither. A half-configured super-admin is the worst of the three
+// outcomes: it LOOKS configured, seeds nothing, and the operator finds out on the
+// day they need the account. Same trap loadR2Config exists to prevent, same answer
+// — fail at boot with a sentence naming what is missing.
+function loadSuperAdminConfig(e: {
+  SUPER_ADMIN_EMAIL?: string | undefined
+  SUPER_ADMIN_PASSWORD?: string | undefined
+}): { email: string; password: string } | null {
+  const email = e.SUPER_ADMIN_EMAIL || null
+  const password = e.SUPER_ADMIN_PASSWORD || null
+  if (!email && !password) return null
+  if (!email || !password) {
+    throw new Error(
+      'SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be set together (seeds the super-admin) or both left unset (no super-admin on this deployment)',
+    )
+  }
+  return { email, password }
+}
 
 // Where Segmind serves a finished clip. EVIDENCE, not a guess: their own 404 body
 // calls `api.segmind.com/v1/requests/{id}` the OUTPUT endpoint ("Output for this

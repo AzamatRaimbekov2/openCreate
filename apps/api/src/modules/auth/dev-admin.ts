@@ -54,7 +54,12 @@ function ensureUnlimitedBalance(db: Db, userId: string, log?: MoneyLog) {
   if (delta > 0) grantSignupBonus(db, userId, delta, log)
 }
 
-// `_signupBonusCredits` is the REAL-USER signup bonus (config); the dev admin
+// The credentials of an account to seed. The dev admin passes the fixed pair
+// above; a deployment passes what its operator put in the environment. Nothing
+// else may construct one — a caller that invents a password here has published it.
+export type SuperAdminCredentials = { email: string; password: string; name: string }
+
+// `_signupBonusCredits` is the REAL-USER signup bonus (config); an admin
 // intentionally ignores it and is topped up to DEV_ADMIN_CREDITS instead. Kept in
 // the signature so the app.ts call site (positional) is untouched.
 export async function seedDevAdmin(
@@ -63,7 +68,25 @@ export async function seedDevAdmin(
   _signupBonusCredits: number,
   log?: MoneyLog,
 ) {
-  const existing = db.select().from(user).where(eq(user.email, DEV_ADMIN_EMAIL)).get()
+  await seedSuperAdmin(
+    db,
+    auth,
+    { email: DEV_ADMIN_EMAIL, password: DEV_ADMIN_PASSWORD, name: 'Dev Admin' },
+    log,
+  )
+}
+
+// Idempotent: creates the account, or repairs and refills the one already there.
+// Runs on EVERY boot in every environment that configures it, which is what makes
+// "the admin always exists" true rather than aspirational — a wiped volume, a
+// hand-edited row and a spent-down balance all heal on the next start.
+export async function seedSuperAdmin(
+  db: Db,
+  auth: Auth,
+  creds: SuperAdminCredentials,
+  log?: MoneyLog,
+) {
+  const existing = db.select().from(user).where(eq(user.email, creds.email)).get()
   if (existing) {
     // Repair, don't duplicate: a db that predates the role column (or a row
     // someone edited by hand) is healed to super_admin on the next boot.
@@ -82,15 +105,15 @@ export async function seedDevAdmin(
   // better-auth's own scrypt hasher — the sign-in endpoint must be able to
   // verify this hash, so no other hasher is correct here.
   const ctx = await auth.$context
-  const passwordHash = await ctx.password.hash(DEV_ADMIN_PASSWORD)
+  const passwordHash = await ctx.password.hash(creds.password)
 
   const now = new Date()
   const userId = crypto.randomUUID()
   db.insert(user)
     .values({
       id: userId,
-      name: 'Dev Admin',
-      email: DEV_ADMIN_EMAIL,
+      name: creds.name,
+      email: creds.email,
       // Verified: there is no mailbox behind dev.local to click a link from.
       emailVerified: true,
       role: 'super_admin',

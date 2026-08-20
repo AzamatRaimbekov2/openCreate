@@ -85,3 +85,54 @@ describe('dev super-admin seed', () => {
     expect(res.statusCode).toBe(200)
   })
 })
+
+// ── The DEPLOYMENT super-admin ──────────────────────────────────────────────
+// Same account shape as the dev admin, opposite credential story: the dev one is
+// gated on NODE_ENV because its password is printed in the source; this one is
+// gated on an operator having supplied a password at all. On a public deployment
+// that distinction is the whole security model, so it is tested as behaviour and
+// not left to a comment.
+const DEPLOY_ADMIN = { email: 'owner@example.com', password: 'a-long-enough-passphrase-01' }
+
+const signInDeployAdmin = (app: Awaited<ReturnType<typeof buildTestApp>>) =>
+  app.inject({
+    method: 'POST',
+    url: '/api/auth/sign-in/email',
+    payload: DEPLOY_ADMIN,
+  })
+
+describe('deployment super-admin seed', () => {
+  it('seeds from the environment in PRODUCTION, with the role and the unlimited floor', async () => {
+    const app = await buildTestApp({ nodeEnv: 'production', superAdmin: DEPLOY_ADMIN })
+    const res = await signInDeployAdmin(app)
+    expect(res.statusCode).toBe(200)
+    expect(res.json().user.role).toBe('super_admin')
+    expect(res.json().user.creditsBalance).toBeGreaterThanOrEqual(DEV_ADMIN_CREDITS)
+  })
+
+  it('seeds NOTHING when the environment names no admin — the safe default', async () => {
+    // The account must not exist by accident on a deployment nobody configured.
+    const app = await buildTestApp({ nodeEnv: 'production' })
+    expect((await signInDeployAdmin(app)).statusCode).not.toBe(200)
+  })
+
+  it('does NOT seed the dev admin in production', async () => {
+    // The fixed source credential stays out of any deployment, configured or not.
+    const app = await buildTestApp({ nodeEnv: 'production', superAdmin: DEPLOY_ADMIN })
+    expect((await signInAdmin(app)).statusCode).not.toBe(200)
+  })
+
+  it('refills a spent-down balance on the next boot', async () => {
+    // "Unlimited" is a self-healing floor, not a one-time grant: an admin that
+    // spent credits comes back topped up, which is what makes the promise hold
+    // over a long-lived deployment rather than only on the first start.
+    const db = createDb(':memory:').db
+    const first = await buildTestApp({ nodeEnv: 'production', superAdmin: DEPLOY_ADMIN, db })
+    const before = (await signInDeployAdmin(first)).json().user.id
+    db.update(user).set({ creditsBalance: 5 }).where(eq(user.id, before)).run()
+
+    const second = await buildTestApp({ nodeEnv: 'production', superAdmin: DEPLOY_ADMIN, db })
+    const res = await signInDeployAdmin(second)
+    expect(res.json().user.creditsBalance).toBeGreaterThanOrEqual(DEV_ADMIN_CREDITS)
+  })
+})
