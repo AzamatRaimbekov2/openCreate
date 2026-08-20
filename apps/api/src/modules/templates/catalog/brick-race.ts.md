@@ -58,6 +58,10 @@ flowchart TD
 - **16:9**: a race is horizontal motion. A vertical frame can hold a driver's face but not
   two cars side by side, and two cars side by side is the sport.
 - Price: 336 / 810 / 840 credits (draft / standard / premium), 50s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

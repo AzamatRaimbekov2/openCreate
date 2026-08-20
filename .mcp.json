@@ -1,8 +1,10 @@
 {
   "mcpServers": {
     "claude-flow": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "ruflo@latest",
         "mcp",
@@ -15,16 +17,6 @@
         "CLAUDE_FLOW_TOPOLOGY": "hierarchical-mesh",
         "CLAUDE_FLOW_MAX_AGENTS": "15",
         "CLAUDE_FLOW_MEMORY_BACKEND": "hybrid"
-      },
-      "autoStart": false
-    },
-    "opencreate": {
-      "command": "npx",
-      "args": ["tsx", "packages/mcp/src/index.ts"],
-      "env": {
-        "OPENCREATE_BASE_URL": "${OPENCREATE_BASE_URL:-http://localhost:8787}",
-        "OPENCREATE_EMAIL": "${OPENCREATE_EMAIL:-admin@dev.local}",
-        "OPENCREATE_PASSWORD": "${OPENCREATE_PASSWORD:-admin}"
       },
       "autoStart": false
     }

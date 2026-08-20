@@ -44,6 +44,12 @@ export const brickRace: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: '{{hero}} против {{rival}}',
 
+  // Plastic minifigures — stylised and fantastical, no label required (the same
+  // call the whole shelf makes, argued in brick-heist.ts). Not loopable: the
+  // story resolves.
+  loopable: false,
+  disclosureTier: 'none',
+
   models: {
     draft: 'pixverse-v6',
     standard: 'wan-2-7',

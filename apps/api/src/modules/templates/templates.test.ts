@@ -17,6 +17,7 @@
 //
 // None of these fail loudly on their own. That is what this file is for.
 import { describe, expect, it } from 'vitest'
+import { DISCLOSURE_TIERS } from '@opencreate/contracts'
 import { CATALOG, getModel } from '../catalog/catalog'
 import { TEMPLATES } from './catalog'
 import { assertTemplatesValid } from './service'
@@ -66,7 +67,15 @@ describe('template catalog', () => {
     // "stop-motion brickfilm", "visible brick studs"), so there is no cost to the
     // ban — only to forgetting it. Word-boundary matched so "allegory" and friends
     // do not trip it.
-    const BANNED = /\blegos?\b/i
+    //
+    // WIDENED 2026-08-20 for «Фигурка в большом мире» (shorts-figurine-pov). That
+    // card is the AI-collectible format, and the collectible lines it evokes are
+    // live trademarks under active enforcement. The card is authored to take the
+    // USER'S character from the entity library precisely so it never has to name
+    // one — this pattern makes that a rule rather than an intention, catalog-wide,
+    // for the same two reasons the toy brand is banned: someone else's mark, and
+    // a phrase a provider's moderation may reject on the premium tier only.
+    const BANNED = /\blegos?\b|\blabubu\b|\bsonny\s*angel\b|\bsmiski\b|\bpop\s*mart\b/i
     for (const t of TEMPLATES) {
       const strings = [
         t.id,
@@ -226,6 +235,162 @@ describe('template catalog', () => {
       for (const shot of template.shots) {
         if (isClip(shot)) continue
         expect(shot.title.text.length).toBeGreaterThan(0)
+      }
+    })
+
+    it('declares a disclosure tier the contract recognises', () => {
+      // Required rather than optional on the type, so the compiler already
+      // guarantees SOMETHING is there — this asserts it is one of the three the
+      // wire will accept, which the compiler cannot see for catalog data any more
+      // than it can see a model id. Retrofitting provenance onto a shipped
+      // catalog costs far more than carrying the field (ADR shorts-studio §12).
+      expect(DISCLOSURE_TIERS).toContain(template.disclosureTier)
+    })
+
+    it('backs a loopable claim in its final clip beat', () => {
+      // THE ONE THAT CAN ACTUALLY CATCH A LIE. `loopable` is a promise made to the
+      // gallery — since 2025-03-31 a replay counts as a view, so a user filters on
+      // this field and picks the card because of it. But a model does not infer
+      // "the last frame should equal the first"; it has to be told, in the prompt,
+      // every time. So a template that declares the loop without ASKING for it
+      // ships a clip that visibly jumps at the seam, which is worse than never
+      // claiming the loop.
+      //
+      // Matching on the authored prompt text is crude on purpose: the alternative
+      // is trusting a boolean nobody can verify. If this fires, the fix is almost
+      // never to loosen the matcher — it is that the template is lying, or that
+      // its last beat lost the frame-match sentence in an edit (ADR §10).
+      if (!template.loopable) return
+      const clips = template.shots.filter(isClip)
+      const last = clips.at(-1)
+      expect(last, 'a loopable template with no clips').toBeDefined()
+      const prompt = last!.prompt.toLowerCase()
+      const saysReturn =
+        prompt.includes('match the opening composition') ||
+        prompt.includes('matches the opening composition')
+      expect(
+        saysReturn,
+        `${template.id}: loopable is true but the final beat ("${last!.beat}") never ` +
+          'asks the model to return to the opening frame',
+      ).toBe(true)
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The SHORTS shelf («Шортсы», ADR shorts-studio). Like the brick shelf above,
+// these are promises of THIS PACK rather than of templates in general — and here
+// they are arithmetic rather than taste. The vertical triple's native duration
+// tables intersect at exactly {8} (§6), so a shorts card has one legal clip
+// length; three beats is the loop sweet spot (§10); and the knob budget is a
+// stated discipline (§8) with at least one knob that changes what is ON SCREEN,
+// which is the feature's licence to exist under YouTube's inauthentic-content
+// policy (§9).
+//
+// The payoff of the uniform shape is the batch runner's: every card costs the
+// same, so the itemised confirm is rows × beats × one number.
+// ─────────────────────────────────────────────────────────────────────────────
+const SHORTS = TEMPLATES.filter((t) => t.category === 'shorts')
+
+describe('shorts shelf', () => {
+  it('ships the eleven formats the shelf claims, in gallery order', () => {
+    // 'shorts-figurine-pov' is authored but deliberately NOT registered: its
+    // format needs a tier that can hold a character across shots, and the only
+    // such tier model is unreachable on this deployment, so the one tier that
+    // runs is the one tier that cannot do the card's job. See the note in
+    // catalog/index.ts and that file's own header for the return condition.
+    expect(SHORTS.map((t) => t.id)).toEqual([
+      'shorts-asmr-impossible',
+      'shorts-lofi-loop',
+      'shorts-timelapse-cycle',
+      'shorts-b-roll',
+      'shorts-pov-immersion',
+      'shorts-talking-object',
+      'shorts-absurd-creature',
+      'shorts-stylised-everyday',
+      'shorts-cold-open-loop',
+      'shorts-what-if-doc',
+      'shorts-ai-slop',
+    ])
+  })
+
+  it('never reaches the in-player disclosure tier', () => {
+    // §12: the shelf leads with stylised and no-face formats precisely because
+    // they are cheaper, more reliable AND less policy-exposed. A shorts card that
+    // needs an in-player label is a talking-head format that wandered onto the
+    // wrong shelf — those ship later, and knowingly.
+    for (const t of SHORTS) expect(t.disclosureTier, t.id).not.toBe('in-player')
+  })
+
+  describe.each(SHORTS.map((t) => [t.id, t] as const))('%s', (_id, template) => {
+    it('is vertical on the shelf triple, and says which tiers actually work', () => {
+      // The triple changed on 2026-08-20 and the reason was deployment reality,
+      // not craft: pixverse-v6 (draft) routes to Runware, whose production key is
+      // a placeholder, so the whole shelf passed every check here and then failed
+      // on the first real click. seedance-1-5-pro runs on kie.ai, which is
+      // verified working in production, and it costs the SAME 56 credits at 8s —
+      // so the swap changed no price and no beat. Standard and premium are left
+      // pointing at providers this deployment cannot reach yet, deliberately:
+      // aiming all three tiers at one working model would make the tier picker a
+      // lie. What we owe the user is the truth on the pill, so this test also
+      // pins that EVERY tier carries a note — an unreachable tier with a silent
+      // pill is the exact trap the change exists to remove.
+      expect(template.aspectRatio).toBe('9:16')
+      expect(template.models).toEqual({
+        draft: 'seedance-1-5-pro',
+        standard: 'wan-2-7',
+        premium: 'veo-3-1-fast',
+      })
+      for (const tier of ['draft', 'standard', 'premium'] as const)
+        expect(template.tierNotes?.[tier]?.length, `${tier}: no note`).toBeGreaterThan(0)
+    })
+
+    it('is 3 or 4 beats, every one of them a paid 8s clip', () => {
+      // 8 is the intersection of the three tier models' native duration tables,
+      // so it is the only legal length here — assertTemplatesValid would fail the
+      // deploy on anything else, but this says WHY rather than just that.
+      const clips = template.shots.filter(isClip)
+      expect(clips.length).toBe(template.shots.length)
+      expect(clips.length).toBeGreaterThanOrEqual(3)
+      expect(clips.length).toBeLessThanOrEqual(4)
+      for (const c of clips) expect(c.durationSeconds, c.beat).toBe(8)
+    })
+
+    it('has at most three knobs, and at least one that changes the picture', () => {
+      // §8: more than three knobs is a Cinema template wearing the wrong shelf.
+      // §9: a batch VARIES by default — a template whose only knob is cosmetic is
+      // a machine for producing N identical clips, which is the named
+      // demonetisation trigger this shelf exists downstream of. "Changes the
+      // picture" is checked as "some select knob is substituted into a visual
+      // prompt", which is the closest a test can get to it.
+      expect(template.variables.length).toBeLessThanOrEqual(3)
+      const selectKeys = new Set(
+        template.variables.filter((v) => v.kind === 'select').map((v) => v.key),
+      )
+      const inVisualPrompts = new Set(
+        template.shots
+          .flatMap((s) => stringsOf(s))
+          .filter((f) => f.visual)
+          .flatMap((f) => placeholdersIn(f.text)),
+      )
+      const onScreen = [...selectKeys].filter((k) => inVisualPrompts.has(k))
+      expect(
+        onScreen.length,
+        `${template.id}: no knob reaches a visual prompt — every batch row would look identical`,
+      ).toBeGreaterThan(0)
+    })
+
+    it('never asks the model to render text, and frames for the platform UI', () => {
+      // §11, the two prompt-level constraints. Text rendering is the one bad
+      // failure mode that is free to eliminate, and the platform's own UI eats the
+      // bottom ~26% of a 9:16 frame — so both belong in every authored prompt, not
+      // in a compositor step nobody has built yet.
+      for (const shot of template.shots) {
+        if (!isClip(shot)) continue
+        const p = shot.prompt.toLowerCase()
+        expect(p, `${shot.beat}: no text suppression`).toContain('no text anywhere in frame')
+        expect(p, `${shot.beat}: no safe-area framing`).toContain('upper two thirds')
+        expect(p, `${shot.beat}: no empty lower third`).toContain('lower third')
       }
     })
   })

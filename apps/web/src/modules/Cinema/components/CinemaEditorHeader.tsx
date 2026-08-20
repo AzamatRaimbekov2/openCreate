@@ -42,6 +42,16 @@ export type CinemaEditorHeaderProps = {
   canExport: boolean
   // True while the kick-off POST is in flight — the button shows its spinner.
   isStarting: boolean
+  // One-off "Export to Canvas" conversion (owned by FilmEditor, same as
+  // `onExport`): builds a brand-new Canvas document from this film's shots and
+  // navigates there. No live link back — a snapshot, not a sync.
+  onExportToCanvas: () => void
+  // True while that conversion is in flight. The Menu has no built-in loading
+  // affordance, so the busy state is a swapped LABEL, not a disabled item —
+  // re-entrancy (a second click mid-export) is gated in the handler itself.
+  // Explicit `| undefined` (exactOptionalPropertyTypes): FilmEditor may hand
+  // through a real `boolean | undefined` from its own local state.
+  isExportingToCanvas?: boolean | undefined
   // Shot count + total duration for the film-META row (context chips under the
   // title). Undefined while the film loads; the meta is hidden until then.
   // Explicit `| undefined` because tsconfig has exactOptionalPropertyTypes — the
@@ -66,6 +76,8 @@ export function CinemaEditorHeader({
   durationMs,
   styles,
   chrome,
+  onExportToCanvas,
+  isExportingToCanvas = false,
 }: CinemaEditorHeaderProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -139,6 +151,13 @@ export function CinemaEditorHeader({
                   id: 'settings',
                   label: t('cinema.editor.rename'),
                   onSelect: () => setIsSettingsOpen(true),
+                },
+                {
+                  id: 'exportToCanvas',
+                  label: isExportingToCanvas
+                    ? t('cinema.editor.exportingToCanvas')
+                    : t('cinema.editor.exportToCanvas'),
+                  onSelect: onExportToCanvas,
                 },
                 {
                   id: 'delete',

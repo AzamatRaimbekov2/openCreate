@@ -44,6 +44,18 @@ export const catDrama: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: '{{hero}} и предательство',
 
+  // THE AMBIGUOUS ONE, resolved upward on purpose. A cat head on a human body is
+  // unmistakably synthetic, which argues for 'description'. But everything else in
+  // frame is photoreal: human bodies, a real apartment, a real gym, a rainy street.
+  // 'description' is defined as the NON-photoreal tier and this is not that, so the
+  // only clean literal fit above it is 'in-player'. The rule when a card sits
+  // between two tiers is to take the higher one — over-labelling costs a line of
+  // copy, under-labelling a photoreal human drama is a policy exposure, and
+  // TikTok's C2PA detection will apply the label here whatever we declare.
+  // Not loopable: betrayal → glow-up → revenge, and it ends.
+  loopable: false,
+  disclosureTier: 'in-player',
+
   models: {
     draft: 'pixverse-v6',
     standard: 'wan-2-7',

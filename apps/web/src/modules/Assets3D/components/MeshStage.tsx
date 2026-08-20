@@ -23,13 +23,12 @@ import { useTranslation } from 'react-i18next'
 import type { Asset3dPart, CatalogModel } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
-import { Button, Card, EmptyState, Select } from 'shared/ui'
+import { Button, Card, EmptyState, Select, SpendConfirmModal } from 'shared/ui'
 import { useMeshPart } from '../model/asset3dApi'
 import { meshPrice, meshTierOptions } from '../model/assetPricing'
 import { useWizardStore } from '../model/wizardStore'
 import { PartGenerationCard } from './PartGenerationCard'
 import { PriceTag } from './PriceTag'
-import { SpendConfirmModal } from './SpendConfirmModal'
 
 export type MeshStageProps = {
   // The asset being meshed

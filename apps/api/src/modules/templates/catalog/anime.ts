@@ -29,6 +29,12 @@ export const anime: Template = {
   defaultStyleId: 'anime',
   titleTemplate: 'Аниме: {{hero}}',
 
+  // Cel-shaded and fantastical — glowing runes and an awakening power are not
+  // something anyone mistakes for a record. Not loopable: the arc is a battle
+  // that resolves into «Продолжение следует».
+  loopable: false,
+  disclosureTier: 'none',
+
   // Same ladder as the other two formats — 8s at 16:9 on every tier (the
   // invariant templates.test.ts enforces). wan-2-7 standard: references keep
   // the SAME hero across episodes, which for a series is the whole point.

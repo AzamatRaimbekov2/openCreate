@@ -128,7 +128,7 @@ describe('film audio integrity', () => {
     // is allowed to be rewritten, but the machine-readable cause is the contract.
     // (It said "not ready" until 2026-07-21, when the vague single sentence was
     // split into one instruction per cause — see films-render-reasons.test.ts.)
-    expect(() => svc.createRender(USER, film.id)).toThrow(
+    await expect(svc.createRender(USER, film.id)).rejects.toThrow(
       expect.objectContaining({ reason: 'audio_processing' }),
     )
   })
@@ -142,7 +142,7 @@ describe('film audio integrity', () => {
 
     // A DIFFERENT reason from the processing case above — that separation is the
     // whole point: "wait" and "remove" cannot be the same sentence.
-    expect(() => svc.createRender(USER, film.id)).toThrow(
+    await expect(svc.createRender(USER, film.id)).rejects.toThrow(
       expect.objectContaining({ reason: 'audio_failed' }),
     )
   })
@@ -165,7 +165,7 @@ describe('film audio integrity', () => {
     seedAudioGeneration(db, 'gen-no-file', 'succeeded')
     svc.addAudio(USER, film.id, { kind: 'voiceover', generationId: 'gen-no-file' })
 
-    expect(() => svc.createRender(USER, film.id)).toThrow(/audio/i)
+    await expect(svc.createRender(USER, film.id)).rejects.toThrow(/audio/i)
   })
 
   it('renders when the attached track does have its file', async () => {
@@ -173,10 +173,10 @@ describe('film audio integrity', () => {
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedAudioGeneration(db, 'gen-has-file', 'succeeded')
-    writeFileSync(storage.localPath('gen-has-file', 'mp3'), 'not really mp3, but it exists')
+    writeFileSync(storage.scratchPath('gen-has-file', 'mp3'), 'not really mp3, but it exists')
     svc.addAudio(USER, film.id, { kind: 'voiceover', generationId: 'gen-has-file' })
 
-    const render = svc.createRender(USER, film.id)
+    const render = await svc.createRender(USER, film.id)
     expect(render.status).toBe('processing')
   })
 })

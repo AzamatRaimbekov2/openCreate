@@ -165,6 +165,10 @@ CREATE TABLE IF NOT EXISTS film (
   -- Which template this film came from (ADR: template-catalog), NULL if hand-made.
   -- No FK: templates are code, not rows — retiring one must leave old films intact.
   template_id TEXT,
+  -- Which batch created this film (ADR: shorts-studio), NULL for a film made one
+  -- at a time. Server-set provenance, like template_id, and no FK for the same
+  -- reason: a batch is a LABEL, there is no batch row to point at.
+  batch_id TEXT,
   -- The film's cover picture: the '/media/<uuid>.<ext>' path of an image uploaded
   -- at create time. NULL = no cover, which is every film written before this.
   cover_image_path TEXT,
@@ -251,6 +255,26 @@ CREATE TABLE IF NOT EXISTS film_render (
   completed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_film_render_film ON film_render(film_id, created_at DESC);
+`
+
+// The batch board's index (ADR: shorts-studio §2), and it is SEPARATE from
+// FILM_DDL on purpose — this is the trap the split exists to avoid:
+//
+//   CREATE TABLE IF NOT EXISTS is a no-op on a database that already has `film`,
+//   so on an EXISTING volume the batch_id column does not appear until the
+//   ALTER TABLE micro-migration in client.ts runs — which happens AFTER the DDL
+//   exec. An index on batch_id written inside FILM_DDL would therefore boot fine
+//   on a fresh volume and throw "no such column: batch_id" on every existing one.
+//
+// So client.ts execs this immediately after the column guard, when the column is
+// guaranteed to exist on both paths. Still IF NOT EXISTS, still idempotent.
+//
+// (user_id, batch_id) rather than batch_id alone because the query it serves is
+// always both — a batch is only ever read through its owner (`WHERE user_id = ?
+// AND batch_id = ?`), and an index that omits the ownership predicate would make
+// the database do work the scope has already narrowed.
+export const FILM_BATCH_INDEX_DDL = `
+CREATE INDEX IF NOT EXISTS idx_film_user_batch ON film(user_id, batch_id);
 `
 
 // Studio3D tables (ADR: photo-to-3d-studio §D3). Exec'd with the main DDL — all

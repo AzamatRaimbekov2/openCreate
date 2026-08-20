@@ -1,8 +1,13 @@
+import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { buildTestApp } from './helpers/build-test-app'
 import { createAuth } from '../src/modules/auth/auth'
+import { registerAuth } from '../src/modules/auth/plugin'
 import { createDb } from '../src/db/client'
+import { user } from '../src/db/schema'
 import type { AppConfig } from '../src/config'
+import type { Auth } from '../src/modules/auth/auth'
 
 async function register(app: Awaited<ReturnType<typeof buildTestApp>>) {
   const res = await app.inject({
@@ -36,6 +41,28 @@ describe('auth', () => {
     expect(res.json().error.code).toBe('unauthorized')
   })
 
+  // Gap: the session is still valid but the underlying user row is gone.
+  // Normally session.user_id CASCADEs on user delete, so this can only happen
+  // via an out-of-band admin/migration delete that bypasses the FK (simulated
+  // here by toggling the pragma) — users/routes.ts must still answer a clean
+  // 404 not_found rather than a null-dereference 500 in that case.
+  it('GET /api/me → 404 not_found when the session outlives its user row', async () => {
+    const { db, sqlite } = createDb(':memory:')
+    const app = await buildTestApp({ db })
+    const res = await register(app)
+    const cookie = String(res.headers['set-cookie'])
+    const me = (await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json() as {
+      id: string
+    }
+    sqlite.pragma('foreign_keys = OFF')
+    db.delete(user).where(eq(user.id, me.id)).run()
+    sqlite.pragma('foreign_keys = ON')
+
+    const after = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
+    expect(after.statusCode).toBe(404)
+    expect(after.json().error.code).toBe('not_found')
+  })
+
   it('Google may link to an existing email+password account (no local email verification exists)', () => {
     // The live bug: Google sign-in with the email of an existing password
     // account died on better-auth's error page with account_not_linked. Root
@@ -59,5 +86,42 @@ describe('auth', () => {
       trustedProviders: ['google'],
       requireLocalEmailVerified: false,
     })
+  })
+})
+
+describe('registerAuth response bridge', () => {
+  it('forwards multiple Set-Cookie headers as separate headers, not comma-joined', async () => {
+    // The bug this guards: undici's Headers.forEach folds repeated headers
+    // (like Set-Cookie) into one comma-joined string. plugin.ts special-cases
+    // set-cookie via response.headers.getSetCookie() specifically to avoid
+    // this — no test in the suite has ever driven a real multi-cookie
+    // response through the bridge, since better-auth's normal sign-up/sign-in
+    // flow here only ever sets one cookie.
+    const fakeAuth = {
+      handler: async () =>
+        new Response('{}', {
+          status: 200,
+          headers: [
+            ['set-cookie', 'session=abc; Path=/; HttpOnly'],
+            ['set-cookie', 'csrf=def; Path=/'],
+            ['content-type', 'application/json'],
+          ],
+        }),
+      api: { getSession: async () => null },
+    } as unknown as Auth
+
+    const app = Fastify()
+    await registerAuth(app, fakeAuth)
+    const res = await app.inject({ method: 'GET', url: '/api/auth/get-session' })
+
+    const setCookie = res.headers['set-cookie']
+    expect(Array.isArray(setCookie)).toBe(true)
+    expect(setCookie).toHaveLength(2)
+    expect(setCookie).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('session=abc'),
+        expect.stringContaining('csrf=def'),
+      ]),
+    )
   })
 })

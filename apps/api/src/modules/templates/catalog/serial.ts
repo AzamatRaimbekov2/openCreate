@@ -32,6 +32,12 @@ export const serial: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: 'Сериал: {{find}}',
 
+  // The most mistakable card in the catalog: photoreal people arguing in a
+  // photoreal kitchen is exactly the footage a viewer reads as a record of
+  // something that happened. Not loopable — it ends on a cliffhanger by design.
+  loopable: false,
+  disclosureTier: 'in-player',
+
   // Same tier ladder as «Фильм»: every model holds 8s at 16:9 (enforced by
   // templates.test.ts); wan-2-7 standard so tagged characters persist between
   // episodes via references.

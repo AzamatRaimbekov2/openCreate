@@ -1,19 +1,29 @@
-// Local storage provider (plan Task 9). Runware asset URLs expire after 7 days,
-// so the moment a generation succeeds we download the bytes into our own
-// STORAGE_DIR and hand the SPA a stable /media/<key>.<ext> path served by
-// @fastify/static (wired in app.ts). Shaped as a StorageProvider interface so
-// an S3/R2 provider can replace it post-MVP without touching callers.
-import { createWriteStream, mkdirSync } from 'node:fs'
-import { unlink } from 'node:fs/promises'
+// Local storage provider (plan Task 9; reshaped for object storage — ADR
+// railway-deployment D2). Runware asset URLs expire after 7 days, so the
+// moment a generation succeeds we download the bytes into our own
+// STORAGE_DIR and hand the SPA a stable /media/<key>.<ext> path. Shaped as a
+// StorageProvider interface so an R2 provider (storage/r2.ts) answers the
+// same calls without touching a caller.
+import { existsSync, mkdirSync } from 'node:fs'
+import { rename, unlink } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
-import { Readable, Transform } from 'node:stream'
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
-import { pipeline } from 'node:stream/promises'
 import { readFile, writeFile } from 'node:fs/promises'
+import { downloadToFile, type DownloadLimits } from './download'
 import { parseImageDataUri } from './dataUri'
 
+// Thrown by materialize() when the requested object does not exist — the
+// provider-agnostic replacement for the caller-side `existsSync(localPath)`
+// check the filesystem shape used to allow. Both providers throw this exact
+// type so callers (films/service.ts, models3d/service.ts) can react to "the
+// asset was never downloaded / was pruned" the same way regardless of backend.
+export class StorageObjectNotFoundError extends Error {
+  constructor(publicPath: string) {
+    super(`storage object not found: ${publicPath}`)
+  }
+}
+
 export type StorageProvider = {
-  // Downloads `url` and stores it as <dir>/<key>.<ext>; returns the public
+  // Downloads `url` and stores it as <key>.<ext>; returns the public
   // "/media/<key>.<ext>" path that goes into generation.mediaJson.
   saveFromUrl(url: string, key: string, ext: string): Promise<string>
   // Stores the bytes of a user-supplied image data URI (entity photos). No
@@ -25,17 +35,25 @@ export type StorageProvider = {
   // publicly reachable in development (or behind a private asset host), so
   // handing over a URL would fail precisely where we test it.
   readAsDataUri(publicPath: string): Promise<string>
-  // Absolute directory @fastify/static serves as /media/* (see app.ts).
-  dir: string
+  // How app.ts should answer a GET /media/<publicPath> request: serve a local
+  // file straight off `root`, or 302 the browser at a public object-storage URL.
+  serve(publicPath: string): Promise<{ kind: 'file'; root: string } | { kind: 'redirect'; url: string }>
   remove(key: string, ext: string): Promise<void>
-  // Absolute on-disk path of a stored asset — the local file the CinemaStudio
-  // ffmpeg render reads (shot media) and writes (the finished mp4). No I/O, no
-  // await: it just joins <dir>/<key>.<ext>. Because every finished generation
-  // asset is already downloaded into STORAGE_DIR (Runware URLs expire in 7 days),
-  // the render's inputs are always local files — ffmpeg needs no network and the
-  // SSRF gate is not in the picture. An S3 provider would implement this by
-  // staging to a temp dir first; noted in the ADR, not built.
-  localPath(key: string, ext: string): string
+  // Guarantees a REAL LOCAL FILE ffmpeg can read for <key>.<ext>, plus a
+  // release() the caller MUST call in a `finally` once done with it. The local
+  // provider returns the stored file itself with a no-op release; an object
+  // storage provider downloads to a scratch file and unlinks it on release.
+  // Throws StorageObjectNotFoundError if the object does not exist.
+  materialize(key: string, ext: string): Promise<{ path: string; release(): Promise<void> }>
+  // Where ffmpeg may WRITE <key>.<ext> — a scratch input (never published) or a
+  // render's output (published via publishLocalFile below once ffmpeg succeeds).
+  // No I/O, no await: pure path computation, safe to call before the file exists.
+  scratchPath(key: string, ext: string): string
+  // Turns a file written at `path` (normally storage.scratchPath's own return
+  // value) into a stored, servable asset at "/media/<key>.<ext>". The local
+  // provider's publish is a rename into place; an object storage provider
+  // uploads then deletes the scratch file.
+  publishLocalFile(path: string, key: string, ext: string): Promise<string>
 }
 
 // Download hardening defaults (review finding). Without a deadline, a single
@@ -49,7 +67,7 @@ export type StorageProvider = {
 // stays safe-by-default for any caller that forgets to pass config values.
 // Reverse of dataUri.ts's MIME_TO_EXT — the extension we stored decides the mime
 // we hand back. Same closed raster set: nothing here can reintroduce svg.
-const MIME_BY_EXT: Record<string, string> = {
+export const MIME_BY_EXT: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
   webp: 'image/webp',
@@ -67,35 +85,6 @@ export type StorageLimits = {
   maxBytes?: number
 }
 
-// SSRF gate for saveFromUrl (review finding). The URL we fetch comes from a
-// PROVIDER RESPONSE, not from our own code — a compromised or misbehaving
-// provider payload could otherwise point our server-side fetch at internal
-// targets (169.254.169.254 cloud metadata, localhost admin ports, private
-// VPC services) and exfiltrate whatever they answer into /media/*.
-// Default-deny: a host passes only if it IS an allowlisted domain or a true
-// subdomain of one ('vm.runware.ai' → 'runware.ai'). Plain suffix matching
-// would be spoofable ('evilrunware.ai' ends with 'runware.ai'), hence the
-// exact-or-dot-boundary comparison. Scheme is https-only: provider asset URLs
-// are always https, and plain http to an allowlisted host would hand the
-// bytes (and the request) to any on-path attacker.
-function assertAllowedAssetUrl(url: string, allowedHosts: string[]): void {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw new Error('asset url not allowed: unparseable')
-  }
-  // Rejects file:, data:, ftp: and downgraded http: in one check — hostless
-  // schemes never reach the host comparison at all.
-  if (parsed.protocol !== 'https:') throw new Error('asset url not allowed: https required')
-  const host = parsed.hostname.toLowerCase()
-  const ok = allowedHosts.some((allowed) => {
-    const a = allowed.toLowerCase()
-    return host === a || host.endsWith(`.${a}`)
-  })
-  if (!ok) throw new Error(`asset host not allowed: ${host}`)
-}
-
 // `allowedHosts` comes from config.assetHostAllowlist (ASSET_HOST_ALLOWLIST,
 // default runware.ai) — configurable so a provider/CDN change is an env edit,
 // not a code change. The default here keeps the constructor safe-by-default
@@ -109,15 +98,16 @@ export function createLocalStorage(
   // but @fastify/static requires an absolute root — normalize once here.
   const root = resolve(dir)
   mkdirSync(root, { recursive: true })
-  const fetchTimeoutMs = limits.fetchTimeoutMs ?? DEFAULT_ASSET_FETCH_TIMEOUT_MS
-  const maxBytes = limits.maxBytes ?? DEFAULT_ASSET_MAX_BYTES
+  const downloadLimits: DownloadLimits = {
+    fetchTimeoutMs: limits.fetchTimeoutMs ?? DEFAULT_ASSET_FETCH_TIMEOUT_MS,
+    maxBytes: limits.maxBytes ?? DEFAULT_ASSET_MAX_BYTES,
+  }
   return {
-    dir: root,
     async saveDataUri(dataUri, key) {
       // Entity photos are ours forever (Runware URLs expire after 7 days), so
       // they land in the same STORAGE_DIR the generations use. Reuses the asset
       // byte cap: one number governs "how big may a stored image be".
-      const { bytes, ext } = parseImageDataUri(dataUri, maxBytes)
+      const { bytes, ext } = parseImageDataUri(dataUri, downloadLimits.maxBytes)
       await writeFile(join(root, `${key}.${ext}`), bytes)
       return `/media/${key}.${ext}`
     },
@@ -132,95 +122,36 @@ export function createLocalStorage(
       return `data:${mime};base64,${bytes.toString('base64')}`
     },
     async saveFromUrl(url, key, ext) {
-      // Gate BEFORE the fetch — a forbidden host must never see the request.
-      assertAllowedAssetUrl(url, allowedHosts)
-      // One AbortController spans the ENTIRE download — the fetch (headers)
-      // AND the body pipeline below share its signal. A deadline on fetch
-      // alone would be a half-measure: undici resolves fetch() at headers, so
-      // a provider that answers fast and then streams forever would still
-      // hold this settlement await indefinitely. `timedOut` disambiguates the
-      // deadline from the manual abort() in the pipeline error handler.
-      const controller = new AbortController()
-      let timedOut = false
-      const timer = setTimeout(() => {
-        timedOut = true
-        controller.abort()
-      }, fetchTimeoutMs)
       const file = join(root, `${key}.${ext}`)
-      try {
-        // redirect: 'manual' closes the allowlist-bypass hop: the gate above only
-        // ever saw the FIRST url, so with fetch's default ('follow') a single 30x
-        // on an allowlisted host (open redirect, compromised provider) would
-        // re-point this server-side request at internal targets — metadata
-        // endpoints, localhost admin ports — and publish the response under
-        // /media/*. Provider asset URLs are direct links; a redirect is treated
-        // as hostile and fails the download outright instead of being re-vetted.
-        // Browser User-Agent: some asset hosts sit behind Cloudflare, which
-        // 403s (CF 1010) a bare Node fetch — notably our RunPod ComfyUI /view
-        // URLs. Harmless for hosts that don't care (Runware).
-        const res = await fetch(url, {
-          redirect: 'manual',
-          signal: controller.signal,
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-          },
-        })
-        if (res.status >= 300 && res.status < 400)
-          throw new Error(`asset redirect not allowed: ${res.status}`)
-        if (!res.ok || !res.body) throw new Error(`asset download failed: ${res.status}`)
-        // Byte cap enforced WHILE streaming (review finding): the counter sits
-        // between the network and the disk, so not one byte past the cap is
-        // written. Content-Length is deliberately ignored — a header can lie
-        // in both directions; only counted bytes are trusted.
-        let received = 0
-        const capBytes = new Transform({
-          transform(chunk: Buffer, _enc, done) {
-            received += chunk.length
-            if (received > maxBytes) done(new Error(`asset too large: exceeded ${maxBytes} bytes`))
-            else done(null, chunk)
-          },
-        })
-        // Stream to disk — videos can be tens of MB; never buffer them in memory.
-        // (Cast: DOM ReadableStream and node:stream/web ReadableStream are
-        // structurally identical here but nominally distinct types.)
-        try {
-          await pipeline(
-            Readable.fromWeb(res.body as unknown as NodeReadableStream<Uint8Array>),
-            capBytes,
-            createWriteStream(file),
-            { signal: controller.signal },
-          )
-        } catch (err) {
-          // Any mid-stream failure (cap trip, timeout abort, network drop):
-          // release the provider socket and remove the partial file — a
-          // truncated asset must never be served from /media/* as if whole.
-          controller.abort()
-          await unlink(file).catch(() => undefined)
-          throw err
-        }
-        return `/media/${key}.${ext}`
-      } catch (err) {
-        // The deadline may fire before headers (fetch rejects with AbortError)
-        // or mid-stream (pipeline rejects) — either way, surface a stable,
-        // caller-meaningful message instead of a generic abort error.
-        if (timedOut) throw new Error(`asset download timed out after ${fetchTimeoutMs}ms`)
-        throw err
-      } finally {
-        clearTimeout(timer)
-      }
+      await downloadToFile(url, allowedHosts, downloadLimits, file)
+      return `/media/${key}.${ext}`
+    },
+    async serve() {
+      // Every /media/* file lives directly under root; app.ts resolves the
+      // requested filename against it (and gets @fastify/static's own
+      // path-traversal guard for free).
+      return { kind: 'file', root }
     },
     async remove(key, ext) {
       // Idempotent delete: a missing file is fine (already cleaned up or the
       // generation failed before download) — callers must not have to care.
       await unlink(join(root, `${key}.${ext}`)).catch(() => undefined)
     },
-    localPath(key, ext) {
-      // Pure path join against the resolved absolute root. Callers (the render
-      // pipeline) pass their own keys/exts; this never touches the network or
-      // the filesystem, so it is safe to call for a path that does not exist yet
-      // (the render OUTPUT path is computed before ffmpeg writes it).
+    async materialize(key, ext) {
+      const path = join(root, `${key}.${ext}`)
+      if (!existsSync(path)) throw new StorageObjectNotFoundError(`${key}.${ext}`)
+      return { path, release: async () => undefined }
+    },
+    scratchPath(key, ext) {
+      // Local has no separate scratch area: the directory @fastify/static
+      // serves IS the publish target, so ffmpeg writes straight to its final
+      // resting place (matches the pre-R2 behaviour exactly).
       return join(root, `${key}.${ext}`)
+    },
+    async publishLocalFile(path, key, ext) {
+      const dest = join(root, `${key}.${ext}`)
+      if (path !== dest) await rename(path, dest)
+      return `/media/${key}.${ext}`
     },
   }
 }

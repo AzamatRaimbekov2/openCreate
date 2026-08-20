@@ -91,3 +91,44 @@ flowchart LR
 - Moderation still applies via the NSFWContent flag on results; the flag only
   controls whether the client SENDS the request-side `safety` object
   (runware/client.ts `omitSafety` plumbing, already tested).
+
+## 2026-08-19 — every image model moved to Seedream 5 (kie.ai)
+
+- The four image entries keep their ids (`flux-schnell`, `flux-dev`,
+  `flux-kontext-pro`, `nano-banana-pro`) because the database is full of rows,
+  shots, templates and canvas nodes that reference them. What changed is what
+  runs behind each id: `kie: { model, quality }` names the Seedream handle and
+  its 2K/3K/4K tier, while `air` stays the Runware handle and becomes the
+  FAILOVER link. One entry, two backends.
+- All four are priced at **7 credits** — Seedream 5 Lite charges one flat
+  $0.035/image regardless of quality tier, so the old ladder (1 / 2 / 8 / 28)
+  has no cost basis any more. The tiers are now a RESOLUTION ladder, not a
+  price one. Restoring a price spread means wiring Seedream 5 Pro ($0.045 up
+  to 2.36MP, $0.09 above), which is deliberately not done here: its kie.ai
+  model id has not been verified against a real key.
+- PRICES AND BOTH MODEL IDS ARE MEASURED (2026-08-19, three live generations on
+  the operator's key): basic 2K, ultra 4K and image-to-image-with-a-reference all
+  billed **5.5 kie credits = $0.0275**, against the $0.035 the price page
+  advertises. So 7 credits is a 2.5× margin, the flat rate is a fact rather than
+  an assumption, and `seedream/5-lite-image-to-image` resolves. Finished assets
+  come from `tempfile.aiquickdraw.com`, which `withKieHost()` already allowlists.
+- Falling back to Runware SELLS BELOW COST (Nano Banana Pro is $0.138 against
+  7 credits of revenue). That is the accepted price of having a fallback at
+  all, bounded by how rarely kie.ai refuses a job — and pinned by a test in
+  `catalog.test.ts` so it is a decision rather than a discovery.
+
+## 2026-08-19 — Pulse (Seedance 1.5 Pro) moved from Runware to kie.ai
+
+- `air` is now `kie:bytedance/seedance-1.5-pro` and the entry carries
+  `provider: 'kie'`. Same model, a third of the cost: kie bills a MEASURED
+  3.5 credits/second on the silent 720p row ($0.0875 for 5s) against Runware’s
+  $0.26136 for the identical clip.
+- Everything we sell fits their schema (docs 2026-08-19): duration 4–12s covers
+  our 5/8/10/12, resolutions 480p/720p/1080p, and every aspect ratio in our list.
+  `generate_audio` is a real flag, so the switchable-audio pricing still holds.
+- The entry is now GATED BY `KIE_API_KEY`, like every other optional backend:
+  no key, no listing. `supportsSafetyParam: false` stays — it describes the
+  model (ByteDance rejects Runware’s `safety`), not the channel.
+- Their `input_urls` takes URLs only, max 2 — so the adapter refuses an
+  image→video job with no public media URL AT SUBMIT rather than letting it
+  queue and fail after the charge. Same rule Segmind needed the same day.

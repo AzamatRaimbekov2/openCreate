@@ -35,6 +35,7 @@ function makeFilm(overrides: Partial<Film> = {}): Film {
     aspectRatio: '16:9',
     defaultStyleId: null,
     templateId: null,
+    batchId: null,
     coverUrl: null,
     createdAt: '2026-07-09T10:00:00.000Z',
     updatedAt: '2026-07-09T10:00:00.000Z',
@@ -50,6 +51,8 @@ type HeaderProps = {
   shotCount?: number
   durationMs?: number
   chrome?: ReactNode
+  onExportToCanvas?: () => void
+  isExportingToCanvas?: boolean
 }
 
 // The bar + a /cinema stub (back link + post-delete navigate) so every Link the
@@ -64,6 +67,8 @@ async function renderHeader({
   shotCount,
   durationMs,
   chrome,
+  onExportToCanvas = () => {},
+  isExportingToCanvas = false,
 }: HeaderProps) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const rootRoute = createRootRoute()
@@ -79,6 +84,8 @@ async function renderHeader({
         shotCount={shotCount}
         durationMs={durationMs}
         chrome={chrome}
+        onExportToCanvas={onExportToCanvas}
+        isExportingToCanvas={isExportingToCanvas}
       />
     ),
   })
@@ -117,7 +124,13 @@ function renderHeaderWithMutableFilm(initialFilm: Film) {
         <button type="button" onClick={() => setFilm({ ...film, title: 'Renamed Live' })}>
           simulate-parent-refresh
         </button>
-        <CinemaEditorHeader film={film} onExport={() => {}} canExport isStarting={false} />
+        <CinemaEditorHeader
+          film={film}
+          onExport={() => {}}
+          canExport
+          isStarting={false}
+          onExportToCanvas={() => {}}
+        />
       </>
     )
   }
@@ -236,6 +249,30 @@ describe('CinemaEditorHeader', () => {
   it('disables export when it cannot run', async () => {
     await renderHeader({ film: makeFilm(), canExport: false })
     expect(screen.getByRole('button', { name: /mp4/i })).toBeDisabled()
+  })
+
+  it('fires onExportToCanvas from the ⋯ menu', async () => {
+    const user = userEvent.setup()
+    const onExportToCanvas = vi.fn()
+    await renderHeader({ film: makeFilm(), onExportToCanvas })
+
+    await user.click(screen.getByRole('button', { name: /actions|действия/i }))
+    await user.click(screen.getByRole('menuitem', { name: /export to canvas|экспорт в холст/i }))
+
+    expect(onExportToCanvas).toHaveBeenCalledOnce()
+  })
+
+  it('swaps the export-to-canvas label while the export is in flight', async () => {
+    const user = userEvent.setup()
+    await renderHeader({ film: makeFilm(), isExportingToCanvas: true })
+
+    await user.click(screen.getByRole('button', { name: /actions|действия/i }))
+    expect(
+      screen.getByRole('menuitem', { name: /exporting to canvas|экспортируем в холст/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('menuitem', { name: /^export to canvas$|^экспорт в холст$/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('deletes the film only after the destructive confirm (§9)', async () => {

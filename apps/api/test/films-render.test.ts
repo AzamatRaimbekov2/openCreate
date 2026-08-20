@@ -47,7 +47,7 @@ describe('film render lifecycle', () => {
     // A title-only shot needs no media file — renders as a card.
     svc.addShot(USER, film.id, { title: { text: 'THE END', position: 'center' }, durationMs: 2000 })
 
-    const render = svc.createRender(USER, film.id)
+    const render = await svc.createRender(USER, film.id)
     expect(render.status).toBe('processing')
 
     const done = await waitTerminal(svc, USER, film.id, render.id)
@@ -62,7 +62,7 @@ describe('film render lifecycle', () => {
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '1:1' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'top' }, durationMs: 1500 })
 
-    const render = svc.createRender(USER, film.id)
+    const render = await svc.createRender(USER, film.id)
     const done = await waitTerminal(svc, USER, film.id, render.id)
     expect(done.status).toBe('failed')
     expect(done.errorMessage).toBe('boom')
@@ -75,7 +75,7 @@ describe('film render lifecycle', () => {
     const { db, svc } = service(hang)
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
-    const render = svc.createRender(USER, film.id)
+    const render = await svc.createRender(USER, film.id)
 
     // Backdate the row well past the staleness threshold.
     db.update(filmRender)
@@ -104,7 +104,7 @@ describe('film detail carries the latest render', () => {
     const { svc } = service(vi.fn(async () => ({ ok: true as const })))
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
-    const render = svc.createRender(USER, film.id)
+    const render = await svc.createRender(USER, film.id)
     await waitTerminal(svc, USER, film.id, render.id)
 
     // A fresh load of the film — the only thing a reloaded editor gets
@@ -119,9 +119,9 @@ describe('film detail carries the latest render', () => {
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
 
-    const first = svc.createRender(USER, film.id)
+    const first = await svc.createRender(USER, film.id)
     await waitTerminal(svc, USER, film.id, first.id)
-    const second = svc.createRender(USER, film.id)
+    const second = await svc.createRender(USER, film.id)
     await waitTerminal(svc, USER, film.id, second.id)
 
     expect(svc.getFilm(USER, film.id).latestRender?.id).toBe(second.id)
@@ -148,8 +148,8 @@ describe('concurrent renders are refused', () => {
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
 
-    svc.createRender(USER, film.id)
-    expect(() => svc.createRender(USER, film.id)).toThrow(FilmRenderInProgressError)
+    void svc.createRender(USER, film.id)
+    await expect(svc.createRender(USER, film.id)).rejects.toThrow(FilmRenderInProgressError)
     // And only ONE ffmpeg job was ever started. The runner is reached through an
     // async semaphore acquire, so this has to wait for the job to actually start
     // rather than assert on the same tick as the refusal.
@@ -161,8 +161,8 @@ describe('concurrent renders are refused', () => {
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 1000 })
 
-    const first = svc.createRender(USER, film.id)
+    const first = await svc.createRender(USER, film.id)
     await waitTerminal(svc, USER, film.id, first.id)
-    expect(() => svc.createRender(USER, film.id)).not.toThrow()
+    await expect(svc.createRender(USER, film.id)).resolves.toBeDefined()
   })
 })

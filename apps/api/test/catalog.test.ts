@@ -11,7 +11,7 @@ describe('catalog', () => {
     for (const m of CATALOG) expect(catalogModelSchema.safeParse(m).success).toBe(true)
   })
   it('creditsFor image ignores duration', () => {
-    expect(creditsFor(getModel('flux-schnell')!, undefined)).toBe(1)
+    expect(creditsFor(getModel('flux-schnell')!, undefined)).toBe(7)
   })
   it('creditsFor video uses duration table', () => {
     expect(creditsFor(getModel('pixverse-v6')!, 5)).toBe(35)
@@ -41,10 +41,14 @@ describe('catalog', () => {
   it('creditsFor video with unsupported duration throws', () => {
     expect(() => creditsFor(getModel('pixverse-v6')!, 99)).toThrow()
   })
-  it('offers Seedance 1.5 Pro (AIR verified live 2026-07-07) in the standard tier with i2v', () => {
+  it('offers Seedance 1.5 Pro on kie.ai in the standard tier with i2v', () => {
     const m = getModel('seedance-1-5-pro')
     expect(m).toBeDefined()
-    expect(m!.air).toBe('bytedance:seedance@1.5-pro')
+    // Moved off Runware 2026-08-19: same model, kie's measured $0.0875 per
+    // 5s/720p silent clip against Runware's $0.26136. The id is kie's own,
+    // behind the synthetic prefix the shared AIR regex requires.
+    expect(m!.air).toBe('kie:bytedance/seedance-1.5-pro')
+    expect(m!.type === 'video' && m!.provider).toBe('kie')
     expect(m!.supportsImageInput).toBe(true)
     expect(creditsFor(m!, 5)).toBe(35)
     expect(creditsFor(m!, 10)).toBe(70)
@@ -116,10 +120,21 @@ describe('GET /api/catalog', () => {
   // 'segmind' joined on 2026-08-02 when seedance-2-0 moved there: a listed model
   // whose backend cannot run is worse than an absent one — the user picks it, pays,
   // and gets a provider_error.
-  const optionalProviders = ['wan-runpod', 'bytedance', 'alibaba', 'deepinfra', 'segmind']
+  // Every backend whose models vanish from the catalogue when its key is unset.
+  // 'kie' joined on 2026-08-19 with Seedance 1.5 Pro — the gate is the point:
+  // a model nobody can run must not be selectable, or the user pays to discover
+  // that for us.
+  const optionalProviders = [
+    'wan-runpod',
+    'bytedance',
+    'alibaba',
+    'deepinfra',
+    'segmind',
+    'kie',
+  ]
 
-  it('is public and lists only Runware models when both optional backends are off', async () => {
-    // buildTestApp defaults comfyBaseUrl AND arkApiKey to null.
+  it('is public and hides every optional backend when none of their keys are set', async () => {
+    // buildTestApp defaults every optional backend key to null.
     const app = await buildTestApp()
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     expect(res.statusCode).toBe(200)
@@ -199,6 +214,8 @@ describe('GET /api/catalog', () => {
       deepinfraToken: 'di-key',
       // seedance-2-0 is gated by THIS key since the Segmind move.
       segmindApiKey: 'sg-key',
+      // ...and seedance-1-5-pro by this one since the kie move.
+      kieApiKey: 'kie-key',
     })
     const res = await app.inject({ method: 'GET', url: '/api/catalog' })
     const body = res.json() as { models: Array<{ provider?: string }> }
@@ -226,8 +243,30 @@ describe('nano-banana-pro — the reference/character model', () => {
     expect(resolutionFor(m!, '9:16')).toEqual({ width: 768, height: 1376 })
   })
 
-  it('is priced above wholesale ($0.138/image at 1K)', () => {
-    expect(m!.type === 'image' && m!.credits).toBeGreaterThan(14)
+  it('is priced above Seedream 5 Lite wholesale ($0.035/image)', () => {
+    // This entry runs on Seedream now (kie.ai); Nano Banana is its FALLBACK.
+    // 1 credit = $0.01, so anything at or below 3 credits sells an image for
+    // less than the primary backend costs.
+    expect(m!.type === 'image' && m!.credits).toBeGreaterThan(3)
+  })
+
+  it('names Seedream as its primary backend and keeps the Runware AIR as fallback', () => {
+    // The two-handle shape IS the failover contract: lose either and the entry
+    // silently becomes single-backend again.
+    expect(m!.type === 'image' && m!.kie?.model).toBe('seedream/5-lite-text-to-image')
+    expect(m!.air).toBe('google:4@2')
+  })
+
+  it('SELLS BELOW COST WHENEVER IT FALLS BACK, deliberately', () => {
+    // Nano Banana Pro is $0.138/image — 13.8 credits of cost against the 7 we
+    // charge. Every generation that fails over loses money, and that is the
+    // accepted price of having a fallback at all: it is bounded by how rarely
+    // kie.ai refuses a job, never by anything the user can do.
+    //
+    // Pinned as a test because it is the kind of fact that gets discovered in a
+    // margin report six weeks later. If the fallback ever stops being rare,
+    // this is the line to come back to.
+    expect(m!.type === 'image' && m!.credits).toBeLessThan(13.8)
   })
 })
 

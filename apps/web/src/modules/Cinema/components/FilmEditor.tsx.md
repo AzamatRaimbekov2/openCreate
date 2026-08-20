@@ -20,12 +20,17 @@ rail, and the full-width timeline strip below them.
 
 ## Dependencies
 
-- Imports: `react` (`useEffect`, `useState`), `react-i18next`, contract catalog
-  types + `TemplateSummary`, `shared/ui` (`ErrorState`, `Skeleton`), `useFilm`,
-  `useExportController` (the CLIENT export cutover — 2026-07-23, replaces
-  `useCreateRender`/`useRender`/`renderBlockCopy`), `useTimelineClock` (`reset` on
-  film change), `totalDurationMs`, `useTimelineKeys` (editor keyboard shortcuts —
-  Phase 4), `shotStartMs` (from `../model/voiceoverApi`), and every editor child
+- Imports: `react` (`useEffect`, `useState`), `react-i18next`, `@tanstack/react-router`
+  (`useNavigate` — Export to Canvas's post-create navigation), contract catalog
+  types + `TemplateSummary`, `shared/ui` (`ErrorState`, `Skeleton`, `toast`),
+  `modules/Canvas` (`useCreateCanvas`, `saveCanvas` — the ONE approved cross-module
+  exception, see the Update below), `../model/exportToCanvas`
+  (`buildCanvasDocFromFilm`), `useFilm`, `../model/shotGeneration`
+  (`useShotGenerations`, reused for Export to Canvas), `useExportController` (the
+  CLIENT export cutover — 2026-07-23, replaces `useCreateRender`/`useRender`/
+  `renderBlockCopy`), `useTimelineClock` (`reset` on film change), `totalDurationMs`,
+  `useTimelineKeys` (editor keyboard shortcuts — Phase 4), `shotStartMs` (from
+  `../model/voiceoverApi`), and every editor child
   (`CinemaEditorHeader` — the
   editor's OWN full-bleed top bar, rendered in every state; `Timeline`,
   `PreviewPlayer`, `RenderBar`, `AudioTracks`, `ShotInspector`, `StoryboardModal`).
@@ -312,3 +317,46 @@ Blind-tuned (no browser session) — verify visually.
   point because it is where all three consumers already live.
 - Empty while `GET /api/styles` is in flight; each picker falls back to the bundled
   builtins, so no style choice ever disappears mid-request.
+
+## Update 2026-08-04 — "Export to Canvas" (one-off, no live link back)
+
+FilmEditor now owns the ⋯ menu's "Export to Canvas" action end to end. Converts the
+CURRENT film's shots into a brand-new Canvas document, saves it, and navigates there —
+a SNAPSHOT, not a sync: the produced canvas has no connection back to this film after
+the click.
+
+- **`modules/Canvas` import is the ONE approved exception** to "modules never import
+  each other" (owner request). Only `useCreateCanvas` + `saveCanvas` cross the seam,
+  via the module's public barrel — same discipline every other cross-module read in
+  this file already follows (`models`/`templates`/`entities`/`styles` come from the
+  ROUTE instead, because THOSE modules have no such exception).
+- **The pure conversion lives OUTSIDE this component**: `model/exportToCanvas.ts`'s
+  `buildCanvasDocFromFilm(film, shots, generationsById)` imports nothing from
+  `modules/Canvas` and is unit-tested standalone. FilmEditor's job is only to gather
+  its three inputs and act on the `CanvasExportDoc | null` it returns.
+- **`generationsById` reuses `useShotGenerations`** (already used by the preview
+  player) over `data.shots.map(s => s.generationId).filter(id => id !== null)` —
+  the SAME `['generation', id]` cache every clip thumbnail reads, so no new network
+  path is introduced. Called unconditionally with `data?.shots ?? []`-derived ids to
+  keep hook order stable through the loading state (same discipline as
+  `useTimelineKeys` above it).
+- **`null` → an error toast, not an empty canvas.** `buildCanvasDocFromFilm` returns
+  `null` when nothing is exportable (every shot a title card / unset / still
+  processing / failed); the handler surfaces `toasts.exportToCanvas.empty*` and stops
+  — matching this module's established failure pattern (`shotFailureToast.ts`'s
+  `toast.error({ title, description })`, not a new UI pattern).
+- **Flow on success:** `createCanvas.mutateAsync(doc.title)` →
+  `saveCanvas(canvas.id, doc)` (the full node/edge doc, one PATCH) →
+  `navigate({ to: '/canvas/$canvasId', params: { canvasId } })`. Any rejection
+  (create OR save) is caught in ONE try/catch and surfaced as
+  `toasts.exportToCanvas.failed*` — the same "one truth, one failure toast" shape as
+  the empty case.
+- **Re-entrancy is gated in the handler**, not the Menu: `Menu`'s `MenuItem` has no
+  disabled/loading affordance, so a local `isExportingToCanvas` boolean short-circuits
+  a second click while one export is already running; `CinemaEditorHeader` only reads
+  it to swap the menu item's LABEL (idle ↔ "Exporting to Canvas…").
+- Covered by `FilmEditor.test.tsx` (`describe('FilmEditor — export to Canvas')`): a
+  successful export POSTs `/api/canvases`, PATCHes the new canvas, and navigates
+  (asserted against a real `/canvas/$canvasId` stub route, not just "some navigation
+  happened"); an all-title-card film raises exactly one error toast and never calls
+  `/api/canvases`; a failed create call raises the "failed" toast instead.

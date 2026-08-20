@@ -59,6 +59,7 @@ tags:
 ## Decisions
 
 - [[template-catalog]] - Pre-authored viral formats (Brainrot Studio) that instantiate into a whole film; server-side prompts, per-tier model pinning, zero-charge apply.
+- [[shorts-studio]] - A vertical `shorts` template shelf plus a batch runner: one template × N rows of knob values → N films under one server-minted `batchId`, still zero-charge.
 
 - [[frontend-architecture-guardrails]] - Project guardrails for shared ownership, dependency rules, UI component sourcing, TanStack Router/Query, Zustand, ESLint, and bundle splitting.
 - [[frontend-error-ux-startup-required]] - Require frontend initialization to run `frontend-error-ux` and verify app-level failure/offline surfaces.

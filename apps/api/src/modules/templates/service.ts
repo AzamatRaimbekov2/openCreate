@@ -17,6 +17,10 @@
 import type {
   CatalogAudioModel,
   CreateFilmFromTemplateInput,
+  CreateFilmInput,
+  CreateFilmsFromTemplateBatchInput,
+  CreateFilmsFromTemplateBatchResult,
+  CreateFilmsFromTemplateBatchRow,
   CreateShotInput,
   FilmDetail,
   TemplateSummary,
@@ -161,6 +165,8 @@ export function toSummary(template: Template): TemplateSummary {
       generated: isClip(s),
     })),
     tiers: priceTiers(template),
+    loopable: template.loopable,
+    disclosureTier: template.disclosureTier,
     variables: template.variables.map((v) =>
       v.kind === 'select'
         ? {
@@ -204,17 +210,38 @@ function catalogVoices(): string[] {
   return tts?.voices ?? []
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAN, then write. This function does every substitution and every check a
+// templated film needs and returns what to insert — it touches no database.
+//
+// The split exists for the BATCH (ADR: shorts-studio). A batch validates all N
+// rows before the first row is written, so one bad row rejects the whole request
+// and leaves nothing behind; that is only expressible if validating and writing
+// are two steps. The single-film route is the same code with N = 1, which is the
+// point: there is exactly one implementation of "what a template becomes", and
+// the two routes differ only in how many of them they commit and in one column.
+//
+// Everything here THROWS on bad input (unknown knob, value outside the option
+// set, a voice the catalog no longer offers) and nothing here is recoverable
+// per-row on purpose — a partially-applied batch is not a smaller batch.
+// ─────────────────────────────────────────────────────────────────────────────
+type PlannedFilm = { input: CreateFilmInput; shots: CreateShotInput[] }
+
 export type TemplateService = ReturnType<typeof createTemplateService>
 
 export function createTemplateService({ films }: { films: FilmService }) {
-  function instantiate(userId: string, input: CreateFilmFromTemplateInput): FilmDetail {
-    const template = getTemplate(input.templateId)
-    if (!template) throw new TemplateNotFoundError()
-
-    const vars = resolveVars(template, input.variables)
+  function planFilm(
+    template: Template,
+    tier: CreateFilmFromTemplateInput['tier'],
+    // The batch ROW type, reused for the single route too: one film's worth of
+    // knob values plus an optional title override, which is exactly what the two
+    // callers have in common.
+    row: CreateFilmsFromTemplateBatchRow,
+  ): PlannedFilm {
+    const vars = resolveVars(template, row.variables)
     // The tier IS the model choice — pinned onto every generated shot, which is
     // the whole reason shot.modelId exists.
-    const modelId = template.models[input.tier]
+    const modelId = template.models[tier]
     const voices = catalogVoices()
 
     const shots: CreateShotInput[] = template.shots.map((s) => {
@@ -262,19 +289,57 @@ export function createTemplateService({ films }: { films: FilmService }) {
       }
     })
 
-    const title = (input.title ?? substitute(template.titleTemplate, vars, 'spoken'))
+    const title = (row.title ?? substitute(template.titleTemplate, vars, 'spoken'))
       .trim()
       .slice(0, 120)
 
-    return films.createFromTemplate(
-      userId,
-      template.id,
-      { title, aspectRatio: template.aspectRatio, defaultStyleId: template.defaultStyleId },
+    return {
+      input: {
+        title,
+        aspectRatio: template.aspectRatio,
+        defaultStyleId: template.defaultStyleId,
+      },
       shots,
-    )
+    }
   }
 
-  return { list: listTemplates, instantiate }
+  // One film from one template. Unchanged behaviour: plan, then write, in one
+  // transaction, for zero credits, with every shot a draft.
+  function instantiate(userId: string, input: CreateFilmFromTemplateInput): FilmDetail {
+    const template = requireTemplate(input.templateId)
+    const planned = planFilm(template, input.tier, input)
+    return films.createFromTemplate(userId, template.id, planned.input, planned.shots)
+  }
+
+  // N films from ONE template — the Shorts Studio batch (ADR: shorts-studio §2).
+  //
+  // THE ORDER OF THE TWO LINES IS THE FEATURE. Every row is planned — substituted
+  // and validated — before createManyFromTemplate is reached, so a single bad row
+  // throws with the database untouched. Planning row by row as we write would
+  // leave the user with the films from the rows that happened to come first: a
+  // half-batch nobody asked for, that looks exactly like a finished one.
+  //
+  // It charges NOTHING, for the same reason its single-film sibling doesn't and
+  // more so: this is the largest spend the product can set up, and the credits go
+  // later, per beat, behind the itemised confirm the ADR requires. There is no
+  // ledger call anywhere on this path — not a charge, not a hold, not a check.
+  function instantiateBatch(
+    userId: string,
+    input: CreateFilmsFromTemplateBatchInput,
+  ): CreateFilmsFromTemplateBatchResult {
+    const template = requireTemplate(input.templateId)
+    const planned = input.rows.map((row) => planFilm(template, input.tier, row))
+    return films.createManyFromTemplate(userId, template.id, planned)
+  }
+
+  return { list: listTemplates, instantiate, instantiateBatch }
+}
+
+// Both entry points start here, so "unknown template" is one 404 and not two.
+function requireTemplate(templateId: string): Template {
+  const template = getTemplate(templateId)
+  if (!template) throw new TemplateNotFoundError()
+  return template
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

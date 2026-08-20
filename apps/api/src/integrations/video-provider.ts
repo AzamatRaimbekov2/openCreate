@@ -33,6 +33,18 @@ export type VideoSubmitInput = {
   // image→video seed frame as a data URI (never a URL). Providers that only do
   // text→video (wan-runpod today) ignore it.
   inputImage?: string | undefined
+  // THE SAME seed frame, as a publicly fetchable URL — present only when the
+  // asset is one of ours on disk and the deployment has a public origin.
+  //
+  // Two backends, two opposite requirements, and no way to derive one from the
+  // other: Runware conditions on the BYTES (a data URI), Segmind's schema takes
+  // a URL and rejects anything else. Carrying both is what lets one submit serve
+  // both without either adapter guessing.
+  //
+  // Absent means "we have no URL for this", which a URL-only backend must treat
+  // as a refusal AT SUBMIT — not as permission to drop the frame. Dropping it
+  // renders a text→video clip the user did not ask for, at full price.
+  inputImageUrl?: string | undefined
   // Tagged-character reference photos, as data URIs. NOT a seed frame: a seed
   // frame is the literal first picture of the clip, whereas a reference says
   // "whoever this is, that is who appears" — the character can be somewhere else
@@ -44,6 +56,11 @@ export type VideoSubmitInput = {
   // BEFORE the user is charged. A provider whose backend has no reference mode
   // simply ignores this; the composed prompt still names the character either way.
   referenceImages?: string[] | undefined
+  // The same reference photos as URLs, index-aligned with referenceImages, for
+  // the same reason inputImageUrl exists. Partial by nature: a reference that
+  // never was a stored asset has no URL, and a URL-only backend refuses the job
+  // rather than silently conditioning on fewer subjects than the user tagged.
+  referenceImageUrls?: string[] | undefined
   // Optional deterministic seed. Absent → the adapter picks a random one.
   seed?: number | undefined
   // Runware-internal routing: some models 400 on Runware's `safety` param, so

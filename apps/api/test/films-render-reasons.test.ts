@@ -57,10 +57,12 @@ function seedGeneration(
 }
 
 // Run createRender and hand back the refusal, so each test asserts on fields
-// rather than re-writing the same try/catch.
-function refusalOf(fn: () => unknown): FilmValidationError {
+// rather than re-writing the same try/catch. createRender is async (ADR
+// railway-deployment D2 — it awaits storage.materialize() for every referenced
+// asset), so a refusal now arrives as a rejection, not a synchronous throw.
+async function refusalOf(fn: () => Promise<unknown>): Promise<FilmValidationError> {
   try {
-    fn()
+    await fn()
   } catch (error) {
     if (error instanceof FilmValidationError) return error
     throw error
@@ -81,7 +83,7 @@ describe('render refusal reasons — audio', () => {
       generationId: 'gen-pending',
     })
 
-    const refusal = refusalOf(() => svc.createRender(USER, film.id))
+    const refusal = await refusalOf(() => svc.createRender(USER, film.id))
 
     expect(refusal.reason).toBe('audio_processing')
     expect(refusal.subjectKind).toBe('audio')
@@ -96,7 +98,7 @@ describe('render refusal reasons — audio', () => {
     seedGeneration(db, 'gen-bad', 'audio', 'failed')
     const track = svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-bad' })
 
-    const refusal = refusalOf(() => svc.createRender(USER, film.id))
+    const refusal = await refusalOf(() => svc.createRender(USER, film.id))
 
     expect(refusal.reason).toBe('audio_failed')
     expect(refusal.subjectId).toBe(track.id)
@@ -110,7 +112,7 @@ describe('render refusal reasons — audio', () => {
     svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-gone' })
     db.delete(generation).run()
 
-    expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe(
+    expect((await refusalOf(() => svc.createRender(USER, film.id))).reason).toBe(
       'audio_generation_missing',
     )
   })
@@ -122,7 +124,9 @@ describe('render refusal reasons — audio', () => {
     seedGeneration(db, 'gen-nofile', 'audio', 'succeeded')
     svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-nofile' })
 
-    expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe('audio_media_missing')
+    expect((await refusalOf(() => svc.createRender(USER, film.id))).reason).toBe(
+      'audio_media_missing',
+    )
   })
 })
 
@@ -133,7 +137,7 @@ describe('render refusal reasons — shots', () => {
     seedGeneration(db, 'gen-run', 'video', 'processing')
     const shot = svc.addShot(USER, film.id, { generationId: 'gen-run', durationMs: 2000 })
 
-    const refusal = refusalOf(() => svc.createRender(USER, film.id))
+    const refusal = await refusalOf(() => svc.createRender(USER, film.id))
 
     expect(refusal.reason).toBe('shot_clip_processing')
     expect(refusal.subjectKind).toBe('shot')
@@ -147,7 +151,7 @@ describe('render refusal reasons — shots', () => {
     seedGeneration(db, 'gen-dead', 'video', 'failed')
     const shot = svc.addShot(USER, film.id, { generationId: 'gen-dead', durationMs: 2000 })
 
-    const refusal = refusalOf(() => svc.createRender(USER, film.id))
+    const refusal = await refusalOf(() => svc.createRender(USER, film.id))
 
     expect(refusal.reason).toBe('shot_clip_failed')
     expect(refusal.subjectId).toBe(shot.id)
@@ -160,7 +164,7 @@ describe('render refusal reasons — shots', () => {
     svc.addShot(USER, film.id, { generationId: 'gen-vanish', durationMs: 2000 })
     db.delete(generation).run()
 
-    expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe('shot_clip_missing')
+    expect((await refusalOf(() => svc.createRender(USER, film.id))).reason).toBe('shot_clip_missing')
   })
 
   it('reports an audio clip used as a shot as shot_clip_is_audio', async () => {
@@ -169,7 +173,7 @@ describe('render refusal reasons — shots', () => {
     seedGeneration(db, 'gen-sound', 'audio', 'succeeded')
     svc.addShot(USER, film.id, { generationId: 'gen-sound', durationMs: 2000 })
 
-    expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe('shot_clip_is_audio')
+    expect((await refusalOf(() => svc.createRender(USER, film.id))).reason).toBe('shot_clip_is_audio')
   })
 
   it('reports a succeeded clip whose FILE is gone as shot_media_missing', async () => {
@@ -178,7 +182,7 @@ describe('render refusal reasons — shots', () => {
     seedGeneration(db, 'gen-nofile', 'video', 'succeeded')
     svc.addShot(USER, film.id, { generationId: 'gen-nofile', durationMs: 2000 })
 
-    expect(refusalOf(() => svc.createRender(USER, film.id)).reason).toBe('shot_media_missing')
+    expect((await refusalOf(() => svc.createRender(USER, film.id))).reason).toBe('shot_media_missing')
   })
 })
 
@@ -187,7 +191,7 @@ describe('render refusal reasons — film', () => {
     const { svc } = service()
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
 
-    const refusal = refusalOf(() => svc.createRender(USER, film.id))
+    const refusal = await refusalOf(() => svc.createRender(USER, film.id))
 
     expect(refusal.reason).toBe('film_no_shots')
     expect(refusal.subjectKind).toBe('film')
@@ -202,9 +206,9 @@ describe('a render that CAN proceed', () => {
     const film = await svc.createFilm(USER, { title: 'F', aspectRatio: '16:9' })
     svc.addShot(USER, film.id, { title: { text: 'x', position: 'center' }, durationMs: 2000 })
     seedGeneration(db, 'gen-ok', 'audio', 'succeeded')
-    writeFileSync(storage.localPath('gen-ok', 'mp3'), 'exists')
+    writeFileSync(storage.scratchPath('gen-ok', 'mp3'), 'exists')
     svc.addAudio(USER, film.id, { kind: 'music', generationId: 'gen-ok' })
 
-    expect(svc.createRender(USER, film.id).status).toBe('processing')
+    expect((await svc.createRender(USER, film.id)).status).toBe('processing')
   })
 })

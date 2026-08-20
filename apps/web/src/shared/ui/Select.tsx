@@ -49,6 +49,12 @@ export type SelectProps<T extends string> = {
   // Let the panel be wider than the trigger — a rich row needs room even when
   // the control itself is a narrow rail chip
   panelWidth?: 'trigger' | 'wide'
+  // Keep the caption in the accessibility tree but off the screen — for a dense
+  // data grid whose column header already names the field. Same rule as Input's:
+  // the label still exists and still names the control, it just is not repeated
+  // in every cell. The caption stays aria-labelledby'd, so a screen reader still
+  // hears "Setting, Tokyo at night" rather than only the value.
+  labelHidden?: boolean
 }
 
 // Chevron affordance (decorative — rotates when open)
@@ -123,6 +129,7 @@ export function Select<T extends string>({
   placeholder,
   groups,
   panelWidth = 'trigger',
+  labelHidden = false,
 }: SelectProps<T>) {
   const { ordered, sections } = flatten(options, groups)
   const captionId = useId()
@@ -167,7 +174,10 @@ export function Select<T extends string>({
           NOT be aria-hidden: a lone aria-label on the trigger would REPLACE the
           selected option's text, so a screen reader would announce "Model" and
           never say which model is chosen. aria-labelledby concatenates both. */}
-      <span id={captionId} className="truncate text-[11px] leading-none text-mist-dim">
+      <span
+        id={captionId}
+        className={labelHidden ? 'sr-only' : 'truncate text-[11px] leading-none text-mist-dim'}
+      >
         {label}
       </span>
 

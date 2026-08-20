@@ -57,6 +57,9 @@ const BASE = 'https://api.kie.ai/api/v1'
 // DeepInfra's 10 minutes (that one blocks for the whole generation).
 const REQUEST_TIMEOUT_MS = 30_000
 
+// Their documented ceiling for `input_urls` (Seedance 1.5 Pro, docs 2026-08-19).
+const MAX_INPUT_URLS = 2
+
 // Their fixed credit→USD rate, read off the pricing table under the operator's own
 // login: claude-opus-5 output is listed as 2000 credits AND $10 per million tokens,
 // which pins one credit at half a cent. Verified independently by the live
@@ -119,6 +122,17 @@ export function createKieClient(opts: KieOptions = {}): VideoProvider {
     const apiKey = opts.apiKey
     if (!apiKey) throw new KieError('kie provider is not configured (KIE_API_KEY unset)')
 
+    // REFUSE BEFORE SPENDING, for the reason the Segmind adapter spells out at
+    // length: a backend that takes URLs and is handed bytes does not bounce the
+    // request, it accepts and fails later — which is a charge, a refund, and no
+    // clip. Submit is the last moment the failover chain can still act.
+    if (input.inputImage && !input.inputImageUrl) {
+      throw new KieError('this channel needs a public URL for the seed frame')
+    }
+    if (input.referenceImages?.length && !input.referenceImageUrls?.length) {
+      throw new KieError('this channel needs public URLs for reference images')
+    }
+
     const body = {
       model: toKieModelId(input.model),
       input: {
@@ -136,12 +150,19 @@ export function createKieClient(opts: KieOptions = {}): VideoProvider {
         // soundtrack is paid-for waste. ByteDance bills audio at 2×, and on kie.ai
         // the with-audio row is likewise double — so this flag IS the price.
         generate_audio: input.audio === true,
-        // image→video seed frame. NOTE their schema takes URLs (max 2), NOT data
-        // URIs — our seam carries data URIs, so a locally-stored photo would have to
-        // be uploaded first. Forwarded unchanged rather than guessing a conversion;
-        // a data URI here will be rejected by them, loudly, instead of silently
-        // producing a text→video clip the user did not ask for.
-        ...(input.inputImage ? { input_urls: [input.inputImage] } : {}),
+        // image→video seed frame and reference photos. Their schema takes URLs,
+        // max 2 — the refusal for a missing URL happens ABOVE, before this body is
+        // built, so the chain can still route the job somewhere that takes bytes.
+        // Capped rather than truncated-by-them: over the limit they reject the
+        // WHOLE job, which would kill a generation for the sake of a third
+        // reference the model was never going to read.
+        ...(() => {
+          const urls = [
+            ...(input.inputImageUrl ? [input.inputImageUrl] : []),
+            ...(input.referenceImageUrls ?? []),
+          ].slice(0, MAX_INPUT_URLS)
+          return urls.length > 0 ? { input_urls: urls } : {}
+        })(),
       },
     }
 

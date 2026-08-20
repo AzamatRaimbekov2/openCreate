@@ -37,6 +37,10 @@ flowchart LR
   R --> SV[service.ts: knobs → substitute → shots]
   SV --> FILM[Film + 7 shots in Cinema editor]
 ```
+- **Disclosure tier `in-player`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). This is the **most mistakable card in the catalog**: photoreal people
+  arguing in a photoreal kitchen is exactly the footage a viewer reads as a record of
+  something that happened. Ends on a cliffhanger by design, so it does not loop.
 
 ## Commits
 

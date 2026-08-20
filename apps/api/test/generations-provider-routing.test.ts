@@ -268,4 +268,51 @@ describe('video provider routing', () => {
     const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
     expect(me.json().creditsBalance).toBe(200)
   })
+
+  // Pulse moved off Runware on 2026-08-19 — same model, a third of the price, and
+  // (at the time) the only channel with a working key at all. The money path is
+  // untouched by the move; what this pins is that the ROW routes to kie and never
+  // silently falls back to Runware, which would fail on a key that is a
+  // placeholder and refund every clip.
+  it('routes seedance-1-5-pro to the kie provider (never Runware) and settles', async () => {
+    const runware = fakeVideoProvider()
+    const kie = fakeVideoProvider()
+    kie.submit.mockResolvedValue({ providerJobId: 'kie-task-1' })
+    kie.poll.mockResolvedValue({
+      status: 'success',
+      assetUrl: 'https://tempfile.aiquickdraw.com/clip.mp4',
+      nsfw: false,
+    })
+    const app = await buildTestApp({
+      videoProviders: { runware, kie },
+      assetHostAllowlist: ['runware.ai', 'tempfile.aiquickdraw.com'],
+    })
+    const cookie = await registerAndGetCookie(app)
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'seedance-1-5-pro',
+        prompt: 'a red fox running',
+        aspectRatio: '16:9',
+        duration: 5,
+      },
+    })
+    expect(created.statusCode).toBe(202)
+    expect(kie.submit).toHaveBeenCalledTimes(1)
+    expect(runware.submit).not.toHaveBeenCalled()
+    // The handle kie speaks, not the Runware AIR it used to carry.
+    expect((kie.submit.mock.calls[0]![0] as { model: string }).model).toBe(
+      'kie:bytedance/seedance-1.5-pro',
+    )
+
+    const polled = await app.inject({
+      method: 'GET',
+      url: `/api/generations/${created.json().id}`,
+      headers: { cookie },
+    })
+    expect(polled.json().status).toBe('succeeded')
+  })
 })

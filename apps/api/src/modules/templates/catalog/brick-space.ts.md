@@ -61,6 +61,10 @@ flowchart TD
   on a tether against black are landscape compositions. All three tier models do 8s at 16:9
   as well as 9:16, so the choice costs nothing — `assertTemplatesValid()` checks it at boot.
 - Price: 336 / 810 / 840 credits (draft / standard / premium), 50s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

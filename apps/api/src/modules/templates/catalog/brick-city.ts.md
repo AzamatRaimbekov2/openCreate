@@ -66,6 +66,10 @@ flowchart TD
 - **9:16**: a kitchen, a lift, a desk, a bus queue. The everyday is vertical, and this is the
   story on the shelf most likely to be posted rather than watched.
 - Price: 280 / 675 / 700 credits (draft / standard / premium), 42s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

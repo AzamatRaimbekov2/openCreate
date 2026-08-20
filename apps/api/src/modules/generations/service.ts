@@ -11,9 +11,15 @@ import type { CreateGenerationInput, Generation, PromptPreset } from '@opencreat
 import type { Db } from '../../db/client'
 import type { RunwareClient } from '../../integrations/runware/client'
 import { createRunwareVideoAdapter } from '../../integrations/runware/video-adapter'
+import { createRunwareImageAdapter } from '../../integrations/runware/image-adapter'
 import { createRunwareAudioAdapter } from '../../integrations/runware/audio-adapter'
 import { createRunwareMeshAdapter } from '../../integrations/runware/mesh-adapter'
 import type { VideoProvider, VideoProviderId } from '../../integrations/video-provider'
+import type {
+  ImageProvider,
+  ImageProviderId,
+  ImageReference,
+} from '../../integrations/image-provider'
 import type { AudioProvider } from '../../integrations/audio-provider'
 import type { Mesh3dProvider } from '../../integrations/mesh-provider'
 import type { StorageProvider } from '../../storage/local'
@@ -73,10 +79,21 @@ export class ContentBlockedError extends Error {
 // disable (0) or exercise it without real clocks.
 type Deps = {
   db: Db
-  // Still used DIRECTLY for the synchronous IMAGE path (imageInference), which
-  // is deliberately never routed through the provider registry — image stays
-  // Runware-only and unchanged.
+  // Still the client every OTHER Runware-backed path is built from (video,
+  // audio and 3D adapters are derived from it below), and the source of the
+  // image seam's own fallback when no registry is injected.
   runware: RunwareClient
+  // IMAGE provider (ImageProvider seam). Optional: when absent it is derived
+  // from `runware`, which keeps every direct-service unit test constructing
+  // { db, runware, storage } on exactly the synchronous path it always had.
+  // buildApp injects the real chain — Seedream on kie.ai, with Runware behind it.
+  imageProvider?: ImageProvider
+  // Where OUR stored media is publicly reachable (config.mediaPublicBaseUrl).
+  // Only reference images need it, and only for providers that fetch by URL
+  // rather than taking bytes inline. Absent → references carry no public URL and
+  // a URL-only backend refuses the job, which the failover chain answers by
+  // running it on a backend that takes data URIs.
+  mediaPublicBaseUrl?: string | undefined
   // VIDEO provider registry (VideoProvider seam). Optional: when absent the
   // service derives a single-entry { runware } registry from `runware`, so the
   // existing direct-service unit tests (poll-throttle/stale/atomicity) keep
@@ -229,6 +246,20 @@ function assetExt(type: 'image' | 'video' | 'audio' | 'model3d'): 'mp4' | 'mp3' 
   return 'webp'
 }
 
+// A stored '/media/<key>.<ext>' path → a URL a PROVIDER can fetch, or null when
+// it cannot be one. Null is the honest answer in two ordinary cases: no public
+// base is configured (local dev), or the reference never was a stored asset (raw
+// bytes handed in by an in-process orchestrator). A backend that only takes URLs
+// refuses such a job, and the failover chain runs it on one that takes bytes —
+// which is why this returns null rather than inventing a localhost URL that
+// would fail at the vendor, after the charge, with a confusing message.
+function publicMediaUrl(base: string | undefined, path: string | null): string | null {
+  if (!base || !path) return null
+  // Already absolute (an R2 public domain, say) → hand it over untouched.
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return path.startsWith('/') ? base + path : base + '/' + path
+}
+
 // DB row → wire DTO (contracts generationSchema). JSON columns are parsed here
 // and dates leave as ISO strings — the wire contract is JSON, not Date objects.
 function toDto(row: typeof generation.$inferSelect): Generation {
@@ -267,12 +298,19 @@ export function createGenerationService({
   videoProviders,
   audioProvider,
   meshProvider,
+  imageProvider,
+  mediaPublicBaseUrl,
   storage,
   entities,
   resolveStyle,
   log: baseLog,
   pollMinIntervalMs = DEFAULT_POLL_MIN_INTERVAL_MS,
 }: Deps) {
+  // Image provider fallback. The seam is new; this line is what makes it a
+  // refactor rather than a rewrite — a caller injecting only { db, runware,
+  // storage } gets the Runware adapter, whose submit is the same synchronous
+  // imageInference call that used to be inline here, settled in the same request.
+  const images: ImageProvider = imageProvider ?? createRunwareImageAdapter(runware)
   // Audio provider fallback (mirrors the video registry fallback below): a
   // caller that injects only { db, runware, storage } still gets a working
   // audio submit path via the runware audioInference adapter.
@@ -391,6 +429,10 @@ export function createGenerationService({
     // missing id, a failed run and a video source must all be
     // indistinguishable — nothing about other users' rows may leak.
     let chainImage: string | undefined
+    // The /media path the seed frame was read from — kept because a URL-taking
+    // backend (Segmind) needs the address, and readAsDataUri below turns the path
+    // into bytes from which no address can be recovered.
+    let chainImagePath: string | undefined
     if (input.inputGenerationId) {
       const cited = db
         .select()
@@ -408,6 +450,7 @@ export function createGenerationService({
       // readAsDataUri re-guards the disk read (raster-only MIME table) and
       // hands the provider a data URI — /media is not reachable from outside.
       chainImage = await storage.readAsDataUri(mediaUrl)
+      chainImagePath = mediaUrl
       if (model.type === 'image') {
         // Into the SAME server-only channel entity photos and shot references
         // use — so the referenceMode/maxReferenceImages gates below count it,
@@ -436,6 +479,13 @@ export function createGenerationService({
     // happily return a plausible image of a stranger for full price.
     const refs = input.entityRefs ?? []
     let referenceImages: string[] | undefined
+    // Index-aligned with referenceImages: the /media path each reference came
+    // from, or null when it never had one (a caller-supplied data URI that is
+    // not a stored asset). Exists because kie.ai's Seedream takes reference
+    // images as URLS ONLY, and a data URI is not convertible into one — the
+    // path has to be remembered at the moment we still have it, not
+    // reconstructed later from bytes.
+    const referencePaths: Array<string | null> = []
     let mentionEntities: MentionEntities = {}
 
     // Server-only DIRECT reference channel (ADR modular-3d-assets, Task 4). An
@@ -506,6 +556,8 @@ export function createGenerationService({
         // reachable in dev (or behind a private asset host), so handing over a
         // URL would fail exactly where we test it. (ADR: reference delivery.)
         urls.push(await storage.readAsDataUri(url))
+        // The same asset, as the path a URL-taking provider can be pointed at.
+        referencePaths.push(url)
       }
       referenceImages = urls
     }
@@ -515,7 +567,13 @@ export function createGenerationService({
     // — NOT nested under the entity block above, which a concept-only extraction
     // never enters; without this the concept ref would be dropped silently and the
     // extractor would redraw from the prompt alone at full price.
-    if (directRefs.length > 0) referenceImages = [...(referenceImages ?? []), ...directRefs]
+    if (directRefs.length > 0) {
+      referenceImages = [...(referenceImages ?? []), ...directRefs]
+      // Raw bytes from an in-process orchestrator: no stored path exists, so no
+      // public URL can. Recorded as nulls to keep the arrays aligned — a
+      // URL-only provider refuses such a job and the chain runs it elsewhere.
+      referencePaths.push(...directRefs.map(() => null))
+    }
 
     // ── The style package's reference images (ADR style-studio A2/A3) ─────────
     // LAST, and that position is the whole design. A style is AMBIENT: the user
@@ -557,10 +615,16 @@ export function createGenerationService({
       // the gates above use, so one model can never be read two ways.
       const budget = (model.maxReferenceImages ?? 1) - (referenceImages?.length ?? 0)
       const styleImages: string[] = []
+      // The paths of the images that actually READ — collected here rather than
+      // sliced off stylePaths afterwards, because a read that fails in the MIDDLE
+      // would leave the two lists misaligned and hand a provider the wrong URL
+      // for a reference it was given the right bytes for.
+      const styleImagePaths: string[] = []
       for (const path of stylePaths) {
         if (styleImages.length >= budget) break
         try {
           styleImages.push(await storage.readAsDataUri(path))
+          styleImagePaths.push(path)
         } catch (err) {
           // Not a failure of THIS request — a fact about our storage. Logged so
           // the operator can find the dangling row; the generation goes on.
@@ -570,8 +634,11 @@ export function createGenerationService({
           )
         }
       }
-      if (styleImages.length > 0)
+      if (styleImages.length > 0) {
         referenceImages = [...(referenceImages ?? []), ...styleImages]
+        // Style references ARE stored assets, so they keep their paths.
+        for (const path of styleImagePaths) referencePaths.push(path)
+      }
     }
 
     let cost: number
@@ -628,11 +695,17 @@ export function createGenerationService({
     // A cited generation conditions the run just as much as an uploaded frame
     // does, so a chain run is image-mode too (the gallery/DTO read it as such).
     const mode = input.inputImage || input.inputGenerationId ? 'image' : 'text'
-    // Which backend runs this job. Image is always Runware (never routed);
-    // video reads the catalog `provider` (default 'runware'). Persisted on the
-    // row so the poll path resolves the SAME provider it submitted to.
-    const providerId: VideoProviderId =
-      model.type === 'video' ? (model.provider ?? 'runware') : 'runware'
+    // Which backend runs this job, persisted so the poll path resolves the same
+    // one it submitted to. Video reads the catalog `provider`; an IMAGE row now
+    // records where its chain STARTS ('kie' when the entry has a Seedream
+    // mapping) — the link that actually ran is encoded into the job id by the
+    // failover chain, so this column is the intent and that id is the fact.
+    const providerId: VideoProviderId | ImageProviderId =
+      model.type === 'video'
+        ? (model.provider ?? 'runware')
+        : model.type === 'image' && model.kie
+          ? 'kie'
+          : 'runware'
 
     // Charge + row insert in ONE transaction (review finding): as two separate
     // transactions, a crash between them charged the user for a generation row
@@ -691,39 +764,79 @@ export function createGenerationService({
     logCharge(log, userId, id, cost)
 
     if (model.type === 'image') {
-      // Images are synchronous: one provider call resolves to a URL we
-      // immediately copy into our own storage.
+      // Images used to be Runware-only AND synchronous; only the second half is
+      // still guaranteed. The ImageProvider seam answers "done" (Runware — one
+      // call, settled inside this request, byte-for-byte the behaviour every
+      // existing image test pins) or "pending" (Seedream on kie.ai — a task id,
+      // parked as a processing row for the same poll path video/audio/3D use).
+      //
+      // Every money rule that lived here still lives here: the charge happened
+      // above, the safety gate runs BEFORE the asset reaches storage, the settle
+      // is status-guarded, and any failure refunds exactly once.
       try {
-        const res = await runware.imageInference({
-          taskUUID,
+        const submitted = await images.submit({
           // The preset-composed prompt (== composedPrompt when no preset).
-          positivePrompt: modelPrompt,
-          // Style/framing preset negative (empty string when neither is set) —
-          // steers the model away from the wrong medium (a Disney render must push
-          // off "photorealistic, live action") and, for a Soul Studio sheet, away
-          // from a busy background.
-          //
-          // ...unless the model has no negative channel. Runware does not ignore a
-          // parameter a model cannot take, it REJECTS THE WHOLE TASK — so sending
-          // one to FLUX.1 Kontext costs the user credits and returns nothing. The
-          // capability is declared in the catalogue (supportsNegativePrompt) and
-          // enforced HERE, because the composer upstream cannot know which model
-          // the request will land on.
+          prompt: modelPrompt,
+          // Style/framing preset negative — omitted for a model with no negative
+          // channel, because a provider does not IGNORE a parameter it cannot
+          // take, it rejects the whole task, and the user paid for that task.
           ...(negativePrompt && model.supportsNegativePrompt !== false
             ? { negativePrompt }
             : {}),
-          model: model.air,
-          // Omitted entirely when untagged — exactOptionalPropertyTypes keeps a
-          // stray `referenceImages: undefined` out of the task envelope
-          ...(referenceImages ? { referenceImages } : {}),
+          // One handle per backend. Which links can run this generation is read
+          // off these keys, so a model with no Seedream equivalent costs no
+          // failed kie call — it simply is not part of that chain.
+          models: { runware: model.air, ...(model.kie ? { kie: model.kie.model } : {}) },
+          ...(model.kie ? { quality: model.kie.quality } : {}),
           width,
           height,
+          // Non-null for the same reason width/height above are: the guard at the
+          // top of create() rejects an image request without a ratio before any
+          // money moves, so by here it exists.
+          aspectRatio: input.aspectRatio!,
+          // BOTH forms of every reference: the bytes, for a backend that inlines
+          // them, and a public URL for one that fetches them. Assembled here
+          // because this is the last place that still knows which /media path
+          // each reference came from (referencePaths, index-aligned above).
+          ...(referenceImages
+            ? {
+                referenceImages: referenceImages.map(
+                  (dataUri, i): ImageReference => ({
+                    dataUri,
+                    publicUrl: publicMediaUrl(mediaPublicBaseUrl, referencePaths[i] ?? null),
+                  }),
+                ),
+              }
+            : {}),
         })
-        // Safety gate BEFORE the download: an NSFW-flagged asset must never
-        // reach our storage or be served to the user (spec §2/§9.4). Throwing
-        // here routes through the catch below → failed + refund + 422 envelope.
-        if (res.NSFWContent) throw new ContentBlockedError()
-        const mediaUrl = await storage.saveFromUrl(res.imageURL, id, 'webp')
+
+        if (submitted.kind === 'pending') {
+          // Asynchronous backend. Publish the job id ONLY now that the provider
+          // has acknowledged the job: before this point get() refuses to poll (a
+          // null id means no provider call), which is what closes the submit-
+          // window race where a concurrent poll asks about a job the provider has
+          // not registered yet, reads the error as a failure, and refunds a
+          // generation we are already paying for. Status-guarded so a row settled
+          // elsewhere is never resurrected.
+          db.update(generation)
+            .set({ runwareTaskUuid: submitted.providerJobId })
+            .where(and(eq(generation.id, id), eq(generation.status, 'processing')))
+            .run()
+          const pending = db.select().from(generation).where(eq(generation.id, id)).get()
+          return { dto: toDto(pending!), created: true }
+        }
+
+        // Synchronous backend: the picture already exists, so this request
+        // settles it — the shape images have always had.
+        //
+        // Safety gate BEFORE the download (spec §2/§9.4): an NSFW-flagged asset
+        // must never reach our storage or be served to the user. Throwing here
+        // routes through the catch below → failed + refund + 422 envelope.
+        if (submitted.nsfw) throw new ContentBlockedError()
+        // The provider’s own format, not an assumption: a PNG written as .webp
+        // is served with the wrong mime by @fastify/static.
+        const ext = submitted.ext ?? assetExt('image')
+        const mediaUrl = await storage.saveFromUrl(submitted.assetUrl, id, ext)
         // Status-guarded settle: ONLY a processing row may become succeeded.
         // Without the guard a row that some other path already failed+refunded
         // (e.g. the stale-generation reaper) would be flipped back to
@@ -737,9 +850,9 @@ export function createGenerationService({
             .set({
               status: 'succeeded',
               mediaJson: JSON.stringify([mediaUrl]),
-              runwareCostUsd: res.cost?.toString(),
+              runwareCostUsd: submitted.costUsd?.toString(),
               completedAt: new Date(),
-              paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, seed: res.seed }),
+              paramsJson: JSON.stringify({ aspectRatio: input.aspectRatio, seed: submitted.seed }),
             })
             .where(eq(generation.id, id))
             .run()
@@ -753,20 +866,20 @@ export function createGenerationService({
               userId,
               generationId: id,
               costCredits: cost,
-              runwareCostUsd: res.cost ?? null,
+              runwareCostUsd: submitted.costUsd ?? null,
             },
             'generation settled',
           )
         // Row already settled elsewhere (failed + refunded) → the user was
         // made whole; discard the downloaded asset instead of delivering it.
-        if (!settled) await storage.remove(id, 'webp')
+        if (!settled) await storage.remove(id, ext)
       } catch (err) {
         // Provider, safety, or download failure → guarded fail + refund, then
         // rethrow so the route surfaces the matching error envelope
         // (provider_error / content_blocked). The errorCode is persisted so
         // the gallery card can localize the safety block later — the envelope
         // alone only reaches whoever made the POST.
-        // Money-path log: the operator may still be paying Runware for this
+        // Money-path log: the operator may still be paying the provider for this
         // call — provider failures need their own structured event, with the
         // REAL error detail (the client only ever sees the sanitized envelope).
         log?.error(
@@ -848,6 +961,30 @@ export function createGenerationService({
             : chainImage
               ? { inputImage: chainImage }
               : {}),
+          // ...and the same frame as a URL, for a backend whose schema takes one.
+          // Only the CHAINED frame can have it: an explicit inputImage is raw
+          // bytes from the client that were never stored, so there is no address
+          // to give. Absent → a URL-only backend refuses at submit and the chain
+          // routes the job to one that inlines bytes.
+          ...(!input.inputImage && chainImagePath
+            ? (() => {
+                const url = publicMediaUrl(mediaPublicBaseUrl, chainImagePath)
+                return url ? { inputImageUrl: url } : {}
+              })()
+            : {}),
+          // Reference photos as URLs — ALL OR NOTHING. A partial list would let a
+          // URL-only backend condition on fewer subjects than the user tagged and
+          // charge full price for the wrong cast; the chain failing over to a
+          // bytes-taking backend is the honest outcome instead.
+          ...(() => {
+            if (!referenceImages?.length) return {}
+            const urls = referenceImages.map((_, i) =>
+              publicMediaUrl(mediaPublicBaseUrl, referencePaths[i] ?? null),
+            )
+            return urls.every((u): u is string => u !== null)
+              ? { referenceImageUrls: urls }
+              : {}
+          })(),
           // ByteDance models 400 on Runware's `safety` param — the catalog flag
           // routes around it (Runware adapter omits it; other providers ignore it).
           ...(model.type === 'video' && model.supportsSafetyParam === false
@@ -964,10 +1101,18 @@ export function createGenerationService({
     const poll =
       row.type === 'model3d'
         ? await mesh.poll(row.runwareTaskUuid)
-        : await resolveProvider(row.provider).poll(row.runwareTaskUuid)
+        : row.type === 'image'
+          ? await images.poll(row.runwareTaskUuid)
+          : await resolveProvider(row.provider).poll(row.runwareTaskUuid)
     if (poll.status === 'processing') {
-      db.update(generation).set({ progress: poll.progress }).where(eq(generation.id, id)).run()
-      return toDto({ ...row, progress: poll.progress })
+      // Images report no progress percentage — there is no frame count to be a
+      // fraction of, and Seedream's task states are queued/generating, not a
+      // number. Read defensively rather than defaulted at the seam, so the column
+      // keeps meaning "the provider said N%" instead of "some provider said 0".
+      const progress =
+        'progress' in poll && typeof poll.progress === 'number' ? poll.progress : null
+      db.update(generation).set({ progress }).where(eq(generation.id, id)).run()
+      return toDto({ ...row, progress })
     }
     if (poll.status === 'success') {
       // Safety gate BEFORE the download (spec §2/§9.4): NSFW-flagged output
@@ -1006,7 +1151,11 @@ export function createGenerationService({
       }
       // Download BEFORE the status flip: if the download throws, the row stays
       // processing and the next poll retries — never a succeeded row without media.
-      const mediaUrl = await storage.saveFromUrl(src, id, assetExt(row.type))
+      // The provider's own format when it stated one (Seedream returns png),
+      // the media-type default otherwise. Storing a png as .webp would have
+      // @fastify/static serve it under the wrong mime.
+      const pollExt = 'ext' in poll && poll.ext ? poll.ext : assetExt(row.type)
+      const mediaUrl = await storage.saveFromUrl(src, id, pollExt)
       // Guard: only transition if still processing (two browser tabs can poll
       // the same generation concurrently).
       let settled = false

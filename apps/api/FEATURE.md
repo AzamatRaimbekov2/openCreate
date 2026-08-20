@@ -278,12 +278,14 @@ Runbook (env table, first run, TLS/reverse proxy, backup/restore): `PROD.md`.
 Pre-authored viral formats that instantiate into a whole film. ADR:
 `docs/wiki/decisions/template-catalog.md`.
 
-Four shelves (`TemplateCategory`): **`format`** — «Фильм» (trailer grammar),
+Five shelves (`TemplateCategory`): **`format`** — «Фильм» (trailer grammar),
 «Сериал» (prime-time episode with recap + cliffhanger cards), «Аниме» (shōnen
 battle cold-open, styleId 'anime') — LOOK/GENRE scaffolds the user rewrites,
 all 16:9 · 8s beats · wan-2-7 as the standard tier (its r2v references keep a
 tagged hero consistent across beats); **`brick`** («Брик-мульты» — see below);
-**`animation`** («Буран»); **`brainrot`** (the viral dramas).
+**`animation`** («Буран»); **`brainrot`** (the viral dramas); **`shorts`** (the
+vertical batch shelf — see «Shorts Studio» below; the enum value exists, no
+template declares it yet).
 
 - `modules/templates/catalog/*.ts` — the templates, **one file per template**. This is where the
   prompts live and they never leave the server: `GET /api/templates` returns a `TemplateSummary`
@@ -298,6 +300,35 @@ tagged hero consistent across beats); **`brick`** («Брик-мульты» —
   snaps the duration, changing both the cut and the price behind the user's back.
 - **Two substitution modes.** `{{var}}` in a visual prompt → the option's English fragment; in a
   title or a spoken line → its Russian noun. Free text never reaches a visual prompt.
+
+### Shorts Studio — the batch (ADR `docs/wiki/decisions/shorts-studio.md`, phase 1)
+
+One template applied once per ROW, in one request. Server side only so far: the runner, the
+itemised confirm dialog and the shorts templates themselves are not built.
+
+- `POST /api/films/from-template/batch` — `{ templateId, tier, rows: [{ variables, title? }] }`
+  → **201** `{ batchId, films: FilmDetail[] }`. Rate limit **10/min** (half the single route's,
+  because one call is up to twenty times the write). **Charges zero credits**, like its
+  single-film sibling — nothing on this path imports the ledger.
+- **1–20 rows.** Twenty is the submit limiter's number: `POST /api/generations` is 20/min, so a
+  bigger batch could not be *run* faster than the limiter releases it anyway.
+- **All-or-nothing, twice over.** `TemplateService.planFilm` substitutes and validates without
+  touching the database, and `instantiateBatch` plans EVERY row before writing the first — so one
+  bad row is a 400 with nothing behind it. Then all N films commit in ONE transaction
+  (`films.createManyFromTemplate`); better-sqlite3 is synchronous, so there is nothing to await
+  between the inserts.
+- **`film.batch_id` is provenance, server-set.** `randomUUID()` is minted inside
+  `createManyFromTemplate` and there is deliberately no parameter and no input field for it
+  anywhere — a client can neither forge a batch nor join someone else's.
+- `GET /api/films?batchId=<uuid>` — the board's whole persistence; filtered by owner AND batch,
+  never batch alone. A non-uuid is a 400, not an empty list.
+- **The index is not in `FILM_DDL`, and that is load-bearing.** `CREATE TABLE IF NOT EXISTS` is a
+  no-op on an existing volume, so `batch_id` only appears there after the `ALTER TABLE` in
+  `db/client.ts` — which runs after the DDL exec. An index declared next to the table would pass
+  every fresh install and brick every deployed one. It lives in `FILM_BATCH_INDEX_DDL`, exec'd
+  right after the column guard; `test/db-ddl.test.ts` boots a pre-feature file to keep it there.
+- Tests: `test/templates-batch.test.ts` (zero charge at the premium tier, drafts only, whole-batch
+  rejection, the 20 cap, the filter, ownership, and the forged-`batchId` refusal).
 
 ### `brick` — «Брик-мульты» (owner request 2026-07-30)
 

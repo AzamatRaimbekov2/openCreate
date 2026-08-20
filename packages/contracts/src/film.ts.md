@@ -255,3 +255,19 @@ Owner follow-up to the create-time cover: the picture is editable from the film'
 - Same image rule as everywhere else on this wire (`rasterImageDataUriSchema`): bytes not URLs, no
   svg, bounded.
 - Widening: `{}` and every pre-existing patch body still parse.
+
+## Update 2026-08-20 - `filmSchema.batchId` (ADR: `docs/wiki/decisions/shorts-studio.md`)
+
+- `filmSchema` gains **`batchId: z.string().nullable()`** - which batch created this
+  film, or null for every film made one at a time.
+- **Provenance, exactly like `templateId` beside it**, and read-only in the same way:
+  no create route accepts one, `POST /films/from-template/batch` mints it server-side.
+  A client that could stamp a batch id could merge itself into somebody's board or
+  forge one that never ran.
+- **Nullable, never absent**, the same discipline as `coverUrl`: null is a real state
+  (a film with no batch) that the UI renders differently from "not loaded yet".
+- This field IS the batch. There is no batch entity on the wire, no job list and no
+  status enum - progress is derived per shot from its generation, and the board is
+  reconstructed from `GET /api/films?batchId=...`.
+- **Breaking for hand-built fixtures only**: a `Film` literal must now name `batchId`.
+  The nine Cinema test fixtures in `apps/web` were updated in the same change.

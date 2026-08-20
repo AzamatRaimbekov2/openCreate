@@ -72,7 +72,7 @@ describe('create/poll race', () => {
 
     // Net ledger effect: exactly one charge, never a refund.
     const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
-    expect(me.json().creditsBalance).toBe(199)
+    expect(me.json().creditsBalance).toBe(193)
     const tx = await app.inject({
       method: 'GET',
       url: '/api/credits/transactions',

@@ -306,11 +306,11 @@ describe('THE BUDGET GATE over HTTP', () => {
 
     const done = await waitFor(app, cookie, opened.id, ['idle'])
     expect(rw.imageInference).toHaveBeenCalledOnce()
-    expect(await balanceOf(app, cookie)).toBe(before - 1)
+    expect(await balanceOf(app, cookie)).toBe(before - 7)
     const step = done.messages.find(
       (m) => (m.content as { tool?: string }).tool === 'start_generation',
     )
-    expect(step?.content).toMatchObject({ kind: 'step', status: 'done', costCredits: 1 })
+    expect(step?.content).toMatchObject({ kind: 'step', status: 'done', costCredits: 7 })
     expect((step?.content as { generationId?: string }).generationId).toBeTruthy()
   })
 

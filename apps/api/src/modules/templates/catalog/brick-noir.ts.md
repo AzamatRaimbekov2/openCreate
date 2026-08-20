@@ -64,6 +64,10 @@ flowchart TD
 - **9:16**: an office, a doorway, a bar stool, a fire escape — vertical, all of it. The one
   story on the shelf where the phone frame is a stylistic asset rather than a compromise.
 - Price: 336 / 810 / 840 credits (draft / standard / premium), 50s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

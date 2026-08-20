@@ -75,6 +75,18 @@ export const filmSchema = z.object({
   // prompt the template authored, so the user doesn't have to invent "melancholic
   // soap-opera strings" themselves) and analytics ("which templates get finished?").
   templateId: z.string().nullable(),
+  // Provenance, exactly like templateId above and for exactly the same reasons:
+  // which BATCH this film was created in (ADR: shorts-studio §2), or null for
+  // every film made one at a time. Server-set — POST /films/from-template/batch
+  // mints the id and stamps it; no create route accepts one, so a client can
+  // neither forge a batch nor add itself to somebody's board.
+  //
+  // This IS the batch. There is no batch table, no job row and no status machine:
+  // a batch is a label on films, its progress is derived from each shot's
+  // generation, and a reload reconstructs the whole board from
+  // GET /api/films?batchId=… — which only works because the label rides on the
+  // film the client already has.
+  batchId: z.string().nullable(),
   // The film's cover picture: the '/media/<uuid>.<ext>' path of an image the user
   // uploaded when they created it, or null. Owner request 2026-07-31 — the film
   // library was a grid of identical glyphs, because a film genuinely had no cover

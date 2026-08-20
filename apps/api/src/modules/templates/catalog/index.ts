@@ -26,6 +26,17 @@ import { film } from './film'
 import { fruitDrama } from './fruit-drama'
 import { catDrama } from './cat-drama'
 import { serial } from './serial'
+import { shortsAbsurdCreature } from './shorts-absurd-creature'
+import { shortsAiSlop } from './shorts-ai-slop'
+import { shortsAsmrImpossible } from './shorts-asmr-impossible'
+import { shortsBRoll } from './shorts-b-roll'
+import { shortsColdOpenLoop } from './shorts-cold-open-loop'
+import { shortsLofiLoop } from './shorts-lofi-loop'
+import { shortsPovImmersion } from './shorts-pov-immersion'
+import { shortsStylisedEveryday } from './shorts-stylised-everyday'
+import { shortsTalkingObject } from './shorts-talking-object'
+import { shortsTimelapseCycle } from './shorts-timelapse-cycle'
+import { shortsWhatIfDoc } from './shorts-what-if-doc'
 import { talkingFood } from './talking-food'
 
 // This order is the order of the SHELVES too, not just the cards: the gallery
@@ -42,7 +53,50 @@ import { talkingFood } from './talking-food'
 // from its name: heist and space sell themselves, «День минифигурки» needs the
 // card read.
 //
-// «Буран» slides to third and keeps the role it has always had: the template
+// ШОРТСЫ takes third place (ADR shorts-studio, 2026-08-20). It is the shelf the
+// batch runner exists for, and it is ordered ahead of «Буран» and the dramas for
+// the same reason БРИК-МУЛЬТЫ is ordered ahead of them: it is a whole pack rather
+// than one card, and it is the shelf a user arrives wanting. Its own eight run
+// from the two formats that need no explanation at all (ASMR, the lo-fi loop)
+// through the ones whose card has to be read (the pseudo-documentary, the
+// deliberate slop).
+//
+// EVERY CARD ON THAT SHELF IS THE SAME SHAPE, and it is not a coincidence — it is
+// arithmetic (ADR §6). Three clips × 8 seconds, no title cards, 24 seconds total,
+// on the vertical triple pixverse-v6 / wan-2-7 / veo-3-1-fast whose native
+// duration tables intersect at exactly {8}. So every shorts card costs the same
+// 168 / 405 / 420 credits, which is the property a batch runner needs: the price
+// of a run is rows × beats × one number, and a user reading the itemised confirm
+// does not have to hold eight different per-template rates in their head.
+//
+// «Фигурка в большом мире» (shorts-figurine-pov.ts) IS AUTHORED AND DELIBERATELY
+// NOT REGISTERED HERE. Its format needs a tier that can hold a character across
+// shots, and the only such tier model (wan-2-7, the sole one carrying
+// `referenceMode`) is unreachable on this deployment — so the only tier that runs
+// today is the only tier that cannot do the card's one job, and its first batch
+// would teach a user that the format does not work. The other cards DEGRADE on
+// the working tier; that one is BROKEN on it, and a tier note is not enough when
+// the tier that works is the wrong one. IT GOES BACK ON THE SHELF the moment a
+// reference-capable tier is reachable — a DashScope key for wan-2-7, or any 9:16
+// model with `referenceMode` at 8s. Re-add the import and one line below.
+//
+// Nine of the eleven are LOOPABLE, and their final beat's prompt says so
+// explicitly — a claim templates.test.ts checks against that prompt rather than
+// trusting the flag (ADR §10). The two that are not — the pseudo-documentary and
+// the deliberate slop — are escalations whose payoff is in the last beat, and each
+// says so in its own header rather than pretending otherwise.
+//
+// WAVE 2 (2026-08-20) added four: «От первого лица» (POV), «Фигурка в большом
+// мире» (the user's own tagged character in an oversized real world), «Холодное
+// открытие» (the shelf's only NARRATIVE loop — it loops on meaning, not on
+// picture) and «Круг в одном кадре» (time-lapse, whose loop is free because a
+// cycle returns). Two formats the research surfaced were deliberately NOT taken:
+// the explainer, which needs composited lower-thirds and a 6–9 beat arc that this
+// grid does not have, and audio-reactive beat-sync, which needs beat markers
+// extracted BEFORE generation — a different pipeline. Both are real formats and
+// both would have to be faked here, so neither shipped.
+//
+// «Буран» slides to fourth and keeps the role it has always had: the template
 // picked to be worked ON. The brainrot dramas still close the page.
 export const TEMPLATES: Template[] = [
   film,
@@ -56,6 +110,17 @@ export const TEMPLATES: Template[] = [
   brickNoir,
   brickPirates,
   brickCity,
+  shortsAsmrImpossible,
+  shortsLofiLoop,
+  shortsTimelapseCycle,
+  shortsBRoll,
+  shortsPovImmersion,
+  shortsTalkingObject,
+  shortsAbsurdCreature,
+  shortsStylisedEveryday,
+  shortsColdOpenLoop,
+  shortsWhatIfDoc,
+  shortsAiSlop,
   buran,
   fruitDrama,
   catDrama,

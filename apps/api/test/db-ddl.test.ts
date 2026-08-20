@@ -6,6 +6,10 @@
 // the credit ledger, which is the one thing this table must never touch).
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createDb } from '../src/db/client'
 import {
   ASSET3D_DDL,
   CANVAS_DDL,
@@ -233,5 +237,73 @@ describe('CREATOR_DDL', () => {
     db.prepare(`DELETE FROM creator_session WHERE id='s1'`).run()
     const left = db.prepare(`SELECT COUNT(*) AS n FROM creator_message`).get()
     expect((left as { n: number }).n).toBe(0)
+  })
+})
+
+// film.batch_id (ADR: shorts-studio §2). The column is nullable and additive, so
+// the interesting part is not the column — it is the INDEX, and the order the two
+// statements run in.
+//
+// CREATE TABLE IF NOT EXISTS is a no-op on a database that already has `film`, so
+// on an existing volume batch_id does not exist until client.ts's ALTER TABLE
+// runs — which is AFTER the DDL exec. An index on batch_id written inside
+// FILM_DDL would therefore pass every fresh-volume test and brick the boot of
+// every deployed one with "no such column: batch_id". That is why it lives in its
+// own constant, and this is the test that keeps it there.
+describe('film.batch_id on an existing volume', () => {
+  // A film table exactly as it was BEFORE this feature: no batch_id.
+  const LEGACY_FILM_DDL = `
+    CREATE TABLE film (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      aspect_ratio TEXT NOT NULL,
+      default_style_id TEXT,
+      template_id TEXT,
+      cover_image_path TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );`
+
+  // The real boot path against a FILE, because ':memory:' is always a fresh
+  // volume and can never model the case this test exists for.
+  const bootOntoLegacyFile = () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'oc-batchid-')), 'app.db')
+    const legacy = new Database(path)
+    legacy.exec(LEGACY_FILM_DDL)
+    legacy
+      .prepare(
+        `INSERT INTO film (id, user_id, title, aspect_ratio, created_at, updated_at)
+         VALUES ('old-film', 'u1', 'Старый фильм', '16:9', 0, 0)`,
+      )
+      .run()
+    legacy.close()
+    return path
+  }
+
+  it('adds the column and its index without bricking the boot', () => {
+    const path = bootOntoLegacyFile()
+    const { sqlite } = createDb(path)
+
+    const columns = (sqlite.pragma('table_info(film)') as Array<{ name: string }>).map(
+      (c) => c.name,
+    )
+    expect(columns).toContain('batch_id')
+
+    const indexes = (sqlite.pragma('index_list(film)') as Array<{ name: string }>).map(
+      (i) => i.name,
+    )
+    expect(indexes).toContain('idx_film_user_batch')
+
+    // The pre-existing film survives, reading NULL — which is not a gap, it is
+    // the truth about a film that was made on its own.
+    const old = sqlite.prepare(`SELECT batch_id FROM film WHERE id='old-film'`).get()
+    expect((old as { batch_id: string | null }).batch_id).toBeNull()
+  })
+
+  it('is idempotent — the second boot of the same file is a no-op', () => {
+    const path = bootOntoLegacyFile()
+    createDb(path).sqlite.close()
+    expect(() => createDb(path)).not.toThrow()
   })
 })

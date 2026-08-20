@@ -42,6 +42,11 @@ export const talkingFood: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: 'Говорящая {{food}}',
 
+  // Photoreal fruit with a face — impossible on its face, and no person appears, so
+  // it stays below the photoreal-people tier. Not loopable: hook, payload, CTA.
+  loopable: false,
+  disclosureTier: 'description',
+
   models: {
     draft: 'pixverse-v6',
     standard: 'wan-2-7',

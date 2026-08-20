@@ -261,3 +261,49 @@ Owner follow-up to the create-time cover: the picture is editable from the film'
 - **The OLD file is left on disk** on both replace and clear — a harmless orphan for a future sweep,
   the same treatment detached shot/style references and render outputs get.
 - `InvalidImageDataUriError` → `FilmValidationError` (400), never a 500.
+
+## Update 2026-08-20 - the batch create (ADR: `docs/wiki/decisions/shorts-studio.md`)
+
+### `createManyFromTemplate(userId, templateId, entries): { batchId, films }`
+
+N films and N*M draft shots, in **ONE transaction**, under **one server-minted batch id**,
+for **zero credits**.
+
+- **All N share one transaction, not one each.** better-sqlite3 is synchronous, so there
+  is nothing to await between the inserts and the whole batch is a single commit. Nine
+  films of an intended ten is a state the user cannot see, cannot name, and would have to
+  clean up by hand.
+- **`batchId` is minted here and is NOT a parameter.** With no argument to pass, no caller
+  - route, service or client body - has a way to claim an existing batch or forge one.
+  Same discipline as `templateId`, enforced by the signature rather than by convention.
+- **One timestamp for the whole batch.** The library sorts on `updatedAt`; staggering the
+  films by however long the loop took would order the board by insert luck, not by row.
+- The entries arrive **already validated** - `TemplateService` plans every row before this
+  is called, so a bad row has failed before the first write.
+
+### `insertTemplatedFilm(tx, ...)` - extracted, shared by both template paths
+
+The single and batch routes now write through one function, so they cannot drift apart
+about what a templated film IS (one of them growing a column the other forgets is exactly
+what a second copy of that loop would produce). It takes an OPEN transaction rather than
+opening its own: the single path wraps one call, the batch path wraps N, and the scope of
+the commit is the caller's decision.
+
+`FilmTx` (the open-transaction type) is declared locally rather than imported from the
+credit ledger's identical alias - the film service must not reach into the money module,
+and a type import is still an import.
+
+### `listFilms(userId, batchId?)`
+
+`batchId` narrows the library to one batch - the whole persistence of the run board.
+Filtered ALONGSIDE the ownership scope, never instead of it: a batch id is guessable to
+anyone who has seen it once, so ownership is what keeps a board private.
+
+**Row order is a contract.** `films[i]` is the film built from `entries[i]` — the run board
+maps variant row i to films[i], and the itemised total the user agreed to is per row. What
+would break it is reading the films back with a query: every film in a batch shares one
+`updatedAt`, so an `ORDER BY updatedAt` would return them in whatever order SQLite pleased.
+Asserted by `test/templates-batch.test.ts` > "films[i] is the film built from rows[i]".
+
+`toFilmDto` now carries `batchId`; `createFilm` writes `batchId: null` explicitly, beside
+`templateId: null`, so both provenance fields are visibly answered on the hand-made path.

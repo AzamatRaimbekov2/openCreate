@@ -207,6 +207,16 @@ export const film = sqliteTable('film', {
   // NULL for a hand-made film. Not an FK: templates are code, not rows — deleting
   // a template from the catalog must leave old films intact, just unlinked.
   templateId: text('template_id'),
+  // Which BATCH this film was created in (ADR: shorts-studio §2), or NULL for
+  // every film made one at a time. PROVENANCE, exactly like template_id above:
+  // the server mints it inside the batch endpoint and stamps it on each film —
+  // there is no input field for it anywhere, so a client cannot claim one.
+  //
+  // This column IS the batch. No batch table, no job rows, no status machine: a
+  // batch's progress is derived from each shot's generation, and the board is
+  // reconstructed after a reload by filtering films on this value. Not an FK for
+  // the same reason template_id is not one — there is no row to point at.
+  batchId: text('batch_id'),
   // The film's cover picture — the '/media/<uuid>.<ext>' path of an image the
   // user uploaded at create time (owner request 2026-07-31). A PATH, not bytes
   // and not a generation citation: a cover is an uploaded file, so it is stored

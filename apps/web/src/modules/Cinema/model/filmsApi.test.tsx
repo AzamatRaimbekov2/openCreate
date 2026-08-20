@@ -26,6 +26,7 @@ function makeFilm(overrides: Partial<Film> = {}): Film {
     aspectRatio: '16:9',
     defaultStyleId: null,
     templateId: null,
+    batchId: null,
     coverUrl: null,
     createdAt: '2026-08-02T10:00:00.000Z',
     updatedAt: '2026-08-02T10:00:00.000Z',

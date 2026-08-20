@@ -88,7 +88,42 @@ flowchart TD
   be silently re-snapped by `composeShotClipInput`, changing the cut AND the price
   behind the user's back. That has to be a failed deploy, not a 500 the first user
   finds. It also makes `priceTiers`'s "unknown model" throw unreachable in practice.
+- **`toSummary` now carries `loopable` and `disclosureTier` straight through** (2026-08-20).
+  Unlike `tiers`, neither is computed here — both are authored properties of the format
+  itself, so passing them through unchanged is correct and deriving them would be a
+  second, drifting source of truth. See `types.ts.md` on why both are required fields.
 
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-08-20 - `planFilm` / `instantiateBatch` (ADR: `docs/wiki/decisions/shorts-studio.md`)
+
+### The split: plan, then write
+
+`planFilm(template, tier, row)` does every substitution and every check a templated film
+needs and returns what to insert. **It touches no database.**
+
+The split exists for the batch. A batch must validate all N rows before the first row is
+written, so that one bad row rejects the whole request and leaves nothing behind - and
+that is only expressible if validating and writing are two steps. `instantiate` is the
+same code with N = 1, which is the point: there is exactly one implementation of "what a
+template becomes", and the two routes differ only in how many they commit and in one
+column.
+
+### `instantiateBatch(userId, input): { batchId, films }`
+
+    const planned = input.rows.map((row) => planFilm(template, input.tier, row))
+    return films.createManyFromTemplate(userId, template.id, planned)
+
+**The order of those two lines is the feature.** Planning row by row as we write would
+leave the user with the films from the rows that happened to come first: a half-batch
+nobody asked for, that looks exactly like a finished one.
+
+- It charges **NOTHING** - no ledger call anywhere on this path, not a charge, not a
+  hold, not a check. This is the largest spend the product can set up, and the credits go
+  later, per beat, behind the itemised confirm the ADR requires.
+- `requireTemplate` is shared by both entry points, so "unknown template" is one 404.
+- `row` is typed as the wire's `CreateFilmsFromTemplateBatchRow` - one film's worth of
+  knob values plus an optional title override, which is exactly what the two callers have
+  in common.

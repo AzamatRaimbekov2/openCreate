@@ -94,8 +94,51 @@ describe('inputGenerationId', () => {
       },
     })
     expect(res.statusCode).toBe(202)
-    const submitted = video.submit.mock.calls[0]![0] as { inputImage?: string }
+    const submitted = video.submit.mock.calls[0]![0] as {
+      inputImage?: string
+      inputImageUrl?: string
+    }
     expect(submitted.inputImage).toMatch(/^data:image\/webp;base64,/)
+    // BOTH forms travel, because the two backends want opposite ones: Runware
+    // conditions on the bytes, Segmind's schema takes a URL and rejects anything
+    // else. Sending only the bytes is what made every image→video job on Segmind
+    // charge, queue, fail and refund (production, 2026-08-19).
+    expect(submitted.inputImageUrl).toMatch(
+      /^http:\/\/localhost:8787\/media\/[^/]+\.webp$/,
+    )
+  })
+
+  it('sends NO seed-frame URL for an uploaded frame — there is no address to give', async () => {
+    const rw = fakeRunware()
+    const video = fakeVideoProvider()
+    video.submit.mockResolvedValue({ providerJobId: 'job-1' })
+    const app = await buildTestApp({ runware: rw, videoProviders: { runware: video } })
+    const cookie = await registerAndGetCookie(app)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: { cookie },
+      payload: {
+        modelId: 'pixverse-v6',
+        prompt: 'the fox walks away',
+        aspectRatio: '16:9',
+        duration: 5,
+        // Raw bytes from the client: never stored, so no /media path exists.
+        inputImage: 'data:image/png;base64,iVBORw0KGgo=',
+      },
+    })
+
+    expect(res.statusCode).toBe(202)
+    const submitted = video.submit.mock.calls[0]![0] as {
+      inputImage?: string
+      inputImageUrl?: string
+    }
+    expect(submitted.inputImage).toBe('data:image/png;base64,iVBORw0KGgo=')
+    // Absent rather than invented: a URL-only backend must REFUSE this job so the
+    // chain hands it to one that inlines bytes. Inventing an address here would
+    // put the refusal back where it hurts — after the charge, on the poll.
+    expect(submitted.inputImageUrl).toBeUndefined()
   })
 
   it("refuses a stranger's generation with one default-deny message, charging nothing", async () => {
@@ -170,7 +213,7 @@ describe('inputGenerationId', () => {
     expect(res.statusCode).toBe(400)
     const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
     // 200 signup − 1 for the seed, nothing for the refused chain
-    expect((me.json() as { creditsBalance: number }).creditsBalance).toBe(199)
+    expect((me.json() as { creditsBalance: number }).creditsBalance).toBe(193)
   })
 
   it('rejects inputGenerationId together with inputImage (contract exclusivity)', async () => {

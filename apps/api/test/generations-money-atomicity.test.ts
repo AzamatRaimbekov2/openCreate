@@ -26,7 +26,6 @@ import { fakeRunware } from './helpers/build-test-app'
 
 // Failure paths never touch storage — a throwing stub proves it stays unused.
 const stubStorage = (): StorageProvider => ({
-  dir: '/tmp/unused',
   saveFromUrl: async () => {
     throw new Error('storage must not be touched by these paths')
   },
@@ -34,7 +33,10 @@ const stubStorage = (): StorageProvider => ({
     throw new Error('storage must not be touched by these paths')
   },
   readAsDataUri: async () => 'data:image/png;base64,AAA',
-  localPath: (key, ext) => `/media/${key}.${ext}`,
+  serve: async () => ({ kind: 'file', root: '/tmp/unused' }),
+  materialize: async (key, ext) => ({ path: `/media/${key}.${ext}`, release: async () => undefined }),
+  scratchPath: (key, ext) => `/media/${key}.${ext}`,
+  publishLocalFile: async (_path, key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 })
 

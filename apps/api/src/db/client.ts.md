@@ -148,3 +148,18 @@ already taken** for `template_id` rather than issuing a second `pragma table_inf
 The film's cover picture (owner request 2026-07-31), stored as the `/media/…` path `saveDataUri`
 returned. NULL is not a gap — it is what every film written before this has: no cover. Expand is the
 whole migration; rolling the code back leaves a column no writer reads.
+
+## Update 2026-08-20 - `film.batch_id` micro-migration + its index
+
+- `if (!filmColumns.includes('batch_id')) ALTER TABLE film ADD COLUMN batch_id TEXT`,
+  reusing the `filmColumns` pragma read already done for `template_id`/`cover_image_path`.
+- Additive and nullable, and **NULL is not a gap** - it is the truth about every film
+  ever made one at a time, which is all of them so far. The expand step IS the whole
+  migration: nothing to backfill, no contract step, and rolling the code back leaves a
+  column no writer touches.
+- **`sqlite.exec(FILM_BATCH_INDEX_DDL)` runs on the line after the guard, and the
+  ORDER is the point.** On an existing volume the column was created one statement ago;
+  `FILM_DDL` ran long before it and would have indexed a column that did not yet exist.
+  Both paths - fresh file and existing file - reach that exec with `batch_id` present.
+- Covered by `test/db-ddl.test.ts` > "film.batch_id on an existing volume", which boots
+  the real `createDb` against a file holding the PRE-FEATURE `film` schema.

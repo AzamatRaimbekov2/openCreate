@@ -65,6 +65,12 @@ export { ProviderMark } from './ProviderMark'
 export type { ProviderMarkProps } from './ProviderMark'
 export { Skeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'
+// The app's ONE blocking spend gate. It moved here from Assets3D (2026-08-20,
+// ADR shorts-studio §4) when the Shorts batch became the second paid batch
+// surface: a module may not import another module's internals, and the last
+// thing this app should own two copies of is the dialog that guards credits.
+export { SpendConfirmModal } from './SpendConfirmModal'
+export type { SpendConfirmModalProps } from './SpendConfirmModal'
 // Toast system: the imperative `toast` API + the <Toaster> portal (mounted once
 // in the shell root). Any module notifies through `toast`; the store is exported
 // for tests and the rare consumer that needs to read the live stack directly.

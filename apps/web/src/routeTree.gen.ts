@@ -25,6 +25,7 @@ import { Route as ShellCompareVideoRouteImport } from './routes/_shell.compare-v
 import { Route as ShellCompareRouteImport } from './routes/_shell.compare'
 import { Route as ShellTemplatesIndexRouteImport } from './routes/_shell.templates.index'
 import { Route as ShellSoulIndexRouteImport } from './routes/_shell.soul.index'
+import { Route as ShellShortsIndexRouteImport } from './routes/_shell.shorts.index'
 import { Route as ShellCinemaIndexRouteImport } from './routes/_shell.cinema.index'
 import { Route as ShellCanvasIndexRouteImport } from './routes/_shell.canvas.index'
 import { Route as ShellAssetsIndexRouteImport } from './routes/_shell.assets.index'
@@ -110,6 +111,11 @@ const ShellSoulIndexRoute = ShellSoulIndexRouteImport.update({
   path: '/soul/',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellShortsIndexRoute = ShellShortsIndexRouteImport.update({
+  id: '/shorts/',
+  path: '/shorts/',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellCinemaIndexRoute = ShellCinemaIndexRouteImport.update({
   id: '/cinema/',
   path: '/cinema/',
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/assets/': typeof ShellAssetsIndexRoute
   '/canvas/': typeof ShellCanvasIndexRoute
   '/cinema/': typeof ShellCinemaIndexRoute
+  '/shorts/': typeof ShellShortsIndexRoute
   '/soul/': typeof ShellSoulIndexRoute
   '/templates/': typeof ShellTemplatesIndexRoute
 }
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/assets': typeof ShellAssetsIndexRoute
   '/canvas': typeof ShellCanvasIndexRoute
   '/cinema': typeof ShellCinemaIndexRoute
+  '/shorts': typeof ShellShortsIndexRoute
   '/soul': typeof ShellSoulIndexRoute
   '/templates': typeof ShellTemplatesIndexRoute
 }
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/_shell/assets/': typeof ShellAssetsIndexRoute
   '/_shell/canvas/': typeof ShellCanvasIndexRoute
   '/_shell/cinema/': typeof ShellCinemaIndexRoute
+  '/_shell/shorts/': typeof ShellShortsIndexRoute
   '/_shell/soul/': typeof ShellSoulIndexRoute
   '/_shell/templates/': typeof ShellTemplatesIndexRoute
 }
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/assets/'
     | '/canvas/'
     | '/cinema/'
+    | '/shorts/'
     | '/soul/'
     | '/templates/'
   fileRoutesByTo: FileRoutesByTo
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/canvas'
     | '/cinema'
+    | '/shorts'
     | '/soul'
     | '/templates'
   id:
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/_shell/assets/'
     | '/_shell/canvas/'
     | '/_shell/cinema/'
+    | '/_shell/shorts/'
     | '/_shell/soul/'
     | '/_shell/templates/'
   fileRoutesById: FileRoutesById
@@ -396,6 +408,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellSoulIndexRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/shorts/': {
+      id: '/_shell/shorts/'
+      path: '/shorts'
+      fullPath: '/shorts/'
+      preLoaderRoute: typeof ShellShortsIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/cinema/': {
       id: '/_shell/cinema/'
       path: '/cinema'
@@ -449,6 +468,7 @@ interface ShellRouteChildren {
   ShellAssetsIndexRoute: typeof ShellAssetsIndexRoute
   ShellCanvasIndexRoute: typeof ShellCanvasIndexRoute
   ShellCinemaIndexRoute: typeof ShellCinemaIndexRoute
+  ShellShortsIndexRoute: typeof ShellShortsIndexRoute
   ShellSoulIndexRoute: typeof ShellSoulIndexRoute
   ShellTemplatesIndexRoute: typeof ShellTemplatesIndexRoute
 }
@@ -468,6 +488,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellAssetsIndexRoute: ShellAssetsIndexRoute,
   ShellCanvasIndexRoute: ShellCanvasIndexRoute,
   ShellCinemaIndexRoute: ShellCinemaIndexRoute,
+  ShellShortsIndexRoute: ShellShortsIndexRoute,
   ShellSoulIndexRoute: ShellSoulIndexRoute,
   ShellTemplatesIndexRoute: ShellTemplatesIndexRoute,
 }

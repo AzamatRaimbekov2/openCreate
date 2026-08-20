@@ -68,6 +68,10 @@ flowchart TD
   why the viewer follows the account.
 - Beat 1 carries the premise as a burned-in title because ~70% of this format is watched
   muted — without it the viewer scrolls past.
+- **Disclosure tier `description`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Photoreal macro, but the subject is fruit with human eyes — plainly
+  impossible — and no person appears at any point, so it stays below the photoreal-people
+  tier. The arc is a reveal and a scream; it does not loop.
 
 ## Commits
 

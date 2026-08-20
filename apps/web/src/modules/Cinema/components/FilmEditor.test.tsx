@@ -18,10 +18,11 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CatalogVideoModel, FilmDetail, Generation, Shot } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
+import { useToastStore } from 'shared/ui'
 import { FilmEditor } from './FilmEditor'
 import 'shared/config/i18n'
 
@@ -81,6 +82,7 @@ function makeDetail(shots: Shot[]): FilmDetail {
       aspectRatio: '16:9',
       defaultStyleId: null,
       templateId: null,
+      batchId: null,
       coverUrl: null,
       createdAt: '2026-07-09T10:00:00.000Z',
       updatedAt: '2026-07-09T10:00:00.000Z',
@@ -150,8 +152,16 @@ function renderEditor() {
     path: '/cinema',
     component: () => null,
   })
+  const canvasRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/canvas/$canvasId',
+    component: () => {
+      const { canvasId } = canvasRoute.useParams()
+      return <div>canvas-stub-{canvasId}</div>
+    },
+  })
   const router = createRouter({
-    routeTree: rootRoute.addChildren([indexRoute, libraryStub]),
+    routeTree: rootRoute.addChildren([indexRoute, libraryStub, canvasRoute]),
     history: createMemoryHistory({ initialEntries: ['/'] }),
   })
   return render(
@@ -163,8 +173,57 @@ function renderEditor() {
 
 const exportButton = () => screen.getByRole('button', { name: /render mp4|собрать mp4/i })
 
+// Routes the film detail + per-clip generation fetches (like `routeApi`) PLUS
+// the two Canvas endpoints Export-to-Canvas drives — POST /api/canvases and
+// PATCH /api/canvases/:id — so the export flow needs no `modules/Canvas` mock:
+// `useCreateCanvas`/`saveCanvas` call the SAME `api()` these tests already mock.
+function routeApiWithCanvas(
+  detail: FilmDetail,
+  generations: Record<string, Generation> = {},
+  createdCanvasId = 'canvas1',
+) {
+  apiMock.mockImplementation(((path: string, init?: RequestInit) => {
+    if (path === '/api/canvases' && init?.method === 'POST') {
+      return Promise.resolve({
+        id: createdCanvasId,
+        title: 'Neon Drift — Canvas',
+        createdAt: '2026-08-04T00:00:00.000Z',
+        updatedAt: '2026-08-04T00:00:00.000Z',
+      })
+    }
+    if (path === `/api/canvases/${createdCanvasId}` && init?.method === 'PATCH') {
+      return Promise.resolve({
+        id: createdCanvasId,
+        title: 'Neon Drift — Canvas',
+        createdAt: '2026-08-04T00:00:00.000Z',
+        updatedAt: '2026-08-04T00:00:00.000Z',
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [],
+        edges: [],
+      })
+    }
+    const genMatch = /\/api\/generations\/([^/?]+)/.exec(path)
+    if (genMatch) {
+      const found = generations[genMatch[1] ?? '']
+      return found ? Promise.resolve(found) : Promise.reject(new Error('gone'))
+    }
+    return Promise.resolve(detail)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches apiMock's own generic signature
+  }) as any)
+}
+
+const openExportToCanvas = async (user: ReturnType<typeof userEvent.setup>) => {
+  // findByRole (not getByRole after an unrelated await): the ⋯ menu only
+  // appears once the film has actually LOADED — the "Render mp4" button is
+  // present even during the pending skeleton state, so waiting on it alone
+  // is not enough to know the actions menu has mounted.
+  await user.click(await screen.findByRole('button', { name: /actions|действия/i }))
+  await user.click(screen.getByRole('menuitem', { name: /export to canvas|экспорт в холст/i }))
+}
+
 beforeEach(() => {
   apiMock.mockReset()
+  useToastStore.getState().clear()
   exportRef.current = {
     state: 'idle',
     progress: 0,
@@ -339,5 +398,65 @@ describe('FilmEditor — client export', () => {
     await userEvent.click(screen.getByRole('button', { name: /show me|показать/i }))
 
     expect(await screen.findByDisplayValue('second')).toBeInTheDocument()
+  })
+})
+
+describe('FilmEditor — export to Canvas', () => {
+  it('creates a canvas from the film and navigates to it', async () => {
+    const user = userEvent.setup()
+    routeApiWithCanvas(
+      makeDetail([makeShot({ id: 'a', orderIndex: 1, generationId: 'gen-a', prompt: 'p1' })]),
+      { 'gen-a': gen({ id: 'gen-a' }) },
+    )
+    renderEditor()
+    await screen.findByRole('button', { name: /render mp4|собрать mp4/i })
+
+    await openExportToCanvas(user)
+
+    expect(await screen.findByText('canvas-stub-canvas1')).toBeInTheDocument()
+    expect(apiMock).toHaveBeenCalledWith('/api/canvases', {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Neon Drift — Canvas' }),
+    })
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/canvases/canvas1',
+      expect.objectContaining({ method: 'PATCH' }),
+    )
+  })
+
+  it('shows an error toast and does NOT navigate when the film has nothing exportable', async () => {
+    const user = userEvent.setup()
+    routeApiWithCanvas(makeDetail([makeShot({ id: 'a', orderIndex: 1, generationId: null })]))
+    renderEditor()
+    await screen.findByRole('button', { name: /render mp4|собрать mp4/i })
+
+    await openExportToCanvas(user)
+
+    expect(useToastStore.getState().toasts).toHaveLength(1)
+    expect(useToastStore.getState().toasts[0]?.variant).toBe('error')
+    expect(apiMock).not.toHaveBeenCalledWith('/api/canvases', expect.anything())
+    expect(screen.queryByText(/canvas-stub-/)).not.toBeInTheDocument()
+  })
+
+  it('shows an error toast when the canvas create call fails', async () => {
+    const user = userEvent.setup()
+    const detail = makeDetail([
+      makeShot({ id: 'a', orderIndex: 1, generationId: 'gen-a', prompt: 'p1' }),
+    ])
+    apiMock.mockImplementation(((path: string) => {
+      if (path === '/api/canvases') return Promise.reject(new Error('down'))
+      const genMatch = /\/api\/generations\/([^/?]+)/.exec(path)
+      if (genMatch) return Promise.resolve(gen({ id: 'gen-a' }))
+      return Promise.resolve(detail)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches apiMock's own generic signature
+    }) as any)
+    renderEditor()
+    await screen.findByRole('button', { name: /render mp4|собрать mp4/i })
+
+    await openExportToCanvas(user)
+
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1))
+    expect(useToastStore.getState().toasts[0]?.variant).toBe('error')
+    expect(screen.queryByText(/canvas-stub-/)).not.toBeInTheDocument()
   })
 })

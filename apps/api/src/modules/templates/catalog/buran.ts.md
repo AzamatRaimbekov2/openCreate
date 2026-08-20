@@ -78,6 +78,13 @@ flowchart LR
   AXES --> COMPOSE
   COMPOSE --> MODEL["video model<br/>positive + negative prompt"]
 ```
+- **Disclosure tier `description` AND NOT `none` — the one call on the older shelves worth
+  arguing** (ADR shorts-studio §12, field added 2026-08-20). Hand-drawn animation cannot
+  be mistaken for footage, which is the argument for `none`. But `none` is defined as the
+  stylised **and fantastical** tier, and «Буран» is neither fantastical nor invented: it
+  is a realistic human drama about a real phenomenon, drawn by hand. Non-photoreal over a
+  real-world subject is exactly what `description` is for. Not loopable — the film ends
+  on a fall and an embrace.
 
 ## Commits
 - _no commit yet_

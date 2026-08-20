@@ -10,6 +10,7 @@ import { createDb } from '../../src/db/client'
 import type { RunwareClient } from '../../src/integrations/runware/client'
 import type { VideoProvider, VideoProviderId } from '../../src/integrations/video-provider'
 import type { Mesh3dProvider } from '../../src/integrations/mesh-provider'
+import type { ImageProvider } from '../../src/integrations/image-provider'
 import { createLocalStorage } from '../../src/storage/local'
 
 // Fully-mocked RunwareClient (plan Task 10): each test scripts the provider's
@@ -63,6 +64,10 @@ export type TestAppOverrides = {
   // buildApp derives the runware mesh adapter, so suites that never touch 3D are
   // byte-for-byte unaffected.
   meshProvider?: Mesh3dProvider
+  // ImageProvider seam. Injected by tests of the asynchronous image path (a
+  // backend that answers 'pending'), which no scripted RunwareClient can produce
+  // — Runware images are synchronous by nature.
+  imageProvider?: ImageProvider
   signupBonusCredits?: number
   // Ops hardening: logger is SILENT by default so suites stay quiet; logging
   // tests raise the level and capture pino's NDJSON via a write stub.
@@ -146,6 +151,12 @@ export type TestAppOverrides = {
   // of the suite asserts; a test passes ['kie'] to pin that a parked channel is
   // never even called.
   compareChannels?: readonly ('segmind' | 'deepinfra' | 'kie')[]
+  // R2 storage config (ADR railway-deployment D2): default null (local disk,
+  // same as every other suite). Storage-provider tests construct createR2Storage
+  // directly rather than going through buildTestApp, so this exists mainly so
+  // AppConfig stays satisfied — set it if an HTTP-level test ever needs to prove
+  // the app boots with R2 configured.
+  r2?: import('../../src/config').R2StorageConfig | null
 }
 
 export async function buildTestApp(overrides: TestAppOverrides = {}) {
@@ -174,6 +185,7 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
     // and nobody would notice until it was restored.
     compareChannels: overrides.compareChannels ?? ['deepinfra', 'kie'],
     ...(overrides.meshProvider ? { meshProvider: overrides.meshProvider } : {}),
+    ...(overrides.imageProvider ? { imageProvider: overrides.imageProvider } : {}),
     ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
     // Presence matters, not truthiness: `[]` is the meaningful "nothing
     // configured" case the creator suite asserts on, so it must reach buildApp
@@ -185,6 +197,10 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       databasePath: ':memory:',
       storageDir,
       runwareApiKey: 'test-key',
+      // What a URL-taking image backend would be pointed at. Nothing in a test
+      // ever fetches it — it exists so reference images carry a public URL at all,
+      // which is the difference between exercising that path and skipping it.
+      mediaPublicBaseUrl: 'http://localhost:8787',
       // DashScope (direct Wan channel): both default null → provider unconfigured,
       // its catalog models hidden (see the override note above for why it is a pair).
       dashscopeApiKey: overrides.dashscopeApiKey ?? null,
@@ -227,6 +243,7 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // Default-deny like production: proxy headers are only trusted when a
       // test opts in — mirrors the TRUST_PROXY env knob (unset → false).
       trustProxy: overrides.trustProxy ?? false,
+      r2: overrides.r2 ?? null,
       // 'test' (NOT 'production') by default: prod-only behaviors like SPA
       // serving must be opted into explicitly by the tests that pin them.
       nodeEnv: overrides.nodeEnv ?? 'test',

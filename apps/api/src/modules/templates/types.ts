@@ -20,6 +20,7 @@
 import type {
   AspectRatio,
   BuiltinStyleId,
+  DisclosureTier,
   PromptPreset,
   TemplateCategory,
   TemplateTier,
@@ -142,6 +143,41 @@ export type Template = {
   // Unlike the shot prompts this DOES go on the wire (TemplateSummary.musicPrompt)
   // — it is one line, and pre-filling the audio panel with it is the whole point.
   musicPrompt?: string
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Two REQUIRED properties of the format itself, not of any one beat. Both are
+  // required rather than optional on purpose: an optional compliance field is a
+  // field nobody fills in, and the cost of retrofitting either onto a catalog
+  // that already ships is far higher than the cost of answering the question
+  // once, while authoring. Both travel on the wire (TemplateSummary).
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // Does the last beat return to the first frame? (ADR shorts-studio §10.)
+  //
+  // Since 2025-03-31 every replay counts as an additional view and replay rate is
+  // one of the strongest distribution signals a vertical platform has, so a
+  // seamless loop is a distribution mechanism rather than a flourish — which is
+  // why it is a declared property the gallery can filter on and not a note in a
+  // header.
+  //
+  // THE CLAIM IS ENFORCED, NOT TRUSTED: a template with `loopable: true` must
+  // state the return to the opening composition in its FINAL clip beat's authored
+  // prompt, and templates.test.ts asserts it. A model does not infer "the last
+  // frame should equal the first" — it has to be told, every time — so a template
+  // that declares the loop without asking for it produces a clip that visibly
+  // jumps, which is worse than not claiming the loop at all.
+  loopable: boolean
+  // How much AI-provenance labelling this template's output needs, and the reason
+  // it is carried from day one rather than added when someone asks for it:
+  // retrofitting compliance across a shipped catalog costs far more than a field,
+  // and the EU already requires machine-readable provenance on AI ad content.
+  //
+  // 'none' = stylised AND fantastical · 'description' = non-photoreal, or
+  // photoreal but plainly impossible · 'in-player' = photoreal people, places or
+  // events. WHEN A TEMPLATE SITS BETWEEN TWO, TAKE THE HIGHER ONE — over-labelling
+  // costs a line of copy, under-labelling a photoreal human drama is a policy
+  // exposure. The full definitions live on `disclosureTierSchema` in contracts.
+  disclosureTier: DisclosureTier
 
   variables: TemplateVariableDef[]
   shots: TemplateShot[]

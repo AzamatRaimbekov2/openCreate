@@ -40,6 +40,10 @@ flowchart LR
   R --> S[service.ts: knobs → substitute → shots]
   S --> FILM[Film + 7 shots in Cinema editor]
 ```
+- **Disclosure tier `in-player`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Photoreal people shot as live action is the case the disclosure rule is
+  actually aimed at, and the fact that the film is fiction does not change what the
+  footage looks like. A trailer escalates into a title card, so there is nothing to loop.
 
 ## Commits
 

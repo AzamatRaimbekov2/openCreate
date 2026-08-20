@@ -40,6 +40,7 @@ const film: FilmDetail = {
     aspectRatio: '16:9',
     defaultStyleId: null,
     templateId: null,
+    batchId: null,
     coverUrl: null,
     createdAt: '2026-07-23T10:00:00.000Z',
     updatedAt: '2026-07-23T10:00:00.000Z',

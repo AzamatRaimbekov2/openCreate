@@ -113,3 +113,16 @@ what maps a refused cover to the service's `400 validation_failed`.
 
 Body is `updateFilmInputSchema`, where `coverDataUri` is three-valued: a data URI replaces the cover,
 `null` clears it, absent leaves it alone.
+
+## Update 2026-08-20 - `GET /api/films?batchId=`
+
+- `GET /api/films` accepts an optional `batchId` query parameter and passes it to
+  `service.listFilms(user.id, batchId)`.
+- **It is the only thing that reconstructs a Shorts Studio run board after a reload**
+  (ADR shorts-studio section 2) - the batch was never anywhere but on these rows.
+- **A non-uuid is a 400, not an empty list.** Every batch id is a `randomUUID()` this
+  server minted, so anything else is definitionally not one; a client that mangled the id
+  learns so instead of being told "your batch is gone". Matched with a module-level
+  `UUID_RE` rather than a zod schema - it is one optional query string, not a body.
+- Ownership still does the protecting: the service filters by user AND batch, never batch
+  alone, so a leaked id addresses nothing outside its owner's library.

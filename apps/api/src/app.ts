@@ -18,6 +18,10 @@ import { createDeepinfraClient } from './integrations/deepinfra/deepinfra-client
 import { createKieClient } from './integrations/kie/kie-video'
 import { createSegmindClient } from './integrations/segmind/segmind-video'
 import { createFailoverProvider } from './integrations/failover-provider'
+import { createImageFailoverProvider } from './integrations/failover-image-provider'
+import type { ImageProvider } from './integrations/image-provider'
+import { createKieImageClient } from './integrations/kie/kie-image'
+import { createRunwareImageAdapter } from './integrations/runware/image-adapter'
 import type { VideoProvider, VideoProviderId } from './integrations/video-provider'
 import type { Mesh3dProvider } from './integrations/mesh-provider'
 import type { StorageProvider } from './storage/local'
@@ -41,6 +45,8 @@ import { registerTemplateRoutes } from './modules/templates/routes'
 import { createAsset3dService } from './modules/assets3d/service'
 import { createAnalyzeService } from './modules/assets3d/analyze'
 import { registerAsset3dRoutes } from './modules/assets3d/routes'
+import { createModels3dService, settleStaleModelRenders } from './modules/models3d/service'
+import { registerModels3dRoutes } from './modules/models3d/routes'
 import { createPromptEnhanceService } from './modules/prompt/enhance'
 import { registerPromptRoutes } from './modules/prompt/routes'
 import { registerCompareRoutes } from './modules/compare/routes'
@@ -85,6 +91,12 @@ export type AppDeps = {
   // beats running our own GPU for this). 3D tests inject a fake to assert that a
   // mesh job submits here and NEVER through the video registry.
   meshProvider?: Mesh3dProvider
+  // IMAGE provider (ImageProvider seam). Optional: when absent the production
+  // chain below is built (Seedream on kie.ai → Runware). Injected by tests that
+  // need the ASYNCHRONOUS half of the seam, which is otherwise reachable only by
+  // calling kie.ai for real — and by any test that wants to prove a job went to
+  // the chain rather than straight to Runware.
+  imageProvider?: ImageProvider
   // Optional pino destination override. Tests inject a capture stream to
   // assert on structured log lines; production leaves it unset (stdout).
   logStream?: { write: (msg: string) => void }
@@ -264,6 +276,10 @@ export async function buildApp(deps: AppDeps) {
   // the model must vanish from /api/catalog rather than sit there as a broken option:
   // a listed model whose backend cannot run is worse than an absent one.
   if (deps.config.segmindApiKey !== null) configuredProviders.add('segmind')
+  // kie gates seedance-1-5-pro since it moved there (2026-08-19). Same rule as
+  // every other optional backend: no key, no listing — a model the user can pick
+  // but nothing can run is worse than one that is simply absent.
+  if (deps.config.kieApiKey !== null) configuredProviders.add('kie')
   // Catalog is public (no requireUser): pricing must render before sign-in.
   registerCatalogRoutes(app, configuredProviders)
   // The core (Task 10): generation lifecycle service gets the db + provider +
@@ -287,6 +303,12 @@ export async function buildApp(deps: AppDeps) {
     runware: createRunwareVideoAdapter(deps.runware),
     'wan-runpod': createComfyClient({ baseUrl: deps.config.comfyBaseUrl }),
     bytedance: arkClient,
+    // Seedance 1.5 Pro's channel. A single adapter, not a chain: the Runware
+    // fallback would need the OLD AIR, and this seam carries one model handle —
+    // so a second link here would be handed an id it cannot read. If a Runware
+    // key ever returns, the honest way back is a second catalogue entry, not a
+    // chain that guesses which spelling it is holding.
+    kie: createKieClient({ apiKey: deps.config.kieApiKey }),
     alibaba: createDashscopeClient({
       apiKey: deps.config.dashscopeApiKey,
       workspaceId: deps.config.dashscopeWorkspaceId,
@@ -376,11 +398,35 @@ export async function buildApp(deps: AppDeps) {
   // Hoisted to a const (it used to be constructed inline in the register call)
   // because Soul Studio's portrait orchestrator needs THIS instance: it is the
   // single money path, and a second instance would mean a second poll-throttle map.
+  // The IMAGE chain: Seedream on kie.ai first, Runware behind it. Two links and
+  // not one because a single vendor IS the outage — the day Runware's balance ran
+  // dry it took every video model, voiceover and music with it, and images would
+  // have gone too. Order is deliberate: kie.ai is the cheaper, newer model family
+  // we now sell; Runware is the proven path that also happens to accept the
+  // reference form kie cannot (data URIs), which is what makes it a real fallback
+  // for tagged-entity work in dev rather than a second way to fail.
+  //
+  // A catalogue entry with no `kie` mapping never reaches the first link at all
+  // (the chain filters on the per-backend handle), so an unconfigured or
+  // Runware-only model costs nothing here.
+  const imageProvider = deps.imageProvider ?? createImageFailoverProvider(
+    [
+      { id: 'kie', provider: createKieImageClient({ apiKey: deps.config.kieApiKey }) },
+      { id: 'runware', provider: createRunwareImageAdapter(deps.runware) },
+    ],
+    {
+      onFailover: ({ from, to, reason }) =>
+        app.log.warn({ event: 'provider.failover', from, to, reason }, 'image provider failed over'),
+    },
+  )
+
   const generationService = createGenerationService({
     db: deps.db,
     runware: deps.runware,
     videoProviders,
     meshProvider,
+    imageProvider,
+    mediaPublicBaseUrl: deps.config.mediaPublicBaseUrl,
     storage: deps.storage,
     entities: entityService,
     // The registry lookup, narrowed to the ONE question the money path asks
@@ -460,6 +506,12 @@ export async function buildApp(deps: AppDeps) {
     assets: asset3dService,
   })
   registerAsset3dRoutes(app, asset3dService, analyzeService)
+  // Studio3D renders + shares (ADR: photo-to-3d-studio §D3, §D7): turntable
+  // renders of an already-succeeded model3d generation, plus public share
+  // links. Spends no credits of its own (see the module header), so it needs
+  // only db + storage — not the generation service.
+  const models3dService = createModels3dService({ db: deps.db, storage: deps.storage })
+  registerModels3dRoutes(app, models3dService)
   // Prompt enhancer (POST /api/prompt/enhance): a generic, FREE, stateless text
   // transform — rough shot idea → one cinematic Wan prompt, plus a 'soften' mode for
   // content_blocked retries. It runs an ORDERED PROVIDER CHAIN: DeepInfra
@@ -561,20 +613,28 @@ export async function buildApp(deps: AppDeps) {
   // Render reaper (no refund — a render has no charge): a render whose ffmpeg
   // process died would hold 'processing' forever with no poller to settle it.
   settleStaleRenders(deps.db, Date.now(), app.log)
+  // Model3d render reaper (no refund either — a render has no charge): mirrors
+  // the film render reaper above for the same reason (ffmpeg process death
+  // must not hold a row 'processing' forever).
+  settleStaleModelRenders(deps.db, Date.now(), app.log)
   // Agent-turn reaper (no refund either — a turn spends LLM tokens, not credits;
   // any generation it already started settles through its own poll path). An
   // in-flight turn lives in process memory, so a restart leaves a `running`
   // session that nothing else can move off the spinner.
   settleStaleCreatorSessions(deps.db, Date.now(), app.log)
 
-  // Serve downloaded generation assets at /media/* straight off the storage
-  // dir. Public by design for the MVP: keys are unguessable UUIDs minted by
-  // us, and <img>/<video> tags need plain GETs without auth headers.
-  await app.register(fastifyStatic, {
-    root: deps.storage.dir,
-    prefix: '/media/',
-    index: false,
-    list: false,
+  // Serve downloaded generation assets at /media/*. Public by design for the
+  // MVP: keys are unguessable UUIDs minted by us, and <img>/<video> tags need
+  // plain GETs without auth headers. The storage provider decides per request
+  // whether that means a local file (@fastify/static's sendFile, path-
+  // traversal-guarded) or a 302 to R2's public bucket domain (ADR
+  // railway-deployment D2) — `serve: false` below only wires up the sendFile
+  // decorator this route (and the SPA fallback further down) both rely on.
+  await app.register(fastifyStatic, { root: process.cwd(), serve: false })
+  app.get<{ Params: { '*': string } }>('/media/*', async (req, reply) => {
+    const result = await deps.storage.serve(`/media/${req.params['*']}`)
+    if (result.kind === 'redirect') return reply.redirect(result.url, 302)
+    return reply.sendFile(req.params['*'], result.root)
   })
 
   // Production single-origin serving (ops hardening): when the API is the only
@@ -587,8 +647,8 @@ export async function buildApp(deps: AppDeps) {
     await app.register(fastifyStatic, {
       root: webDist,
       prefix: '/',
-      // The /media registration above already added the sendFile decorator;
-      // a second decoration would throw. sendFile still works here because it
+      // The decorator-only registration above already added sendFile; a
+      // second decoration would throw. sendFile still works here because it
       // accepts an explicit root argument (used in the fallback below).
       decorateReply: false,
       index: ['index.html'],

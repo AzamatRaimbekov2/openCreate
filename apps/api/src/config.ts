@@ -148,6 +148,20 @@ const envSchema = z.object({
   // endpoint, which DeepInfra lacks. NOT for Seedance 2.0: kie.ai is dearer there
   // ($0.205/s vs a measured $0.1518/s). `|| null` normalizes '' → null below.
   KIE_API_KEY: z.string().optional(),
+  // Where OUR stored media is reachable from the PUBLIC internet. Only needed by
+  // providers that fetch reference images by URL instead of taking the bytes
+  // inline — kie.ai's Seedream is the first (its schema rejects a data URI).
+  //
+  // Absent → derived from BETTER_AUTH_URL, which is already required to be the
+  // public https origin users hit, so a correctly configured deploy needs
+  // nothing extra here. Set it explicitly only when media is served from
+  // somewhere else than the app's own origin — an R2 public bucket domain, say.
+  //
+  // Its localhost DEFAULT is the honest answer for dev, not a working one: kie.ai
+  // cannot fetch your laptop. The image adapter refuses reference jobs rather
+  // than sending a link nobody can resolve, and the failover chain runs them on
+  // Runware (which takes data URIs) instead.
+  MEDIA_PUBLIC_BASE_URL: z.url().optional(),
   // Segmind API key — the CHEAPEST surveyed channel for Seedance 2.0 (2026-08-02).
   // Every channel bills the same token count, so only the rate per million differs:
   // Segmind holds a FLAT $7.00/M on every resolution, where ByteDance itself charges
@@ -172,6 +186,16 @@ const envSchema = z.object({
   // Unset/empty/'false' = no trust: direct-exposure deploys must never honor
   // a client-forged X-Forwarded-For.
   TRUST_PROXY: z.string().optional(),
+  // Cloudflare R2 media storage (ADR railway-deployment D2). ALL FIVE or NONE —
+  // enforced below, not by the schema, because zod has no cross-field rule and
+  // a half-set group is a misconfiguration that must fail at BOOT, not fall
+  // back to local disk silently (the exact trap dashscopeConfigured exists to
+  // prevent for DashScope, applied here to five fields instead of two).
+  R2_ENDPOINT: z.url().optional(),
+  R2_BUCKET: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_PUBLIC_BASE_URL: z.url().optional(),
 })
 
 export type LogLevel = z.infer<typeof envSchema.shape.LOG_LEVEL>
@@ -217,6 +241,9 @@ export type AppConfig = {
   // kie.ai key for the third Seedance channel; null when unset (provider disabled,
   // its catalog models hidden, boot stays healthy).
   kieApiKey: string | null
+  // Absolute, no trailing slash. '/media/<key>.<ext>' appended to it is a URL a
+  // provider can GET.
+  mediaPublicBaseUrl: string
   // Segmind key for the cheapest Seedance 2.0 channel; null when unset (provider
   // disabled, its models hidden from the catalog).
   segmindApiKey: string | null
@@ -233,6 +260,18 @@ export type AppConfig = {
   // parseTrustProxy), string = fastify/proxy-addr address/CIDR/keyword list of
   // peers whose headers are trusted.
   trustProxy: boolean | number | string
+  // Cloudflare R2 credentials + public read domain; null = local disk storage
+  // (storage/local.ts). Never partially set — see the ALL FIVE OR NONE check
+  // in loadConfig below.
+  r2: R2StorageConfig | null
+}
+
+export type R2StorageConfig = {
+  endpoint: string
+  bucket: string
+  accessKeyId: string
+  secretAccessKey: string
+  publicBaseUrl: string
 }
 
 // TRUST_PROXY env → fastify trustProxy. Default-deny: only an explicit opt-in
@@ -259,6 +298,29 @@ function parseTrustProxy(raw: string | undefined): boolean | number | string {
   // silently mistyped one would be a security change, not a config typo.
   if (/^\d+$/.test(value)) return Number(value)
   return value
+}
+
+// R2_* env → R2StorageConfig | null. Zod validates each field's own shape
+// (a set R2_ENDPOINT is a URL, etc) but not the group — this is the
+// cross-field rule: all five present → R2 is the storage backend; any subset
+// throws at boot rather than quietly running on local disk with, say, no
+// public read domain configured (a deploy that "boots fine" and then 500s on
+// the first /media/* request).
+function loadR2Config(e: z.infer<typeof envSchema>): R2StorageConfig | null {
+  const fields = {
+    endpoint: e.R2_ENDPOINT,
+    bucket: e.R2_BUCKET,
+    accessKeyId: e.R2_ACCESS_KEY_ID,
+    secretAccessKey: e.R2_SECRET_ACCESS_KEY,
+    publicBaseUrl: e.R2_PUBLIC_BASE_URL,
+  }
+  const setCount = Object.values(fields).filter((v) => v !== undefined && v !== '').length
+  if (setCount === 0) return null
+  if (setCount < 5)
+    throw new Error(
+      'R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_PUBLIC_BASE_URL must be set together (R2 storage) or all left unset (local disk storage)',
+    )
+  return fields as R2StorageConfig
 }
 
 export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
@@ -290,10 +352,15 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
   const dashscopeConfigured = Boolean(e.DASHSCOPE_API_KEY && e.DASHSCOPE_WORKSPACE_ID)
   const dashscopeApiKey = dashscopeConfigured ? (e.DASHSCOPE_API_KEY ?? null) : null
   const dashscopeWorkspaceId = dashscopeConfigured ? (e.DASHSCOPE_WORKSPACE_ID ?? null) : null
+  const r2 = loadR2Config(e)
   return {
     runwareApiKey: e.RUNWARE_API_KEY,
     betterAuthSecret: e.BETTER_AUTH_SECRET,
     betterAuthUrl: e.BETTER_AUTH_URL,
+    // Trailing slash stripped ONCE, here, so no caller has to think about it:
+    // z.url() accepts 'https://host/' and 'https://host' alike, and joining the
+    // first with '/media/x' yields a double slash that some CDNs 404 on.
+    mediaPublicBaseUrl: (e.MEDIA_PUBLIC_BASE_URL ?? e.BETTER_AUTH_URL).replace(/[/]+$/, ''),
     webOrigin: e.WEB_ORIGIN,
     // Explicit API_PORT → platform-injected PORT → the Dockerfile's EXPOSE.
     port: e.API_PORT ?? e.PORT ?? 8787,
@@ -347,6 +414,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     assetFetchTimeoutMs: e.ASSET_FETCH_TIMEOUT_MS,
     assetMaxBytes: e.ASSET_MAX_BYTES,
     trustProxy: parseTrustProxy(e.TRUST_PROXY),
+    r2,
     comfyBaseUrl,
     arkApiKey,
     dashscopeApiKey,
@@ -447,19 +515,31 @@ export const KIE_ASSET_HOST = 'tempfile.aiquickdraw.com'
 // calls `api.segmind.com/v1/requests/{id}` the OUTPUT endpoint ("Output for this
 // request ID … Not Found"), and the submit envelope returns that URL as `poll_url`.
 //
-// NOT YET CONFIRMED against a successful render, because no paid generation has run
-// through the production path. Every other provider here serves files from a host
-// UNRELATED to its API (kie.ai → tempfile.aiquickdraw.com, ByteDance → *.volces.com),
-// so Segmind may well redirect to a CDN too. The adapter logs the real host on its
-// first success (`event: segmind.asset_host`) — read that line and add the host here
-// if it differs, rather than widening the allowlist speculatively.
-export const SEGMIND_ASSET_HOST = 'api.segmind.com'
+// CONFIRMED 2026-08-20, and the guess above was half right — which is why this is
+// now a LIST. A Seedance 2.0 clip rendered successfully in production and the
+// download was refused: «asset host not allowed: images.segmind.com». The prediction
+// written here (that a provider serving files from a host unrelated to its API is
+// the norm, as kie.ai → tempfile.aiquickdraw.com already showed) was correct, and
+// the cost of being one host short is the worst-shaped failure this system has: the
+// provider bills, the clip exists, and the user gets a 500 with nothing to retry.
+//
+// Both hosts stay. `api.segmind.com` is where their v1 output endpoint lives and is
+// what their own 404 body names; `images.segmind.com` is where the finished file
+// actually comes from. Neither is speculative now — one is documented by the vendor,
+// the other observed in production through the adapter's own `segmind.asset_host`
+// log line, which exists for exactly this correction.
+export const SEGMIND_ASSET_HOSTS = ['api.segmind.com', 'images.segmind.com'] as const
 
 // Folded in ONLY when the provider is configured; the download surface stays closed
 // by default, exactly like the hosts above.
 function withSegmindHost(allowlist: string[], segmindApiKey: string | null): string[] {
   if (!segmindApiKey) return allowlist
-  return allowlist.includes(SEGMIND_ASSET_HOST) ? allowlist : [...allowlist, SEGMIND_ASSET_HOST]
+  // De-duplicated per host rather than per list: an operator who has already named
+  // one of these in ASSET_HOST_ALLOWLIST must not lose the other.
+  return SEGMIND_ASSET_HOSTS.reduce<string[]>(
+    (acc, host) => (acc.includes(host) ? acc : [...acc, host]),
+    allowlist,
+  )
 }
 
 // Folded in ONLY when the provider is configured; the download surface stays closed

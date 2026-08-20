@@ -62,6 +62,15 @@ flowchart TD
   building to a triumphant orchestral swell, tracking the arc's turn at beat 6.
 - **`veo-3-1-fast` is the premium tier because the characters speak natively.** Same
   reasoning as `fruit-drama`.
+- **Disclosure tier `in-player` — THE AMBIGUOUS ONE, resolved upward on purpose** (ADR
+  shorts-studio §12, field added 2026-08-20). A cat head on a human body is unmistakably
+  synthetic, which argues for `description`. But everything else in frame is photoreal:
+  human bodies, a real apartment, a real gym, a rainy street. `description` is defined as
+  the NON-photoreal tier and this is not that, so the only clean literal fit above it is
+  `in-player`. The rule when a card sits between two tiers is to take the higher one —
+  over-labelling costs a line of copy, under-labelling a photoreal human drama is a
+  policy exposure, and TikTok's C2PA detection will apply the label here whatever we
+  declare. Not loopable: betrayal → glow-up → revenge, and it ends.
 
 ## Commits
 

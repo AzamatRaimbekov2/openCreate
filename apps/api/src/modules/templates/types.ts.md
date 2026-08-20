@@ -78,6 +78,25 @@ flowchart TD
 - `musicPrompt` is the one piece of authored prose that DOES go on the wire
   (`TemplateSummary.musicPrompt`) — it is one line, and pre-filling the editor's audio
   panel with it is the whole point.
+- **`loopable: boolean` and `disclosureTier` are REQUIRED, and required is the whole
+  design** (ADR shorts-studio §10/§12, added 2026-08-20). An optional compliance field is
+  a field nobody fills in, and retrofitting provenance across a catalog that already ships
+  costs far more than answering the question once while authoring. Both travel on
+  `TemplateSummary`: the gallery filters on `loopable`, and the export will stamp the
+  label from `disclosureTier`.
+- **The `loopable` claim is enforced against the prompts, not trusted.**
+  `templates.test.ts` asserts that a template declaring `loopable: true` actually asks for
+  the return to the opening composition in its FINAL clip beat. A model does not infer
+  "the last frame should equal the first" — it has to be told, every time — so a template
+  that declares the loop without asking for it produces a clip that visibly jumps at the
+  seam, which is worse than never claiming the loop. Matching on prompt text is crude on
+  purpose; the alternative is trusting a boolean nobody can verify.
+- **Choosing a `disclosureTier`**: `'none'` = stylised AND fantastical (a minifigure
+  world, a cel-shaded shonen battle); `'description'` = non-photoreal over a real-world
+  subject, OR photoreal over something plainly impossible (macro fruit with eyes);
+  `'in-player'` = photoreal people, identifiable places or events. **When a card sits
+  between two tiers, take the higher one** — over-labelling costs a line of copy,
+  under-labelling a photoreal human drama is a policy exposure.
 
 ## Commits
 

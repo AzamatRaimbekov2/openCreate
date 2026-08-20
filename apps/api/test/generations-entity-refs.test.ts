@@ -17,12 +17,14 @@ const GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABA
 const REFERENCE_DATA_URI = 'data:image/gif;base64,REFERENCEBYTES'
 
 const stubStorage = (): StorageProvider => ({
-  dir: '/tmp/unused',
   saveFromUrl: async () => '/media/out.webp',
   saveDataUri: async (_d, key) => `/media/${key}.gif`,
   // Runware conditions on data URIs; our /media paths are not publicly reachable
   readAsDataUri: async () => REFERENCE_DATA_URI,
-  localPath: (key, ext) => `/media/${key}.${ext}`,
+  serve: async () => ({ kind: 'file', root: '/tmp/unused' }),
+  materialize: async (key, ext) => ({ path: `/media/${key}.${ext}`, release: async () => undefined }),
+  scratchPath: (key, ext) => `/media/${key}.${ext}`,
+  publishLocalFile: async (_path, key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 })
 

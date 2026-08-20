@@ -138,3 +138,62 @@ flowchart TD
 ## Commits
 
 - `f0ea3b1` feat(contracts): add the 'brick' template shelf to the category enum
+
+## Update 2026-08-20 - the `shorts` shelf and the BATCH request (ADR: `docs/wiki/decisions/shorts-studio.md`)
+
+- `templateCategorySchema` gains **`'shorts'`** - the fifth shelf, and the only one that
+  exists for a RUNNER rather than a genre. The gallery groups by category and nothing
+  else, so widening this enum IS the shelf's entire client-side existence. No shipped
+  template declares it yet.
+- `createFilmsFromTemplateBatchInputSchema` - `{ templateId, tier, rows: [{ variables,
+  title? }] }`. One tier for the whole batch (the tier is the price, and a batch is
+  priced as one number confirmed once); a row supplies **knob values only** - cast,
+  style and voice are durable inventory chosen once for the batch, not per row.
+- **`rows` is 1-20, and 20 is the submit limiter's number** (`TEMPLATE_BATCH_MAX_ROWS`).
+  `POST /api/generations` is 20/min, so a batch bigger than the bucket cannot be RUN
+  faster than the limiter releases it - it queues behind the runner's cap. Capping
+  creation at the same number keeps what the user can ask for and what the system can
+  deliver in a minute the same number. `.min(1)` because an empty batch is not a smaller
+  batch; answering 201 with zero films would tell the client something ran.
+- `createFilmsFromTemplateBatchResultSchema` - `{ batchId, films: FilmDetail[] }`. Full
+  details rather than ids, for the same reason the single route returns one: the SPA
+  seeds `['film', id]` from each and draws the board with no N+1 fetch.
+- **There is no `batchId` on any INPUT schema, and that absence is the enforcement.**
+  The server mints it; a client with no field to fill cannot forge a batch or join one.
+- This file now imports `filmDetailSchema` from `./film` - one-directional, `film.ts`
+  imports nothing from here, and `index.ts` already exports film before templates.
+
+## Update 2026-08-20 - `loopable` and `disclosureTier` become REAL FIELDS (ADR: `docs/wiki/decisions/shorts-studio.md` §10, §12)
+
+- `disclosureTierSchema` / `DisclosureTier` / `DISCLOSURE_TIERS` - a new three-value enum,
+  `'none' | 'description' | 'in-player'`. `DISCLOSURE_TIERS` mirrors `TEMPLATE_TIERS`: a
+  runtime list the API's catalog test iterates, because the type system cannot see catalog
+  data any more than it can see a model id.
+- `templateSummarySchema` gains **`loopable: boolean`** and
+  **`disclosureTier: DisclosureTier`**, both REQUIRED. Both were header prose in the eight
+  shorts cards first and are now data on all twenty-three templates.
+- **Required rather than optional is the whole design.** An optional compliance field is a
+  field nobody fills in, and retrofitting provenance across a shipped catalog costs far more
+  than answering the question once while authoring. The EU already requires machine-readable
+  provenance on AI ad content.
+- **Choosing a tier.** `'none'` = stylised AND fantastical (a minifigure world, a cel-shaded
+  shonen battle, a snail with a lion's mane). `'description'` = either non-photoreal over a
+  real-world subject (a hand-drawn human drama), or photoreal over something plainly
+  impossible (macro fruit with eyes). `'in-player'` = photoreal PEOPLE, IDENTIFIABLE PLACES
+  or EVENTS - the label rides in the player on YouTube, and TikTok's C2PA detection applies
+  it whether we self-disclose or not. **When a template sits between two tiers, take the
+  higher one**: over-labelling costs a line of description, under-labelling a photoreal human
+  drama is a policy exposure, and the asymmetry is not close.
+- **Both travel, unlike the shot prompts, because consumers outside the catalog need them.**
+  The gallery filters on `loopable` (since 2025-03-31 a replay counts as an additional view,
+  so "does this loop?" is a real reason to pick one card over another) and the export will
+  stamp the label from `disclosureTier`.
+- **`loopable` is a claim the prompts have to back, and a test enforces it.** A template
+  declaring `loopable: true` must state the return to the opening composition in its FINAL
+  clip beat's authored prompt (`apps/api/src/modules/templates/templates.test.ts`). A model
+  never infers "the last frame should equal the first", so a card that claims the loop
+  without asking for it ships a visible jump at the seam - worse than not claiming it.
+- **The shorts shelf may never reach `'in-player'`**, and that is asserted too. §12's
+  consequence stated plainly: stylised and no-face formats are cheaper, more reliable AND
+  less policy-exposed, so the shelf leads with them. A shorts card needing an in-player label
+  is a talking-head format on the wrong shelf; those ship later, knowingly.

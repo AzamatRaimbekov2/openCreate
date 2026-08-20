@@ -209,3 +209,20 @@ composition layer OVER generations, exactly like `FILM_DDL`. See ADR `docs/wiki/
 - Additive and nullable: a fresh db gets it from this DDL, a legacy file from the pragma-guarded
   `ALTER TABLE` in `client.ts`. NULL is the honest state of every film that predates it, so there is
   no backfill and no contract step.
+
+## Update 2026-08-20 - `film.batch_id` and the index that must not live in `FILM_DDL`
+
+- `FILM_DDL`'s `film` table gains `batch_id TEXT` (nullable, no FK) for a FRESH volume.
+- **`FILM_BATCH_INDEX_DDL` is a SEPARATE exported constant, and this is the trap it
+  exists to avoid.** `CREATE TABLE IF NOT EXISTS` is a no-op on a database that already
+  has `film`, so on an existing volume `batch_id` does not appear until the `ALTER TABLE`
+  micro-migration in `client.ts` - which runs AFTER the DDL exec. An index on `batch_id`
+  written inside `FILM_DDL` would boot fine on every fresh install and fail every
+  deployed one with `no such column: batch_id`.
+- `client.ts` therefore execs it immediately after the column guard, where both paths
+  are guaranteed to have the column. Still `IF NOT EXISTS`, still idempotent.
+- Precedent for the split: `REFUND_ONCE_INDEX_DDL`, which is separate for a different
+  reason (it may legitimately throw on a legacy file and must not abort the bootstrap).
+- `test/db-ddl.test.ts` boots a FILE created with the pre-feature `film` schema and
+  asserts the column, the index and the untouched legacy row. `':memory:'` cannot model
+  this - it is always a fresh volume.

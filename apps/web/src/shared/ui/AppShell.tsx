@@ -151,6 +151,18 @@ export function AppShell({
             >
               {t('nav.templates')}
             </Link>
+            {/* Directly after Templates, because that is what it is: the shorts
+                shelf lives in the catalogue like every other shelf, and this
+                entry is the BATCH surface over it — pick one vertical format,
+                write N rows, run them behind one price. */}
+            <Link
+              to="/shorts"
+              className={navLinkClass}
+              activeProps={{ className: 'text-white' }}
+              inactiveProps={{ className: 'text-mist-dim' }}
+            >
+              {t('nav.shorts')}
+            </Link>
             {/* Soul Studio owns CHARACTERS (built from the constructor); /entities
                 stays the generic library of objects, places and plain uploads. The
                 adjacency is the hint that one is a specialization of the other. */}

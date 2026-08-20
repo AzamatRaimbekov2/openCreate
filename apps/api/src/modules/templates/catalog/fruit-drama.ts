@@ -46,6 +46,12 @@ export const fruitDrama: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: '{{couple}} и {{lover}}',
 
+  // Photoreal macro, but the subject is fruit with human eyes — plainly impossible,
+  // and no person appears at any point, so it stays below the photoreal-people
+  // tier. Not loopable: the arc is a reveal and a scream.
+  loopable: false,
+  disclosureTier: 'description',
+
   // All three tier models natively do 8s at 9:16 — the invariant the contract
   // test enforces. veo-3-1-fast is the premium tier because it generates the
   // dialogue audio itself, which is how the real videos in this trend are made:

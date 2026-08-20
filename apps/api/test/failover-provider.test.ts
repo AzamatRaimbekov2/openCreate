@@ -51,6 +51,12 @@ const blockedError = () =>
     statusCode: 400,
   })
 
+describe('failover — construction', () => {
+  it('refuses to build a chain with no links, rather than silently accepting every job it drops', () => {
+    expect(() => createFailoverProvider([])).toThrow(/at least one link/)
+  })
+})
+
 describe('failover — submit', () => {
   it('uses the first link when it accepts, and never touches the rest', async () => {
     const a = fakeProvider()

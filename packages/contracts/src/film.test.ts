@@ -208,6 +208,7 @@ describe('filmSchema.coverUrl', () => {
     aspectRatio: '16:9' as const,
     defaultStyleId: null,
     templateId: null,
+    batchId: null,
     createdAt: '2026-07-31T00:00:00.000Z',
     updatedAt: '2026-07-31T00:00:00.000Z',
   }

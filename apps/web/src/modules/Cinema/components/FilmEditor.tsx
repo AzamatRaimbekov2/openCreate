@@ -22,6 +22,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from '@tanstack/react-router'
 import type {
   CatalogAudioModel,
   CatalogModel,
@@ -29,9 +30,15 @@ import type {
   Style,
   TemplateSummary,
 } from '@opencreate/contracts'
-import { ErrorState, Skeleton } from 'shared/ui'
+import { ErrorState, Skeleton, toast } from 'shared/ui'
+// The ONE approved exception to "modules never import each other" (owner
+// request, "Export to Canvas"): Cinema may reach into Canvas's public API to
+// create + save a one-off document. See modules/Canvas/index.ts.md.
+import { saveCanvas, useCreateCanvas } from 'modules/Canvas'
 import { useExportController } from '../model/useExportController'
+import { buildCanvasDocFromFilm } from '../model/exportToCanvas'
 import { useFilm } from '../model/filmsApi'
+import { useShotGenerations } from '../model/shotGeneration'
 import { useTimelineClock } from '../model/timelineClock'
 import { totalDurationMs } from '../model/timelineGeometry'
 import { useTimelineKeys } from '../model/useTimelineKeys'
@@ -126,9 +133,12 @@ export function FilmEditor({
   chrome,
 }: FilmEditorProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { data, isPending, isError, refetch } = useFilm(filmId)
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null)
   const [isStoryboardOpen, setIsStoryboardOpen] = useState(false)
+  const [isExportingToCanvas, setIsExportingToCanvas] = useState(false)
+  const createCanvas = useCreateCanvas()
 
   // The timeline clock is a singleton (Timeline + PreviewPlayer share it), so it
   // would otherwise carry a stale playhead into a different film. Zero it when the
@@ -160,6 +170,46 @@ export function FilmEditor({
   // already owns, so "show me" is a real affordance.
   const jumpToBlockedShot = exp.blockedShotId
 
+  // Export to Canvas: resolve every cited generation's TYPE/STATUS/media (the
+  // pure `buildCanvasDocFromFilm` needs the full row, not just its id) through
+  // the SAME cache the clip thumbnails/preview already share. `?? []` keeps
+  // the hook order stable through the loading state, same discipline as
+  // `useTimelineKeys` above.
+  const shotGenerationIds = (data?.shots ?? []).flatMap((shot) =>
+    shot.generationId !== null ? [shot.generationId] : [],
+  )
+  const generationsById = useShotGenerations(shotGenerationIds)
+
+  // One-off "Export to Canvas": build the doc from the CURRENT film, create a
+  // brand-new canvas, save the doc into it, then navigate there. No live link
+  // back — a snapshot, not a sync. Guards its own re-entrancy (a second click
+  // while one export is already running is ignored) since the ⋯ Menu item has
+  // no built-in disabled/loading affordance.
+  const onExportToCanvas = async () => {
+    if (isExportingToCanvas || !data) return
+    const doc = buildCanvasDocFromFilm(data.film, data.shots, generationsById)
+    if (!doc) {
+      toast.error({
+        title: t('toasts.exportToCanvas.emptyTitle'),
+        description: t('toasts.exportToCanvas.emptyDescription'),
+      })
+      return
+    }
+    setIsExportingToCanvas(true)
+    try {
+      const canvas = await createCanvas.mutateAsync(doc.title)
+      await saveCanvas(canvas.id, doc)
+      void navigate({ to: '/canvas/$canvasId', params: { canvasId: canvas.id } })
+    } catch {
+      toast.error({
+        title: t('toasts.exportToCanvas.failedTitle'),
+        description: t('toasts.exportToCanvas.failedDescription'),
+      })
+    } finally {
+      setIsExportingToCanvas(false)
+    }
+  }
+
   // The editor's OWN top bar — rendered in EVERY state (loading/error/data) so
   // the bar never pops in. It replaces the global AppShell nav on this route
   // (owner request 2026-07-23); the `chrome` slot carries the balance/lang/
@@ -177,6 +227,8 @@ export function FilmEditor({
       durationMs={data ? totalDurationMs(data.shots) : undefined}
       styles={styles}
       chrome={chrome}
+      onExportToCanvas={() => void onExportToCanvas()}
+      isExportingToCanvas={isExportingToCanvas}
     />
   )
 

@@ -51,6 +51,11 @@ function mapDomainError(error: unknown) {
   return null
 }
 
+// Every batch id is a randomUUID() this server minted, so the query filter can
+// hold the boundary to that exact shape. Matched here rather than with a zod
+// schema because it is one optional query string, not a body.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // A render spawns an ffmpeg process — a much stricter bucket than reads. 10/min
 // keeps a user iterating on exports while capping runaway render storms.
 const RENDER_RATE_LIMIT = { max: 10, timeWindow: '1 minute' }
@@ -91,9 +96,20 @@ export function registerFilmRoutes(
   }
 
   // ── Films ─────────────────────────────────────────────────────────────────
-  app.get('/api/films', async (req) => {
+  // `?batchId=` narrows the library to one batch — the ONLY thing that
+  // reconstructs a Shorts Studio run board after a reload (ADR: shorts-studio §2),
+  // because the batch was never anywhere but on these rows to begin with.
+  //
+  // A batch id is only ever a uuid this server minted, so anything else is
+  // definitionally not one and is refused rather than answered with an empty list
+  // — an allowlist at the boundary, and a client that mangled the id learns so
+  // instead of seeing "your batch is gone". Ownership is still what protects the
+  // board: the service filters by user AND batch, never by batch alone.
+  app.get<{ Querystring: { batchId?: string } }>('/api/films', async (req, reply) => {
     const user = await app.requireUser(req)
-    return { items: service.listFilms(user.id) }
+    const { batchId } = req.query
+    if (batchId !== undefined && !UUID_RE.test(batchId)) return badInput(reply, 'invalid batchId')
+    return { items: service.listFilms(user.id, batchId) }
   })
 
   app.post('/api/films', async (req, reply) => {
@@ -276,7 +292,9 @@ export function registerFilmRoutes(
     { config: { rateLimit: RENDER_RATE_LIMIT } },
     async (req, reply) => {
       const user = await app.requireUser(req)
-      return guard(reply, () => reply.status(202).send(service.createRender(user.id, req.params.id)))
+      return guard(reply, async () =>
+        reply.status(202).send(await service.createRender(user.id, req.params.id)),
+      )
     },
   )
 

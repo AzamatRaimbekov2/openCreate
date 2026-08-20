@@ -91,7 +91,7 @@ describe('parts + extract (paid image)', () => {
     const task = rw.imageInference.mock.calls[0]![0]
     expect(task.referenceImages[0]).toMatch(/^data:image\//)
     const after = (await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json().creditsBalance
-    expect(after).toBe(before - 8) // flux-kontext-pro flat image price
+    expect(after).toBe(before - 7) // flat image price (Seedream 5 Lite tier)
   })
 
   it('extract failure refunds and leaves the part draft (retryable)', async () => {
@@ -134,7 +134,7 @@ describe('parts + extract (paid image)', () => {
     expect(partB.imageGenerationId).toBeNull() // B left draft, retryable
     expect(partB.status).toBe('draft')
     // Net charge = only A's flat image price (B refunded exactly once). 200 - 8 = 192.
-    expect((await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json().creditsBalance).toBe(192)
+    expect((await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json().creditsBalance).toBe(193)
   })
 })
 

@@ -9,6 +9,7 @@ import {
   DDL,
   ENTITY_DDL,
   FILM_DDL,
+  FILM_BATCH_INDEX_DDL,
   MODEL3D_DDL,
   ASSET3D_DDL,
   CANVAS_DDL,
@@ -154,6 +155,20 @@ export function createDb(path: string) {
   if (!filmColumns.includes('cover_image_path')) {
     sqlite.exec('ALTER TABLE film ADD COLUMN cover_image_path TEXT')
   }
+  //  · film.batch_id  which batch created this film (ADR: shorts-studio §2).
+  //    Additive and nullable, and NULL is not a gap — it is the truth about every
+  //    film ever made one at a time, which is all of them so far. So the expand
+  //    step IS the whole migration: nothing to backfill, no contract step, and
+  //    rolling the code back leaves a column no writer touches.
+  if (!filmColumns.includes('batch_id')) {
+    sqlite.exec('ALTER TABLE film ADD COLUMN batch_id TEXT')
+  }
+  // The index goes HERE, not in FILM_DDL, and the ordering is the whole point: on
+  // an existing volume the column above was created one statement ago, while
+  // FILM_DDL ran long before it and would have indexed a column that did not yet
+  // exist. Both paths — fresh file and existing file — reach this line with
+  // batch_id present. See FILM_BATCH_INDEX_DDL's comment.
+  sqlite.exec(FILM_BATCH_INDEX_DDL)
   //  · film_audio.shot_id  which shot a voiceover track belongs to. Without it the
   //                        editor cannot tell whether a shot is already voiced, so
   //                        a second click on "Voice this shot" would append a

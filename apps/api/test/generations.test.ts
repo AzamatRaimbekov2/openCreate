@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildTestApp, fakeRunware, registerAndGetCookie } from './helpers/build-test-app'
+import {
+  buildTestApp,
+  fakeRunware,
+  fakeVideoProvider,
+  registerAndGetCookie,
+} from './helpers/build-test-app'
 
 // Generation success paths download the produced asset via global fetch
 // (storage.saveFromUrl) — stub it so tests never hit the network.
@@ -36,7 +41,7 @@ describe('generations', () => {
     expect(gen.status).toBe('succeeded')
     expect(gen.mediaUrls[0]).toMatch(/^\/media\/.+\.webp$/)
     const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
-    expect(me.json().creditsBalance).toBe(199)
+    expect(me.json().creditsBalance).toBe(193)
   })
 
   it('image: refunds on runware failure', async () => {
@@ -303,9 +308,9 @@ describe('generations', () => {
 
 describe('provider parameter compatibility wiring', () => {
   it('video create passes omitSafety for models flagged supportsSafetyParam=false', async () => {
-    const rw = fakeRunware()
-    rw.submitVideo.mockResolvedValue(undefined)
-    const app = await buildTestApp({ runware: rw })
+    const kie = fakeVideoProvider()
+    kie.submit.mockResolvedValue({ providerJobId: 'kie-1' })
+    const app = await buildTestApp({ videoProviders: { kie }, kieApiKey: 'kie-key' })
     const cookie = await registerAndGetCookie(app)
     const res = await app.inject({
       method: 'POST',
@@ -319,7 +324,9 @@ describe('provider parameter compatibility wiring', () => {
       },
     })
     expect(res.statusCode).toBe(202)
-    expect(rw.submitVideo).toHaveBeenCalledWith(expect.objectContaining({ omitSafety: true }))
+    // The flag is Runware's concern, but FORWARDING it is the service's — every
+    // other adapter ignores the field, which is what makes it safe to always send.
+    expect(kie.submit).toHaveBeenCalledWith(expect.objectContaining({ omitSafety: true }))
   })
   it('video create does NOT set omitSafety for models that accept safety', async () => {
     const rw = fakeRunware()
@@ -339,9 +346,9 @@ describe('provider parameter compatibility wiring', () => {
     expect(arg.omitSafety).toBeUndefined()
   })
   it('video create OMITS negativePrompt for models flagged supportsNegativePrompt=false', async () => {
-    const rw = fakeRunware()
-    rw.submitVideo.mockResolvedValue(undefined)
-    const app = await buildTestApp({ runware: rw })
+    const kie = fakeVideoProvider()
+    kie.submit.mockResolvedValue({ providerJobId: 'kie-1' })
+    const app = await buildTestApp({ videoProviders: { kie }, kieApiKey: 'kie-key' })
     const cookie = await registerAndGetCookie(app)
     // Runware started rejecting the whole task on `negativePrompt` for
     // Seedance 1.5 Pro ("Unsupported use of 'negativePrompt' parameter",
@@ -361,10 +368,12 @@ describe('provider parameter compatibility wiring', () => {
       },
     })
     expect(res.statusCode).toBe(202)
-    const arg = rw.submitVideo.mock.calls[0]![0] as Record<string, unknown>
+    const arg = kie.submit.mock.calls[0]![0] as Record<string, unknown>
     expect(arg.negativePrompt).toBeUndefined()
     // The positive side of the preset still travels — only the negative is cut.
-    expect(String(arg.positivePrompt)).toContain('anime style')
+    // `prompt` at the seam — 'positivePrompt' is Runware's own spelling, and this
+    // assertion no longer looks at a Runware request.
+    expect(String(arg.prompt)).toContain('anime style')
   })
   it('video create still sends negativePrompt to models that accept it', async () => {
     const rw = fakeRunware()

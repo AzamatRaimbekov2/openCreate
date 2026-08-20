@@ -19,7 +19,7 @@ Every `/api/canvases` call the Canvas module makes, in one file: the list/detail
 
 ## Dependencies
 - Imports / depends on: `@tanstack/react-query`, contract types from `@opencreate/contracts`, `api` from `shared/libs/apiClient`.
-- Used by: `useCanvasDoc.ts` (`saveCanvas`), `components/CanvasLibrary.tsx` (`useCanvases`, `useCreateCanvas`), `components/UploadNode.tsx` (`uploadCanvasImage`), `routes/canvas.$canvasId.tsx` via the module barrel (`useCanvasDetail`).
+- Used by: `useCanvasDoc.ts` (`saveCanvas`), `components/CanvasLibrary.tsx` (`useCanvases`, `useCreateCanvas`), `components/UploadNode.tsx` (`uploadCanvasImage`), `routes/canvas.$canvasId.tsx` via the module barrel (`useCanvasDetail`), and — via the barrel's one cross-module exception — `modules/Cinema/components/FilmEditor.tsx` (`useCreateCanvas` + `saveCanvas`, Export to Canvas).
 
 ## Diagram
 ```mermaid

@@ -52,9 +52,37 @@ const catalogBase = z.object({
   supportsNegativePrompt: z.boolean().optional(),
 })
 
+// Which backend runs an IMAGE model. 'kie' = Seedream 5 through kie.ai's unified
+// jobs API; 'runware' is the aggregator that ran every image until then and now
+// stands behind kie as the failover link. Both are real backends for the SAME
+// catalogue entry: the user picks "Flash", and which company rendered it is our
+// business and may differ between two clicks.
+export const imageProviderSchema = z.enum(['runware', 'kie'])
+export type ImageProviderId = z.infer<typeof imageProviderSchema>
+
+// Seedream's own output-size ladder. It is a QUALITY enum, not a pixel pair — the
+// provider takes an aspect ratio plus one of these and picks the dimensions
+// itself. 'basic' = 2K, 'high' = 3K, 'ultra' = 4K.
+export const seedreamQualitySchema = z.enum(['basic', 'high', 'ultra'])
+export type SeedreamQuality = z.infer<typeof seedreamQualitySchema>
+
 export const catalogImageModelSchema = catalogBase.extend({
   type: z.literal('image'),
   credits: z.number().int().positive(),
+  // How this entry runs on kie.ai. Absent = kie cannot run it, and the image
+  // failover chain collapses to its single Runware link (via the AIR above) —
+  // which is what a model with no Seedream equivalent must do rather than 400.
+  //
+  // The AIR stays the RUNWARE handle throughout: it is what the fallback link
+  // needs. Two ids in two fields is what lets ONE catalogue entry name two
+  // backends without either of them guessing which id it is looking at.
+  kie: z
+    .object({
+      // kie.ai's own model id, e.g. 'seedream/5-lite-text-to-image'.
+      model: z.string().min(1),
+      quality: seedreamQualitySchema,
+    })
+    .optional(),
 })
 // 'alibaba' = Alibaba Cloud Model Studio (DashScope) direct, bypassing Runware.
 // Reason is PRICE, and unusually so: Runware's markup is model-dependent, not
@@ -73,6 +101,15 @@ export const videoProviderSchema = z.enum([
   'bytedance',
   'alibaba',
   'deepinfra',
+  // kie.ai — where Seedance 1.5 Pro runs (moved off Runware 2026-08-19). Their
+  // measured rate for the row we always buy (silent, 720p) is 3.5 credits/second
+  // at $0.005 = $0.0175/s, i.e. $0.0875 for a 5s clip — against $0.26136 for the
+  // same clip through Runware. Three times cheaper for an identical model, on a
+  // channel whose task API we already poll.
+  //
+  // It is NOT the right channel for Seedance 2.0: there they are $0.205/s against
+  // DeepInfra's measured $0.1518/s, which is why that model keeps its own chain.
+  'kie',
   // Segmind — the CHEAPEST verified Seedance channel. Added 2026-08-02 after a live
   // 15s/1080p render billed $5.12 against a $5.10 prediction (0.4%), which pins their
   // rate at $7.02/M — the flat rate they publish, and 9% under DeepInfra's MEASURED
@@ -110,8 +147,10 @@ export const catalogVideoModelSchema = catalogBase.extend({
   // self-hosted ComfyUI worker instead (see the VideoProvider seam in the API
   // and the wan-selfhost-video-provider ADR); 'bytedance' routes to ByteDance's
   // ModelArk API directly, bypassing the Runware aggregator (see the
-  // seedance-direct-bytedance ADR). Image models are always Runware, so this
-  // lives on the video schema only.
+  // seedance-direct-bytedance ADR). Images have their OWN provider union now
+  // (imageProviderSchema above) rather than sharing this one: the two sets of
+  // backends do not overlap, and one shared enum would let a video-only id be
+  // written into an image row and still typecheck.
   provider: videoProviderSchema.optional(),
 })
 // CinemaStudio audio models (music beds + voiceover). Flat-priced per generation

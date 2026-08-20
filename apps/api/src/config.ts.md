@@ -72,3 +72,24 @@ flowchart LR
 
 ## Update 2026-07-22 — GROQ_API_KEY (prompt enhancer fallback)
 - `GROQ_API_KEY` (optional string) → `config.groqApiKey` (`string | null`, `|| null` so empty = unconfigured). Same optional-secret pattern as the others. It is the FREE fallback LLM (`llama-3.3-70b-versatile`) for `POST /api/prompt/enhance`, tried after DeepInfra (`DEEPINFRA_TOKEN` → `deepinfraToken`, now ALSO the enhancer's primary LLM `deepseek-ai/DeepSeek-V3-0324`). EITHER key alone makes the endpoint work; NEITHER → it answers `provider_error` (boot healthy). No asset host to fold in (Groq is not an asset source), so `assetHostAllowlist` is untouched. Consumed by `app.ts` → `createPromptEnhanceService({ deepinfraToken, groqApiKey, log })`.
+
+## 2026-08-19 — MEDIA_PUBLIC_BASE_URL (Seedream on kie.ai)
+
+- `MEDIA_PUBLIC_BASE_URL` (optional `z.url()`) → `config.mediaPublicBaseUrl`
+  (`string`, defaults to `BETTER_AUTH_URL`, one trailing slash stripped here so
+  no caller has to think about it). It is the PUBLIC origin our own `/media/*`
+  is reachable at, and it exists for exactly one reason: kie.ai takes reference
+  images as URLs and rejects data URIs, which is the opposite of what Runware
+  wants. The generation service carries BOTH forms per reference and each
+  adapter takes the one it can use.
+- It is the first config value whose DEFAULT is knowingly non-functional in
+  dev: kie.ai cannot fetch `localhost`. That is not papered over — the kie
+  adapter refuses a reference job with no reachable URL, and the image failover
+  chain runs it on Runware instead. The alternative (send the localhost URL
+  anyway) fails at the vendor, after the charge, with a message nobody can act
+  on.
+- No new asset host to fold into `assetHostAllowlist`: kie serves finished
+  assets from `tempfile.aiquickdraw.com`, which `withKieHost()` already adds
+  whenever `KIE_API_KEY` is set. That path was written for video and now
+  carries images too — worth knowing, because an image download from an
+  unlisted host fails AFTER the user is charged.

@@ -11,7 +11,13 @@ describe('templateCategorySchema', () => {
   it('carries exactly the shelves the gallery has headings for', () => {
     // Order is the enum's, not the gallery's — the shelf order comes from the
     // server catalog's first-seen order (catalog/index.ts). This is membership.
-    expect(templateCategorySchema.options).toEqual(['format', 'brainrot', 'animation', 'brick'])
+    expect(templateCategorySchema.options).toEqual([
+      'format',
+      'brainrot',
+      'animation',
+      'brick',
+      'shorts',
+    ])
   })
 
   it('accepts the brick shelf', () => {

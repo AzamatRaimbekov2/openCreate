@@ -54,6 +54,10 @@ flowchart TD
 - **9:16**: a tower is the one subject a vertical frame renders better than a wide one — the
   whole story is looking UP at something that is not finished yet.
 - Price: 280 / 675 / 700 credits (draft / standard / premium), 42s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

@@ -20,6 +20,7 @@
 // That is deliberate: a template is a starting point the user then owns.
 import { z } from 'zod'
 import { aspectRatioSchema } from './catalog'
+import { filmDetailSchema } from './film'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category — the shelf a template sits on in the gallery. An enum rather than a
@@ -56,7 +57,22 @@ import { aspectRatioSchema } from './catalog'
 // mark and a phrase Veo's moderation rejects — which would break the premium
 // tier only, silently. The aesthetic vocabulary is "plastic construction
 // bricks", "minifigure", "brickfilm", "visible brick studs".
-export const templateCategorySchema = z.enum(['format', 'brainrot', 'animation', 'brick'])
+//
+// 'shorts' (2026-08-20, ADR shorts-studio §1) is the fifth shelf, and it is the
+// only one that exists for a RUNNER rather than for a genre: a shorts template is
+// an ordinary Template with aspectRatio '9:16' and few beats, picked to be run in
+// a BATCH — N films from one template and N rows of knob values. There is no new
+// media type behind it and no new render path; a finished short is a film.
+//
+// It is a shelf and not a flag because the gallery groups by category and nothing
+// else: widening this enum is the entire client-side existence of the shelf.
+export const templateCategorySchema = z.enum([
+  'format',
+  'brainrot',
+  'animation',
+  'brick',
+  'shorts',
+])
 export type TemplateCategory = z.infer<typeof templateCategorySchema>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +93,46 @@ export type TemplateCategory = z.infer<typeof templateCategorySchema>
 // test in the API asserts this for every template × tier; see
 // modules/templates/templates.test.ts.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Disclosure tier — how much AI-provenance labelling a template's output needs
+// (ADR shorts-studio §12). It is a REQUIRED field on every template, not an
+// optional one, and that is the entire design: an optional compliance field is a
+// field nobody fills in, and retrofitting provenance onto a shipped catalog costs
+// far more than carrying the value from day one. The EU already requires
+// machine-readable provenance on AI ad content.
+//
+// The three tiers, and the axis that separates them:
+//   · 'none'        — stylised AND fantastical. A minifigure world, a cel-shaded
+//                     shonen battle, a snail with a lion's mane. Nothing a viewer
+//                     could mistake for a record of something that happened.
+//   · 'description' — either a non-photoreal rendering of things that COULD be
+//                     real (a hand-drawn human drama), or a photoreal rendering
+//                     of something that plainly could not be (macro fruit with
+//                     eyes). The label goes in the expanded description.
+//   · 'in-player'   — photoreal PEOPLE, IDENTIFIABLE PLACES or EVENTS. The label
+//                     rides in the player on YouTube, and TikTok's C2PA detection
+//                     applies it whether we self-disclose or not.
+//
+// WHEN A TEMPLATE SITS BETWEEN TWO TIERS, TAKE THE HIGHER ONE. Over-labelling
+// costs a line of description; under-labelling a photoreal human drama is a
+// policy exposure, and the asymmetry is not close.
+//
+// It travels on the wire (unlike the shot prompts) because two consumers outside
+// the catalog need it: the gallery, which can warn before a user commits to a
+// format they will have to label, and the export, which will stamp the label
+// from it.
+export const disclosureTierSchema = z.enum(['none', 'description', 'in-player'])
+export type DisclosureTier = z.infer<typeof disclosureTierSchema>
+
+// The same three values as a runtime list, mirroring TEMPLATE_TIERS below. The
+// catalog test iterates it to assert every authored template names a tier the
+// wire will accept — the type system cannot see catalog data, so a test has to.
+export const DISCLOSURE_TIERS = [
+  'none',
+  'description',
+  'in-player',
+] as const satisfies readonly DisclosureTier[]
+
 export const templateTierSchema = z.enum(['draft', 'standard', 'premium'])
 export type TemplateTier = z.infer<typeof templateTierSchema>
 
@@ -174,6 +230,22 @@ export const templateSummarySchema = z.object({
   // because it is the difference between a silent slideshow and the format as it
   // actually goes viral.
   hasVoiceover: z.boolean(),
+  // Whether the template's last beat is authored to return to its opening frame,
+  // so the clip cuts back to its own start seamlessly (ADR shorts-studio §10).
+  // On the wire because the gallery filters on it: since 2025-03-31 every replay
+  // counts as an additional view, and replay rate is one of the strongest
+  // distribution signals a vertical platform has, so "does this loop?" is a real
+  // reason to pick one card over another.
+  //
+  // It is a CLAIM THE PROMPTS HAVE TO BACK: a loopable template's final clip beat
+  // must actually state the return to the opening composition, and a test in the
+  // API asserts exactly that (templates.test.ts). A template that says true and
+  // does not say so in its last prompt is lying to the gallery.
+  loopable: z.boolean(),
+  // How much AI-provenance labelling this template's output needs. See
+  // disclosureTierSchema above for the three tiers and the rule for choosing
+  // between them.
+  disclosureTier: disclosureTierSchema,
   // The music bed the template recommends, as a prompt for the `music` model —
   // e.g. "melancholic soap-opera strings, dramatic, emotional piano". null = the
   // template has no opinion.
@@ -215,3 +287,65 @@ export const createFilmFromTemplateInputSchema = z.object({
   title: z.string().min(1).max(120).optional(),
 })
 export type CreateFilmFromTemplateInput = z.infer<typeof createFilmFromTemplateInputSchema>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Batch instantiation — the Shorts Studio entry point (ADR: shorts-studio §2).
+// The SAME template, applied once per ROW, in one request. It creates N films and
+// N×M draft shots and charges, like its single-film sibling, NOTHING: the credits
+// are spent afterwards, per beat, by the client-side runner and only behind the
+// itemised confirm the ADR makes the load-bearing rule of the feature.
+//
+// A row supplies KNOB VALUES ONLY. Reusable inventory — cast entities, style
+// packages, voices — is chosen once for the whole batch, not per row: forty clips
+// need one brand and one face. Conflating durable inventory with per-run knobs is
+// what makes a batch incoherent (ADR §5).
+// ─────────────────────────────────────────────────────────────────────────────
+export const createFilmsFromTemplateBatchRowSchema = z.object({
+  // Same shape and the same server-side validation as the single-film route's
+  // `variables`: unknown key → 400, select value outside the option set → 400.
+  variables: z.record(z.string(), z.string().max(600)).default({}),
+  // Overrides the title this row's template would compose from its own variables.
+  title: z.string().min(1).max(120).optional(),
+})
+export type CreateFilmsFromTemplateBatchRow = z.infer<typeof createFilmsFromTemplateBatchRowSchema>
+
+// TWENTY IS THE CAP, AND IT IS THE SUBMIT BUCKET'S NUMBER, NOT A ROUND ONE.
+// POST /api/generations is rate-limited to 20/min because every submit spends
+// provider money. A batch is instantiated free, but every beat it creates is a
+// submit waiting to happen — so a batch larger than the bucket cannot be *run*
+// faster than the bucket lets it: it queues behind the runner's concurrency cap
+// and drips out at the limiter's pace. Capping the creation at the same 20 keeps
+// the size of what the user can ask for and the size of what the system can
+// actually deliver in a minute the same number, instead of letting the board show
+// a hundred pending rows that the limiter will spend five minutes releasing.
+//
+// One is the floor because an empty batch is not a smaller batch — it is a
+// request with no work in it, and answering 201 with zero films would tell the
+// client something ran.
+export const TEMPLATE_BATCH_MAX_ROWS = 20
+
+export const createFilmsFromTemplateBatchInputSchema = z.object({
+  templateId: z.string().min(1),
+  // ONE tier for the whole batch: the tier is the price, and a batch is priced as
+  // one number the user confirms once.
+  tier: templateTierSchema,
+  rows: z.array(createFilmsFromTemplateBatchRowSchema).min(1).max(TEMPLATE_BATCH_MAX_ROWS),
+})
+export type CreateFilmsFromTemplateBatchInput = z.infer<
+  typeof createFilmsFromTemplateBatchInputSchema
+>
+
+// The response. `batchId` is minted by the SERVER — there is deliberately no
+// field for it on the input — and stamped on every film in `films`, which is what
+// makes the board reconstructible from GET /api/films?batchId=… after a reload.
+//
+// Full FilmDetails rather than ids for the same reason the single route returns
+// one: the SPA seeds ['film', id] from each and draws the board immediately, with
+// no N+1 fetch between "Создать" and a screen full of timelines.
+export const createFilmsFromTemplateBatchResultSchema = z.object({
+  batchId: z.string(),
+  films: z.array(filmDetailSchema),
+})
+export type CreateFilmsFromTemplateBatchResult = z.infer<
+  typeof createFilmsFromTemplateBatchResultSchema
+>

@@ -24,13 +24,12 @@ import { useTranslation } from 'react-i18next'
 import type { Asset3dPart, CatalogModel } from '@opencreate/contracts'
 import { ApiClientError } from 'shared/libs/apiClient'
 import { errorCodeMessageKey } from 'shared/libs/errorCopy'
-import { Button, Card, EmptyState } from 'shared/ui'
+import { Button, Card, EmptyState, SpendConfirmModal } from 'shared/ui'
 import { useExtractPart } from '../model/asset3dApi'
 import { extractionPrice } from '../model/assetPricing'
 import { useWizardStore } from '../model/wizardStore'
 import { PartGenerationCard } from './PartGenerationCard'
 import { PriceTag } from './PriceTag'
-import { SpendConfirmModal } from './SpendConfirmModal'
 
 export type ExtractStageProps = {
   // The asset being extracted

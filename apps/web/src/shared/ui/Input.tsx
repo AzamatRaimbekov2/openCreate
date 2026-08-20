@@ -10,12 +10,25 @@ import type { ComponentPropsWithRef } from 'react'
 export type InputProps = {
   // Visible field label — fields are never placeholder-only
   label: string
+  // Keep the label in the accessibility tree but off the screen. ONLY for a
+  // dense data grid, where the column header already names the field visually
+  // and repeating it in forty cells is noise a screen reader also has to hear
+  // forty times. It is not a way to ship a placeholder-only field: the label
+  // still exists, is still required, and still names the control.
+  labelHidden?: boolean
   // Validation message; `| undefined` keeps RHF's `errors.x?.message` assignable
   // under exactOptionalPropertyTypes
   error?: string | undefined
 } & ComponentPropsWithRef<'input'>
 
-export function Input({ label, error, id, className = '', ...rest }: InputProps) {
+export function Input({
+  label,
+  labelHidden = false,
+  error,
+  id,
+  className = '',
+  ...rest
+}: InputProps) {
   // Stable generated id so label/error wiring works without callers passing one
   const autoId = useId()
   const inputId = id ?? autoId
@@ -25,7 +38,7 @@ export function Input({ label, error, id, className = '', ...rest }: InputProps)
       {/* Mono caption label — 12px dimmed mist; no uppercase transform (v3
           kills the editorial tracking/uppercase voice), so the accessible
           name / getByLabelText queries stay the raw i18n string as before */}
-      <label htmlFor={inputId} className="text-xs text-mist-dim">
+      <label htmlFor={inputId} className={labelHidden ? 'sr-only' : 'text-xs text-mist-dim'}>
         {label}
       </label>
       {/* Steel field: bg one surface step above the void, 8px radius, hairline

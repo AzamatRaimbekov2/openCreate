@@ -5,7 +5,10 @@
 //
 // ADR: docs/wiki/decisions/template-catalog.md
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { createFilmFromTemplateInputSchema } from '@opencreate/contracts'
+import {
+  createFilmFromTemplateInputSchema,
+  createFilmsFromTemplateBatchInputSchema,
+} from '@opencreate/contracts'
 import { FilmNotFoundError, FilmValidationError } from '../films/service'
 import { TemplateNotFoundError, TemplateValidationError } from './service'
 import type { TemplateService } from './service'
@@ -23,6 +26,15 @@ function mapDomainError(error: unknown) {
 // enough that a user comparing templates never hits it; tight enough that a
 // script cannot fill someone's library with a thousand films.
 const FROM_TEMPLATE_RATE_LIMIT = { max: 20, timeWindow: '1 minute' }
+
+// HALF the single route's bucket, because one call here is up to TWENTY times
+// the work: twenty films and ~a hundred shot rows in one transaction. The single
+// route's 20/min is sized for a user comparing templates by making one of each;
+// nobody sets up ten batches a minute by hand, so 10 leaves ordinary use
+// untouched while capping the write amplification a script could aim at the
+// database. Still not a money guard — this path spends nothing — it is the same
+// "keep a script from filling a library" backstop, scaled to a heavier call.
+const FROM_TEMPLATE_BATCH_RATE_LIMIT = { max: 10, timeWindow: '1 minute' }
 
 export function registerTemplateRoutes(app: FastifyInstance, service: TemplateService) {
   async function guard<T>(reply: FastifyReply, fn: () => T | Promise<T>) {
@@ -67,6 +79,39 @@ export function registerTemplateRoutes(app: FastifyInstance, service: TemplateSe
           },
         })
       return guard(reply, () => reply.status(201).send(service.instantiate(user.id, parsed.data)))
+    },
+  )
+
+  // The batch (ADR: shorts-studio §2). One template, N rows of knob values, N
+  // films — created in ONE transaction under ONE server-minted batchId, and
+  // charging, like its single-film sibling, NOTHING.
+  //
+  // 201 with the full FilmDetail of every film, for the same reason the single
+  // route returns one: the SPA seeds ['film', id] from each and draws the run
+  // board immediately instead of firing N follow-up fetches at the API it just
+  // finished writing to.
+  //
+  // A bad row anywhere is a 400 for the WHOLE request, and nothing is written —
+  // the service validates every row before it writes the first. That is the
+  // behaviour worth stating on the route because it is the one a caller would
+  // otherwise have to guess at: there is no partial success here, and no list of
+  // per-row errors to reconcile.
+  app.post(
+    '/api/films/from-template/batch',
+    { config: { rateLimit: FROM_TEMPLATE_BATCH_RATE_LIMIT } },
+    async (req, reply) => {
+      const user = await app.requireUser(req)
+      const parsed = createFilmsFromTemplateBatchInputSchema.safeParse(req.body)
+      if (!parsed.success)
+        return reply.status(400).send({
+          error: {
+            code: 'validation_failed',
+            message: parsed.error.issues[0]?.message ?? 'invalid input',
+          },
+        })
+      return guard(reply, () =>
+        reply.status(201).send(service.instantiateBatch(user.id, parsed.data)),
+      )
     },
   )
 }

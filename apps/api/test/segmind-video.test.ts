@@ -310,3 +310,71 @@ describe('segmind — tolerant readers (the SUCCESS shape is still unverified)',
     expect(readAssetUrl(null)).toBeUndefined()
   })
 })
+
+// ── image→video: the seed frame must be a URL, never bytes ──────────────────
+// Their API accepts ANY submit and validates later, so a data URI does not fail
+// fast — it queues, renders nothing, and comes back "Reference media rejected:
+// URL must be a valid HTTP or HTTPS URL." on the poll. Observed in production
+// 2026-08-19: the user was charged 130 credits and refunded, twice over, with
+// only "the channel refused this job" in the log to show for it.
+//
+// So the rule this suite pins is: send the public URL when we have one, and
+// REFUSE AT SUBMIT when we do not. Refusing at submit is what lets the failover
+// chain hand the job to DeepInfra/ByteDance, which take the bytes inline.
+describe('segmind — the seed frame and references travel as URLs', () => {
+  it('sends first_frame_url from the public URL, not the data URI', async () => {
+    reply(200, { request_id: 'req-1' })
+    await createSegmindClient({ apiKey: KEY }).submit({
+      ...t2v,
+      inputImage: 'data:image/png;base64,AAA',
+      inputImageUrl: 'https://app.example.com/media/seed.png',
+    })
+    const body = sentBody()
+    expect(body.first_frame_url).toBe('https://app.example.com/media/seed.png')
+    // The bytes must not leak into the request under any key — that is the whole
+    // failure mode being fixed.
+    expect(JSON.stringify(body)).not.toContain('data:image')
+  })
+
+  it('sends reference_images as URLs', async () => {
+    reply(200, { request_id: 'req-1' })
+    await createSegmindClient({ apiKey: KEY }).submit({
+      ...t2v,
+      referenceImages: ['data:image/png;base64,AAA', 'data:image/png;base64,BBB'],
+      referenceImageUrls: [
+        'https://app.example.com/media/a.png',
+        'https://app.example.com/media/b.png',
+      ],
+    })
+    expect(sentBody().reference_images).toEqual([
+      'https://app.example.com/media/a.png',
+      'https://app.example.com/media/b.png',
+    ])
+  })
+
+  it('REFUSES a seed frame with no public URL, before spending anything', async () => {
+    const client = createSegmindClient({ apiKey: KEY })
+    await expect(
+      client.submit({ ...t2v, inputImage: 'data:image/png;base64,AAA' }),
+    ).rejects.toThrow(/public/i)
+    // Never sent: an accepted-then-failed job is a charge, a refund, and a user
+    // staring at a clip that never arrives.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('REFUSES references with no public URLs, before spending anything', async () => {
+    const client = createSegmindClient({ apiKey: KEY })
+    await expect(
+      client.submit({ ...t2v, referenceImages: ['data:image/png;base64,AAA'] }),
+    ).rejects.toThrow(/public/i)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('still submits a plain text→video job with neither', async () => {
+    reply(200, { request_id: 'req-1' })
+    await createSegmindClient({ apiKey: KEY }).submit(t2v)
+    const body = sentBody()
+    expect(body).not.toHaveProperty('first_frame_url')
+    expect(body).not.toHaveProperty('reference_images')
+  })
+})

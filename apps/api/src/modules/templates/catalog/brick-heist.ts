@@ -70,6 +70,12 @@ export const brickHeist: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: 'Ограбление века: {{loot}}',
 
+  // A world of plastic minifigures: stylised AND fantastical, so no label is
+  // required — the call every card on this shelf makes, and the reason a brick
+  // story is cheap to publish. Not loopable: it is a story with a twist ending.
+  loopable: false,
+  disclosureTier: 'none',
+
   // All three tier models natively do 8s at 9:16 — the invariant assertTemplatesValid()
   // checks at boot. veo-3-1-fast is premium because it generates the dialogue
   // itself, and a heist is whispered orders: the voices ARE the scene.

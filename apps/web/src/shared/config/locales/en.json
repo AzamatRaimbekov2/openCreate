@@ -13,7 +13,8 @@
     "templates": "Templates",
     "soul": "Souls",
     "assets": "Assets",
-    "styles": "Styles"
+    "styles": "Styles",
+    "shorts": "Shorts"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -409,6 +410,12 @@
     "shot": {
       "failedTitle": "The clip could not be generated"
     },
+    "exportToCanvas": {
+      "emptyTitle": "Nothing to export",
+      "emptyDescription": "This film has no finished clips yet — generate at least one shot first.",
+      "failedTitle": "Export to Canvas failed",
+      "failedDescription": "The canvas could not be created. Please try again."
+    },
     "contentBlocked": {
       "title": "The safety filter blocked this prompt",
       "description": "It rejects violence, adult (18+) content, real public figures, and politics. Rephrase it more gently, or remove real faces from the reference.",
@@ -719,6 +726,8 @@
       "titleLabel": "Film title",
       "filmMenu": "Film actions",
       "rename": "Film settings",
+      "exportToCanvas": "Export to Canvas",
+      "exportingToCanvas": "Exporting to Canvas…",
       "deleteFilm": "Delete film",
       "deleteConfirm": {
         "title": "Delete this film?",
@@ -1275,6 +1284,83 @@
       "notConfigured": "The agent is not switched on yet. Nothing was charged.",
       "unavailable": "The agent is temporarily unavailable. Try again in a minute — nothing was charged.",
       "turnFailed": "The turn did not finish. Send the task again — nothing was charged."
+    }
+  },
+  "spend": {
+    "credits": "{{count}} cr",
+    "balance": "Your balance",
+    "shortfall": "Short by"
+  },
+  "shorts": {
+    "title": "Shorts Studio",
+    "subtitle": "Pick a vertical format, write one row per short, and run them all behind one price you read first. Creating the shorts is free — credits move only when you confirm the run.",
+    "empty": {
+      "title": "No shorts templates yet",
+      "description": "The vertical shelf is empty. Every other format still lives in Templates."
+    },
+    "pick": {
+      "label": "Format",
+      "change": "Change format",
+      "beats": "{{beats}} beats · {{seconds}}s · {{aspect}}"
+    },
+    "table": {
+      "title": "Variants",
+      "lead": "One row per short. Duplicate a row and change a line — a batch of identical clips is the one thing the platforms demonetise.",
+      "titleColumn": "Title",
+      "titlePlaceholder": "Composed from the fields",
+      "rowLabel": "Short {{index}}",
+      "add": "Add a short",
+      "duplicate": "Duplicate this short",
+      "remove": "Remove this short",
+      "empty": {
+        "title": "No shorts in the table",
+        "description": "Add a row to start a batch."
+      },
+      "numberColumn": "Position",
+      "actions": "Row actions",
+      "count": "{{rows}} / {{max}}",
+      "atCap": "Twenty shorts is the most one batch can create — the same number the generation limiter releases per minute."
+    },
+    "total": {
+      "label": "Total",
+      "unknown": "Price unavailable",
+      "shape": "{{rows}} shorts × {{beats}} beats × {{credits}} cr",
+      "perShort": "{{count}} cr per short"
+    },
+    "run": {
+      "cta": "Run the batch · {{credits}} cr",
+      "ctaUnknown": "Run the batch",
+      "running": "Running the batch",
+      "cancel": "Stop the batch",
+      "incomplete": "Fill every field in every row before running.",
+      "drift": "Our price list and the server’s disagree about this format. Reload the page before running a batch.",
+      "createFailed": "Could not create the shorts. Nothing was charged."
+    },
+    "confirm": {
+      "title": "Run {{rows}} shorts?",
+      "description": "This charges now, once per beat. A beat that fails is refunded on its own and does not stop the rest.",
+      "submit": "Run and charge {{credits}} cr"
+    },
+    "board": {
+      "title": "Run board",
+      "progress": "{{succeeded}} of {{total}} clips",
+      "failed": "{{count}} failed",
+      "open": "Open in Cinema",
+      "beat": "Beat {{index}}",
+      "retry": "Retry this beat · {{credits}} cr",
+      "empty": {
+        "title": "Nothing running yet",
+        "description": "Fill the table above and run the batch to see every beat here."
+      },
+      "status": {
+        "free": "title card",
+        "draft": "not run",
+        "queued": "queued",
+        "submitting": "starting",
+        "processing": "rendering",
+        "succeeded": "ready",
+        "failed": "failed"
+      }
     }
   }
 }

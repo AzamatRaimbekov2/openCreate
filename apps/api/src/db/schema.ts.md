@@ -232,3 +232,15 @@ Two drizzle tables mirroring `CREATOR_DDL` column-for-column (ADR `docs/wiki/dec
   existing `filmColumns` read.
 - Deleting a film does NOT delete the file (see `deleteFilm`) — the same harmless-orphan treatment
   render outputs and detached references already get.
+
+## Update 2026-08-20 - `film.batchId` (ADR: `docs/wiki/decisions/shorts-studio.md`)
+
+- `film` gains **`batchId: text('batch_id')`** - nullable, additive, no FK.
+- **No FK for the same reason `template_id` has none**: a batch is a LABEL, not a row.
+  There is no batch table, no job rows and no status machine anywhere in the feature.
+- **Server-set provenance.** Only `films.createManyFromTemplate` writes it, from a
+  `randomUUID()` it mints itself - the function takes no batch id parameter, so there
+  is no path by which a client value could reach this column.
+- Indexed as `(user_id, batch_id)`, because a batch is only ever read through its
+  owner. The index is declared in `ddl.ts` as its own constant, NOT inside `FILM_DDL`
+  - see that sidecar for why.

@@ -6,10 +6,19 @@ allowBuilds:
   argon2: true
   better-sqlite3: true
   esbuild: true
-  # CinemaStudio server-side render: ffmpeg-static's postinstall downloads the
-  # ffmpeg binary. Allowed so the render worker has a real ffmpeg on disk; the
-  # render module resolves the binary path lazily and fails cleanly if absent.
   ffmpeg-static: true
   hnswlib-node: true
   protobufjs: true
   sharp: true
+onlyBuiltDependencies:
+  - agentdb
+  - argon2
+  - better-sqlite3
+  - esbuild
+  # CinemaStudio server-side render: ffmpeg-static's postinstall downloads the
+  # ffmpeg binary. Allowed so the render worker has a real ffmpeg on disk; the
+  # render module resolves the binary path lazily and fails cleanly if absent.
+  - ffmpeg-static
+  - hnswlib-node
+  - protobufjs
+  - sharp

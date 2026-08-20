@@ -313,7 +313,7 @@ describe('a style delivers its reference images through the existing channel', (
     expect(res.statusCode).toBe(201)
     expect(rw.imageInference.mock.calls[0]?.[0].referenceImages).toHaveLength(2)
     // Charged the ordinary price, once.
-    await expect(balanceOf(app, cookie)).resolves.toBe(before - 8)
+    await expect(balanceOf(app, cookie)).resolves.toBe(before - 7)
   })
 
   // A dead file is an operational fact (a half-restored backup, a manual media

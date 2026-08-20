@@ -12,28 +12,83 @@ import type { CatalogModel } from '@opencreate/contracts'
 export { RESOLUTIONS, resolutionFor } from '@opencreate/contracts'
 export type { Resolution } from '@opencreate/contracts'
 
+// IMAGES RUN ON SEEDREAM 5 (kie.ai) AS OF 2026-08-19, with Runware behind them
+// as the failover link. Each image entry therefore names TWO backends: `air` is
+// the Runware handle it always was, and `kie` is the Seedream id and quality
+// tier. The user-facing ids (flux-schnell, flux-dev, …) are DELIBERATELY
+// unchanged: every generation row, shot, template and canvas node in the
+// database references them, so re-pointing the backend behind a stable id is a
+// migration that touches no rows at all.
+//
+// TWO CONSEQUENCES WORTH KNOWING BEFORE READING THE NUMBERS:
+//
+// · Seedream has NO negative-prompt field, and that is handled in the kie
+//   ADAPTER (which folds the negative into the prompt as an avoidance clause),
+//   NOT with supportsNegativePrompt here. The flag describes the whole entry,
+//   and every entry still has a Runware link where a real negative channel
+//   exists — setting it false would have thrown away a working feature on the
+//   fallback to describe a limitation of the primary.
+//
+// · Seedream takes an aspect ratio plus a QUALITY tier (basic 2K / high 3K /
+//   ultra 4K) and picks its own dimensions, so `resolutionProfile` below now
+//   describes the FALLBACK path only. What the composer promises the user is
+//   Runware’s size; Seedream’s own output may differ. Left as-is rather than
+//   guessed at: their per-tier pixel dimensions are not published, and an
+//   invented table would be a lie the UI repeats confidently.
+//
+// PRICES ARE MEASURED, not quoted (2026-08-19, three live generations on the
+// operator's own key):
+//
+//   text-to-image · quality basic (2K) → creditsConsumed 5.5
+//   text-to-image · quality ultra (4K) → creditsConsumed 5.5
+//   image-to-image · 1 reference       → creditsConsumed 5.5
+//
+// At kie.ai's $0.005/credit that is $0.0275 an image — 2.75 credits of OUR cost,
+// against the $0.035 their price page advertises. The flat rate is now a fact
+// rather than an assumption: quality tier and reference conditioning do not move
+// it, which is exactly why all four entries below can share one price.
+//
+// Sold at 7 = a 2.5× margin. Rounder and slightly fatter than the 2× the other
+// entries carry, deliberately: it is the direction that survives a rate change.
+//
+// The same run verified the two things the catalogue could otherwise only assume:
+// both model ids resolve (including 'seedream/5-lite-image-to-image', which came
+// from the vendor's model list rather than a docs page), and finished assets are
+// served from tempfile.aiquickdraw.com — the host withKieHost() already folds
+// into the SSRF allowlist whenever KIE_API_KEY is set. An asset host outside that
+// list would have failed the download AFTER the user was charged.
 export const CATALOG: CatalogModel[] = [
   {
     id: 'flux-schnell',
     type: 'image',
     name: 'Flash',
-    providerLabel: 'FLUX schnell',
+    // What the user is actually buying now. The id stays 'flux-schnell' because
+    // the database is full of rows pointing at it; the LABEL is the honest part.
+    providerLabel: 'Seedream 5 Lite',
     air: 'runware:100@1',
     tier: 'fast',
     supportsImageInput: false,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    credits: 1,
+    // 2.75 credits of measured cost ($0.0275). Was 1 credit on FLUX schnell, so
+    // this tier got nearly three times dearer to us — pricing it at the old
+    // number would have lost money on every single draft.
+    credits: 7,
+    kie: { model: 'seedream/5-lite-text-to-image', quality: 'basic' },
   },
   {
     id: 'flux-dev',
     type: 'image',
     name: 'Studio',
-    providerLabel: 'FLUX dev',
+    providerLabel: 'Seedream 5 Lite',
     air: 'runware:101@1',
     tier: 'quality',
     supportsImageInput: false,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    credits: 2,
+    // Same price as Flash, and that is MEASURED: a 4K generation billed the
+    // identical 5.5 kie credits as a 2K one. Lite charges per image, not per
+    // pixel. The two entries differ in what arrives, not in what it costs.
+    credits: 7,
+    kie: { model: 'seedream/5-lite-text-to-image', quality: 'high' },
   },
   {
     // The ONLY model in this catalog that can render a TAGGED ENTITY. Neither
@@ -53,12 +108,20 @@ export const CATALOG: CatalogModel[] = [
     id: 'flux-kontext-pro',
     type: 'image',
     name: 'Cast',
-    providerLabel: 'FLUX.1 Kontext pro',
+    providerLabel: 'Seedream 5 Lite',
     air: 'bfl:3@1',
     tier: 'plus',
     supportsImageInput: false,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    credits: 8,
+    // Was 8 on Kontext at 4 credits of raw cost; Seedream Lite is 3.5, so the
+    // same 2× lands at 7 and this tier got very slightly CHEAPER to run.
+    credits: 7,
+    // The image-to-image variant, because this is the entry the entity library
+    // conditions on: references ride 'image_urls', which the text-to-image model
+    // does not take. VERIFIED live on 2026-08-19 — the id resolves, a reference
+    // is honoured, and a referencing generation bills the same 5.5 credits as a
+    // plain one (kie folds the first reference in at no extra charge).
+    kie: { model: 'seedream/5-lite-image-to-image', quality: 'high' },
     // Faces AND objects/places: Kontext conditions on any reference subject
     referenceMode: 'both',
     // Runware documents a max of 2 reference images here. Our wire contract caps
@@ -103,12 +166,23 @@ export const CATALOG: CatalogModel[] = [
     id: 'nano-banana-pro',
     type: 'image',
     name: 'Muse',
-    providerLabel: 'Nano Banana Pro',
+    providerLabel: 'Seedream 5 Lite 4K',
     air: 'google:4@2',
     tier: 'pro',
     supportsImageInput: false,
     aspectRatios: ['16:9', '1:1', '9:16'],
-    credits: 28,
+    // 28 → 7. The premium tier collapses in price because what made it premium
+    // was Nano Banana Pro's $0.138 wholesale, and Seedream Lite bills one flat
+    // rate for every quality tier including 4K — measured, not assumed.
+    //
+    // THAT IS ALSO WHY ALL FOUR IMAGE ENTRIES NOW COST THE SAME, which is a
+    // product question rather than a pricing bug: the ladder that used to be
+    // priced (draft → quality → reference → premium) is now purely a resolution
+    // ladder. Restoring a real spread means wiring Seedream 5 PRO ($0.045 up to
+    // 2.36MP, $0.09 above) into the upper tiers — deliberately NOT done here,
+    // because its kie.ai model id is not something this codebase has verified.
+    credits: 7,
+    kie: { model: 'seedream/5-lite-text-to-image', quality: 'ultra' },
     // Faces AND objects/places — it conditions on any reference subject, and
     // holds identity across several of them at once.
     referenceMode: 'both',
@@ -172,7 +246,16 @@ export const CATALOG: CatalogModel[] = [
     type: 'video',
     name: 'Pulse',
     providerLabel: 'Seedance 1.5 Pro',
-    air: 'bytedance:seedance@1.5-pro',
+    // kie.ai's own model id behind the synthetic prefix the shared AIR regex
+    // needs. Was 'bytedance:seedance@1.5-pro' (a Runware AIR) until 2026-08-19:
+    // the Runware channel is three times dearer for the identical model, and the
+    // duration/resolution/ratio options we sell all fall inside what kie accepts
+    // (4-12s, 480p/720p/1080p, and every ratio in our list).
+    air: 'kie:bytedance/seedance-1.5-pro',
+    // The channel this entry runs on since 2026-08-19. Runware's key is dead and
+    // its rate for the identical model is three times kie's measured $0.0875 per
+    // 5s/720p silent clip.
+    provider: 'kie',
     tier: 'standard',
     supportsImageInput: true,
     aspectRatios: ['16:9', '1:1', '9:16'],

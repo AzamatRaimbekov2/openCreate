@@ -54,7 +54,7 @@ describe('structured logging', () => {
 
     const charge = lines.find((l) => l.event === 'credits.charge')
     expect(charge).toBeDefined()
-    expect(charge!.amount).toBe(1)
+    expect(charge!.amount).toBe(7)
     expect(charge!.generationId).toBe(res.json().id)
     // Money events are logged through the request logger → reqId correlation.
     expect(charge!.reqId).toBeDefined()
@@ -85,7 +85,7 @@ describe('structured logging', () => {
     expect(lines.find((l) => l.event === 'generation.fail')).toBeDefined()
     const refund = lines.find((l) => l.event === 'credits.refund')
     expect(refund).toBeDefined()
-    expect(refund!.amount).toBe(1)
+    expect(refund!.amount).toBe(7)
     expect(refund!.reqId).toBeDefined()
   })
 

@@ -19,14 +19,19 @@ mp4» as the one icon-led primary, and a hairline divider before the quieter glo
 - Responsibilities: render the editor's single top bar — `‹` back link to `/cinema`; the film
   title as the DOMINANT inline-editable h1; a `16:9 ▾` aspect chip-dropdown (checked current);
   a META row (aspect · shot count · duration); a green icon-led «Собрать mp4» primary button; a
-  ⋯ menu (settings + destructive delete); a divider; and the injected `chrome` slot.
+  ⋯ menu (settings + Export to Canvas + destructive delete); a divider; and the injected `chrome` slot.
 - Public API / exports / props / endpoints: `CinemaEditorHeader({ film, onExport, canExport,
-  isStarting, shotCount?, durationMs?, chrome? })` + `CinemaEditorHeaderProps`. `film: Film |
-  undefined` (Skeleton title while loading). Endpoints via hooks: `useUpdateFilm` (PATCH title /
-  aspectRatio), `useDeleteFilm` (DELETE), `FilmSettingsModal` (edit). `formatTimecode` renders
-  the duration; `t('cinema.header.shots', {count})` pluralizes the shot count.
+  isStarting, onExportToCanvas, isExportingToCanvas?, shotCount?, durationMs?, chrome? })` +
+  `CinemaEditorHeaderProps`. `film: Film | undefined` (Skeleton title while loading). Endpoints
+  via hooks: `useUpdateFilm` (PATCH title / aspectRatio), `useDeleteFilm` (DELETE),
+  `FilmSettingsModal` (edit). `formatTimecode` renders the duration; `t('cinema.header.shots',
+  {count})` pluralizes the shot count.
 - Inputs → Outputs: film + export state (props) → the bar; title/aspect edits → PATCH
-  `/api/films/:id`; delete → DELETE then navigate `/cinema`; export click → `onExport()`.
+  `/api/films/:id`; delete → DELETE then navigate `/cinema`; export click → `onExport()`;
+  ⋯ → "Export to Canvas" click → `onExportToCanvas()` (owned by FilmEditor — this bar has no
+  Canvas import of its own, it only fires the callback and swaps the item's LABEL while
+  `isExportingToCanvas` is true; the Menu has no built-in loading affordance, and re-entrancy is
+  gated in the handler FilmEditor owns, not here).
 - Side effects (I/O, network, state): the film PATCH/DELETE mutations; local `isEditing`,
   `isSettingsOpen`, `isConfirmOpen` state; router navigation on delete.
 
@@ -93,3 +98,17 @@ flowchart LR
   The harness's `simulate-parent-refresh` button is a test-only stand-in for "the parent
   re-rendered with fresh film data"; the real triggers are FilmTitleField and AspectChip,
   both of which PATCH the film from this same bar.
+
+## Update 2026-08-04 — "Export to Canvas" joins the menu
+- New required prop `onExportToCanvas: () => void` and optional `isExportingToCanvas?:
+  boolean | undefined` (default `false`). A third `MenuItem` sits between "Film settings"
+  and the destructive "Delete film" — never hidden/disabled (`Menu.MenuItem` has no
+  built-in loading affordance), its LABEL swaps between `cinema.editor.exportToCanvas`
+  and `cinema.editor.exportingToCanvas` off the busy flag instead.
+- This bar owns NO Canvas logic and imports nothing from `modules/Canvas` — the handler,
+  the pure conversion (`model/exportToCanvas.ts`), the `useCreateCanvas`/`saveCanvas`
+  calls and the post-create `navigate` all live in `FilmEditor.tsx`, which also gates
+  re-entrancy (ignoring a second click while `isExportingToCanvas` is already true) —
+  this component just fires the callback it is handed, same as `onExport`.
+- Covered by `CinemaEditorHeader.test.tsx`: the menu item fires `onExportToCanvas`; the
+  label swaps to the "exporting..." copy and the idle copy disappears while busy.

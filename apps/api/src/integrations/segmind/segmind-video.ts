@@ -158,13 +158,31 @@ export function createSegmindClient(opts: SegmindOptions = {}): VideoProvider {
       // cannot silently double the bill.
       generate_audio: input.audio === true,
       ...(input.seed !== undefined ? { seed: input.seed } : {}),
-      // image→video seed frame. THEIR SCHEMA TAKES A URL, not a data URI, and our
-      // seam carries data URIs — so a locally-stored photo needs an upload step that
-      // does not exist yet. Forwarded unchanged so their API rejects it loudly
-      // instead of quietly rendering text→video and charging for it.
-      ...(input.inputImage ? { first_frame_url: input.inputImage } : {}),
-      // Up to 9 reference images — MORE than ByteDance's own 5. Same data-URI caveat.
-      ...(input.referenceImages?.length ? { reference_images: input.referenceImages } : {}),
+      // image→video seed frame, as a URL — the only form their schema accepts.
+      // The refusal for a missing URL happens ABOVE, before this body is built.
+      ...(input.inputImageUrl ? { first_frame_url: input.inputImageUrl } : {}),
+      // Up to 9 reference images — MORE than ByteDance's own 5. URLs likewise.
+      ...(input.referenceImageUrls?.length
+        ? { reference_images: input.referenceImageUrls }
+        : {}),
+    }
+
+    // REFUSE BEFORE SPENDING. Their API accepts any submit and validates on the
+    // render, so bytes where a URL belongs do not bounce — they queue, produce
+    // nothing, and come back as a poll failure. That is a charge and a refund for
+    // a clip that was never going to exist. Observed in production 2026-08-19:
+    // 130 credits out and back, with "the channel refused this job" the only
+    // trace, while their actual sentence was "Reference media rejected: URL must
+    // be a valid HTTP or HTTPS URL."
+    //
+    // Throwing HERE is deliberate: submit is the one moment the failover chain
+    // can still route the job to DeepInfra or ByteDance, both of which take the
+    // bytes inline. A refusal at submit costs nothing and still produces a clip.
+    if (input.inputImage && !input.inputImageUrl) {
+      throw new SegmindError('this channel needs a public URL for the seed frame')
+    }
+    if (input.referenceImages?.length && !input.referenceImageUrls?.length) {
+      throw new SegmindError('this channel needs public URLs for reference images')
     }
 
     const model = toSegmindModelId(input.model)

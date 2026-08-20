@@ -116,7 +116,7 @@ describe('POST /api/entities/:id/portraits', () => {
     // 2 + 3×8 = 26, charged by the ONE money path. If this number moves, either
     // the catalogue was re-priced or Soul Studio grew a ledger of its own.
     const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
-    expect(me.json().creditsBalance).toBe(200 - 26)
+    expect(me.json().creditsBalance).toBe(200 - 28)
   })
 
   it('reports a failed view, refunds it, and still delivers the others', async () => {
@@ -151,7 +151,7 @@ describe('POST /api/entities/:id/portraits', () => {
     // not (and must not) refund anything itself. 2 + 8 charged, 8 charged-and-
     // returned: the user pays only for what they received.
     const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
-    expect(me.json().creditsBalance).toBe(200 - 10)
+    expect(me.json().creditsBalance).toBe(200 - 14)
   })
 
   it('refuses an entity with no soul, before spending anything', async () => {

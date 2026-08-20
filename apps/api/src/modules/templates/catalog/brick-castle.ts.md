@@ -62,6 +62,10 @@ flowchart TD
 - **9:16**: dungeons, arrow slits, a spiral stair, a rope down a wall — this story is composed
   of tall spaces, so the vertical frame is an asset rather than a constraint.
 - Price: 280 / 675 / 700 credits (draft / standard / premium), 44s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

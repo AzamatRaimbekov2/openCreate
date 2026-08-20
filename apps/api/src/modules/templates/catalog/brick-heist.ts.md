@@ -69,6 +69,12 @@ flowchart TD
   asserted for every template).
 - 9:16 because the beats are close-ups of hands, a face and a safe dial. Price: 280 / 675 /
   700 credits (draft / standard / premium), 42s total.
+- **Disclosure tier `none` for the whole brick shelf, none of it loopable** (ADR
+  shorts-studio §12/§10, fields added 2026-08-20). A world of plastic minifigures is
+  stylised AND fantastical, which is the definition of the no-label tier — this file
+  carries the argument and the other seven point back to it, the same way they do for
+  the three prompt instructions above. A brick card is a story with an ending, so
+  `loopable: false` throughout.
 
 ## Commits
 

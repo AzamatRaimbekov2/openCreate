@@ -12,7 +12,7 @@
 //     spends our CPU, not a provider invoice (ADR §2). So the render row moves
 //     processing → succeeded/failed exactly once, and there is nothing to refund.
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { unlink } from 'node:fs/promises'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import type {
   AddFilmAudioInput,
@@ -34,7 +34,7 @@ import type {
   UpdateShotInput,
 } from '@opencreate/contracts'
 import type { Db } from '../../db/client'
-import type { StorageProvider } from '../../storage/local'
+import { StorageObjectNotFoundError, type StorageProvider } from '../../storage/local'
 import { InvalidImageDataUriError } from '../../storage/dataUri'
 import { film, filmAudio, filmRender, generation, shot } from '../../db/schema'
 import {
@@ -175,11 +175,31 @@ export function toShotDto(row: typeof shot.$inferSelect): Shot {
 // changed on the detail page, where the canvas is actually on screen.
 const DEFAULT_FILM_ASPECT_RATIO = '16:9' as const
 
+// An open drizzle transaction handle (what db.transaction hands its callback).
+// Declared locally rather than imported from the credits ledger's identical
+// alias: the film service must not reach into the money module, and a type
+// import is still an import.
+type FilmTx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+// One film's worth of an applied template: the film's own three authored fields
+// and its ordered shots, already substituted and already validated by the
+// template service. The batch path passes N of these; the single path passes one.
+type TemplatedFilm = { input: CreateFilmInput; shots: CreateShotInput[] }
+
 export type FilmService = ReturnType<typeof createFilmService>
 
 export function createFilmService({ db, storage, runRender }: Deps) {
   const semaphore = createSemaphore(MAX_CONCURRENT_RENDERS)
   const runner = runRender ?? ((args, totalMs, onProgress) => runFfmpeg(args, totalMs, onProgress))
+  // Closes a race buildPlan's async materialize() opened (ADR railway-deployment
+  // D2): the "already rendering" guard below reads the DB, then buildPlan awaits
+  // real I/O, and only THEN does the processing row get inserted. Two overlapping
+  // requests for the SAME film can both pass the DB check before either has
+  // written its row. This Set is checked and set with NO await between them —
+  // single-threaded JS makes that atomic — so it closes the window the DB check
+  // alone can no longer cover. Once the row lands, the DB check is authoritative
+  // again, so the film id is dropped in `finally` right after the insert.
+  const filmsBuildingPlan = new Set<string>()
 
   // ── DTO mappers ─────────────────────────────────────────────────────────
   function toFilmDto(row: typeof film.$inferSelect): Film {
@@ -189,6 +209,10 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       aspectRatio: row.aspectRatio,
       defaultStyleId: row.defaultStyleId as Film['defaultStyleId'],
       templateId: row.templateId,
+      // Which batch created this film, or null for one made on its own. Read back
+      // because it IS the batch: the run board is reconstructed after a reload by
+      // asking for the films carrying this value (ADR: shorts-studio §2).
+      batchId: row.batchId,
       // The stored value already IS the public '/media/…' path saveDataUri
       // returned, so this is identity, not a mapping — the same shape a shot
       // reference reads back with. NULL → null: a film with no cover, which is
@@ -280,6 +304,11 @@ export function createFilmService({ db, storage, runRender }: Deps) {
         // A hand-made film has no template. Only createFromTemplate stamps one —
         // provenance is a fact the server establishes, never a client claim.
         templateId: null,
+        // …and it belongs to no batch, for the same reason: only the batch
+        // endpoint mints a batch id, and it does so from a value the client never
+        // supplies. Spelled out rather than left to the column default so both
+        // provenance fields are visibly answered on the hand-made path.
+        batchId: null,
         coverImagePath,
         createdAt: now,
         updatedAt: now,
@@ -310,57 +339,126 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     input: CreateFilmInput,
     shots: CreateShotInput[],
   ): FilmDetail {
-    const id = randomUUID()
-    const now = new Date()
-    db.transaction((tx) => {
-      tx.insert(film)
-        .values({
-          id,
-          userId,
-          title: input.title.trim(),
-          // Same default as the hand-made path. Every shipped template supplies a
-          // ratio, so this fallback is unreachable today — but `aspectRatio` is
-          // optional on the wire now, and a shared const is what keeps the two
-          // creation paths from ever answering differently.
-          aspectRatio: input.aspectRatio ?? DEFAULT_FILM_ASPECT_RATIO,
-          defaultStyleId: input.defaultStyleId ?? null,
-          templateId,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run()
-      shots.forEach((s, i) => {
-        tx.insert(shot)
-          .values({
-            id: randomUUID(),
-            filmId: id,
-            orderIndex: (i + 1) * ORDER_STEP,
-            generationId: null,
-            prompt: (s.prompt ?? '').trim(),
-            promptPresetJson: s.promptPreset ? JSON.stringify(s.promptPreset) : null,
-            // A template can ship a cast per beat — the whole point of a cartoon
-            // template being that the SAME character carries every shot.
-            entityRefsJson: s.entityRefs?.length ? JSON.stringify(s.entityRefs) : null,
-            modelId: s.modelId ?? null,
-            durationMs: s.durationMs ?? 3000,
-            trimStartMs: s.trimStartMs ?? 0,
-            transition: s.transition ?? 'none',
-            transitionMs: s.transitionMs ?? 0,
-            titleJson: s.title ? JSON.stringify(s.title) : null,
-            voiceoverJson: s.voiceover ? JSON.stringify(s.voiceover) : null,
-            createdAt: now,
-          })
-          .run()
-      })
-    })
+    // ONE film, so batchId is null: this route makes films one at a time, and
+    // "made on its own" is exactly what null means on that column.
+    const id = db.transaction((tx) =>
+      insertTemplatedFilm(tx, userId, templateId, null, { input, shots }, new Date()),
+    )
     return getFilm(userId, id)
   }
 
-  function listFilms(userId: string): Film[] {
+  // The batch (ADR: shorts-studio §2) — N films, N×M draft shots, ONE transaction
+  // and ONE server-minted batch id, for zero credits.
+  //
+  // ALL N SHARE ONE TRANSACTION, not one each. better-sqlite3 is synchronous, so
+  // there is nothing to await between the inserts and the whole batch is a single
+  // commit: it lands whole or not at all, which is the only honest outcome for a
+  // board the user is about to run. Nine films of an intended ten is a state they
+  // cannot see, cannot name, and would have to clean up by hand.
+  //
+  // THE BATCH ID IS MINTED HERE AND IS NOT A PARAMETER. That is deliberate and it
+  // is the enforcement, not a convention: with no argument to pass, no caller —
+  // route, service or client body — has a way to claim a batch that already
+  // exists or forge one that never ran. Same discipline as templateId.
+  //
+  // The entries arrive already substituted and already validated: the template
+  // service resolves EVERY row before this is called, so a bad row has failed
+  // before the first write (see instantiateBatch).
+  function createManyFromTemplate(
+    userId: string,
+    templateId: string,
+    entries: TemplatedFilm[],
+  ): { batchId: string; films: FilmDetail[] } {
+    const batchId = randomUUID()
+    // One timestamp for the whole batch: these films were created by one action,
+    // and the library sorts on updatedAt — staggering them by however long the
+    // loop took would order the board by insert luck rather than by row.
+    const now = new Date()
+    const ids = db.transaction((tx) =>
+      entries.map((entry) => insertTemplatedFilm(tx, userId, templateId, batchId, entry, now)),
+    )
+    // ROW ORDER IS A CONTRACT, not an incidental property of this loop: the run
+    // board maps variant row i to films[i], and the itemised total the user
+    // agreed to is per row. Note what would break it — reading the films back
+    // with a query instead. Every film in a batch shares `now`, so an
+    // ORDER BY updatedAt would return them in whatever order SQLite pleased.
+    // Asserted by templates-batch.test.ts › "films[i] is the film built from rows[i]".
+    return { batchId, films: ids.map((id) => getFilm(userId, id)) }
+  }
+
+  // The write both template paths share. Extracted when the batch arrived so the
+  // single and batch routes cannot drift apart about what a templated film IS —
+  // one of them growing a column the other forgets is exactly the bug a second
+  // copy of this loop would produce.
+  //
+  // Takes an OPEN transaction rather than opening its own: the single path wraps
+  // one call, the batch path wraps N, and the difference between them is the
+  // scope of the commit — which is the caller's decision, not this function's.
+  function insertTemplatedFilm(
+    tx: FilmTx,
+    userId: string,
+    templateId: string,
+    batchId: string | null,
+    { input, shots }: TemplatedFilm,
+    now: Date,
+  ): string {
+    const id = randomUUID()
+    tx.insert(film)
+      .values({
+        id,
+        userId,
+        title: input.title.trim(),
+        // Same default as the hand-made path. Every shipped template supplies a
+        // ratio, so this fallback is unreachable today — but `aspectRatio` is
+        // optional on the wire now, and a shared const is what keeps the two
+        // creation paths from ever answering differently.
+        aspectRatio: input.aspectRatio ?? DEFAULT_FILM_ASPECT_RATIO,
+        defaultStyleId: input.defaultStyleId ?? null,
+        templateId,
+        batchId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run()
+    shots.forEach((s, i) => {
+      tx.insert(shot)
+        .values({
+          id: randomUUID(),
+          filmId: id,
+          orderIndex: (i + 1) * ORDER_STEP,
+          generationId: null,
+          prompt: (s.prompt ?? '').trim(),
+          promptPresetJson: s.promptPreset ? JSON.stringify(s.promptPreset) : null,
+          // A template can ship a cast per beat — the whole point of a cartoon
+          // template being that the SAME character carries every shot.
+          entityRefsJson: s.entityRefs?.length ? JSON.stringify(s.entityRefs) : null,
+          modelId: s.modelId ?? null,
+          durationMs: s.durationMs ?? 3000,
+          trimStartMs: s.trimStartMs ?? 0,
+          transition: s.transition ?? 'none',
+          transitionMs: s.transitionMs ?? 0,
+          titleJson: s.title ? JSON.stringify(s.title) : null,
+          voiceoverJson: s.voiceover ? JSON.stringify(s.voiceover) : null,
+          createdAt: now,
+        })
+        .run()
+    })
+    return id
+  }
+
+  // `batchId` narrows the library to ONE batch — the whole persistence of the run
+  // board (ADR: shorts-studio §2). It is filtered ALONGSIDE the ownership scope,
+  // never instead of it: a batch id is guessable to anyone who has seen it once,
+  // so ownership is what keeps a board private, exactly as with a film id.
+  function listFilms(userId: string, batchId?: string): Film[] {
     return db
       .select()
       .from(film)
-      .where(eq(film.userId, userId))
+      .where(
+        batchId === undefined
+          ? eq(film.userId, userId)
+          : and(eq(film.userId, userId), eq(film.batchId, batchId)),
+      )
       .orderBy(desc(film.updatedAt))
       .all()
       .map(toFilmDto)
@@ -621,7 +719,20 @@ export function createFilmService({ db, storage, runRender }: Deps) {
   // Resolve the timeline into a RenderPlan (minus outputPath). Throws a 400 for
   // any shot/audio whose media is missing or not yet ready — a render must never
   // silently drop footage the user arranged.
-  function buildPlan(userId: string, filmRow: typeof film.$inferSelect): Omit<RenderPlan, 'outputPath'> {
+  //
+  // Every referenced asset is storage.materialize()'d into a REAL LOCAL FILE
+  // ffmpeg can read (a no-op on local disk; a scratch download on R2 — ADR
+  // railway-deployment D2). `release` MUST be called once the render job is
+  // done with these files, success or failure alike — the returned closure
+  // releases everything materialized so far, and a throw partway through this
+  // function releases what it already collected before rethrowing.
+  async function buildPlan(
+    userId: string,
+    filmRow: typeof film.$inferSelect,
+  ): Promise<{ planBase: Omit<RenderPlan, 'outputPath'>; release: () => Promise<void> }> {
+    const releases: Array<() => Promise<void>> = []
+    const releaseAll = () => Promise.allSettled(releases.map((r) => r())).then(() => undefined)
+    try {
     const canvas = canvasFor(filmRow.aspectRatio)
     const shots = db
       .select()
@@ -670,12 +781,18 @@ export function createFilmService({ db, storage, runRender }: Deps) {
             ...at,
           })
         const ext = gen.type === 'video' ? 'mp4' : 'webp'
-        const file = storage.localPath(gen.id, ext)
-        if (!existsSync(file))
+        let file: string
+        try {
+          const materialized = await storage.materialize(gen.id, ext)
+          file = materialized.path
+          releases.push(materialized.release)
+        } catch (err) {
+          if (!(err instanceof StorageObjectNotFoundError)) throw err
           throw new FilmValidationError('a shot’s media file is missing', {
             reason: 'shot_media_missing',
             ...at,
           })
+        }
         // Native audio reaches the mix only when BOTH halves agree: the shot asks
         // for it (user intent) AND the generation row says a soundtrack exists
         // (params.audio provenance, stamped at submit). Trusting the shot alone
@@ -749,16 +866,36 @@ export function createFilmService({ db, storage, runRender }: Deps) {
           reason: 'audio_failed',
           ...at,
         })
-      const file = storage.localPath(gen.id, 'mp3')
-      if (!existsSync(file))
+      let file: string
+      try {
+        const materialized = await storage.materialize(gen.id, 'mp3')
+        file = materialized.path
+        releases.push(materialized.release)
+      } catch (err) {
+        if (!(err instanceof StorageObjectNotFoundError)) throw err
         throw new FilmValidationError('an audio track has no media file — remove it and re-add', {
           reason: 'audio_media_missing',
           ...at,
         })
+      }
       audio.push({ file, startSec: a.startMs / 1000, gainDb: a.gainDb })
     }
 
-    return { width: canvas.width, height: canvas.height, segments, audio, fontPath: resolveFontPath(), fps: 30 }
+    return {
+      planBase: {
+        width: canvas.width,
+        height: canvas.height,
+        segments,
+        audio,
+        fontPath: resolveFontPath(),
+        fps: 30,
+      },
+      release: releaseAll,
+    }
+    } catch (err) {
+      await releaseAll()
+      throw err
+    }
   }
 
   // Guarded terminal settle for a render row (mirrors the generation service's
@@ -786,8 +923,13 @@ export function createFilmService({ db, storage, runRender }: Deps) {
     })
   }
 
-  async function runRenderJob(renderId: string, plan: RenderPlan, totalMs: number, mediaUrl: string) {
-    const release = await semaphore.acquire()
+  async function runRenderJob(
+    renderId: string,
+    plan: RenderPlan,
+    totalMs: number,
+    releaseInputs: () => Promise<void>,
+  ) {
+    const releaseSemaphore = await semaphore.acquire()
     try {
       const args = buildFfmpegArgs(plan)
       const result = await runner(args, totalMs, (pct) => {
@@ -797,25 +939,38 @@ export function createFilmService({ db, storage, runRender }: Deps) {
           .where(and(eq(filmRender.id, renderId), eq(filmRender.status, 'processing')))
           .run()
       })
-      if (result.ok) settleRender(renderId, 'succeeded', mediaUrl, null)
-      else {
+      if (result.ok) {
+        // plan.outputPath is a SCRATCH path (storage.scratchPath) — it only
+        // becomes the real served asset here. A no-op rename on local disk;
+        // upload-then-unlink on R2 (ADR railway-deployment D2). Either way the
+        // returned URL is the one settleRender stores, replacing the old
+        // hardcoded `/media/${id}.mp4` (which assumed local disk was the only
+        // possible backend).
+        const mediaUrl = await storage.publishLocalFile(plan.outputPath, renderId, 'mp4')
+        settleRender(renderId, 'succeeded', mediaUrl, null)
+      } else {
         // Failed ffmpeg → discard any partial output; a truncated mp4 must never
-        // be served as a finished film.
-        await storage.remove(renderId, 'mp4')
+        // be served as a finished film. Nothing was published yet, so this is
+        // local-scratch cleanup only (storage.remove targets the published
+        // object, which never existed on this path).
+        await unlink(plan.outputPath).catch(() => undefined)
+        await storage.remove(renderId, 'mp4').catch(() => undefined)
         settleRender(renderId, 'failed', null, result.error)
       }
     } catch (err) {
+      await unlink(plan.outputPath).catch(() => undefined)
       await storage.remove(renderId, 'mp4').catch(() => undefined)
       settleRender(renderId, 'failed', null, err instanceof Error ? err.message : 'render failed')
     } finally {
-      release()
+      await releaseInputs()
+      releaseSemaphore()
     }
   }
 
   // Kick off a render: build the plan (may 400), insert the processing row, then
   // fire the ffmpeg job WITHOUT awaiting it (the SPA polls getRender). Returns
   // 202-shaped state immediately.
-  function createRender(userId: string, filmId: string): FilmRender {
+  async function createRender(userId: string, filmId: string): Promise<FilmRender> {
     const filmRow = requireFilm(userId, filmId)
     // Refuse before doing ANY work if this film is already encoding. Checked
     // ahead of buildPlan so a duplicate click gets the precise "already running"
@@ -829,10 +984,18 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       .where(and(eq(filmRender.filmId, filmId), eq(filmRender.status, 'processing')))
       .get()
     if (running) throw new FilmRenderInProgressError()
-    const planBase = buildPlan(userId, filmRow) // throws 400 before any row is written
+    if (filmsBuildingPlan.has(filmId)) throw new FilmRenderInProgressError()
+    filmsBuildingPlan.add(filmId)
+    let planBase: Omit<RenderPlan, 'outputPath'>
+    let release: () => Promise<void>
+    try {
+      // throws 400 before any row is written
+      ;({ planBase, release } = await buildPlan(userId, filmRow))
+    } finally {
+      filmsBuildingPlan.delete(filmId)
+    }
     const id = randomUUID()
-    const outputPath = storage.localPath(id, 'mp4')
-    const mediaUrl = `/media/${id}.mp4`
+    const outputPath = storage.scratchPath(id, 'mp4')
     const now = new Date()
     db.insert(filmRender)
       .values({ id, filmId, userId, status: 'processing', progress: 0, createdAt: now })
@@ -842,7 +1005,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
       db.select().from(shot).where(eq(shot.filmId, filmId)).all(),
     )
     // Fire-and-forget: the promise settles the row; the request returns now.
-    void runRenderJob(id, plan, totalMs, mediaUrl)
+    void runRenderJob(id, plan, totalMs, release)
     return toRenderDto(db.select().from(filmRender).where(eq(filmRender.id, id)).get()!)
   }
 
@@ -860,6 +1023,7 @@ export function createFilmService({ db, storage, runRender }: Deps) {
   return {
     createFilm,
     createFromTemplate,
+    createManyFromTemplate,
     listFilms,
     getFilm,
     updateFilm,

@@ -22,11 +22,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 const stubStorage = (): StorageProvider => ({
-  dir: '/tmp/unused',
   saveFromUrl: async () => '/media/unused.mp4',
   saveDataUri: async () => '/media/entity.png',
   readAsDataUri: async () => 'data:image/png;base64,AAA',
-  localPath: (key, ext) => `/media/${key}.${ext}`,
+  serve: async () => ({ kind: 'file', root: '/tmp/unused' }),
+  materialize: async (key, ext) => ({ path: `/media/${key}.${ext}`, release: async () => undefined }),
+  scratchPath: (key, ext) => `/media/${key}.${ext}`,
+  publishLocalFile: async (_path, key, ext) => `/media/${key}.${ext}`,
   remove: async () => undefined,
 })
 

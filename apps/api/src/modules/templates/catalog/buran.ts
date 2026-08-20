@@ -86,6 +86,15 @@ export const buran: Template = {
   defaultStyleId: 'hand-drawn',
   titleTemplate: 'Буран: {{name}}',
 
+  // 'description' AND NOT 'none' — the one call on the older shelves worth arguing.
+  // Hand-drawn animation cannot be mistaken for footage, which is the case for
+  // 'none'. But 'none' is for the stylised AND FANTASTICAL, and «Буран» is neither
+  // fantastical nor invented: it is a realistic human drama about a real
+  // phenomenon, drawn by hand. Non-photoreal + real-world subject → the label goes
+  // in the description. Not loopable: the film ends on a fall and an embrace.
+  loopable: false,
+  disclosureTier: 'description',
+
   // Every clip is 8 seconds, and all three models render 8s at 16:9 natively —
   // the invariant templates.test.ts checks. Veo is the only one of the three that
   // speaks, which is the entire argument for the premium tier on this template.

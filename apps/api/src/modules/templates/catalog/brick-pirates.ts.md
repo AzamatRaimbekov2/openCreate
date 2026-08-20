@@ -62,6 +62,10 @@ flowchart TD
   treasure («Корона», «Шкатулка») silently breaks «он», «мой» and «за ним» in one line.
 - **16:9**: a ship, a horizon, a beach. Nothing in this story is vertical.
 - Price: 336 / 810 / 840 credits (draft / standard / premium), 52s total.
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Plastic minifigures are stylised AND fantastical, so no label is required;
+  the argument for the whole shelf lives in `brick-heist.ts.md`. The story resolves, so
+  there is nothing to loop back to.
 
 ## Commits
 

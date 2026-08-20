@@ -68,6 +68,9 @@ flowchart TD
   the foley ARE the audio, and the ASMR variant depends on it). A template with no opinion
   should say nothing rather than invent one — `toSummary` maps the absence to `null` and the
   editor's audio panel simply opens empty.
+- **Disclosure tier `description`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Photoreal fruit with a face — impossible on its face — and no person
+  appears, so it stays below the photoreal-people tier. Hook, payload, CTA: no loop.
 
 ## Commits
 

@@ -32,6 +32,12 @@ export const film: Template = {
   defaultStyleId: 'cinematic',
   titleTemplate: '{{title}}',
 
+  // Photoreal people, shot as live action — the tier the disclosure rule is
+  // actually aimed at, even though the film itself is fiction. Not loopable: a
+  // trailer is an escalation into a title card, and the title card is the end.
+  loopable: false,
+  disclosureTier: 'in-player',
+
   // All three tiers natively hold 8s at 16:9 (the invariant templates.test.ts
   // enforces). wan-2-7 is the standard tier ON PURPOSE — see the header.
   models: {

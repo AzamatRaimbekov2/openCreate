@@ -37,6 +37,9 @@ flowchart LR
   R --> SV[service.ts: knobs → substitute → shots]
   SV --> FILM[Film + 7 shots in Cinema editor]
 ```
+- **Disclosure tier `none`, not loopable** (ADR shorts-studio §12/§10, fields added
+  2026-08-20). Cel-shaded and fantastical — glowing runes and an awakening power are not
+  something anyone mistakes for a record. The arc resolves into «Продолжение следует».
 
 ## Commits
 

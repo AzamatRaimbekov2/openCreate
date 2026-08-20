@@ -6,21 +6,30 @@ import { loadConfig } from './config'
 import { createDb } from './db/client'
 import { createRunwareClient } from './integrations/runware/client'
 import { createLocalStorage } from './storage/local'
+import { createR2Storage } from './storage/r2'
 
 const config = loadConfig()
 // createDb also runs the idempotent DDL bootstrap, so a fresh checkout can boot
 // even before `pnpm db:migrate` was ever run.
 const { db } = createDb(config.databasePath)
-// Local disk storage (mkdir -p'd on boot); assets are served back at /media/*.
-// The allowlist locks server-side asset fetches to the provider's domain
-// (SSRF gate — asset URLs come from provider responses, not our code). The
-// limits bound every download: a hard deadline (a stalled provider stream
-// must not hang a settlement forever) and a streaming byte cap (an oversized
-// body must not fill the disk that also holds the SQLite database).
-const storage = createLocalStorage(config.storageDir, config.assetHostAllowlist, {
-  fetchTimeoutMs: config.assetFetchTimeoutMs,
-  maxBytes: config.assetMaxBytes,
-})
+// R2 when configured (ADR railway-deployment D2), local disk otherwise — the
+// SAME optional-secret discipline every provider in config.ts uses: present
+// (and validated ALL-OR-NOTHING by loadConfig) → R2; absent → local disk,
+// mkdir -p'd on boot. Either way assets are served back at /media/*. The
+// allowlist locks server-side asset fetches to the provider's domain (SSRF
+// gate — asset URLs come from provider responses, not our code). The limits
+// bound every download: a hard deadline (a stalled provider stream must not
+// hang a settlement forever) and a streaming byte cap (an oversized body must
+// not fill the disk that also holds the SQLite database).
+const storage = config.r2
+  ? createR2Storage(config.r2, config.assetHostAllowlist, {
+      fetchTimeoutMs: config.assetFetchTimeoutMs,
+      maxBytes: config.assetMaxBytes,
+    })
+  : createLocalStorage(config.storageDir, config.assetHostAllowlist, {
+      fetchTimeoutMs: config.assetFetchTimeoutMs,
+      maxBytes: config.assetMaxBytes,
+    })
 // The ONLY place the real Runware key leaves config — the client keeps it in a
 // closure and never exposes it (tests always inject a fake instead).
 const runware = createRunwareClient({ apiKey: config.runwareApiKey })

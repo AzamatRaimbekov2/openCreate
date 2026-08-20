@@ -155,11 +155,12 @@ export function createModels3dService({ db, storage, runNormalize }: Models3dDep
 
     // The raw upload is a scratch file: ffmpeg reads it, and it never becomes a
     // served asset. It carries a distinct key so a half-written normalize can never
-    // be mistaken for the finished mp4 at /media/<id>.mp4.
+    // be mistaken for the finished mp4 at /media/<id>.mp4. Both are WRITE-side
+    // scratchPath()s — the output only becomes a real stored asset via
+    // publishLocalFile below, on success (ADR railway-deployment D2).
     const rawKey = `${id}-raw`
-    const rawPath = storage.localPath(rawKey, 'mp4')
-    const outputPath = storage.localPath(id, 'mp4')
-    const mediaUrl = `/media/${id}.mp4`
+    const rawPath = storage.scratchPath(rawKey, 'mp4')
+    const outputPath = storage.scratchPath(id, 'mp4')
 
     const release = await semaphore.acquire()
     try {
@@ -168,17 +169,23 @@ export function createModels3dService({ db, storage, runNormalize }: Models3dDep
       if (!result.ok) {
         // A failed normalize may still have left a truncated mp4 behind. Serving a
         // partial file as a finished turntable is worse than serving nothing.
+        // Nothing was published yet, so this is local-scratch cleanup only.
+        await unlink(outputPath).catch(() => undefined)
         await storage.remove(id, 'mp4').catch(() => undefined)
         settleRender(id, 'failed', null, null, result.error)
       } else {
-        // Poster last, and only on success: it is the crawler/no-WebGL fallback for
-        // an artifact that now exists. saveDataUri re-validates it against the RASTER
-        // allowlist (no svg → no stored XSS), so the schema at the wire is not the
-        // only thing standing between an <script>-carrying "image" and our disk.
+        // Output becomes a real asset here — a no-op rename on local disk,
+        // upload-then-unlink on R2. Poster last, and only on success: it is the
+        // crawler/no-WebGL fallback for an artifact that now exists. saveDataUri
+        // re-validates it against the RASTER allowlist (no svg → no stored XSS),
+        // so the schema at the wire is not the only thing standing between an
+        // <script>-carrying "image" and our disk.
+        const mediaUrl = await storage.publishLocalFile(outputPath, id, 'mp4')
         const posterUrl = await storage.saveDataUri(input.poster, `${id}-poster`)
         settleRender(id, 'succeeded', mediaUrl, posterUrl, null)
       }
     } catch (err) {
+      await unlink(outputPath).catch(() => undefined)
       await storage.remove(id, 'mp4').catch(() => undefined)
       settleRender(id, 'failed', null, null, err instanceof Error ? err.message : 'render failed')
     } finally {

@@ -69,3 +69,23 @@ flowchart TD
 ## Commits
 
 - _no commit yet_
+
+## Update 2026-08-20 - `POST /api/films/from-template/batch` (ADR: `docs/wiki/decisions/shorts-studio.md`)
+
+- `POST /api/films/from-template/batch` -> **201** `{ batchId, films: FilmDetail[] }`.
+  Body parsed with `createFilmsFromTemplateBatchInputSchema` (1-20 rows). Rate limit
+  **10/min** (`FROM_TEMPLATE_BATCH_RATE_LIMIT`).
+- **10/min is half the single route's bucket because one call is up to twenty times the
+  work** - twenty films and around a hundred shot rows in one transaction. Nobody sets
+  up ten batches a minute by hand, so ordinary use is untouched. Still not a money guard:
+  this path spends nothing, it is the same "keep a script from filling a library"
+  backstop, scaled to a heavier call.
+- **It charges NOTHING**, exactly like its single-film sibling. Every shot lands as a
+  draft; the credits are spent later, per beat, by the client-side runner behind the
+  itemised confirm.
+- **There is no partial success.** A bad row anywhere is a 400 for the WHOLE request with
+  nothing written - the service validates every row before it writes the first. Worth
+  stating on the route because it is what a caller would otherwise have to guess at:
+  there is no per-row error list to reconcile.
+- Errors map through the same `mapDomainError`/`guard` pair as the single route: unknown
+  template -> 404 `not_found`, unknown knob or illegal option -> 400 `validation_failed`.
