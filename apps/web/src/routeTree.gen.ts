@@ -29,6 +29,7 @@ import { Route as ShellShortsIndexRouteImport } from './routes/_shell.shorts.ind
 import { Route as ShellCinemaIndexRouteImport } from './routes/_shell.cinema.index'
 import { Route as ShellCanvasIndexRouteImport } from './routes/_shell.canvas.index'
 import { Route as ShellAssetsIndexRouteImport } from './routes/_shell.assets.index'
+import { Route as ShellAdminIndexRouteImport } from './routes/_shell.admin.index'
 import { Route as ShellSoulEntityIdRouteImport } from './routes/_shell.soul.$entityId'
 import { Route as ShellAssetsAssetIdRouteImport } from './routes/_shell.assets.$assetId'
 
@@ -131,6 +132,11 @@ const ShellAssetsIndexRoute = ShellAssetsIndexRouteImport.update({
   path: '/assets/',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellAdminIndexRoute = ShellAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellSoulEntityIdRoute = ShellSoulEntityIdRouteImport.update({
   id: '/soul/$entityId',
   path: '/soul/$entityId',
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/cinema/$filmId': typeof CinemaFilmIdRoute
   '/assets/$assetId': typeof ShellAssetsAssetIdRoute
   '/soul/$entityId': typeof ShellSoulEntityIdRoute
+  '/admin/': typeof ShellAdminIndexRoute
   '/assets/': typeof ShellAssetsIndexRoute
   '/canvas/': typeof ShellCanvasIndexRoute
   '/cinema/': typeof ShellCinemaIndexRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/cinema/$filmId': typeof CinemaFilmIdRoute
   '/assets/$assetId': typeof ShellAssetsAssetIdRoute
   '/soul/$entityId': typeof ShellSoulEntityIdRoute
+  '/admin': typeof ShellAdminIndexRoute
   '/assets': typeof ShellAssetsIndexRoute
   '/canvas': typeof ShellCanvasIndexRoute
   '/cinema': typeof ShellCinemaIndexRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/cinema/$filmId': typeof CinemaFilmIdRoute
   '/_shell/assets/$assetId': typeof ShellAssetsAssetIdRoute
   '/_shell/soul/$entityId': typeof ShellSoulEntityIdRoute
+  '/_shell/admin/': typeof ShellAdminIndexRoute
   '/_shell/assets/': typeof ShellAssetsIndexRoute
   '/_shell/canvas/': typeof ShellCanvasIndexRoute
   '/_shell/cinema/': typeof ShellCinemaIndexRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/cinema/$filmId'
     | '/assets/$assetId'
     | '/soul/$entityId'
+    | '/admin/'
     | '/assets/'
     | '/canvas/'
     | '/cinema/'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/cinema/$filmId'
     | '/assets/$assetId'
     | '/soul/$entityId'
+    | '/admin'
     | '/assets'
     | '/canvas'
     | '/cinema'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/cinema/$filmId'
     | '/_shell/assets/$assetId'
     | '/_shell/soul/$entityId'
+    | '/_shell/admin/'
     | '/_shell/assets/'
     | '/_shell/canvas/'
     | '/_shell/cinema/'
@@ -436,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAssetsIndexRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/admin/': {
+      id: '/_shell/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof ShellAdminIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/soul/$entityId': {
       id: '/_shell/soul/$entityId'
       path: '/soul/$entityId'
@@ -465,6 +484,7 @@ interface ShellRouteChildren {
   ShellVerifyRoute: typeof ShellVerifyRoute
   ShellAssetsAssetIdRoute: typeof ShellAssetsAssetIdRoute
   ShellSoulEntityIdRoute: typeof ShellSoulEntityIdRoute
+  ShellAdminIndexRoute: typeof ShellAdminIndexRoute
   ShellAssetsIndexRoute: typeof ShellAssetsIndexRoute
   ShellCanvasIndexRoute: typeof ShellCanvasIndexRoute
   ShellCinemaIndexRoute: typeof ShellCinemaIndexRoute
@@ -485,6 +505,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellVerifyRoute: ShellVerifyRoute,
   ShellAssetsAssetIdRoute: ShellAssetsAssetIdRoute,
   ShellSoulEntityIdRoute: ShellSoulEntityIdRoute,
+  ShellAdminIndexRoute: ShellAdminIndexRoute,
   ShellAssetsIndexRoute: ShellAssetsIndexRoute,
   ShellCanvasIndexRoute: ShellCanvasIndexRoute,
   ShellCinemaIndexRoute: ShellCinemaIndexRoute,

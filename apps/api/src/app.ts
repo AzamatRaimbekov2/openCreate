@@ -29,6 +29,7 @@ import { createAuth } from './modules/auth/auth'
 import { seedDevAdmin, seedSuperAdmin } from './modules/auth/dev-admin'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
+import { registerAnalyticsRoutes } from './modules/analytics/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
 import { registerEntityRoutes } from './modules/entities/routes'
 import { createEntityService } from './modules/entities/service'
@@ -241,7 +242,7 @@ export async function buildApp(deps: AppDeps) {
   // app.log is handed down so the signup-bonus hook (a money-path event with
   // no request context) still emits a structured ledger entry.
   const auth = createAuth(deps.db, deps.config, app.log)
-  await registerAuth(app, auth)
+  await registerAuth(app, auth, deps.db)
   // Public runtime auth-provider flags (ADR google-oauth). The SPA reads this to
   // decide whether to render the Google button — a SINGLE source of truth derived
   // from the SAME creds pair that gates the better-auth Google provider, so the
@@ -274,6 +275,10 @@ export async function buildApp(deps: AppDeps) {
   }
   registerUserRoutes(app, deps.db)
   registerCreditRoutes(app, deps.db)
+  // Analytics is a READ MODEL over the money path — no table of its own and no
+  // write path, so it can register this early and depends on nothing but the db
+  // (ADR analytics §1).
+  registerAnalyticsRoutes(app, { db: deps.db, creditPriceUsd: deps.config.creditPriceUsd })
   // Which video backends this deployment can actually reach. Runware is always
   // on (its key is required at boot); the two optional providers each light up
   // from their own env var. The catalog route hides the models of any backend

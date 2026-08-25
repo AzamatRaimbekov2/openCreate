@@ -60,6 +60,7 @@ tags:
 
 - [[template-catalog]] - Pre-authored viral formats (Brainrot Studio) that instantiate into a whole film; server-side prompts, per-tier model pinning, zero-charge apply.
 - [[shorts-studio]] - A vertical `shorts` template shelf plus a batch runner: one template × N rows of knob values → N films under one server-minted `batchId`, still zero-charge.
+- [[analytics]] - **Accepted ADR** (2026-08-25): the operator dashboard (`/admin`, super_admin), personal usage (`/api/me/usage`) and optional cookieless product telemetry, built as a **read model over the money path** — no new table and no second write path, because the ledger is already the audited truth. Three rules carry the feature: authorization **re-reads `user.role` from the DB** on every request (revocation lands on the next request, not at session expiry); provider cost is **billed or blank, never estimated** (Segmind reports none, so an `unpricedCount` sits beside every total); and revenue/margin come from an operator-supplied `CREDIT_PRICE_USD`, absent by default — **a margin of $0 and a margin of *unknown* must never render the same**.
 
 - [[frontend-architecture-guardrails]] - Project guardrails for shared ownership, dependency rules, UI component sourcing, TanStack Router/Query, Zustand, ESLint, and bundle splitting.
 - [[frontend-error-ux-startup-required]] - Require frontend initialization to run `frontend-error-ux` and verify app-level failure/offline surfaces.

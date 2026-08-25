@@ -17,6 +17,7 @@ const ERROR_CODE_KEYS: Record<ApiErrorCode, string> = {
   provider_error: 'errors.codes.providerError',
   rate_limited: 'errors.codes.rateLimited',
   conflict: 'errors.codes.conflict',
+  forbidden: 'errors.codes.forbidden',
   internal_error: 'errors.codes.internalError',
 }
 

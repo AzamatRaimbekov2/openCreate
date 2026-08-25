@@ -57,3 +57,7 @@ export * from './canvas'
 // messages (step/plan/result cards). Cites canvases/entities/generations by id
 // only, so ordering is immaterial here too.
 export * from './creator'
+// Analytics (ADR analytics) — the operator dashboard, personal usage. A READ
+// MODEL over the money path: cites no aggregate and owns no table, so ordering
+// is immaterial here too.
+export * from './analytics'

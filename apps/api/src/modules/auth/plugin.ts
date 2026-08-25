@@ -8,7 +8,10 @@
 // (and light-my-request's mocked sockets in tests make that worse). Rebuilding a
 // web Request from the parsed body is the approach better-auth documents for
 // Fastify. Behavior contract = test/auth.test.ts.
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { Db } from '../../db/client'
+import { user } from '../../db/schema'
 import type { Auth } from './auth'
 
 export type SessionUser = { id: string; email: string; name: string | null }
@@ -18,6 +21,7 @@ export type SessionUser = { id: string; email: string; name: string | null }
 declare module 'fastify' {
   interface FastifyInstance {
     requireUser: (req: FastifyRequest) => Promise<SessionUser>
+    requireSuperAdmin: (req: FastifyRequest) => Promise<SessionUser>
   }
 }
 
@@ -38,7 +42,7 @@ function toWebRequest(req: FastifyRequest): Request {
   })
 }
 
-export async function registerAuth(app: FastifyInstance, auth: Auth) {
+export async function registerAuth(app: FastifyInstance, auth: Auth, db: Db) {
   const handler = async (req: FastifyRequest, reply: FastifyReply) => {
     const response = await auth.handler(toWebRequest(req))
     reply.status(response.status)
@@ -84,5 +88,27 @@ export async function registerAuth(app: FastifyInstance, auth: Auth) {
       throw err
     }
     return { id: session.user.id, email: session.user.email, name: session.user.name ?? null }
+  })
+
+  // The role is read from the DATABASE on every admin request, never from a claim
+  // carried in the session (ADR analytics §2). One indexed read by primary key,
+  // and in exchange revoking an admin takes effect on their NEXT REQUEST rather
+  // than whenever their session happens to expire. For the one role that can read
+  // every user's spend and our provider invoices, a stale claim is not an
+  // acceptable failure mode.
+  //
+  // 403 and not 404: the caller is authenticated, and pretending the route does
+  // not exist would only hide it from the one person entitled to be told plainly
+  // that they are not an admin.
+  app.decorate('requireSuperAdmin', async (req: FastifyRequest): Promise<SessionUser> => {
+    const sessionUser = await app.requireUser(req)
+    const row = db.select({ role: user.role }).from(user).where(eq(user.id, sessionUser.id)).get()
+    if (row?.role !== 'super_admin') {
+      const err = new Error('Admin only') as Error & { statusCode: number; apiCode: string }
+      err.statusCode = 403
+      err.apiCode = 'forbidden'
+      throw err
+    }
+    return sessionUser
   })
 }

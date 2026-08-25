@@ -111,7 +111,9 @@ describe('registerAuth response bridge', () => {
     } as unknown as Auth
 
     const app = Fastify()
-    await registerAuth(app, fakeAuth)
+    // This test exercises the cookie bridge only; the db is reached solely by
+    // requireSuperAdmin, which it never calls.
+    await registerAuth(app, fakeAuth, createDb(':memory:').db)
     const res = await app.inject({ method: 'GET', url: '/api/auth/get-session' })
 
     const setCookie = res.headers['set-cookie']

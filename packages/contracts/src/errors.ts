@@ -19,6 +19,11 @@ export const apiErrorCodeSchema = z.enum([
   // forfeit the refund and orphan the provider task). Distinct from
   // validation_failed so the SPA can say "wait for it to finish" specifically.
   'conflict',
+  // 403: authenticated, but not entitled — today only the super_admin analytics
+  // routes. Distinct from 'unauthorized' because the fixes differ: unauthorized
+  // means sign in, forbidden means this account will never be enough, and an SPA
+  // that conflates them bounces an admin to the login screen in a loop.
+  'forbidden',
   'internal_error',
 ])
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>

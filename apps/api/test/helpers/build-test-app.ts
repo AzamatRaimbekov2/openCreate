@@ -117,6 +117,8 @@ export type TestAppOverrides = {
   kieApiKey?: string | null
   // Seeds the deployment super-admin (SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD).
   superAdmin?: { email: string; password: string } | null
+  // Bridges credits→USD for the admin money panel (CREDIT_PRICE_USD).
+  creditPriceUsd?: number | null
   // Segmind on/off: default null (off), same contract as the others.
   segmindApiKey?: string | null
   // Modular 3D Assets analyze (ADR modular-3d-assets): the Claude-vision part
@@ -216,6 +218,10 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // Absent by default: a test app seeds no deployment admin unless it asks,
       // so the account's existence is never an accident of the harness.
       superAdmin: overrides.superAdmin ?? null,
+      // Absent by default so a test that asserts on margin must OPT IN to a rate.
+      // If this defaulted to a number, "margin is null when unconfigured" would
+      // silently stop being covered.
+      creditPriceUsd: overrides.creditPriceUsd ?? null,
       segmindApiKey: overrides.segmindApiKey ?? null,
       // CinemaStudio + Modular 3D Assets config: null → no LLM-backed features in
       // tests (storyboard AND assets3d analyze both answer 502 provider_error).

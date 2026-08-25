@@ -161,6 +161,13 @@ const envSchema = z.object({
   // The minimum is 16 and not better-auth's 8 because the seed writes the password
   // hash DIRECTLY (dev-admin.ts explains why), so better-auth's own signup check
   // never runs on it — and this is the one account with no spending ceiling.
+  // What one credit is sold for, in USD. There is no top-up and no Stripe yet, so
+  // this number does not exist anywhere in the system — an operator invents it,
+  // and the dashboard labels every figure derived from it as resting on that
+  // assumption. Unset ⇒ the margin panel reads "not configured" instead of
+  // rendering a zero, because a margin of 0 and a margin of UNKNOWN must never
+  // look the same (ADR analytics §4).
+  CREDIT_PRICE_USD: z.coerce.number().positive().optional(),
   SUPER_ADMIN_EMAIL: z.email().optional(),
   SUPER_ADMIN_PASSWORD: z.string().min(16).optional(),
   // Where OUR stored media is reachable from the PUBLIC internet. Only needed by
@@ -259,6 +266,8 @@ export type AppConfig = {
   // Both halves or neither (see loadSuperAdminConfig). null = this deployment
   // seeds no super-admin, which is the right default for anything public.
   superAdmin: { email: string; password: string } | null
+  // null ⇒ revenue and margin are not computable; see CREDIT_PRICE_USD.
+  creditPriceUsd: number | null
   // Absolute, no trailing slash. '/media/<key>.<ext>' appended to it is a URL a
   // provider can GET.
   mediaPublicBaseUrl: string
@@ -442,6 +451,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     groqApiKey,
     kieApiKey,
     superAdmin,
+    creditPriceUsd: e.CREDIT_PRICE_USD ?? null,
     segmindApiKey,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.

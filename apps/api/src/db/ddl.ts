@@ -83,6 +83,11 @@ CREATE TABLE IF NOT EXISTS credit_transaction (
 );
 CREATE INDEX IF NOT EXISTS idx_generation_user_created ON generation(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transaction(user_id, created_at DESC);
+-- Admin analytics scans BY TIME ACROSS ALL USERS, which idx_generation_user_created
+-- (user-first) cannot serve. One index so the operator dashboard is an index range
+-- scan rather than a full table scan on every panel (ADR analytics §1).
+CREATE INDEX IF NOT EXISTS idx_generation_created ON generation(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_credit_tx_created ON credit_transaction(created_at DESC);
 `
 
 // DB-level refund-once backstop (review finding). The ledger's app-level

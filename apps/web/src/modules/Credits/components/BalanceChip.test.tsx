@@ -19,7 +19,7 @@ vi.mock('shared/libs/apiClient', async (importOriginal) => {
 
 const apiMock = vi.mocked(api)
 
-const me: Me = { id: 'u1', email: 'a@b.co', name: 'A', creditsBalance: 165 }
+const me: Me = { id: 'u1', email: 'a@b.co', name: 'A', creditsBalance: 165, role: 'user' }
 
 function renderChip() {
   // retry: 0 so error states settle immediately in tests

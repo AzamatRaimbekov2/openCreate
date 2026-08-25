@@ -15,6 +15,7 @@ export function registerUserRoutes(app: FastifyInstance, db: Db) {
         email: user.email,
         name: user.name,
         creditsBalance: user.creditsBalance,
+        role: user.role,
       })
       .from(user)
       .where(eq(user.id, sessionUser.id))

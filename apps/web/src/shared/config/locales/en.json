@@ -14,7 +14,8 @@
     "soul": "Souls",
     "assets": "Assets",
     "styles": "Styles",
-    "shorts": "Shorts"
+    "shorts": "Shorts",
+    "admin": "Admin"
   },
   "landing": {
     "kicker": "AI image & video studio",
@@ -402,7 +403,8 @@
       "rateLimited": "Too many requests — wait a moment and try again.",
       "conflict": "This generation is still processing — wait for it to finish.",
       "internalError": "Something went wrong on our side. Please try again.",
-      "unknown": "Something went wrong. Please try again."
+      "unknown": "Something went wrong. Please try again.",
+      "forbidden": "This account is not allowed to do that"
     }
   },
   "toasts": {
@@ -1360,6 +1362,93 @@
         "processing": "rendering",
         "succeeded": "ready",
         "failed": "failed"
+      }
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Health, money and volume on production",
+    "empty": "No data in this window",
+    "errorTitle": "Could not load",
+    "errorBody": "Could not load analytics. Try again.",
+    "forbiddenTitle": "Admins only",
+    "forbiddenBody": "This section is for the super-admin. You are signed in with a different account.",
+    "window": "{{count}}d",
+    "windowLabel": "Window",
+    "sectionLabel": "Section",
+    "tab": {
+      "health": "Health",
+      "money": "Money",
+      "users": "Users"
+    },
+    "health": {
+      "totals": "Totals for the window",
+      "total": "Total",
+      "successRate": "Success",
+      "failed": "Failed",
+      "processing": "In flight",
+      "nothingSettled": "Nothing settled yet",
+      "filmRenders": "Film renders",
+      "modelRenders": "3D renders",
+      "byModel": "By model",
+      "model": "Model",
+      "provider": "Provider",
+      "median": "Median",
+      "code": "Code",
+      "message": "Message",
+      "recentFailures": "Recent failures",
+      "noFailures": "No failures in this window",
+      "stuckTitle": "Stranded jobs — a refund may be owed",
+      "age": "Stranded for"
+    },
+    "money": {
+      "totals": "Credits and provider bill",
+      "charged": "Credits charged",
+      "refunded": "Refunded",
+      "net": "Net",
+      "netHint": "charged minus refunds",
+      "billed": "Provider bill",
+      "credits": "Credits",
+      "runs": "Runs",
+      "unpriced": "Unpriced",
+      "byDay": "By day",
+      "byModel": "By model",
+      "pricedOf": "priced for {{priced}} of {{total}}",
+      "unpricedNotice": "{{count}} settled generations came back with no cost from the provider (Segmind reports none). This total is short by an unknown amount.",
+      "marginTitle": "Margin",
+      "revenue": "Revenue",
+      "margin": "Margin",
+      "marginPercent": "Margin %",
+      "marginUnconfigured": "No credit price is configured, so there is nothing to compute revenue or margin from. Credits are not sold anywhere yet — set the price as an environment variable and this panel fills in.",
+      "rateAssumption": "Computed at ${{rate}} per credit — your assumption, not a fact the system knows."
+    },
+    "users": {
+      "totals": "Users",
+      "total": "Total",
+      "new": "New",
+      "active": "Active",
+      "activeHint": "people who generated something",
+      "generations": "Generations",
+      "byDay": "By day",
+      "bySurface": "By surface",
+      "top": "Most active",
+      "email": "Email",
+      "signupsShort": "+{{count}} new"
+    },
+    "usage": {
+      "title": "My spend",
+      "balance": "Balance",
+      "spent": "Spent",
+      "refunded": "Refunded",
+      "refundedHint": "from generations that failed",
+      "byDay": "By day",
+      "byType": "By type",
+      "type": "Type",
+      "types": {
+        "image": "Images",
+        "video": "Video",
+        "audio": "Audio",
+        "model3d": "3D"
       }
     }
   }

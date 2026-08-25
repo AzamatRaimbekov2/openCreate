@@ -34,6 +34,12 @@ export type AppShellProps = {
   onSignOut: () => void
   // Credits balance chip (modules/Credits), injected by the layout route
   balanceSlot?: ReactNode
+  // Reveals the /admin link. VISIBILITY ONLY — the dashboard's wall is
+  // server-side (requireSuperAdmin re-reads the role on every request), so a
+  // false here hides a link and protects nothing on its own. It exists because
+  // an operator should not have to remember a URL, not because anyone is kept
+  // out by its absence.
+  isSuperAdmin?: boolean
   // The screen content rendered under the header
   children: ReactNode
 }
@@ -50,6 +56,7 @@ export function AppShell({
   isSessionPending = false,
   onSignOut,
   balanceSlot,
+  isSuperAdmin = false,
   children,
 }: AppShellProps) {
   const { t } = useTranslation()
@@ -163,6 +170,19 @@ export function AppShell({
             >
               {t('nav.shorts')}
             </Link>
+            {/* Last in the row and only for the one account that has it: the
+                operator dashboard is not part of the creative flow, so it sits
+                outside the studio links rather than among them. */}
+            {isSuperAdmin ? (
+              <Link
+                to="/admin"
+                className={navLinkClass}
+                activeProps={{ className: 'text-white' }}
+                inactiveProps={{ className: 'text-mist-dim' }}
+              >
+                {t('nav.admin')}
+              </Link>
+            ) : null}
             {/* Soul Studio owns CHARACTERS (built from the constructor); /entities
                 stays the generic library of objects, places and plain uploads. The
                 adjacency is the hint that one is a specialization of the other. */}

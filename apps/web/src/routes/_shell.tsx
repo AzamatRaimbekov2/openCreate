@@ -5,7 +5,7 @@
 // modules/*), so session state, sign-out and the BalanceChip are injected here.
 import { Outlet, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { signOut, useAuthSession } from 'modules/Auth'
+import { signOut, useAuthSession, useMe } from 'modules/Auth'
 import { BalanceChip } from 'modules/Credits'
 import { AppShell } from 'shared/ui'
 
@@ -15,6 +15,8 @@ export const Route = createFileRoute('/_shell')({
 
 function ShellLayout() {
   const session = useAuthSession()
+  // Nav visibility only; /admin renders its own 403 and the API enforces the role.
+  const me = useMe()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -40,6 +42,7 @@ function ShellLayout() {
       // No chip when signed out — avoids a guaranteed-401 /api/me request;
       // the shell shows its Sign in action in that state instead
       balanceSlot={user ? <BalanceChip /> : undefined}
+      isSuperAdmin={me.data?.role === 'super_admin'}
     >
       <Outlet />
     </AppShell>
