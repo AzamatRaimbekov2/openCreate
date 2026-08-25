@@ -41,12 +41,22 @@ describe('auth', () => {
     expect(res.json().error.code).toBe('unauthorized')
   })
 
-  // Gap: the session is still valid but the underlying user row is gone.
-  // Normally session.user_id CASCADEs on user delete, so this can only happen
-  // via an out-of-band admin/migration delete that bypasses the FK (simulated
-  // here by toggling the pragma) — users/routes.ts must still answer a clean
-  // 404 not_found rather than a null-dereference 500 in that case.
-  it('GET /api/me → 404 not_found when the session outlives its user row', async () => {
+  // Gap: the session row outlives the user row. Normally session.user_id
+  // CASCADEs on user delete, so this needs an out-of-band delete that bypasses
+  // the FK (simulated here by toggling the pragma).
+  //
+  // This asserted 404 until better-auth began RESOLVING the user on every
+  // session lookup: get-session now answers `200 null` for an orphaned session
+  // (verified directly), so requireUser rejects with 401 before /api/me's own
+  // handler runs. 401 is the better answer of the two and the assertion was
+  // updated to it rather than the behaviour bent back — there is no valid
+  // session here, and "sign in again" is exactly what the caller must do, where
+  // a 404 would have them hunting for a missing resource instead.
+  //
+  // The not_found branch in users/routes.ts stays as defence in depth: it costs
+  // one comparison and it is the difference between a clean 404 and a
+  // null-dereference 500 if that upstream behaviour ever changes back.
+  it('GET /api/me → 401 when the session outlives its user row', async () => {
     const { db, sqlite } = createDb(':memory:')
     const app = await buildTestApp({ db })
     const res = await register(app)
@@ -59,8 +69,8 @@ describe('auth', () => {
     sqlite.pragma('foreign_keys = ON')
 
     const after = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })
-    expect(after.statusCode).toBe(404)
-    expect(after.json().error.code).toBe('not_found')
+    expect(after.statusCode).toBe(401)
+    expect(after.json().error.code).toBe('unauthorized')
   })
 
   it('Google may link to an existing email+password account (no local email verification exists)', () => {
