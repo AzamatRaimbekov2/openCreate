@@ -119,6 +119,7 @@ export type TestAppOverrides = {
   superAdmin?: { email: string; password: string } | null
   // Bridges credits→USD for the admin money panel (CREDIT_PRICE_USD).
   creditPriceUsd?: number | null
+  telemetry?: { scriptUrl: string; siteDomain: string } | null
   // Segmind on/off: default null (off), same contract as the others.
   segmindApiKey?: string | null
   // Modular 3D Assets analyze (ADR modular-3d-assets): the Claude-vision part
@@ -222,6 +223,8 @@ export async function buildTestApp(overrides: TestAppOverrides = {}) {
       // If this defaulted to a number, "margin is null when unconfigured" would
       // silently stop being covered.
       creditPriceUsd: overrides.creditPriceUsd ?? null,
+      // No third-party script in tests, ever.
+      telemetry: overrides.telemetry ?? null,
       segmindApiKey: overrides.segmindApiKey ?? null,
       // CinemaStudio + Modular 3D Assets config: null → no LLM-backed features in
       // tests (storyboard AND assets3d analyze both answer 502 provider_error).

@@ -207,3 +207,27 @@ export const meUsageSchema = z.object({
   byDay: z.array(usageDaySchema),
 })
 export type MeUsage = z.infer<typeof meUsageSchema>
+
+// ─── Product telemetry ───────────────────────────────────────────────────────
+// Runtime config for an OPTIONAL third-party analytics script (ADR §7).
+//
+// It is served at runtime rather than baked into the bundle because the SPA is a
+// static build served by our own API: an env var read at build time would mean
+// rebuilding the image to change an analytics domain, and the deploy has exactly
+// one image.
+//
+// `null` is the default and means no script tag is rendered at all — no
+// third-party request, and therefore nothing to put a consent banner in front of.
+// Only cookieless collectors (Plausible, Umami) fit this shape, which is the
+// point: the site is public and its visitors are unauthenticated, so the cheapest
+// correct answer is to collect nothing that would need consent.
+export const telemetryConfigSchema = z.object({
+  scriptUrl: z.url(),
+  siteDomain: z.string().min(1),
+})
+export type TelemetryConfig = z.infer<typeof telemetryConfigSchema>
+
+export const publicConfigSchema = z.object({
+  telemetry: telemetryConfigSchema.nullable(),
+})
+export type PublicConfig = z.infer<typeof publicConfigSchema>

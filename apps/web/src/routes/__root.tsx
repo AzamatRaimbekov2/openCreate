@@ -9,6 +9,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from 'shared/config/queryClient'
+import { useTelemetry } from 'modules/Analytics'
 import { AppErrorBoundary, NotFoundPage, OfflineOverlay, Toaster } from 'shared/ui'
 import 'shared/config/i18n'
 
@@ -22,6 +23,10 @@ function RootLayout() {
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        {/* Must be INSIDE the query provider (it reads /api/config through it)
+            and renders nothing — it only injects a script tag when the
+            deployment configured one. Off by default. */}
+        <Telemetry />
         <OfflineOverlay />
         <Outlet />
         {/* One toast portal for the whole app — inside the query provider so a
@@ -30,4 +35,11 @@ function RootLayout() {
       </QueryClientProvider>
     </AppErrorBoundary>
   )
+}
+
+// A component rather than a hook call in RootLayout, because the hook needs the
+// QueryClientProvider that RootLayout itself renders.
+function Telemetry() {
+  useTelemetry()
+  return null
 }

@@ -249,6 +249,11 @@ export async function buildApp(deps: AppDeps) {
   // button can never drift from what the server actually has wired. No requireUser:
   // it must render on the pre-sign-in auth screen. Registered as a static route,
   // so find-my-way matches it ahead of better-auth's `/api/auth/*` wildcard.
+  // Public runtime config for the SPA. Served rather than baked into the bundle
+  // because the deploy ships ONE image: changing an analytics domain must not
+  // require a rebuild. Contains no secret — the script URL and site domain are
+  // both visible in the page source the moment the script loads.
+  app.get('/api/config', async () => ({ telemetry: deps.config.telemetry }))
   app.get('/api/auth/config', async () => ({
     googleEnabled: deps.config.googleClientId !== null && deps.config.googleClientSecret !== null,
   }))

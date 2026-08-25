@@ -355,3 +355,31 @@ describe('window parameter', () => {
     expect((await get(app, '/api/admin/analytics/health?days=9999', cookie)).statusCode).toBe(400)
   })
 })
+
+// ─── Public telemetry config ─────────────────────────────────────────────────
+
+describe('public config', () => {
+  it('reports NO telemetry by default — a fresh deploy makes no third-party request', async () => {
+    // The default has to be off. A public marketing page that loads a tracker
+    // nobody configured is the one shape of this feature that needs a consent
+    // banner (ADR §7).
+    const { app } = await adminApp()
+    const res = await get(app, '/api/config')
+    expect(res.statusCode).toBe(200)
+    expect(res.json().telemetry).toBeNull()
+  })
+
+  it('reports the configured script without requiring a session', async () => {
+    // Unauthenticated visitors are exactly who this measures, so the endpoint
+    // must answer before sign-in. It carries no secret: both values are visible
+    // in the page source the moment the script loads.
+    const { app } = await adminApp({
+      telemetry: { scriptUrl: 'https://plausible.io/js/script.js', siteDomain: 'opencreate.app' },
+    })
+    const res = await get(app, '/api/config')
+    expect(res.json().telemetry).toEqual({
+      scriptUrl: 'https://plausible.io/js/script.js',
+      siteDomain: 'opencreate.app',
+    })
+  })
+})

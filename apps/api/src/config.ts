@@ -168,6 +168,12 @@ const envSchema = z.object({
   // rendering a zero, because a margin of 0 and a margin of UNKNOWN must never
   // look the same (ADR analytics §4).
   CREDIT_PRICE_USD: z.coerce.number().positive().optional(),
+  // Optional cookieless product analytics (ADR analytics §7). Both or neither.
+  // Shaped for Plausible/Umami — a self-hosted or vendor script URL plus the site
+  // domain it reports under. Unset ⇒ no script tag, no third-party request, and
+  // nothing that needs a consent banner on a public marketing page.
+  ANALYTICS_SCRIPT_URL: z.url().optional(),
+  ANALYTICS_SITE_DOMAIN: z.string().min(1).optional(),
   SUPER_ADMIN_EMAIL: z.email().optional(),
   SUPER_ADMIN_PASSWORD: z.string().min(16).optional(),
   // Where OUR stored media is reachable from the PUBLIC internet. Only needed by
@@ -268,6 +274,8 @@ export type AppConfig = {
   superAdmin: { email: string; password: string } | null
   // null ⇒ revenue and margin are not computable; see CREDIT_PRICE_USD.
   creditPriceUsd: number | null
+  // null ⇒ this deployment loads no analytics script at all.
+  telemetry: { scriptUrl: string; siteDomain: string } | null
   // Absolute, no trailing slash. '/media/<key>.<ext>' appended to it is a URL a
   // provider can GET.
   mediaPublicBaseUrl: string
@@ -452,6 +460,7 @@ export function loadConfig(env?: NodeJS.ProcessEnv): AppConfig {
     kieApiKey,
     superAdmin,
     creditPriceUsd: e.CREDIT_PRICE_USD ?? null,
+    telemetry: loadTelemetryConfig(e),
     segmindApiKey,
     // `|| null` (not `?? null`): an empty string means "not configured", so the
     // storyboard feature stays disabled rather than initializing with a blank key.
@@ -545,6 +554,23 @@ export const KIE_ASSET_HOST = 'tempfile.aiquickdraw.com'
 // outcomes: it LOOKS configured, seeds nothing, and the operator finds out on the
 // day they need the account. Same trap loadR2Config exists to prevent, same answer
 // — fail at boot with a sentence naming what is missing.
+// Both halves or neither, for the same reason loadR2Config and the super-admin
+// loader are: a half-configured integration looks configured and does nothing.
+function loadTelemetryConfig(e: {
+  ANALYTICS_SCRIPT_URL?: string | undefined
+  ANALYTICS_SITE_DOMAIN?: string | undefined
+}): { scriptUrl: string; siteDomain: string } | null {
+  const scriptUrl = e.ANALYTICS_SCRIPT_URL || null
+  const siteDomain = e.ANALYTICS_SITE_DOMAIN || null
+  if (!scriptUrl && !siteDomain) return null
+  if (!scriptUrl || !siteDomain) {
+    throw new Error(
+      'ANALYTICS_SCRIPT_URL and ANALYTICS_SITE_DOMAIN must be set together (loads the analytics script) or both left unset (no telemetry on this deployment)',
+    )
+  }
+  return { scriptUrl, siteDomain }
+}
+
 function loadSuperAdminConfig(e: {
   SUPER_ADMIN_EMAIL?: string | undefined
   SUPER_ADMIN_PASSWORD?: string | undefined
