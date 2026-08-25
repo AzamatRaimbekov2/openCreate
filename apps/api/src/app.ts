@@ -30,6 +30,7 @@ import { seedDevAdmin, seedSuperAdmin } from './modules/auth/dev-admin'
 import { registerAuth } from './modules/auth/plugin'
 import { registerCatalogRoutes } from './modules/catalog/routes'
 import { registerAnalyticsRoutes } from './modules/analytics/routes'
+import { registerMcpRoutes } from './modules/mcp/routes'
 import { registerCreditRoutes } from './modules/credits/routes'
 import { registerEntityRoutes } from './modules/entities/routes'
 import { createEntityService } from './modules/entities/service'
@@ -284,6 +285,10 @@ export async function buildApp(deps: AppDeps) {
   // write path, so it can register this early and depends on nothing but the db
   // (ADR analytics §1).
   registerAnalyticsRoutes(app, { db: deps.db, creditPriceUsd: deps.config.creditPriceUsd })
+  // The remote MCP endpoint + its OAuth discovery documents (ADR mcp-server §P2).
+  // Registered AFTER auth because it holds the same better-auth instance the
+  // session routes do — one authorization server, not two.
+  registerMcpRoutes(app, { auth, publicOrigin: deps.config.betterAuthUrl.replace(/\/+$/, '') })
   // Which video backends this deployment can actually reach. Runware is always
   // on (its key is required at boot); the two optional providers each light up
   // from their own env var. The catalog route hides the models of any backend

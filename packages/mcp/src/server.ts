@@ -5,8 +5,8 @@
 // schemas (zod 4) are converted once via z.toJSONSchema and validated by us.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { ApiError, type ApiClient } from './api-client'
-import { buildQuery, extractBody, isProcessing, toInputSchema } from './registry'
+import { ApiError, type RestClient } from './api-client'
+import { buildQuery, describeTool, extractBody, isProcessing, toInputSchema } from './registry'
 import { tools } from './tools'
 
 const toolByName = new Map(tools.map((t) => [t.name, t]))
@@ -37,7 +37,7 @@ function errorText(err: unknown): string {
 // The pure dispatch path, exported for tests (no MCP transport needed): validate
 // path params + body, build the request, call the API, poll if async, shape result.
 export async function dispatch(
-  client: ApiClient,
+  client: RestClient,
   name: string,
   rawArgs: unknown,
 ): Promise<ToolResult> {
@@ -46,40 +46,56 @@ export async function dispatch(
 
   const args = (rawArgs ?? {}) as Record<string, unknown>
 
-  for (const p of tool.pathParams ?? []) {
+  // `action` is the one required input on every tool (ADR mcp-server §P2.5).
+  // Naming the valid actions in the error matters: a model that guessed wrong
+  // can correct itself from this line instead of re-listing tools.
+  const actionName = args.action
+  if (typeof actionName !== 'string') {
+    return fail(`Tool '${name}' needs an 'action'. Valid: ${Object.keys(tool.actions).join(', ')}.`)
+  }
+  const action = tool.actions[actionName]
+  if (!action) {
+    return fail(
+      `Unknown action '${actionName}' for '${name}'. Valid: ${Object.keys(tool.actions).join(', ')}.`,
+    )
+  }
+
+  // Path params are required PER ACTION — the tool's JSON Schema cannot express
+  // that without a discriminated union, so it is enforced here (registry.ts).
+  for (const p of action.pathParams ?? []) {
     const v = args[p]
     if (typeof v !== 'string' || v.length === 0) {
-      return fail(`Missing required path parameter '${p}'.`)
+      return fail(`Action '${name}.${actionName}' needs the path parameter '${p}'.`)
     }
   }
 
   let body: unknown
-  if (tool.body) {
+  if (action.body) {
     // Validate with the SAME contract schema the API uses — reject before any
-    // network call, so a bad payload never spends a request or provider money.
-    const parsed = tool.body.safeParse(extractBody(tool, args))
+    // request, so a bad payload never spends a request or provider money.
+    const parsed = action.body.safeParse(extractBody(action, args))
     if (!parsed.success) {
-      return fail(`Invalid input: ${parsed.error.issues[0]?.message ?? 'validation failed'}`)
+      return fail(`Invalid input for '${name}.${actionName}': ${parsed.error.issues[0]?.message ?? 'validation failed'}`)
     }
     body = parsed.data
   }
 
-  const path = tool.path(args as Record<string, string>) + buildQuery(tool.query, args)
+  const path = action.path(args as Record<string, string>) + buildQuery(action.query, args)
 
   try {
-    let result = await client.request(tool.method, path, body)
-    // Async lifecycle → one sync call: poll only when the tool submits a job,
+    let result = await client.request(action.method, path, body)
+    // Async lifecycle → one sync call: poll only when the action submits a job,
     // the caller didn't opt out (wait:false), and the job is actually running.
     if (
-      tool.poll &&
+      action.poll &&
       args.wait !== false &&
-      isProcessing(tool, result) &&
+      isProcessing(action, result) &&
       (result as { id?: unknown } | null)?.id
     ) {
       result = await client.pollUntil(
-        tool.poll.path(result as Record<string, unknown>, args),
-        (r) => !isProcessing(tool, r),
-        { timeoutMs: tool.poll.timeoutMs, intervalMs: tool.poll.intervalMs },
+        action.poll.path(result as Record<string, unknown>, args),
+        (r) => !isProcessing(action, r),
+        { timeoutMs: action.poll.timeoutMs, intervalMs: action.poll.intervalMs },
       )
     }
     return ok(result)
@@ -90,7 +106,7 @@ export async function dispatch(
 
 // Build a fully-wired MCP server over the given API client. index.ts connects it
 // to a stdio transport; tests can drive `dispatch` directly instead.
-export function buildServer(client: ApiClient): Server {
+export function buildServer(client: RestClient): Server {
   const server = new Server(
     { name: 'opencreate', version: '0.0.1' },
     { capabilities: { tools: {} } },
@@ -100,7 +116,9 @@ export function buildServer(client: ApiClient): Server {
     tools: tools.map((t) => ({
       name: t.name,
       title: t.title,
-      description: t.description,
+      // The action list is rendered INTO the description, so a model can pick an
+      // action at tools/list time instead of discovering them by trial.
+      description: describeTool(t),
       inputSchema: toInputSchema(t),
     })),
   }))

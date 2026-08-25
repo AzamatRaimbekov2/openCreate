@@ -31,13 +31,24 @@ export type PollOptions = {
   intervalMs: number
 }
 
+// The seam the tool table talks through, and the reason Phase 2 was additive
+// rather than a rewrite (ADR mcp-server §P2.4). Two implementations exist:
+// ApiClient below, which speaks real HTTP with a session cookie for the local
+// stdio server; and the API's own in-process client, which dispatches through
+// the router directly when the MCP server is MOUNTED INSIDE the API it calls.
+// The tool table cannot tell them apart, which is the whole point.
+export interface RestClient {
+  request<T = unknown>(method: HttpMethod, path: string, body?: unknown): Promise<T>
+  pollUntil<T = unknown>(path: string, isDone: (result: T) => boolean, opts: PollOptions): Promise<T>
+}
+
 // Injectable fetch so tests can drive the client with a mock and never touch the
 // network. Defaults to the global (Node 22+ has undici fetch with getSetCookie).
 export type FetchLike = typeof fetch
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export class ApiClient {
+export class ApiClient implements RestClient {
   private cookie: string | null = null
 
   constructor(

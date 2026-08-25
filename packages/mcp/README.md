@@ -4,17 +4,37 @@ An MCP server that wraps the openCreate REST API so a **Claude** user (Claude
 Code / Claude Desktop) can create content and whole film "projects" through
 natural language — the Higgsfield-MCP analogue for openCreate.
 
-- **Transport:** local **stdio** (Phase 1). A remote HTTP + OAuth "Connect
-  button" is the planned Phase 2 — the core is transport-agnostic for it.
-- **Auth:** signs in with email+password (from env) → better-auth session
-  cookie, held in memory, re-login+retry on 401. No backend changes.
-- **Tools:** one per real REST endpoint (~43), each reusing the shared
-  `@opencreate/contracts` zod schema so tool input never drifts from the API.
+Two ways to run it, same tool table:
 
-See the ADR: `docs/wiki/decisions/mcp-server.md` · spec:
-`docs/superpowers/specs/2026-07-22-opencreate-mcp-design.md`.
+| | Remote (recommended) | Local stdio |
+| --- | --- | --- |
+| **Connect with** | a URL + a browser login | a JSON config + your password |
+| **Auth** | OAuth 2.1 + PKCE, tokens in our DB | email/password in the config's env |
+| **Runs** | inside the deployed API (`POST /mcp`) | on your machine, calls the API |
+| **For** | anyone using openCreate | developing on this repo |
 
-## Prerequisites
+- **Tools:** **16**, each fronting a family of endpoints through an `action`
+  argument, each reusing the shared `@opencreate/contracts` zod schema so tool
+  input never drifts from what the API validates. Not one-per-endpoint: ~60 tool
+  descriptions would sit in the context of every request, used or not.
+
+See the ADR: `docs/wiki/decisions/mcp-server.md` (Phase 2 is the second half).
+
+## Remote — connect from Claude
+
+Add openCreate as a custom connector with this URL:
+
+```
+https://opencreate-production.up.railway.app/mcp
+```
+
+Claude discovers the authorization server, registers itself, and opens a browser
+for you to sign in **on openCreate's own domain**. No password ever enters a
+config file. Revoking is deleting the token row — your password is unaffected.
+
+## Local stdio — for developing on this repo
+
+### Prerequisites
 
 1. The openCreate API running and reachable (default `http://localhost:8787`).
    Its origin must be a trusted origin for better-auth — the single-origin

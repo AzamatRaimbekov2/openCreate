@@ -3,6 +3,11 @@
   "version": "0.0.1",
   "type": "module",
   "description": "MCP server that wraps the openCreate REST API so a Claude user can create content and whole film projects from Claude Desktop/Code.",
+  "main": "./src/lib.ts",
+  "types": "./src/lib.ts",
+  "exports": {
+    ".": "./src/lib.ts"
+  },
   "bin": {
     "opencreate-mcp": "./src/index.ts"
   },

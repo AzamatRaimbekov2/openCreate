@@ -1,31 +1,48 @@
-// The full openCreate tool table — one entry per REST endpoint, declared as data.
-// Each tool reuses the SHARED @opencreate/contracts zod schema for its body, so a
-// tool's input can never drift from what the API validates. Path/query params and
-// async polling are the only per-endpoint extras.
+// The openCreate tool table — SIXTEEN tools, each fronting a family of endpoints
+// through an `action` (ADR mcp-server §P2.5). Every action reuses the SHARED
+// @opencreate/contracts zod schema for its body, so a tool's input can never
+// drift from what the API validates.
 //
-// Coverage mirrors the real routes (apps/api/src/modules/*/routes.ts). There is
-// deliberately NO tool for capabilities the API doesn't expose as an endpoint
-// (e.g. entity images / portraits have no standalone route).
+// Coverage mirrors the real routes (apps/api/src/modules/*/routes.ts) with two
+// deliberate omissions:
+//
+//   · /api/admin/analytics/* — reads every user's spend and our provider
+//     invoices. The role check would still hold; this is a second lock on the
+//     same door, chosen because the door opens onto other people's data (§P2.6).
+//   · /api/creator/* — openCreator is our own in-app agent chat. Claude calling
+//     it would be an agent driving a second agent to reach the same endpoints
+//     this table already exposes directly: a longer path to the same place, with
+//     an extra model's judgement in between. If it is ever wanted it belongs
+//     behind ONE tool, not five.
+//   · /api/share/:token — the public read side of a share link. A client that
+//     has a token can open the URL; there is nothing for a tool to add.
+//   · capabilities the API exposes no endpoint for (entity portraits).
 import {
   addFilmAudioInputSchema,
   addShotReferenceInputSchema,
+  addStyleReferenceInputSchema,
   createAsset3dInputSchema,
   createAsset3dPartInputSchema,
+  createCanvasInputSchema,
   createEntityInputSchema,
   createFilmFromTemplateInputSchema,
   createFilmInputSchema,
+  createFilmsFromTemplateBatchInputSchema,
   createGenerationInputSchema,
   createModelRenderInputSchema,
   createShotInputSchema,
   createStoryboardInputSchema,
+  createStyleInputSchema,
   generateShotClipInputSchema,
   promptEnhanceInputSchema,
   reorderShotsInputSchema,
   updateAsset3dInputSchema,
   updateAsset3dPartInputSchema,
+  updateCanvasInputSchema,
   updateEntityInputSchema,
   updateFilmInputSchema,
   updateShotInputSchema,
+  updateStyleInputSchema,
 } from '@opencreate/contracts'
 import type { ToolDef } from './registry'
 
@@ -34,379 +51,471 @@ const GEN_POLL = { timeoutMs: 120_000, intervalMs: 3_000 } as const
 const RENDER_POLL = { timeoutMs: 300_000, intervalMs: 4_000 } as const
 
 export const tools: ToolDef[] = [
-  // ── Meta ──────────────────────────────────────────────────────────────────
+  // ── Account ────────────────────────────────────────────────────────────────
   {
-    name: 'get_me',
-    title: 'Get my account',
-    description: 'Return the signed-in user profile and current credit balance.',
-    method: 'GET',
-    path: () => '/api/me',
-  },
-  {
-    name: 'list_catalog',
-    title: 'List models',
-    description: 'List every available generation model (image/video/audio/3D) with its credit price.',
-    method: 'GET',
-    path: () => '/api/catalog',
-  },
-  {
-    name: 'list_credit_transactions',
-    title: 'List credit transactions',
-    description: 'List the credit ledger (charges, refunds, signup bonus) for the signed-in user.',
-    method: 'GET',
-    path: () => '/api/credits/transactions',
+    name: 'account',
+    title: 'Account, balance and spend',
+    description:
+      'The signed-in account: profile, credit balance, and what credits went to. Read this before a batch — every generation spends real credits.',
+    actions: {
+      me: { summary: 'Profile and current credit balance.', method: 'GET', path: () => '/api/me' },
+      usage: {
+        summary: 'Personal spend over a window: credits, success rate, breakdown by type and day.',
+        method: 'GET',
+        query: ['days'],
+        path: () => '/api/me/usage',
+      },
+      transactions: {
+        summary: 'The raw credit ledger — charges, refunds, signup bonus.',
+        method: 'GET',
+        path: () => '/api/credits/transactions',
+      },
+    },
   },
 
-  // ── Generations ─────────────────────────────────────────────────────────────
+  // ── Catalog ────────────────────────────────────────────────────────────────
+  {
+    name: 'list_models',
+    title: 'List models and prices',
+    description:
+      'Every available generation model (image / video / audio / 3D) with its credit price. Call this before create_generation — the modelId is what picks the media type, and the price is what the user is about to spend.',
+    actions: {
+      list: { summary: 'The full catalog with prices.', method: 'GET', path: () => '/api/catalog' },
+    },
+  },
+
+  // ── Generations (the money path — its own tool, deliberately) ───────────────
   {
     name: 'create_generation',
     title: 'Generate image / video / audio / 3D',
     description:
-      'Create a generation. modelId (from list_catalog) picks the media type. Images finish synchronously; video/audio/3D run async — with wait (default true) the tool polls to completion and returns the finished asset URL.',
-    method: 'POST',
-    body: createGenerationInputSchema,
-    path: () => '/api/generations',
-    poll: { path: (r) => `/api/generations/${r.id}`, ...GEN_POLL },
+      'Create a generation. THIS SPENDS CREDITS. modelId (from list_models) picks the media type. Images finish synchronously; video/audio/3D run async — with wait (default true) the tool polls to completion and returns the finished asset URL.',
+    actions: {
+      create: {
+        summary: 'Submit one generation and (by default) wait for it.',
+        method: 'POST',
+        body: createGenerationInputSchema,
+        path: () => '/api/generations',
+        poll: { path: (r) => `/api/generations/${r.id}`, ...GEN_POLL },
+      },
+    },
   },
   {
-    name: 'list_generations',
-    title: 'List generations',
-    description: 'List the gallery of generations, newest first. Optional limit (max 50) and cursor for paging.',
-    method: 'GET',
-    query: ['limit', 'cursor'],
-    path: () => '/api/generations',
-  },
-  {
-    name: 'get_generation',
-    title: 'Get generation',
-    description: 'Fetch one generation by id (also the manual poll for an async video/audio/3D job).',
-    method: 'GET',
-    pathParams: ['generationId'],
-    path: (a) => `/api/generations/${a.generationId}`,
-  },
-  {
-    name: 'delete_generation',
-    title: 'Delete generation',
-    description: 'Delete a generation from the gallery.',
-    method: 'DELETE',
-    pathParams: ['generationId'],
-    path: (a) => `/api/generations/${a.generationId}`,
+    name: 'generations',
+    title: 'Browse generations',
+    description: 'The gallery: list, fetch and delete past generations. Fetching is also the manual poll for an async job.',
+    actions: {
+      list: {
+        summary: 'List newest first. Optional limit (max 50) and cursor.',
+        method: 'GET',
+        query: ['limit', 'cursor'],
+        path: () => '/api/generations',
+      },
+      get: {
+        summary: 'One generation by id — also the manual poll for a running job.',
+        method: 'GET',
+        pathParams: ['generationId'],
+        path: (a) => `/api/generations/${a.generationId}`,
+      },
+      delete: {
+        summary: 'Remove a generation from the gallery.',
+        method: 'DELETE',
+        pathParams: ['generationId'],
+        path: (a) => `/api/generations/${a.generationId}`,
+      },
+    },
   },
 
-  // ── Films ────────────────────────────────────────────────────────────────────
+  // ── Films ──────────────────────────────────────────────────────────────────
   {
-    name: 'list_films',
-    title: 'List films',
-    description: 'List the signed-in user\'s film projects.',
-    method: 'GET',
-    path: () => '/api/films',
-  },
-  {
-    name: 'get_film',
-    title: 'Get film',
-    description: 'Fetch one film with its shots, audio tracks, and renders.',
-    method: 'GET',
-    pathParams: ['filmId'],
-    path: (a) => `/api/films/${a.filmId}`,
-  },
-  {
-    name: 'create_film',
-    title: 'Create film',
-    description: 'Create an empty film project (title + settings). Add shots or generate a storyboard next.',
-    method: 'POST',
-    body: createFilmInputSchema,
-    path: () => '/api/films',
-  },
-  {
-    name: 'update_film',
-    title: 'Update film',
-    description: 'Update a film\'s title or settings.',
-    method: 'PATCH',
-    pathParams: ['filmId'],
-    body: updateFilmInputSchema,
-    path: (a) => `/api/films/${a.filmId}`,
-  },
-  {
-    name: 'delete_film',
-    title: 'Delete film',
-    description: 'Delete a film project and its shots.',
-    method: 'DELETE',
-    pathParams: ['filmId'],
-    path: (a) => `/api/films/${a.filmId}`,
-  },
-  {
-    name: 'create_film_from_template',
-    title: 'Create film from template',
-    description: 'Instantiate a whole film from a pre-authored template (see list_templates). Charges nothing on apply.',
-    method: 'POST',
-    body: createFilmFromTemplateInputSchema,
-    path: () => '/api/films/from-template',
-  },
-  {
-    name: 'list_templates',
-    title: 'List templates',
-    description: 'List the gallery of pre-authored film templates (viral formats) that instantiate into a film.',
-    method: 'GET',
-    path: () => '/api/templates',
+    name: 'films',
+    title: 'Film projects',
+    description:
+      'Film projects — the multi-shot format. Creating and editing a film is FREE; only generating clips and rendering spend anything. Audio tracks live here too, because a track belongs to a film.',
+    actions: {
+      list: { summary: 'The user\'s film projects.', method: 'GET', path: () => '/api/films' },
+      get: {
+        summary: 'One film with its shots, audio tracks and renders.',
+        method: 'GET',
+        pathParams: ['filmId'],
+        path: (a) => `/api/films/${a.filmId}`,
+      },
+      create: {
+        summary: 'Create an empty film (title + settings).',
+        method: 'POST',
+        body: createFilmInputSchema,
+        path: () => '/api/films',
+      },
+      update: {
+        summary: 'Change a film\'s title or settings.',
+        method: 'PATCH',
+        pathParams: ['filmId'],
+        body: updateFilmInputSchema,
+        path: (a) => `/api/films/${a.filmId}`,
+      },
+      delete: {
+        summary: 'Delete a film and its shots.',
+        method: 'DELETE',
+        pathParams: ['filmId'],
+        path: (a) => `/api/films/${a.filmId}`,
+      },
+      add_audio: {
+        summary: 'Attach an audio track to a film.',
+        method: 'POST',
+        pathParams: ['filmId'],
+        body: addFilmAudioInputSchema,
+        path: (a) => `/api/films/${a.filmId}/audio`,
+      },
+      delete_audio: {
+        summary: 'Remove an audio track (needs audioId).',
+        method: 'DELETE',
+        pathParams: ['filmId', 'audioId'],
+        path: (a) => `/api/films/${a.filmId}/audio/${a.audioId}`,
+      },
+    },
   },
 
-  // ── Shots ────────────────────────────────────────────────────────────────────
+  // ── Shots ──────────────────────────────────────────────────────────────────
   {
-    name: 'add_shot',
-    title: 'Add shot',
-    description: 'Add a shot (a prompt + camera/motion settings) to a film.',
-    method: 'POST',
-    pathParams: ['filmId'],
-    body: createShotInputSchema,
-    path: (a) => `/api/films/${a.filmId}/shots`,
+    name: 'shots',
+    title: 'Film shots',
+    description:
+      'The shots inside a film: add, edit, reorder, and attach reference images. All free — a shot is a prompt plus settings until you generate its clip.',
+    actions: {
+      add: {
+        summary: 'Add a shot (prompt + camera/motion settings).',
+        method: 'POST',
+        pathParams: ['filmId'],
+        body: createShotInputSchema,
+        path: (a) => `/api/films/${a.filmId}/shots`,
+      },
+      update: {
+        summary: 'Change a shot\'s prompt or settings (needs shotId).',
+        method: 'PATCH',
+        pathParams: ['filmId', 'shotId'],
+        body: updateShotInputSchema,
+        path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}`,
+      },
+      delete: {
+        summary: 'Delete a shot (needs shotId).',
+        method: 'DELETE',
+        pathParams: ['filmId', 'shotId'],
+        path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}`,
+      },
+      reorder: {
+        summary: 'Reorder by passing the FULL ordered list of shot ids.',
+        method: 'POST',
+        pathParams: ['filmId'],
+        body: reorderShotsInputSchema,
+        path: (a) => `/api/films/${a.filmId}/shots/reorder`,
+      },
+      add_reference: {
+        summary: 'Attach a reference image to a shot (needs shotId).',
+        method: 'POST',
+        pathParams: ['filmId', 'shotId'],
+        body: addShotReferenceInputSchema,
+        path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}/references`,
+      },
+      remove_reference: {
+        summary: 'Detach a reference (needs shotId, refId).',
+        method: 'DELETE',
+        pathParams: ['filmId', 'shotId', 'refId'],
+        path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}/references/${a.refId}`,
+      },
+    },
   },
-  {
-    name: 'update_shot',
-    title: 'Update shot',
-    description: 'Update a shot\'s prompt or settings.',
-    method: 'PATCH',
-    pathParams: ['filmId', 'shotId'],
-    body: updateShotInputSchema,
-    path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}`,
-  },
-  {
-    name: 'delete_shot',
-    title: 'Delete shot',
-    description: 'Delete a shot from a film.',
-    method: 'DELETE',
-    pathParams: ['filmId', 'shotId'],
-    path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}`,
-  },
-  {
-    name: 'reorder_shots',
-    title: 'Reorder shots',
-    description: 'Reorder a film\'s shots by passing the full ordered list of shot ids.',
-    method: 'POST',
-    pathParams: ['filmId'],
-    body: reorderShotsInputSchema,
-    path: (a) => `/api/films/${a.filmId}/shots/reorder`,
-  },
+
+  // ── The two film money paths, each its own tool ────────────────────────────
   {
     name: 'generate_storyboard',
-    title: 'Generate storyboard',
-    description: 'Turn a script/brief into DRAFT shots via Claude. Nothing is generated or charged until you run generate_shot_clip.',
-    method: 'POST',
-    pathParams: ['filmId'],
-    body: createStoryboardInputSchema,
-    path: (a) => `/api/films/${a.filmId}/storyboard`,
+    title: 'Draft shots from a script',
+    description:
+      'Turn a script or brief into DRAFT shots via Claude. Nothing is generated and nothing is charged until you call generate_shot_clip on a shot.',
+    actions: {
+      create: {
+        summary: 'Draft shots into a film from a brief.',
+        method: 'POST',
+        pathParams: ['filmId'],
+        body: createStoryboardInputSchema,
+        path: (a) => `/api/films/${a.filmId}/storyboard`,
+      },
+    },
   },
   {
     name: 'generate_shot_clip',
-    title: 'Generate shot clip',
+    title: 'Generate one shot\'s clip',
     description:
-      'Generate the clip for a shot (spends credits). Images return synchronously; video runs async — with wait (default true) the tool polls to completion.',
-    method: 'POST',
-    pathParams: ['filmId', 'shotId'],
-    body: generateShotClipInputSchema,
-    path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}/clip`,
-    poll: { path: (r) => `/api/generations/${r.id}`, ...GEN_POLL },
-  },
-  {
-    name: 'add_shot_reference',
-    title: 'Add shot reference image',
-    description: 'Attach a reference image (data URI) to a shot to steer its generation.',
-    method: 'POST',
-    pathParams: ['filmId', 'shotId'],
-    body: addShotReferenceInputSchema,
-    path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}/references`,
-  },
-  {
-    name: 'remove_shot_reference',
-    title: 'Remove shot reference image',
-    description: 'Detach a reference image from a shot.',
-    method: 'DELETE',
-    pathParams: ['filmId', 'shotId', 'refId'],
-    path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}/references/${a.refId}`,
-  },
-
-  // ── Audio & render ───────────────────────────────────────────────────────────
-  {
-    name: 'add_film_audio',
-    title: 'Add film audio',
-    description: 'Attach an audio track (music/voiceover generation or upload) to a film\'s timeline.',
-    method: 'POST',
-    pathParams: ['filmId'],
-    body: addFilmAudioInputSchema,
-    path: (a) => `/api/films/${a.filmId}/audio`,
-  },
-  {
-    name: 'delete_film_audio',
-    title: 'Delete film audio',
-    description: 'Remove an audio track from a film.',
-    method: 'DELETE',
-    pathParams: ['filmId', 'audioId'],
-    path: (a) => `/api/films/${a.filmId}/audio/${a.audioId}`,
+      'Render one shot into a video clip. THIS SPENDS CREDITS, per shot. With wait (default true) it polls to completion.',
+    actions: {
+      create: {
+        summary: 'Generate the clip for one shot (needs shotId).',
+        method: 'POST',
+        pathParams: ['filmId', 'shotId'],
+        body: generateShotClipInputSchema,
+        path: (a) => `/api/films/${a.filmId}/shots/${a.shotId}/clip`,
+        poll: { path: (r) => `/api/generations/${r.id}`, ...GEN_POLL },
+      },
+    },
   },
   {
     name: 'render_film',
-    title: 'Render film',
+    title: 'Render a film to one video',
     description:
-      'Render the film timeline into a single mp4 (server-side ffmpeg). Async — with wait (default true) the tool polls until the render finishes and returns the mp4 URL.',
-    method: 'POST',
-    pathParams: ['filmId'],
-    path: (a) => `/api/films/${a.filmId}/renders`,
-    poll: { path: (r, a) => `/api/films/${a.filmId}/renders/${r.id}`, ...RENDER_POLL },
-  },
-  {
-    name: 'get_render',
-    title: 'Get render',
-    description: 'Fetch a film render by id (manual poll / result).',
-    method: 'GET',
-    pathParams: ['filmId', 'renderId'],
-    path: (a) => `/api/films/${a.filmId}/renders/${a.renderId}`,
-  },
-
-  // ── Entities (characters / objects / places) ─────────────────────────────────
-  {
-    name: 'list_entities',
-    title: 'List entities',
-    description: 'List the entity library (characters, objects, places) usable as tagged references in prompts.',
-    method: 'GET',
-    path: () => '/api/entities',
-  },
-  {
-    name: 'get_entity',
-    title: 'Get entity',
-    description: 'Fetch one entity with its reference images and soul spec.',
-    method: 'GET',
-    pathParams: ['entityId'],
-    path: (a) => `/api/entities/${a.entityId}`,
-  },
-  {
-    name: 'create_entity',
-    title: 'Create entity',
-    description: 'Create a library entity (character/object/place) that can be tagged into generation prompts.',
-    method: 'POST',
-    body: createEntityInputSchema,
-    path: () => '/api/entities',
-  },
-  {
-    name: 'update_entity',
-    title: 'Update entity',
-    description: 'Update an entity\'s name, description, images, or soul spec.',
-    method: 'PATCH',
-    pathParams: ['entityId'],
-    body: updateEntityInputSchema,
-    path: (a) => `/api/entities/${a.entityId}`,
-  },
-  {
-    name: 'delete_entity',
-    title: 'Delete entity',
-    description: 'Delete a library entity.',
-    method: 'DELETE',
-    pathParams: ['entityId'],
-    path: (a) => `/api/entities/${a.entityId}`,
+      'Stitch a film\'s generated clips and audio into a single video. Spends no provider credits — it is our own compute — but needs every shot to have a clip already.',
+    actions: {
+      start: {
+        summary: 'Start a render and (by default) wait for it.',
+        method: 'POST',
+        pathParams: ['filmId'],
+        path: (a) => `/api/films/${a.filmId}/renders`,
+        poll: { path: (r, a) => `/api/films/${a.filmId as string}/renders/${r.id}`, ...RENDER_POLL },
+      },
+      get: {
+        summary: 'Check a render\'s status (needs renderId).',
+        method: 'GET',
+        pathParams: ['filmId', 'renderId'],
+        path: (a) => `/api/films/${a.filmId}/renders/${a.renderId}`,
+      },
+    },
   },
 
-  // ── 3D assets (Studio3D / modular assets) ────────────────────────────────────
+  // ── Templates, including the Shorts batch ──────────────────────────────────
   {
-    name: 'list_assets3d',
-    title: 'List 3D assets',
-    description: 'List modular 3D assets (concept image → named parts → per-part meshes).',
-    method: 'GET',
-    path: () => '/api/assets3d',
-  },
-  {
-    name: 'get_asset3d',
-    title: 'Get 3D asset',
-    description: 'Fetch one 3D asset with its parts.',
-    method: 'GET',
-    pathParams: ['assetId'],
-    path: (a) => `/api/assets3d/${a.assetId}`,
-  },
-  {
-    name: 'create_asset3d',
-    title: 'Create 3D asset',
-    description: 'Create a modular 3D asset from a concept image.',
-    method: 'POST',
-    body: createAsset3dInputSchema,
-    path: () => '/api/assets3d',
-  },
-  {
-    name: 'update_asset3d',
-    title: 'Update 3D asset',
-    description: 'Rename a 3D asset.',
-    method: 'PATCH',
-    pathParams: ['assetId'],
-    body: updateAsset3dInputSchema,
-    path: (a) => `/api/assets3d/${a.assetId}`,
-  },
-  {
-    name: 'delete_asset3d',
-    title: 'Delete 3D asset',
-    description: 'Delete a 3D asset and its parts.',
-    method: 'DELETE',
-    pathParams: ['assetId'],
-    path: (a) => `/api/assets3d/${a.assetId}`,
-  },
-  {
-    name: 'add_asset3d_part',
-    title: 'Add 3D asset part',
-    description: 'Add a named part (e.g. Body, Hair, Armor) to a 3D asset.',
-    method: 'POST',
-    pathParams: ['assetId'],
-    body: createAsset3dPartInputSchema,
-    path: (a) => `/api/assets3d/${a.assetId}/parts`,
-  },
-  {
-    name: 'update_asset3d_part',
-    title: 'Update 3D asset part',
-    description: 'Update a 3D asset part.',
-    method: 'PATCH',
-    pathParams: ['assetId', 'partId'],
-    body: updateAsset3dPartInputSchema,
-    path: (a) => `/api/assets3d/${a.assetId}/parts/${a.partId}`,
-  },
-  {
-    name: 'delete_asset3d_part',
-    title: 'Delete 3D asset part',
-    description: 'Delete a part from a 3D asset.',
-    method: 'DELETE',
-    pathParams: ['assetId', 'partId'],
-    path: (a) => `/api/assets3d/${a.assetId}/parts/${a.partId}`,
-  },
-
-  // ── Model renders (Studio3D presentable clips) ───────────────────────────────
-  {
-    name: 'create_model_render',
-    title: 'Render 3D model',
+    name: 'templates',
+    title: 'Templates and batch creation',
     description:
-      'Render a turntable/preset clip from a 3D model generation. Async — with wait (default true) the tool polls until the render finishes.',
-    method: 'POST',
-    pathParams: ['generationId'],
-    body: createModelRenderInputSchema,
-    path: (a) => `/api/models/${a.generationId}/renders`,
-    poll: { path: (r) => `/api/model-renders/${r.id}`, ...RENDER_POLL },
-  },
-  {
-    name: 'get_model_render',
-    title: 'Get 3D model render',
-    description: 'Fetch a 3D model render by id (manual poll / result).',
-    method: 'GET',
-    pathParams: ['renderId'],
-    path: (a) => `/api/model-renders/${a.renderId}`,
-  },
-  {
-    name: 'delete_model_render',
-    title: 'Delete 3D model render',
-    description: 'Delete a 3D model render.',
-    method: 'DELETE',
-    pathParams: ['renderId'],
-    path: (a) => `/api/model-renders/${a.renderId}`,
+      'Pre-authored formats (including the vertical `shorts` shelf) that instantiate into films. Applying a template charges NOTHING — the films arrive as drafts and you generate clips afterwards. `create_batch` is the Shorts Studio surface: one template, up to 20 rows of knob values, N films under one batch id, in one transaction.',
+    actions: {
+      list: {
+        summary: 'The template gallery, with each template\'s knobs and per-clip price.',
+        method: 'GET',
+        path: () => '/api/templates',
+      },
+      create_film: {
+        summary: 'Instantiate ONE film from a template.',
+        method: 'POST',
+        body: createFilmFromTemplateInputSchema,
+        path: () => '/api/films/from-template',
+      },
+      create_batch: {
+        summary: 'Instantiate N films from one template (max 20 rows) under one batch id.',
+        method: 'POST',
+        body: createFilmsFromTemplateBatchInputSchema,
+        path: () => '/api/films/from-template/batch',
+      },
+    },
   },
 
-  // ── Prompt ───────────────────────────────────────────────────────────────────
+  // ── Entities ───────────────────────────────────────────────────────────────
+  {
+    name: 'entities',
+    title: 'Entity library',
+    description:
+      'Reusable characters, objects and places that can be tagged in prompts so they stay consistent across generations.',
+    actions: {
+      list: { summary: 'All entities.', method: 'GET', path: () => '/api/entities' },
+      get: {
+        summary: 'One entity by id.',
+        method: 'GET',
+        pathParams: ['entityId'],
+        path: (a) => `/api/entities/${a.entityId}`,
+      },
+      create: {
+        summary: 'Create an entity.',
+        method: 'POST',
+        body: createEntityInputSchema,
+        path: () => '/api/entities',
+      },
+      update: {
+        summary: 'Update an entity.',
+        method: 'PATCH',
+        pathParams: ['entityId'],
+        body: updateEntityInputSchema,
+        path: (a) => `/api/entities/${a.entityId}`,
+      },
+      delete: {
+        summary: 'Delete an entity.',
+        method: 'DELETE',
+        pathParams: ['entityId'],
+        path: (a) => `/api/entities/${a.entityId}`,
+      },
+    },
+  },
+
+  // ── Styles ─────────────────────────────────────────────────────────────────
+  {
+    name: 'styles',
+    title: 'Style library',
+    description:
+      'User-built styles — a reusable look that can be applied to generations, with optional reference images.',
+    actions: {
+      list: { summary: 'All styles.', method: 'GET', path: () => '/api/styles' },
+      create: {
+        summary: 'Create a style.',
+        method: 'POST',
+        body: createStyleInputSchema,
+        path: () => '/api/styles',
+      },
+      update: {
+        summary: 'Update a style.',
+        method: 'PATCH',
+        pathParams: ['styleId'],
+        body: updateStyleInputSchema,
+        path: (a) => `/api/styles/${a.styleId}`,
+      },
+      delete: {
+        summary: 'Delete a style.',
+        method: 'DELETE',
+        pathParams: ['styleId'],
+        path: (a) => `/api/styles/${a.styleId}`,
+      },
+      add_reference: {
+        summary: 'Attach a reference image to a style.',
+        method: 'POST',
+        pathParams: ['styleId'],
+        body: addStyleReferenceInputSchema,
+        path: (a) => `/api/styles/${a.styleId}/references`,
+      },
+      remove_reference: {
+        summary: 'Detach a style reference (needs refId).',
+        method: 'DELETE',
+        pathParams: ['styleId', 'refId'],
+        path: (a) => `/api/styles/${a.styleId}/references/${a.refId}`,
+      },
+    },
+  },
+
+  // ── Canvas ─────────────────────────────────────────────────────────────────
+  {
+    name: 'canvases',
+    title: 'Canvas boards',
+    description:
+      'Node-graph boards that cite generations — the non-linear workspace. Boards themselves are free; the generations they cite are the ones that cost.',
+    actions: {
+      list: { summary: 'All canvases.', method: 'GET', path: () => '/api/canvases' },
+      get: {
+        summary: 'One canvas with its nodes and edges.',
+        method: 'GET',
+        pathParams: ['canvasId'],
+        path: (a) => `/api/canvases/${a.canvasId}`,
+      },
+      create: {
+        summary: 'Create a canvas.',
+        method: 'POST',
+        body: createCanvasInputSchema,
+        path: () => '/api/canvases',
+      },
+      update: {
+        summary: 'Update a canvas (nodes, edges, title).',
+        method: 'PATCH',
+        pathParams: ['canvasId'],
+        body: updateCanvasInputSchema,
+        path: (a) => `/api/canvases/${a.canvasId}`,
+      },
+      delete: {
+        summary: 'Delete a canvas.',
+        method: 'DELETE',
+        pathParams: ['canvasId'],
+        path: (a) => `/api/canvases/${a.canvasId}`,
+      },
+    },
+  },
+
+  // ── 3D ─────────────────────────────────────────────────────────────────────
+  {
+    name: 'assets3d',
+    title: 'Modular 3D assets',
+    description: 'Multi-part 3D assets and the parts inside them.',
+    actions: {
+      list: { summary: 'All 3D assets.', method: 'GET', path: () => '/api/assets3d' },
+      get: {
+        summary: 'One asset with its parts.',
+        method: 'GET',
+        pathParams: ['assetId'],
+        path: (a) => `/api/assets3d/${a.assetId}`,
+      },
+      create: {
+        summary: 'Create an asset.',
+        method: 'POST',
+        body: createAsset3dInputSchema,
+        path: () => '/api/assets3d',
+      },
+      update: {
+        summary: 'Update an asset.',
+        method: 'PATCH',
+        pathParams: ['assetId'],
+        body: updateAsset3dInputSchema,
+        path: (a) => `/api/assets3d/${a.assetId}`,
+      },
+      delete: {
+        summary: 'Delete an asset.',
+        method: 'DELETE',
+        pathParams: ['assetId'],
+        path: (a) => `/api/assets3d/${a.assetId}`,
+      },
+      add_part: {
+        summary: 'Add a part to an asset.',
+        method: 'POST',
+        pathParams: ['assetId'],
+        body: createAsset3dPartInputSchema,
+        path: (a) => `/api/assets3d/${a.assetId}/parts`,
+      },
+      update_part: {
+        summary: 'Update a part (needs partId).',
+        method: 'PATCH',
+        pathParams: ['assetId', 'partId'],
+        body: updateAsset3dPartInputSchema,
+        path: (a) => `/api/assets3d/${a.assetId}/parts/${a.partId}`,
+      },
+      delete_part: {
+        summary: 'Delete a part (needs partId).',
+        method: 'DELETE',
+        pathParams: ['assetId', 'partId'],
+        path: (a) => `/api/assets3d/${a.assetId}/parts/${a.partId}`,
+      },
+    },
+  },
+  {
+    name: 'model_renders',
+    title: 'Turntable renders of a 3D model',
+    description:
+      'Render a 3D generation as a turntable video through a named scene preset. Our own compute, not a provider invoice.',
+    actions: {
+      create: {
+        summary: 'Start a turntable render and (by default) wait for it.',
+        method: 'POST',
+        body: createModelRenderInputSchema,
+        path: () => '/api/model-renders',
+        poll: { path: (r) => `/api/model-renders/${r.id}`, ...RENDER_POLL },
+      },
+      get: {
+        summary: 'Check a render\'s status (needs renderId).',
+        method: 'GET',
+        pathParams: ['renderId'],
+        path: (a) => `/api/model-renders/${a.renderId}`,
+      },
+      delete: {
+        summary: 'Delete a render (needs renderId).',
+        method: 'DELETE',
+        pathParams: ['renderId'],
+        path: (a) => `/api/model-renders/${a.renderId}`,
+      },
+    },
+  },
+
+  // ── Prompt ─────────────────────────────────────────────────────────────────
   {
     name: 'enhance_prompt',
-    title: 'Enhance prompt',
-    description: 'Rewrite a prompt to be richer (enhance) or safer/simpler (soften). Charges nothing.',
-    method: 'POST',
-    body: promptEnhanceInputSchema,
-    path: () => '/api/prompt/enhance',
+    title: 'Enhance a prompt',
+    description:
+      'Rewrite a short prompt into a fuller one using the same enhancer the web composer uses. Free, and it generates nothing — it only returns text.',
+    actions: {
+      enhance: {
+        summary: 'Expand a prompt.',
+        method: 'POST',
+        body: promptEnhanceInputSchema,
+        path: () => '/api/prompt/enhance',
+      },
+    },
   },
 ]

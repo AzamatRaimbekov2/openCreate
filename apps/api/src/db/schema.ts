@@ -63,6 +63,66 @@ export const verification = sqliteTable('verification', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// OAuth authorization server (ADR mcp-server §P2.2) — the three tables
+// better-auth's oidc-provider/mcp plugin needs so Claude can connect to this
+// deployment WITHOUT a password in a config file.
+//
+// Shapes are dictated by the plugin, not by us: field names must match its
+// schema exactly or the adapter silently reads nothing. What IS ours is the
+// snake_case table naming (matching credit_transaction and every other table
+// here) and the explicit drizzle mapping in auth.ts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// A registered MCP client. Written by Dynamic Client Registration — Claude
+// registers ITSELF on first connect, which is why there is no allowlist to
+// maintain and no client secret for a user to copy anywhere.
+export const oauthApplication = sqliteTable('oauth_application', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  icon: text('icon'),
+  metadata: text('metadata'),
+  clientId: text('client_id').notNull().unique(),
+  // Absent for public clients: a desktop app cannot keep a secret, which is
+  // exactly why PKCE is required instead (§P2.2).
+  clientSecret: text('client_secret'),
+  redirectUrls: text('redirect_urls').notNull(),
+  type: text('type').notNull(),
+  disabled: integer('disabled', { mode: 'boolean' }).default(false),
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+// An issued access/refresh token pair. Revoking a user's Claude connection is a
+// DELETE here — no password rotation, nothing else affected.
+export const oauthAccessToken = sqliteTable('oauth_access_token', {
+  id: text('id').primaryKey(),
+  accessToken: text('access_token').notNull().unique(),
+  refreshToken: text('refresh_token').notNull().unique(),
+  accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp_ms' }).notNull(),
+  refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp_ms' }).notNull(),
+  clientId: text('client_id').notNull(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+  scopes: text('scopes').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+// "This user allowed this client these scopes." Kept so a returning client skips
+// the consent screen, and so a user can see what they have connected.
+export const oauthConsent = sqliteTable('oauth_consent', {
+  id: text('id').primaryKey(),
+  clientId: text('client_id').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  scopes: text('scopes').notNull(),
+  consentGiven: integer('consent_given', { mode: 'boolean' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
 export const generation = sqliteTable('generation', {
   id: text('id').primaryKey(),
   userId: text('user_id')

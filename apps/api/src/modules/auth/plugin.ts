@@ -74,11 +74,45 @@ export async function registerAuth(app: FastifyInstance, auth: Auth, db: Db) {
   })
   app.route({ method: ['GET'], url: '/api/auth/*', handler })
 
+  // Resolve an MCP OAuth access token to its user (ADR mcp-server §P2.3). Returns
+  // null for anything that is not a live Bearer token, so the caller can fall
+  // through to the ordinary unauthorized path.
+  const mcpUser = async (req: FastifyRequest): Promise<SessionUser | null> => {
+    const header = req.headers.authorization
+    if (!header?.startsWith('Bearer ')) return null
+    const headers = new Headers({ authorization: header })
+    try {
+      const token = await auth.api.getMcpSession({ headers })
+      if (!token?.userId) return null
+      // The token carries only a userId, so the profile comes from the row —
+      // which also means a deleted user's live token stops working immediately.
+      const row = db
+        .select({ id: user.id, email: user.email, name: user.name })
+        .from(user)
+        .where(eq(user.id, token.userId))
+        .get()
+      return row ? { id: row.id, email: row.email, name: row.name } : null
+    } catch {
+      // A malformed or expired token is not an exception the request should
+      // die on — it is simply not authenticated.
+      return null
+    }
+  }
+
   app.decorate('requireUser', async (req: FastifyRequest): Promise<SessionUser> => {
-    // Only the cookie matters for session lookup — forward it verbatim.
+    // Cookie FIRST, and the order is deliberate: a request that somehow carries
+    // both is a browser request, and the browser's own session is the one whose
+    // CSRF protections were designed for it.
     const headers = new Headers()
     if (req.headers.cookie) headers.set('cookie', req.headers.cookie)
     const session = await auth.api.getSession({ headers })
+    if (!session) {
+      // No cookie session — this may still be Claude calling with an MCP token.
+      // Accepting it HERE, at the one seam every protected route already passes
+      // through, is what makes all 50 routes work over MCP without 50 edits.
+      const viaMcp = await mcpUser(req)
+      if (viaMcp) return viaMcp
+    }
     if (!session) {
       // Central error handler (app.ts) maps statusCode+apiCode to the ApiError
       // envelope, so throwing here yields { error: { code: 'unauthorized' } }.

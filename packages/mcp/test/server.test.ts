@@ -20,10 +20,18 @@ describe('MCP server (in-memory)', () => {
   it('lists the full tool table with valid input schemas', async () => {
     const client = await connectPair()
     const { tools } = await client.listTools()
-    expect(tools.length).toBeGreaterThanOrEqual(40)
+    // 16 action tools, not 40+ endpoint tools (ADR mcp-server §P2.5). The upper
+    // bound is the assertion that matters — the whole point of the consolidation
+    // is that this number stays small enough to sit in every request's context.
+    expect(tools.length).toBeLessThanOrEqual(16)
     for (const t of tools) {
       expect(t.name).toMatch(/^[a-z0-9_]+$/)
       expect((t.inputSchema as { type?: string }).type).toBe('object')
+      // Every tool is action-dispatched, and the actions are listed in the
+      // description so a model can choose one without a second round trip.
+      const props = (t.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
+      expect(props).toHaveProperty('action')
+      expect(t.description).toContain('Actions:')
     }
     // A known async submit tool advertises the wait flag.
     const cg = tools.find((t) => t.name === 'create_generation')
@@ -32,7 +40,7 @@ describe('MCP server (in-memory)', () => {
 
   it('returns a clean tool error (not a crash) when credentials are missing', async () => {
     const client = await connectPair()
-    const res = await client.callTool({ name: 'get_me', arguments: {} })
+    const res = await client.callTool({ name: 'account', arguments: { action: 'me' } })
     expect(res.isError).toBe(true)
     const text = (res.content as Array<{ text: string }>)[0]!.text
     expect(text).toMatch(/OPENCREATE_EMAIL|credentials/i)

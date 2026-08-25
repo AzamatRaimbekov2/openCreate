@@ -88,6 +88,52 @@ CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transaction(user_id, cre
 -- scan rather than a full table scan on every panel (ADR analytics §1).
 CREATE INDEX IF NOT EXISTS idx_generation_created ON generation(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_credit_tx_created ON credit_transaction(created_at DESC);
+
+-- OAuth authorization server (ADR mcp-server §P2.2). Column names are dictated by
+-- better-auth's oidc-provider schema — its adapter matches on them, so a rename
+-- here reads as an empty table rather than an error.
+CREATE TABLE IF NOT EXISTS oauth_application (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  icon TEXT,
+  metadata TEXT,
+  client_id TEXT NOT NULL UNIQUE,
+  -- NULL for public clients (a desktop app cannot keep a secret; PKCE is what
+  -- protects the exchange instead).
+  client_secret TEXT,
+  redirect_urls TEXT NOT NULL,
+  type TEXT NOT NULL,
+  disabled INTEGER DEFAULT 0,
+  user_id TEXT REFERENCES user(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oauth_access_token (
+  id TEXT PRIMARY KEY,
+  access_token TEXT NOT NULL UNIQUE,
+  refresh_token TEXT NOT NULL UNIQUE,
+  access_token_expires_at INTEGER NOT NULL,
+  refresh_token_expires_at INTEGER NOT NULL,
+  client_id TEXT NOT NULL,
+  user_id TEXT REFERENCES user(id) ON DELETE CASCADE,
+  scopes TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oauth_consent (
+  id TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  scopes TEXT NOT NULL,
+  consent_given INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+-- Token lookup happens on EVERY MCP tool call, by the token itself. The UNIQUE
+-- above already indexes access_token; this one is for "show me / revoke what this
+-- user has connected", which scans by user.
+CREATE INDEX IF NOT EXISTS idx_oauth_token_user ON oauth_access_token(user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_consent_user ON oauth_consent(user_id, client_id);
 `
 
 // DB-level refund-once backstop (review finding). The ledger's app-level
