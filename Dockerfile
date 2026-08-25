@@ -27,6 +27,9 @@ FROM base AS build
 # Manifests first so the install layer caches across source-only changes.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/
+# Every workspace package the lockfile references must have its manifest here,
+# or `--frozen-lockfile` resolves against a workspace that does not match.
+COPY packages/mcp/package.json packages/mcp/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 # No BuildKit cache mount for the pnpm store: Railway's builder rejects any
@@ -45,6 +48,9 @@ RUN pnpm build
 FROM base AS prod-deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/contracts/package.json packages/contracts/
+# Every workspace package the lockfile references must have its manifest here,
+# or `--frozen-lockfile` resolves against a workspace that does not match.
+COPY packages/mcp/package.json packages/mcp/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 RUN pnpm install --prod --frozen-lockfile --filter @opencreate/api...
