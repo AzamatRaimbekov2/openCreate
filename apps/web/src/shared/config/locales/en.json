@@ -1196,6 +1196,7 @@
       "characterEmpty": "No characters yet.",
       "characterEmptyCta": "Create one in Soul",
       "characterModelHint": "This model cannot hold a character — pick another.",
+      "uploadInputHint": "An uploaded image cannot feed a run yet — remove the wire, or feed this node from an image node instead.",
       "version": "v{{index}} / {{count}}",
       "prevVersion": "Previous version",
       "nextVersion": "Next version",
@@ -1208,9 +1209,14 @@
     "runBranch": {
       "title": "Run branch",
       "cta": "Run branch",
+      "stop": "Stop branch",
       "lead": "These runs will be charged in order:",
       "total": "Total",
       "confirm": "Run · {{credits}} cr",
+      "stopped": {
+        "notRunnable": "A node in the queue could not run — check its prompt, model and inputs.",
+        "timeout": "This run is taking longer than usual, so the queue stopped waiting. It is still going — reopen the node later to see the result."
+      },
       "blocked": {
         "config": "A node in this chain still needs a prompt and a model.",
         "character": "A character is wired into this chain, but nobody is cast yet.",

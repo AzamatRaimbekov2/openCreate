@@ -449,5 +449,47 @@ describe('useRunBranch runner', () => {
     })
     const posts = apiMock.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'POST')
     expect(posts).toHaveLength(1)
+    // ...and it must also RELEASE the board. Asserting only that spending stopped
+    // let a real bug through: this exit `return`ed without a terminal status, and
+    // the branch store is a module singleton the route never resets — so
+    // `useIsBranchRunning()` stayed true and "Run branch" was disabled on every
+    // node of every canvas until the tab was reloaded.
+    expect(result.current.state.status).not.toBe('running')
+    expect(result.current.state.activeNodeId).toBeNull()
+  })
+
+  it('a poll that outlives its budget ENDS the run instead of pinning it open', async () => {
+    // The 20-minute ceiling exists so one stuck generation cannot hold the queue
+    // for the rest of the session. Reaching it used to `return` with the status
+    // still 'running' — same permanent lock as the board-change exit above, but
+    // reached without the user doing anything at all.
+    let now = 0
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      const { result } = renderRunner()
+      apiMock.mockImplementation((_path: string, init?: RequestInit) => {
+        if (init?.method !== 'POST') {
+          // The run never settles; step past the ceiling on the first poll.
+          now += 21 * 60 * 1000
+        }
+        return Promise.resolve({
+          id: 'g1',
+          status: 'processing',
+          mediaUrls: [],
+        } as unknown as never)
+      })
+      const plan = result.current.buildPlan('a')
+      expect(plan.ok).toBe(true)
+      if (!plan.ok) return
+      await act(async () => {
+        await result.current.run(plan)
+      })
+      expect(result.current.state.status).toBe('failed')
+      expect(result.current.state.failedNodeId).toBe('a')
+      expect(result.current.state.errorCode).toBe('timeout')
+      expect(result.current.state.activeNodeId).toBeNull()
+    } finally {
+      nowSpy.mockRestore()
+    }
   })
 })

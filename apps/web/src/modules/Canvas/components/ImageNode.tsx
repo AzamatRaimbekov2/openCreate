@@ -23,6 +23,7 @@ import {
 } from '../model/useNodeGeneration'
 import type { BranchPlan } from '../model/useRunBranch'
 import {
+  branchErrorMessageKey,
   useBranchNodeError,
   useIsBranchBusy,
   useIsBranchRunning,
@@ -125,6 +126,13 @@ export function GenerationNode({
   const promptTemplate = findPromptParent(node.id, nodes, edges)?.config.prompt?.trim()
   const runInput = buildRunInput(node, nodes, edges, generationStatus)
   const canRun = runInput !== null && !blockedByModel
+  // An upload parent is a LEGAL wire that cannot be cited yet (buildRunInput
+  // refuses it: a stored file has no generation id). Disabling Generate over a
+  // wire the user can see, with nothing said, is the exact defect the refused-wire
+  // toast was built to fix — a rule working as designed reads as a broken feature.
+  // Narrow on purpose: only when the upload is the reason, so this line never
+  // steals the explanation from a missing prompt or an uncast character.
+  const blockedByUpload = findMediaParent(node.id, nodes, edges)?.kind === 'upload'
   const duration = node.config.duration ?? model?.durationOptions?.[0]
 
   const status: NodeRunStatus =
@@ -302,6 +310,13 @@ export function GenerationNode({
             {t('canvas.node.characterModelHint')}
           </p>
         ) : null}
+        {/* Same amber, same reasoning as above: nothing has FAILED — the graph is
+            simply ahead of what a run can cite, and the copy names the way out. */}
+        {blockedByUpload ? (
+          <p role="status" className="text-[11px] leading-4 text-glow-amber">
+            {t('canvas.node.uploadInputHint')}
+          </p>
+        ) : null}
         {/* Aspect (and duration) only appear once a model is chosen — their
             legal values come from that model, not from a global list. */}
         {model ? (
@@ -334,7 +349,11 @@ export function GenerationNode({
           already tells the story, with the refund chip. */}
       {branchErrorCode && status !== 'failed' ? (
         <p role="status" className="mb-2 text-[11px] leading-4 text-glow-amber">
-          {t(errorCodeMessageKey(branchErrorCode))}
+          {/* The QUEUE's mapping, not the API one: `timeout` and `not_runnable`
+              are this runner's own codes and would each degrade to the generic
+              "something went wrong" through the shared map — wrong twice over for
+              a timeout, where nothing failed and the run is still going. */}
+          {t(branchErrorMessageKey(branchErrorCode))}
         </p>
       ) : null}
 
@@ -352,17 +371,32 @@ export function GenerationNode({
         >
           {status === 'processing' ? t('canvas.node.generating') : t('canvas.node.generate')}
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="nodrag w-full"
-          // Planning is cheap and pure; opening the dialog IS the plan being
-          // shown, so both happen in the same click.
-          onClick={() => setPlan(branch.buildPlan(id, data.models))}
-          disabled={isBranchRunning}
-        >
-          {t('canvas.runBranch.cta')}
-        </Button>
+        {/* While a queue is running this pill becomes the way OUT of it. It used
+            to be merely disabled, and `cancel()` — written, exported and unit
+            tested — was called by nothing: once a branch started, the user could
+            not stop it and every credit in the plan was spent. The confirm dialog
+            protects the FIRST charge; this protects the rest. */}
+        {isBranchRunning ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="nodrag w-full"
+            onClick={() => branch.cancel()}
+          >
+            {t('canvas.runBranch.stop')}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="nodrag w-full"
+            // Planning is cheap and pure; opening the dialog IS the plan being
+            // shown, so both happen in the same click.
+            onClick={() => setPlan(branch.buildPlan(id, data.models))}
+          >
+            {t('canvas.runBranch.cta')}
+          </Button>
+        )}
       </div>
 
       <RunBranchDialog

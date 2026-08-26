@@ -291,7 +291,11 @@ describe('ImageNode', () => {
     vi.mocked(useIsBranchRunning).mockReturnValue(true)
     renderNode()
     expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /run branch/i })).toBeDisabled()
+    // No SECOND queue can be started — but the pill is no longer merely dead:
+    // it is now the exit from the running one, so the guarantee is "Run branch
+    // is not offered", not "Run branch is disabled".
+    expect(screen.queryByRole('button', { name: /run branch/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /stop/i })).toBeEnabled()
   })
 
   it('enhances the prompt in place from the sparkle, and the node keeps the result', async () => {
@@ -343,5 +347,53 @@ describe('ImageNode', () => {
     client.setQueryData(['generation', 'g-parent'], gen('succeeded'))
     renderNode(client)
     expect(screen.getByRole('button', { name: /generate/i })).toBeEnabled()
+  })
+
+  it('SAYS WHY Generate is dead when the only wired input is an upload', () => {
+    // An upload is legal to wire (edgeRules allows it) and cannot be cited yet,
+    // so Generate disables. Disabling SILENTLY is the same defect the refused-wire
+    // toast was built to fix: a rule working as designed, indistinguishable from a
+    // broken feature. The card must name the reason and the way out.
+    useCanvasStore.getState().init({
+      ...DOC,
+      nodes: [
+        ...DOC.nodes,
+        {
+          id: 'up',
+          kind: 'upload' as const,
+          position: { x: 0, y: 0 },
+          config: {},
+          generationIds: [] as string[],
+          uploadUrl: '/media/a.webp',
+        },
+      ],
+      edges: [{ id: 'e-up', sourceNodeId: 'up', targetNodeId: 'n1' }],
+    })
+    renderNode()
+    expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled()
+    expect(screen.getByText(/uploaded image/i)).toBeInTheDocument()
+  })
+
+  it('offers a way to STOP a running branch', async () => {
+    // `cancel()` existed, was exported and was unit-tested — and no component ever
+    // called it. Once a queue started there was no exit: a long branch ran to the
+    // end and spent every credit in its plan.
+    const cancel = vi.fn()
+    mockBranch.mockReturnValue({
+      buildPlan: vi.fn(() => BRANCH_PLAN),
+      run: vi.fn(),
+      cancel,
+      state: {
+        status: 'running',
+        activeNodeId: 'n1',
+        nodeIds: ['n1'],
+        failedNodeId: null,
+        errorCode: null,
+      },
+    } as never)
+    vi.mocked(useIsBranchRunning).mockReturnValue(true)
+    renderNode()
+    await userEvent.click(screen.getByRole('button', { name: /stop/i }))
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
 })

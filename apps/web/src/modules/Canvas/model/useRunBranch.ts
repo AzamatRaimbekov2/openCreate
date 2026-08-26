@@ -26,6 +26,7 @@ import type {
 } from '@opencreate/contracts'
 import { api } from 'shared/libs/apiClient'
 import { ApiClientError } from 'shared/libs/apiClient'
+import { errorCodeMessageKey } from 'shared/libs/errorCopy'
 import type { CanvasModelOption } from './types'
 import { useCanvasStore } from './canvasStore'
 import {
@@ -299,13 +300,19 @@ async function submitWithRetry(
 
 // Poll ONE generation to a terminal state through the SHARED cache entry, so the
 // node's own `useNodeGeneration` subscription re-renders from the same data (no
-// second source of truth for "how is this run doing"). Returns the terminal
-// generation, or null when the run was interrupted or ran out of budget.
+// second source of truth for "how is this run doing").
+//
+// The two non-terminal outcomes are NAMED rather than both collapsing to null.
+// They call for opposite endings and the caller cannot tell them apart after the
+// fact: a cancel is the user's own doing and ends the run quietly, while the
+// budget running out is news — the generation is still alive server-side, we
+// simply stopped watching, and a queue that goes quiet there is indistinguishable
+// from one that finished.
 async function pollToTerminal(
   queryClient: QueryClient,
   generationId: string,
   run: { cancelled: boolean },
-): Promise<Generation | null> {
+): Promise<Generation | 'cancelled' | 'timeout'> {
   const startedAt = Date.now()
   for (;;) {
     const generation = await queryClient.fetchQuery({
@@ -314,10 +321,27 @@ async function pollToTerminal(
       staleTime: 0,
     })
     if (generation.status === 'succeeded' || generation.status === 'failed') return generation
-    if (run.cancelled) return null
-    if (Date.now() - startedAt > POLL_BUDGET_MS) return null
+    if (run.cancelled) return 'cancelled'
+    if (Date.now() - startedAt > POLL_BUDGET_MS) return 'timeout'
     await sleep(POLL_INTERVAL_MS)
   }
+}
+
+// Branch-run codes that are NOT API error codes — the queue's own reasons for
+// stopping. They need canvas copy: routed through the shared map they would each
+// degrade to the generic "something went wrong", which is wrong twice over for a
+// timeout (nothing went wrong, and the generation is still running).
+const BRANCH_CODE_KEYS: Readonly<Record<string, string>> = {
+  not_runnable: 'canvas.runBranch.stopped.notRunnable',
+  timeout: 'canvas.runBranch.stopped.timeout',
+}
+
+// One place a branch failure becomes copy: our own codes first, then the shared
+// API mapping (which itself degrades an unknown code to a generic message, so
+// this is total).
+export function branchErrorMessageKey(code: string | null | undefined): string {
+  if (code && code in BRANCH_CODE_KEYS) return BRANCH_CODE_KEYS[code] ?? 'errors.codes.unknown'
+  return errorCodeMessageKey(code)
 }
 
 export function useRunBranch() {
@@ -346,7 +370,25 @@ export function useRunBranch() {
       const thisRun = { cancelled: false }
       activeRun = thisRun
       const canvasId = useCanvasStore.getState().canvasId
-      useBranchRunStore.getState().set({
+
+      // EVERY exit from this loop must leave a terminal state. Three of them used
+      // to be a bare `return`, and `useBranchRunStore` is a module singleton that
+      // nothing resets — the route's cleanup resets the DOCUMENT store, not this
+      // one. So leaving the board mid-run, or the poll budget running out, left
+      // `status: 'running'` for the rest of the session: `useIsBranchRunning()`
+      // stayed true and "Run branch" was dead on every node of every canvas until
+      // the tab was reloaded.
+      //
+      // The `activeRun !== thisRun` guard is the other half: once a later run has
+      // taken over, this one is a ghost and must never stomp its successor's
+      // state on the way out.
+      const write = (patch: Partial<BranchRunState>) => {
+        if (activeRun !== thisRun) return
+        useBranchRunStore.getState().set(patch)
+      }
+      const settle = (patch: Partial<BranchRunState>) => write({ activeNodeId: null, ...patch })
+
+      write({
         status: 'running',
         nodeIds: plan.nodeIds,
         activeNodeId: plan.nodeIds[0] ?? null,
@@ -358,27 +400,28 @@ export function useRunBranch() {
         // Two ways a run stops being wanted: an explicit cancel, or the board
         // being left (the route's reset() nulls canvasId). Checked BEFORE every
         // charge, because the point is to not spend money nobody asked for.
-        if (thisRun.cancelled) return
-        if (useCanvasStore.getState().canvasId !== canvasId) return
+        // A cancel has already put the store back to idle; settling again is
+        // harmless and keeps "every exit is terminal" true by inspection.
+        if (thisRun.cancelled) return settle(IDLE)
+        // Idle, not failed: nobody is looking at the board that was left, and an
+        // error pinned to a canvas the user walked away from is noise that would
+        // greet them on the NEXT canvas they open.
+        if (useCanvasStore.getState().canvasId !== canvasId) return settle(IDLE)
 
         // FRESH store read per node — the previous iteration appended a
         // generation id to its node, and this node's input cites it. A snapshot
         // taken before the loop would cite nothing and submit a plain t2i.
         const { nodes, edges } = useCanvasStore.getState()
         const node = nodes.find((candidate) => candidate.id === nodeId)
-        if (!node) return
+        // Deleted mid-run. There is no card left to carry an error, so the queue
+        // simply ends rather than naming a node that is no longer on the board.
+        if (!node) return settle(IDLE)
         const input = buildRunInput(node, nodes, edges, statusSnapshot(nodes, queryClient))
         if (!input) {
-          useBranchRunStore.getState().set({
-            status: 'failed',
-            activeNodeId: null,
-            failedNodeId: nodeId,
-            errorCode: 'not_runnable',
-          })
-          return
+          return settle({ status: 'failed', failedNodeId: nodeId, errorCode: 'not_runnable' })
         }
 
-        useBranchRunStore.getState().set({ activeNodeId: nodeId })
+        write({ activeNodeId: nodeId })
         let generation: Generation
         try {
           generation = await submitWithRetry(queryClient, nodeId, input)
@@ -386,31 +429,32 @@ export function useRunBranch() {
           // The node itself shows nothing for a submit that never created a row,
           // so the branch state carries the reason (insufficient credits is the
           // one users hit most).
-          useBranchRunStore.getState().set({
+          return settle({
             status: 'failed',
-            activeNodeId: null,
             failedNodeId: nodeId,
             errorCode: error instanceof ApiClientError ? error.code : 'internal_error',
           })
-          return
         }
 
         const terminal = await pollToTerminal(queryClient, generation.id, thisRun)
-        if (terminal === null) return
+        if (terminal === 'cancelled') return settle(IDLE)
+        if (terminal === 'timeout') {
+          // The generation is still alive on the server — only our watching gave
+          // up — so the node is named and the code says exactly that.
+          return settle({ status: 'failed', failedNodeId: nodeId, errorCode: 'timeout' })
+        }
         if (terminal.status === 'failed') {
           // Spec: the failed node shows its own error card (with the refund chip);
           // downstream never starts. The branch stops here, quietly.
-          useBranchRunStore.getState().set({
+          return settle({
             status: 'failed',
-            activeNodeId: null,
             failedNodeId: nodeId,
             errorCode: terminal.errorCode ?? 'provider_error',
           })
-          return
         }
       }
 
-      useBranchRunStore.getState().set({ status: 'done', activeNodeId: null })
+      settle({ status: 'done' })
     },
     [queryClient],
   )
