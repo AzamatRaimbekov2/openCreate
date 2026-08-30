@@ -5,6 +5,19 @@
 import { describe, expect, it } from 'vitest'
 import { buildTestApp, registerAndGetCookie } from './helpers/build-test-app'
 
+// A split answers exactly two shots, and both assertion blocks below read them
+// positionally. `noUncheckedIndexedAccess` types a destructured element as
+// `| undefined` and the compiler cannot read the `toHaveLength(2)` above it, so
+// the invariant is restated where the compiler CAN see it — as a throw, not a
+// `!`. A wrong split then fails with one sentence naming the real count instead
+// of fifteen "possibly undefined" errors that say nothing about the product.
+function twoShots(shots: unknown): [Record<string, unknown>, Record<string, unknown>] {
+  const list = shots as Array<Record<string, unknown>>
+  const [a, b] = list
+  if (!a || !b) throw new Error(`expected the split to answer 2 shots, got ${list.length}`)
+  return [a, b]
+}
+
 async function makeFilm(app: Awaited<ReturnType<typeof buildTestApp>>, cookie: string) {
   const res = await app.inject({
     method: 'POST',
@@ -56,7 +69,7 @@ describe('POST /api/films/:id/shots/:shotId/split', () => {
     const detail = res.json()
     expect(detail.shots).toHaveLength(2)
 
-    const [a, b] = detail.shots as Array<Record<string, unknown>>
+    const [a, b] = twoShots(detail.shots)
     expect(a.id).toBe(shotId)
     expect(a.durationMs).toBe(4000)
     expect(a.trimStartMs).toBe(0)
@@ -79,7 +92,7 @@ describe('POST /api/films/:id/shots/:shotId/split', () => {
 
     const res = await split(app, cookie, filmId, shotId, 4000)
     expect(res.statusCode).toBe(200)
-    const [a, b] = res.json().shots as Array<Record<string, unknown>>
+    const [a, b] = twoShots(res.json().shots)
     expect(a.title).toBeTruthy()
     expect(b.title).toBeNull()
     expect(b.voiceover).toBeNull()

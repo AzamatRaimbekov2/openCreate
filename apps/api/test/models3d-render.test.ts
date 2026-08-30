@@ -288,7 +288,7 @@ describe('settleStaleModelRenders reaper', () => {
   })
 
   it('leaves a fresh processing render alone', () => {
-    const { db, svc } = service()
+    const { db } = service()
     expect(settleStaleModelRenders(db, Date.now())).toBe(0)
   })
 })
